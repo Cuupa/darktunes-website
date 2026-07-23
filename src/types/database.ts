@@ -4524,7 +4524,12 @@ export interface Database {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      get_assets_storage_stats: {
+        Args: Record<string, never>
+        Returns: { used_bytes: number; asset_count: number }[]
+      }
+    }
     Enums: {
       sync_status: 'success' | 'partial' | 'error'
       sync_api_source: 'itunes' | 'spotify' | 'discogs' | 'songkick' | 'odesli' | 'all'

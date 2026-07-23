@@ -207,4 +207,49 @@ describe('assets DAL', () => {
     })
     expect(result.isPressApproved).toBe(true)
   })
+
+  it('moves asset into artist folder when assigning a single artist', async () => {
+    const artistFolderId = 'artist-folder-1'
+    const movedRow = { ...mockRow, folder_id: artistFolderId, artist_id: 'artist-1' }
+    // Sequence: update tags empty path fetch → delete junction → insert junction →
+    // sync artist_id → list folders → update folder_id → re-fetch asset → list artistIds
+    const db = makeMockDb([
+      { data: mockRow, error: null }, // fetch current (empty dbUpdates)
+      { data: null, error: null }, // delete asset_artists
+      { data: null, error: null }, // insert asset_artists
+      { data: null, error: null }, // sync artist_id
+      { data: [{ id: artistFolderId, artist_id: 'artist-1', name: 'Band', parent_id: 'artists-root' }], error: null }, // folders
+      { data: null, error: null }, // update folder_id
+      { data: movedRow, error: null }, // re-fetch asset
+      { data: [{ artist_id: 'artist-1' }], error: null }, // asset_artists for return
+    ])
+    const result = await updateAsset(db, 'asset-uuid-1', { artistIds: ['artist-1'] })
+    expect(result.folderId).toBe(artistFolderId)
+    expect(result.artistIds).toEqual(['artist-1'])
+  })
+
+  it('moves multi-artist assets into primary collabs subfolder', async () => {
+    const artistFolderId = 'artist-folder-1'
+    const collabsId = 'collabs-1'
+    const movedRow = { ...mockRow, folder_id: collabsId, artist_id: 'artist-1' }
+    const db = makeMockDb([
+      { data: mockRow, error: null }, // fetch current
+      { data: null, error: null }, // delete junction
+      { data: null, error: null }, // insert junction
+      { data: null, error: null }, // sync artist_id
+      {
+        data: [
+          { id: artistFolderId, artist_id: 'artist-1', name: 'Band A', parent_id: 'artists-root' },
+          { id: 'artist-folder-2', artist_id: 'artist-2', name: 'Band B', parent_id: 'artists-root' },
+        ],
+        error: null,
+      }, // resolve folders
+      { data: { id: collabsId }, error: null }, // existing collabs maybeSingle
+      { data: null, error: null }, // update folder_id
+      { data: movedRow, error: null }, // re-fetch
+      { data: [{ artist_id: 'artist-1' }, { artist_id: 'artist-2' }], error: null },
+    ])
+    const result = await updateAsset(db, 'asset-uuid-1', { artistIds: ['artist-1', 'artist-2'] })
+    expect(result.folderId).toBe(collabsId)
+  })
 })

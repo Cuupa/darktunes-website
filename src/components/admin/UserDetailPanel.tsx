@@ -110,6 +110,12 @@ export function UserDetailPanel() {
   const [allArtists, setAllArtists] = useState<Artist[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isMutating, setIsMutating] = useState(false)
+  const [customRolesCatalog, setCustomRolesCatalog] = useState<
+    Array<{ id: string; name: string; label: string }>
+  >([])
+  const [assignedCustomRoleIds, setAssignedCustomRoleIds] = useState<string[]>([])
+  const [pendingCustomRoleIds, setPendingCustomRoleIds] = useState<string[]>([])
+  const [customRolesDirty, setCustomRolesDirty] = useState(false)
 
   // UI state
   const [showHistory, setShowHistory] = useState(false)
@@ -141,9 +147,11 @@ export function UserDetailPanel() {
     setIsLoading(true)
     try {
       const headers = await authHeaders()
-      const [usersRes, artistsRes] = await Promise.all([
+      const [usersRes, artistsRes, customRolesRes, assignedRes] = await Promise.all([
         fetch('/api/admin/users', { headers }),
         fetch('/api/admin/artists', { headers }),
+        fetch('/api/admin/roles/custom', { headers }),
+        fetch(`/api/admin/users/${userId}/custom-roles`, { headers }),
       ])
 
       if (!usersRes.ok) throw new Error('Failed to load users')
@@ -160,6 +168,25 @@ export function UserDetailPanel() {
       if (artistsRes.ok) {
         const { artists } = (await artistsRes.json()) as { artists: Artist[] }
         setAllArtists(artists)
+      }
+
+      if (customRolesRes.ok) {
+        const catalog = (await customRolesRes.json()) as Array<{
+          id: string
+          name: string
+          label: string
+        }>
+        setCustomRolesCatalog(catalog.map((r) => ({ id: r.id, name: r.name, label: r.label })))
+      }
+
+      if (assignedRes.ok) {
+        const body = (await assignedRes.json()) as {
+          roles: Array<{ roleId: string }>
+        }
+        const ids = body.roles.map((r) => r.roleId)
+        setAssignedCustomRoleIds(ids)
+        setPendingCustomRoleIds(ids)
+        setCustomRolesDirty(false)
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to load user')
@@ -206,6 +233,37 @@ export function UserDetailPanel() {
       await load()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to remove role')
+    } finally {
+      setIsMutating(false)
+    }
+  }
+
+  const togglePendingCustomRole = (roleId: string) => {
+    setPendingCustomRoleIds((prev) => {
+      const next = prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]
+      setCustomRolesDirty(
+        [...next].sort().join(',') !== [...assignedCustomRoleIds].sort().join(','),
+      )
+      return next
+    })
+  }
+
+  const saveCustomRoles = async () => {
+    setIsMutating(true)
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/custom-roles`, {
+        method: 'PUT',
+        headers: await authHeaders(),
+        body: JSON.stringify({ roleIds: pendingCustomRoleIds }),
+      })
+      if (!res.ok) {
+        throw new Error(((await res.json()) as { error?: string }).error ?? 'Failed to save custom roles')
+      }
+      toast.success('Custom roles updated')
+      setAssignedCustomRoleIds(pendingCustomRoleIds)
+      setCustomRolesDirty(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save custom roles')
     } finally {
       setIsMutating(false)
     }
@@ -486,6 +544,56 @@ export function UserDetailPanel() {
               </Button>
             </div>
           )}
+
+          <Separator />
+
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">Custom roles</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Supplemental capabilities from Roles &amp; Permissions. These merge with system role permissions.
+              </p>
+            </div>
+            {customRolesCatalog.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No custom roles defined yet. Create them under Roles &amp; Permissions.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {customRolesCatalog.map((role) => {
+                  const checked = pendingCustomRoleIds.includes(role.id)
+                  return (
+                    <label
+                      key={role.id}
+                      className="flex min-h-11 items-center gap-3 rounded-md border border-border px-3 py-2 cursor-pointer hover:bg-muted/30"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-primary"
+                        checked={checked}
+                        disabled={isMutating}
+                        onChange={() => togglePendingCustomRole(role.id)}
+                        aria-label={`Assign custom role ${role.label}`}
+                      />
+                      <span className="text-sm">
+                        <span className="font-medium">{role.label}</span>
+                        <span className="ml-2 font-mono text-xs text-muted-foreground">{role.name}</span>
+                      </span>
+                    </label>
+                  )
+                })}
+                <div className="flex justify-end pt-1">
+                  <Button
+                    size="sm"
+                    onClick={() => void saveCustomRoles()}
+                    disabled={!customRolesDirty || isMutating}
+                  >
+                    Save custom roles
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

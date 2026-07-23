@@ -6,7 +6,6 @@ import { MessagesManager } from './MessagesManager'
 const {
   mockToastError,
   mockGetArtists,
-  mockGetMessageTemplates,
   mockGetAllLabelMessages,
   mockSearchLabelMessages,
   mockGetRepliesForMessage,
@@ -15,13 +14,9 @@ const {
 } = vi.hoisted(() => {
   const mockToastError = vi.fn()
   const mockGetArtists = vi.fn()
-  const mockGetMessageTemplates = vi.fn()
   const mockGetAllLabelMessages = vi.fn()
   const mockSearchLabelMessages = vi.fn()
   const mockGetRepliesForMessage = vi.fn()
-  const mockSendMessage = vi.fn()
-  const mockSoftDeleteMessage = vi.fn()
-  const mockStarMessage = vi.fn()
   const mockChannel = {
     on: vi.fn().mockReturnThis(),
     subscribe: vi.fn().mockReturnThis(),
@@ -36,15 +31,11 @@ const {
   return {
     mockToastError,
     mockGetArtists,
-    mockGetMessageTemplates,
     mockGetAllLabelMessages,
     mockSearchLabelMessages,
     mockGetRepliesForMessage,
     mockSetSession,
     mockSupabase,
-    mockSendMessage,
-    mockSoftDeleteMessage,
-    mockStarMessage,
   }
 })
 
@@ -86,12 +77,25 @@ vi.mock('sonner', () => ({
   },
 }))
 
+vi.mock('next/link', () => ({
+  default: ({ children, href, ...props }: { children: React.ReactNode; href: string }) => (
+    <a href={href} {...props}>{children}</a>
+  ),
+}))
+
 vi.mock('@/components/ui/badge', () => ({
   Badge: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
 vi.mock('@/components/ui/button', () => ({
-  Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button>,
+  Button: ({
+    children,
+    asChild,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean }) => {
+    if (asChild && React.isValidElement(children)) return children
+    return <button {...props}>{children}</button>
+  },
 }))
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -118,11 +122,10 @@ vi.mock('@/lib/api/artistReplies', () => ({
 
 vi.mock('@/lib/api/labelMessages', () => ({
   getAllLabelMessages: mockGetAllLabelMessages,
-  getMessageTemplates: mockGetMessageTemplates,
   searchLabelMessages: mockSearchLabelMessages,
-  sendMessage: vi.fn(),
   softDeleteMessage: vi.fn(),
   starMessage: vi.fn(),
+  markMessageRead: vi.fn(),
 }))
 
 vi.mock('@/lib/api/portalMessages', () => ({
@@ -132,36 +135,43 @@ vi.mock('@/lib/api/portalMessages', () => ({
   togglePortalMessageStar: vi.fn(),
 }))
 
-vi.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+vi.mock('@/lib/api/messageFolders', () => ({
+  getFolders: vi.fn().mockResolvedValue([]),
+  createFolder: vi.fn(),
+  updateFolder: vi.fn(),
+  deleteFolder: vi.fn(),
+  moveMessageToFolder: vi.fn(),
 }))
 
-vi.mock('@/components/messaging/MessageComposer', () => ({
-  MessageComposer: ({
-    artists,
-    isArtistsLoading,
-    artistLoadError,
-  }: {
-    artists: Array<{ id: string; name: string }>
-    isArtistsLoading?: boolean
-    artistLoadError?: string | null
-  }) => (
-    <div data-testid="composer">
-      {isArtistsLoading ? 'loading' : ((artistLoadError ?? artists.map((artist) => artist.name).join(',')) || 'empty')}
-    </div>
-  ),
+vi.mock('@/lib/api/messageRules', () => ({
+  getRules: vi.fn().mockResolvedValue([]),
+  createRule: vi.fn(),
+  updateRule: vi.fn(),
+  deleteRule: vi.fn(),
+}))
+
+vi.mock('@/lib/api/messageAttachments', () => ({
+  getAttachmentsForMessage: vi.fn().mockResolvedValue([]),
 }))
 
 vi.mock('@/components/messaging/MessageSearch', () => ({
   MessageSearch: () => <div data-testid="search" />,
 }))
 
-vi.mock('@/components/messaging/ThreadView', () => ({
-  ThreadView: () => <div data-testid="thread-view" />,
+vi.mock('@/components/messaging/FolderTree', () => ({
+  FolderTree: () => <div data-testid="folder-tree" />,
+}))
+
+vi.mock('@/components/messaging/MessageRulesManager', () => ({
+  MessageRulesManager: () => null,
+}))
+
+vi.mock('@/components/messaging/ExternalEmailComposer', () => ({
+  ExternalEmailComposer: () => null,
+}))
+
+vi.mock('@/components/messaging/AttachmentViewer', () => ({
+  AttachmentViewer: () => null,
 }))
 
 describe('MessagesManager', () => {
@@ -169,13 +179,12 @@ describe('MessagesManager', () => {
     vi.clearAllMocks()
     mockSetSession.mockResolvedValue({ error: null })
     mockGetArtists.mockResolvedValue([])
-    mockGetMessageTemplates.mockResolvedValue([])
     mockGetAllLabelMessages.mockResolvedValue([])
     mockSearchLabelMessages.mockResolvedValue([])
     mockGetRepliesForMessage.mockResolvedValue([])
   })
 
-  it('syncs the authenticated session into the local client before loading artists', async () => {
+  it('syncs the authenticated session into the local client before loading messages', async () => {
     mockGetArtists.mockResolvedValue([
       { id: 'artist-1', name: 'Artist One' },
       { id: 'artist-2', name: 'Artist Two' },
@@ -189,16 +198,20 @@ describe('MessagesManager', () => {
         refresh_token: 'refresh-token',
       })
     })
-    await waitFor(() => expect(screen.getByTestId('composer')).toHaveTextContent('Artist One,Artist Two'))
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: /compose/i })).toHaveAttribute(
+        'href',
+        '/admin/messages/compose',
+      )
+    })
   })
 
-  it('still passes artists to the composer when templates fail to load', async () => {
-    mockGetArtists.mockResolvedValue([{ id: 'artist-1', name: 'Artist One' }])
-    mockGetMessageTemplates.mockRejectedValue(new Error('Templates unavailable'))
+  it('still loads the mailbox when artist list is empty', async () => {
+    mockGetArtists.mockResolvedValue([])
 
     render(<MessagesManager />)
 
-    await waitFor(() => expect(screen.getByTestId('composer')).toHaveTextContent('Artist One'))
-    expect(mockToastError).toHaveBeenCalledWith('Templates unavailable')
+    await waitFor(() => expect(mockGetAllLabelMessages).toHaveBeenCalled())
+    expect(screen.getByRole('link', { name: /compose/i })).toBeInTheDocument()
   })
 })

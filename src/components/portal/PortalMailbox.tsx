@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { sanitizeHtml } from '@/lib/sanitizeHtml'
@@ -30,21 +31,7 @@ import {
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { FolderTree, type FolderSelection } from '@/components/messaging/FolderTree'
 import { RichTextEditor } from '@/components/messaging/RichTextEditor'
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
@@ -62,22 +49,6 @@ interface PortalMailboxProps {
   artists: Artist[]
   initialMessages?: PortalMessage[]
   initialFolders?: PortalMessageFolder[]
-}
-
-interface ComposeDraft {
-  toArtistId: string
-  toLabel: boolean
-  subject: string
-  bodyHtml: string
-  bodyText: string
-}
-
-const DEFAULT_DRAFT: ComposeDraft = {
-  toArtistId: '',
-  toLabel: false,
-  subject: '',
-  bodyHtml: '',
-  bodyText: '',
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +74,7 @@ type MailboxSelection =
   | { kind: 'label'; id: string }
   | null
 
-export function PortalMailbox({ artistId, artists, initialMessages = [], initialFolders = [] }: PortalMailboxProps) {
+export function PortalMailbox({ artistId, artists: _artists, initialMessages = [], initialFolders = [] }: PortalMailboxProps) {
   const t = useTranslations('portal')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const { setUnreadCount } = useUnreadMessages()
@@ -117,11 +88,6 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
   const [selection, setSelection] = useState<MailboxSelection>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-
-  // Compose
-  const [composeOpen, setComposeOpen] = useState(false)
-  const [draft, setDraft] = useState<ComposeDraft>(DEFAULT_DRAFT)
-  const [isSending, setIsSending] = useState(false)
 
   // Reply state
   const [replyHtml, setReplyHtml] = useState('')
@@ -171,11 +137,11 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
         setLabelReplies({})
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to load messages')
+      toast.error(err instanceof Error ? err.message : t('messages_load_failed'))
     } finally {
       setIsLoading(false)
     }
-  }, [artistId])
+  }, [artistId, t])
 
   const loadFolders = useCallback(async () => {
     try {
@@ -326,11 +292,11 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deleted: true }),
       })
-      toast.success('Moved to trash')
+      toast.success(t('messages_moved_trash'))
     } catch {
-      toast.error('Failed to delete')
+      toast.error(t('messages_delete_failed'))
     }
-  }, [selection])
+  }, [selection, t])
 
   const restore = useCallback(async (messageId: string) => {
     try {
@@ -340,50 +306,11 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
         body: JSON.stringify({ deleted: false }),
       })
       setMessages((prev) => prev.filter((m) => m.id !== messageId))
-      toast.success('Message restored')
+      toast.success(t('messages_restored'))
     } catch {
-      toast.error('Failed to restore')
+      toast.error(t('messages_restore_failed'))
     }
-  }, [])
-
-  // ---------------------------------------------------------------------------
-  // Compose + send
-  // ---------------------------------------------------------------------------
-
-  const handleSend = useCallback(async () => {
-    if (!draft.subject.trim()) {
-      toast.error('Subject is required')
-      return
-    }
-    if (!draft.toLabel && !draft.toArtistId) {
-      toast.error('Please select a recipient')
-      return
-    }
-    setIsSending(true)
-    try {
-      const res = await fetch('/api/portal/messages/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fromArtistId: artistId,
-          toArtistId: draft.toArtistId || null,
-          toLabel: draft.toLabel,
-          subject: draft.subject,
-          body: draft.bodyText,
-          bodyHtml: draft.bodyHtml || null,
-        }),
-      })
-      if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? 'Failed')
-      toast.success('Message sent')
-      setComposeOpen(false)
-      setDraft(DEFAULT_DRAFT)
-      if (selectedFolder === 'sent') void loadMessages('sent')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to send')
-    } finally {
-      setIsSending(false)
-    }
-  }, [draft, artistId, selectedFolder, loadMessages])
+  }, [t])
 
   // ---------------------------------------------------------------------------
   // Folder management
@@ -466,26 +393,16 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
   // Render
   // ---------------------------------------------------------------------------
 
-  const otherArtists = useMemo(
-    () => artists.filter((a) => a.id !== artistId),
-    [artists, artistId],
-  )
-
   return (
     <div className="flex h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-border">
       {/* Left panel — folder tree */}
       <div className="w-52 shrink-0 border-r border-border bg-card flex flex-col">
         <div className="p-3">
-          <Button
-            size="sm"
-            className="w-full gap-2"
-            onClick={() => {
-              setDraft(DEFAULT_DRAFT)
-              setComposeOpen(true)
-            }}
-          >
-            <PaperPlaneTilt size={14} aria-hidden="true" />
-            Compose
+          <Button size="sm" className="w-full gap-2" asChild>
+            <Link href={`/portal/messages/compose?artistId=${encodeURIComponent(artistId)}`}>
+              <PaperPlaneTilt size={14} aria-hidden="true" />
+              {t('messages_compose')}
+            </Link>
           </Button>
         </div>
         <Separator />
@@ -673,16 +590,16 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
                         })
                         setReplyHtml('')
                         setReplyText('')
-                        toast.success('Reply sent')
+                        toast.success(t('messages_reply_sent'))
                       } catch (err) {
-                        toast.error(err instanceof Error ? err.message : 'Failed to send reply')
+                        toast.error(err instanceof Error ? err.message : t('messages_reply_failed'))
                       } finally {
                         setIsSendingReply(false)
                       }
                     })()
                   }}
                 >
-                  Send reply
+                  {isSendingReply ? t('messages_compose_sending') : t('messages_send_reply')}
                 </Button>
               </div>
             </div>
@@ -789,12 +706,12 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
                               bodyHtml: replyHtml || null,
                             }),
                           })
-                          if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? 'Failed')
-                          toast.success('Reply sent')
+                          if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? t('messages_reply_failed'))
+                          toast.success(t('messages_reply_sent'))
                           setReplyHtml('')
                           setReplyText('')
                         } catch (err) {
-                          toast.error(err instanceof Error ? err.message : 'Failed')
+                          toast.error(err instanceof Error ? err.message : t('messages_reply_failed'))
                         } finally {
                           setIsSendingReply(false)
                         }
@@ -804,7 +721,7 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
                     className="gap-2"
                   >
                     <PaperPlaneTilt size={14} aria-hidden="true" />
-                    {isSendingReply ? 'Sending…' : 'Send Reply'}
+                    {isSendingReply ? t('messages_compose_sending') : t('messages_send_reply')}
                   </Button>
                 </div>
               </div>
@@ -812,83 +729,6 @@ export function PortalMailbox({ artistId, artists, initialMessages = [], initial
           </>
         )}
       </div>
-
-      {/* Compose dialog */}
-      <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
-        <DialogContent className="max-w-2xl" aria-describedby="compose-dialog-desc">
-          <DialogHeader>
-            <DialogTitle>New Message</DialogTitle>
-          </DialogHeader>
-          <p id="compose-dialog-desc" className="sr-only">Compose a new message to an artist or the label</p>
-          <div className="space-y-4">
-            {/* Recipient */}
-            <div>
-              <Label htmlFor="compose-to">To</Label>
-              <div className="flex gap-2 mt-1">
-                <Select
-                  value={draft.toLabel ? '__label__' : draft.toArtistId}
-                  onValueChange={(v) => {
-                    if (v === '__label__') {
-                      setDraft((d) => ({ ...d, toLabel: true, toArtistId: '' }))
-                    } else {
-                      setDraft((d) => ({ ...d, toLabel: false, toArtistId: v }))
-                    }
-                  }}
-                >
-                  <SelectTrigger id="compose-to">
-                    <SelectValue placeholder="Select recipient…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__label__">{t('messages_compose_label_recipient')}</SelectItem>
-                    {otherArtists.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Subject */}
-            <div>
-              <Label htmlFor="compose-subject">Subject</Label>
-              <Input
-                id="compose-subject"
-                value={draft.subject}
-                onChange={(e) => setDraft((d) => ({ ...d, subject: e.target.value }))}
-                placeholder="Subject…"
-                className="mt-1"
-              />
-            </div>
-
-            {/* Body */}
-            <div>
-              <Label>Message</Label>
-              <div className="mt-1">
-                <RichTextEditor
-                  value={draft.bodyHtml}
-                  onChange={(html, text) => setDraft((d) => ({ ...d, bodyHtml: html, bodyText: text }))}
-                  placeholder="Write your message…"
-                  minHeight={160}
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setComposeOpen(false)} disabled={isSending}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => void handleSend()}
-                disabled={isSending || (!draft.toLabel && !draft.toArtistId) || !draft.subject.trim()}
-                className="gap-2"
-              >
-                <PaperPlaneTilt size={14} aria-hidden="true" />
-                {isSending ? 'Sending…' : 'Send'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

@@ -66,6 +66,11 @@ export function MessageComposer({
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+    // Reply/prefill from URL must win over a stale local draft
+    if (defaultArtistId || defaultSubject) {
+      setHasHydratedDraft(true)
+      return
+    }
     const stored = window.localStorage.getItem(DRAFT_STORAGE_KEY)
     if (!stored) {
       setHasHydratedDraft(true)
@@ -82,7 +87,7 @@ export function MessageComposer({
     } finally {
       setHasHydratedDraft(true)
     }
-  }, [])
+  }, [defaultArtistId, defaultSubject])
 
   useEffect(() => {
     if (typeof window === 'undefined' || !hasHydratedDraft) return

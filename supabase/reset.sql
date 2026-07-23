@@ -1102,6 +1102,23 @@ CREATE INDEX IF NOT EXISTS idx_assets_created_at  ON public.assets (created_at D
 CREATE INDEX IF NOT EXISTS idx_assets_folder_id   ON public.assets (folder_id);
 CREATE INDEX IF NOT EXISTS idx_assets_artist_id   ON public.assets (artist_id);
 CREATE INDEX IF NOT EXISTS idx_assets_sha256_hash ON public.assets (sha256_hash);
+
+-- Aggregate catalog storage (avoids PostgREST row-limit undercount on SELECT size_bytes)
+CREATE OR REPLACE FUNCTION public.get_assets_storage_stats()
+RETURNS TABLE(used_bytes bigint, asset_count bigint)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    COALESCE(SUM(a.size_bytes), 0)::bigint AS used_bytes,
+    COUNT(*)::bigint AS asset_count
+  FROM public.assets a;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_assets_storage_stats() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_assets_storage_stats() TO service_role;
 CREATE INDEX IF NOT EXISTS idx_assets_release_id  ON public.assets (release_id);
 CREATE INDEX IF NOT EXISTS idx_assets_press_approved ON public.assets (is_press_approved) WHERE is_press_approved = TRUE;
 CREATE INDEX IF NOT EXISTS idx_assets_press_suggested ON public.assets (press_suggested) WHERE press_suggested = TRUE;

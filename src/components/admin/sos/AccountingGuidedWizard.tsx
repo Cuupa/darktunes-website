@@ -137,13 +137,13 @@ export function AccountingGuidedWizard({
 
   const stepHint = useMemo(() => {
     if (activeStep === 'setup') {
-      return 'Tragen Sie Zeitraum und Standard-Parameter ein, bevor Sie CSVs hochladen.'
+      return t.guidedStepSetupDesc
     }
     if (activeStep === 'upload') {
       return isProcessing ? t.guidedProcessingHint : t.guidedUploadHint
     }
     if (activeStep === 'validate') {
-      return 'Prüfen Sie die automatischen Hinweise und beheben Sie Fehler vor dem Review.'
+      return t.guidedStepValidateDesc
     }
     if (activeStep === 'review') return t.guidedReviewHint
     return t.guidedSettleHint
@@ -239,13 +239,13 @@ export function AccountingGuidedWizard({
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-4 bg-muted/10">
-        <Button type="button" variant="outline" size="sm" disabled={!canGoBack} onClick={goBack}>
+      <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-4 bg-card/40">
+        <Button type="button" variant="outline" disabled={!canGoBack} onClick={goBack} className="min-h-11">
           <ArrowLeft size={16} className="mr-1.5" aria-hidden="true" />
           {t.guidedBack}
         </Button>
         {activeStep !== 'settle' ? (
-          <Button type="button" size="sm" disabled={!canGoNext} onClick={goNext}>
+          <Button type="button" disabled={!canGoNext} onClick={goNext} className="min-h-11">
             {nextLabel}
             <ArrowRight size={16} className="ml-1.5" aria-hidden="true" />
           </Button>

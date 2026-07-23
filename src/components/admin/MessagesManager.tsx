@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import {
   PencilSimple,
   ArrowBendUpLeft,
@@ -18,9 +19,7 @@ import { getArtists } from '@/lib/api/artists'
 import { getRepliesForMessage } from '@/lib/api/artistReplies'
 import {
   getAllLabelMessages,
-  getMessageTemplates,
   searchLabelMessages,
-  sendMessage,
   softDeleteMessage,
   starMessage,
   markMessageRead,
@@ -46,17 +45,14 @@ import type {
   MessageFolder,
   MessageRule,
   MessageAttachment,
-  MessageTemplate,
   PortalMessage,
 } from '@/types'
 import type { Database } from '@/types/database'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
-import { MessageComposer } from '@/components/messaging/MessageComposer'
 import { MessageSearch } from '@/components/messaging/MessageSearch'
 import { FolderTree, type FolderSelection } from '@/components/messaging/FolderTree'
 import { MessageRulesManager } from '@/components/messaging/MessageRulesManager'
@@ -168,7 +164,6 @@ export function MessagesManager() {
   const [messages, setMessages] = useState<LabelMessage[]>([])
   const [fromArtistMessages, setFromArtistMessages] = useState<PortalMessage[]>([])
   const [repliesByMessageId, setRepliesByMessageId] = useState<Record<string, ArtistReply[]>>({})
-  const [templates, setTemplates] = useState<MessageTemplate[]>([])
   const [folders, setFolders] = useState<MessageFolder[]>([])
   const [rules, setRules] = useState<MessageRule[]>([])
 
@@ -177,10 +172,6 @@ export function MessagesManager() {
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [attachments, setAttachments] = useState<MessageAttachment[]>([])
   const [loadingAttachments, setLoadingAttachments] = useState(false)
-  const [isSending, setIsSending] = useState(false)
-  const [isLoadingArtists, setIsLoadingArtists] = useState(true)
-  const [artistLoadError, setArtistLoadError] = useState<string | null>(null)
-  const [composeOpen, setComposeOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
   // ── Folder-filtered message lists ─────────────────────────────────────────
@@ -268,32 +259,21 @@ export function MessagesManager() {
   const load = useCallback(async () => {
     if (authLoading) return
     if (!session?.access_token || !session.refresh_token) {
-      setIsLoadingArtists(false)
-      setArtistLoadError('Please sign in again to load artists.')
+      toast.error('Please sign in again to load messages.')
       return
     }
-    setIsLoadingArtists(true)
-    setArtistLoadError(null)
     try {
       await supabase.auth.setSession({
         access_token: session.access_token,
         refresh_token: session.refresh_token,
       })
-      const [artistRes, templateRes, folderRes, ruleRes] = await Promise.allSettled([
+      const [artistRes, folderRes, ruleRes] = await Promise.allSettled([
         getArtists(supabase),
-        getMessageTemplates(supabase),
         getFolders(supabase),
         getRules(supabase),
       ])
       if (artistRes.status === 'fulfilled') {
         setArtists(artistRes.value.map((a) => ({ id: a.id, name: a.name })))
-      } else {
-        setArtistLoadError(artistRes.reason instanceof Error ? artistRes.reason.message : 'Failed to load artists')
-      }
-      if (templateRes.status === 'fulfilled') {
-        setTemplates(templateRes.value)
-      } else {
-        toast.error(templateRes.reason instanceof Error ? templateRes.reason.message : 'Failed to load templates')
       }
       if (folderRes.status === 'fulfilled') setFolders(folderRes.value)
       if (ruleRes.status === 'fulfilled') setRules(ruleRes.value)
@@ -302,10 +282,7 @@ export function MessagesManager() {
       await refreshMessages(searchStateRef.current)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to load messages'
-      setArtistLoadError(msg)
       toast.error(msg)
-    } finally {
-      setIsLoadingArtists(false)
     }
   }, [authLoading, refreshMessages, session?.access_token, session?.refresh_token, supabase])
 
@@ -369,23 +346,6 @@ export function MessagesManager() {
       void refreshMessages(next)
     },
     [refreshMessages],
-  )
-
-  const handleSend = useCallback(
-    async (artistIds: string[], subject: string, html: string, text: string) => {
-      setIsSending(true)
-      try {
-        await Promise.all(artistIds.map((id) => sendMessage(supabase, id, subject, text, html)))
-        await refreshMessages(searchStateRef.current)
-        toast.success(`Message sent to ${artistIds.length} artist${artistIds.length === 1 ? '' : 's'}`)
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Failed to send message')
-        throw e
-      } finally {
-        setIsSending(false)
-      }
-    },
-    [refreshMessages, supabase],
   )
 
   const handleStar = useCallback(
@@ -564,26 +524,12 @@ export function MessagesManager() {
           className="h-7 text-sm flex-1 min-w-[140px]"
         />
         <div className="flex flex-wrap items-center gap-1">
-          <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="h-7 gap-1 text-xs">
-                <PencilSimple size={13} aria-hidden="true" />
-                Compose
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader><DialogTitle>New Message</DialogTitle></DialogHeader>
-              <MessageComposer
-                artists={artists}
-                templates={templates}
-                isSending={isSending}
-                isArtistsLoading={isLoadingArtists}
-                artistLoadError={artistLoadError}
-                onSend={handleSend}
-                onClose={() => setComposeOpen(false)}
-              />
-            </DialogContent>
-          </Dialog>
+          <Button size="sm" className="h-7 gap-1 text-xs" asChild>
+            <Link href="/admin/messages/compose">
+              <PencilSimple size={13} aria-hidden="true" />
+              Compose
+            </Link>
+          </Button>
           <ExternalEmailComposer />
           <MessageRulesManager
             rules={rules}
@@ -787,26 +733,14 @@ export function MessagesManager() {
                   <ArrowBendUpLeft size={12} className="inline mr-1" aria-hidden="true" />
                   Reply to Artist
                 </p>
-                <QuickReply
-                  message={{
-                    id: selectedFromArtistMessage.id,
-                    artistId: selectedFromArtistMessage.fromArtistId,
-                    subject: selectedFromArtistMessage.subject,
-                    body: selectedFromArtistMessage.body,
-                    bodyHtml: selectedFromArtistMessage.bodyHtml,
-                    read: Boolean(selectedFromArtistMessage.readAt),
-                    readAt: selectedFromArtistMessage.readAt,
-                    starred: selectedFromArtistMessage.starred,
-                    deletedAt: selectedFromArtistMessage.deletedAt,
-                    sentAt: selectedFromArtistMessage.sentAt,
-                  }}
-                  artists={artists}
-                  templates={templates}
-                  isSending={isSending}
-                  isArtistsLoading={isLoadingArtists}
-                  artistLoadError={artistLoadError}
-                  onSend={handleSend}
-                />
+                <Button variant="outline" size="sm" className="gap-1.5" asChild>
+                  <Link
+                    href={`/admin/messages/compose?artistId=${encodeURIComponent(selectedFromArtistMessage.fromArtistId)}&subject=${encodeURIComponent(`Re: ${selectedFromArtistMessage.subject}`)}`}
+                  >
+                    <ArrowBendUpLeft size={14} aria-hidden="true" />
+                    Reply to {artists.find((a) => a.id === selectedFromArtistMessage.fromArtistId)?.name ?? 'Artist'}
+                  </Link>
+                </Button>
               </div>
             </div>
           </>
@@ -934,22 +868,21 @@ export function MessagesManager() {
                 </div>
               )}
 
-              {/* Quick reply */}
+              {/* Reply on compose page (avoids dismissible overlay) */}
               <div className="mt-6">
                 <Separator className="mb-4" />
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                   <ArrowBendUpLeft size={12} className="inline mr-1" aria-hidden="true" />
-                  Quick Reply to Artist
+                  Reply to Artist
                 </p>
-                <QuickReply
-                  message={selectedMessage}
-                  artists={artists}
-                  templates={templates}
-                  isSending={isSending}
-                  isArtistsLoading={isLoadingArtists}
-                  artistLoadError={artistLoadError}
-                  onSend={handleSend}
-                />
+                <Button variant="outline" size="sm" className="gap-1.5" asChild>
+                  <Link
+                    href={`/admin/messages/compose?artistId=${encodeURIComponent(selectedMessage.artistId)}&subject=${encodeURIComponent(`Re: ${selectedMessage.subject}`)}`}
+                  >
+                    <ArrowBendUpLeft size={14} aria-hidden="true" />
+                    Reply to {artists.find((a) => a.id === selectedMessage.artistId)?.name ?? 'Artist'}
+                  </Link>
+                </Button>
               </div>
             </div>
           </>
@@ -962,46 +895,6 @@ export function MessagesManager() {
       </div>
       </div>
     </div>
-  )
-}
-
-// ── QuickReply ────────────────────────────────────────────────────────────────
-
-interface QuickReplyProps {
-  message: LabelMessage
-  artists: Array<{ id: string; name: string }>
-  templates: MessageTemplate[]
-  isSending: boolean
-  isArtistsLoading: boolean
-  artistLoadError: string | null
-  onSend: (artistIds: string[], subject: string, html: string, text: string) => Promise<void>
-}
-
-function QuickReply({ message, artists, templates, isSending, isArtistsLoading, artistLoadError, onSend }: QuickReplyProps) {
-  const [open, setOpen] = useState(false)
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5">
-          <ArrowBendUpLeft size={14} aria-hidden="true" />
-          Reply to {artists.find((a) => a.id === message.artistId)?.name ?? 'Artist'}
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>Reply</DialogTitle></DialogHeader>
-        <MessageComposer
-          artists={artists}
-          templates={templates}
-          isSending={isSending}
-          isArtistsLoading={isArtistsLoading}
-          artistLoadError={artistLoadError}
-          defaultArtistId={message.artistId}
-          defaultSubject={`Re: ${message.subject}`}
-          onSend={onSend}
-          onClose={() => setOpen(false)}
-        />
-      </DialogContent>
-    </Dialog>
   )
 }
 
