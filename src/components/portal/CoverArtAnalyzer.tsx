@@ -26,13 +26,18 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
   const [state, setState] = useState<UiState>('idle')
   const [sizeInfo, setSizeInfo] = useState<SizeInfo | null>(null)
   const lastCheckedUrl = useRef<string>('')
+  const requestIdRef = useRef(0)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onVerifiedRef = useRef(onVerified)
+  onVerifiedRef.current = onVerified
 
   const verify = useCallback(async () => {
     const trimmed = url.trim()
     if (!trimmed) return
+
+    const requestId = ++requestIdRef.current
     setState('verifying')
-    onVerified(false)
+    onVerifiedRef.current(false)
     setSizeInfo(null)
 
     try {
@@ -40,6 +45,7 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
       const {
         data: { session },
       } = await supabase.auth.getSession()
+      if (requestId !== requestIdRef.current) return
       if (!session?.access_token) {
         setState('fetch_failed')
         return
@@ -54,8 +60,11 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
         body: JSON.stringify({ url: trimmed }),
       })
 
+      if (requestId !== requestIdRef.current) return
+
       if (!res.ok) {
         setState('fetch_failed')
+        onVerifiedRef.current(false)
         return
       }
 
@@ -66,25 +75,30 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
         height?: number
       }
 
+      if (requestId !== requestIdRef.current) return
+
       if (data.width != null && data.height != null) {
         setSizeInfo({ width: data.width, height: data.height })
       }
 
       lastCheckedUrl.current = trimmed
       setState(data.status)
-      onVerified(data.verified === true)
+      onVerifiedRef.current(data.verified === true)
     } catch {
+      if (requestId !== requestIdRef.current) return
       setState('fetch_failed')
-      onVerified(false)
+      onVerifiedRef.current(false)
     }
-  }, [url, onVerified])
+  }, [url])
 
   useEffect(() => {
     if (!autoCheck) return
     const trimmed = url.trim()
     if (!trimmed) {
+      requestIdRef.current += 1
+      lastCheckedUrl.current = ''
       setState('idle')
-      onVerified(false)
+      onVerifiedRef.current(false)
       return
     }
     if (trimmed === lastCheckedUrl.current) return
@@ -97,7 +111,7 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [url, autoCheck, verify, onVerified])
+  }, [url, autoCheck, verify])
 
   const getMessage = (): string => {
     switch (state) {

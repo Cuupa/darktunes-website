@@ -32,15 +32,19 @@ describe('verifyCoverArtUrl', () => {
     expect(r.status).toBe('forbidden_host')
   })
 
-  it('accepts valid 3000×3000 JPEG from allowed host', async () => {
-    const buf = await jpegBuffer(3000, 3000)
-    const fetchFn = vi.fn().mockResolvedValue({
+  function mockImageResponse(buf: Buffer, contentType = 'image/jpeg') {
+    return {
       ok: true,
       status: 200,
-      headers: new Headers({ 'content-type': 'image/jpeg' }),
+      headers: new Headers({ 'content-type': contentType }),
       arrayBuffer: async () =>
-        buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength),
-    })
+        buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer,
+    }
+  }
+
+  it('accepts valid 3000×3000 JPEG from allowed host', async () => {
+    const buf = await jpegBuffer(3000, 3000)
+    const fetchFn = vi.fn().mockResolvedValue(mockImageResponse(buf))
 
     const r = await verifyCoverArtUrl('https://drive.google.com/file/d/abc/view', {
       fetchFn: fetchFn as unknown as typeof fetch,
@@ -54,13 +58,7 @@ describe('verifyCoverArtUrl', () => {
 
   it('rejects wrong dimensions', async () => {
     const buf = await jpegBuffer(1500, 1500)
-    const fetchFn = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      headers: new Headers({ 'content-type': 'image/jpeg' }),
-      arrayBuffer: async () =>
-        buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength),
-    })
+    const fetchFn = vi.fn().mockResolvedValue(mockImageResponse(buf))
 
     const r = await verifyCoverArtUrl('https://drive.google.com/uc?export=download&id=x', {
       fetchFn: fetchFn as unknown as typeof fetch,
@@ -83,5 +81,20 @@ describe('verifyCoverArtUrl', () => {
     })
     expect(r.verified).toBe(false)
     expect(r.status).toBe('not_image')
+  })
+
+  it('rejects redirect to a non-allowlisted host', async () => {
+    const fetchFn = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 302,
+      headers: new Headers({ location: 'http://127.0.0.1/secret.jpg' }),
+      arrayBuffer: async () => new ArrayBuffer(0),
+    })
+
+    const r = await verifyCoverArtUrl('https://drive.google.com/uc?export=download&id=x', {
+      fetchFn: fetchFn as unknown as typeof fetch,
+    })
+    expect(r.verified).toBe(false)
+    expect(r.status).toBe('fetch_failed')
   })
 })

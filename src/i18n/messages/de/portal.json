@@ -680,6 +680,8 @@
   "submission_wizard_review_cover_missing": "Nicht verifiziert",
   "submission_wizard_draft_restored": "Wir haben deinen unfertigen Entwurf von diesem Gerät wiederhergestellt.",
   "submission_wizard_draft_discard": "Neu starten",
+  "submission_wizard_yes": "Ja",
+  "submission_wizard_no": "Nein",
   "releases_submit_tracks_heading": "Tracks",
   "releases_submit_add_track": "Track hinzufügen",
   "releases_submit_remove_track": "Entfernen",

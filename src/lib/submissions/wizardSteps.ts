@@ -60,12 +60,16 @@ export function buildReleaseWizardSteps(
   releaseFields: SubmissionFormField[],
   trackFields: SubmissionFormField[],
   options?: {
-    /** Force type step even if `type` field is hidden (for track-count UX). Default true when type present. */
+    /**
+     * Force a type step even when the `type` field is hidden.
+     * Use when track-count UI must still be shown for multi-track types.
+     */
     forceTypeStep?: boolean
   },
 ): WizardStep[] {
   const steps: WizardStep[] = []
   const typeField = releaseFields.find((f) => f.fieldKey === 'type')
+  // Always show type step when type field exists OR caller needs track-count entry UX
   const includeTypeStep = options?.forceTypeStep === true || typeField != null
 
   if (includeTypeStep) {

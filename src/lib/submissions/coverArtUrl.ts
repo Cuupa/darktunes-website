@@ -38,7 +38,11 @@ export const COVER_ART_HOSTNAME_PATTERNS: RegExp[] = [
   /^[^.]+\.cdninstagram\.com$/,
   // Dropbox share → raw
   /^www\.dropbox\.com$/,
+  /^dropbox\.com$/,
   /^dl\.dropboxusercontent\.com$/,
+  // WeTransfer / common share hosts artists use for covers
+  /^[^.]+\.wetransfer\.com$/,
+  /^download\.wetransfer\.com$/,
 ]
 
 const BLOCKED_HOSTNAMES = new Set(['localhost', 'metadata.google.internal', 'metadata.goog'])

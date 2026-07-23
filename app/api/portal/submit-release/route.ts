@@ -81,16 +81,22 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   })
 
   // Re-verify cover art server-side — never trust client coverArtVerified alone
-  const { serverEnv } = await import('@/lib/env.server')
-  const coverCheck = await verifyCoverArtUrl(body.coverArtUrl, {
-    r2PublicUrl: serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
-  })
-  if (!coverCheck.verified) {
-    throw new ApiError(
-      400,
-      coverCheck.message ??
-        `Cover art verification failed (${coverCheck.status}). Expected JPEG 3000×3000.`,
-    )
+  // Skip only when cover field is absent from the active schema entirely
+  const coverFieldInSchema = schemaFields.some(
+    (f) => f.fieldKey === 'cover_art_url' && f.fieldScope === 'release' && f.isVisible,
+  )
+  if (coverFieldInSchema || body.coverArtUrl) {
+    const { serverEnv } = await import('@/lib/env.server')
+    const coverCheck = await verifyCoverArtUrl(body.coverArtUrl, {
+      r2PublicUrl: serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
+    })
+    if (!coverCheck.verified) {
+      throw new ApiError(
+        400,
+        coverCheck.message ??
+          `Cover art verification failed (${coverCheck.status}). Expected JPEG 3000×3000.`,
+      )
+    }
   }
 
   const releaseType = body.type ?? 'single'

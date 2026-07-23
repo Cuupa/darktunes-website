@@ -135,6 +135,9 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
   const [draft, setDraft, clearDraft, draftLoaded] = useLocalKV<DraftState>(draftKey)
   const restoredRef = useRef(false)
   const headingFocusRef = useRef(false)
+  const prevReleaseTypeRef = useRef<SubmissionReleaseType | null>(null)
+  // Suppress draft persist until initial restore decision is done
+  const allowPersistRef = useRef(false)
 
   const releaseFields = useMemo(
     () => formSchema.filter((f) => f.fieldScope === 'release').sort((a, b) => a.displayOrder - b.displayOrder),
@@ -148,6 +151,8 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
   const [values, setValues] = useState<Record<string, string>>(() =>
     buildInitialValues(formSchema, artist),
   )
+  const valuesRef = useRef(values)
+  valuesRef.current = values
 
   const releaseType = (values.type || 'single') as SubmissionReleaseType
   const activeTypeRule = getTypeRuleForRelease(typeRules, releaseType)
@@ -183,17 +188,23 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     [visibleReleaseFields, visibleTrackFields],
   )
 
-  // Restore draft once IndexedDB loads
+  // Restore draft once IndexedDB loads (never trust coverArtVerified — re-check)
   useEffect(() => {
-    if (!draftLoaded || restoredRef.current || !draft) return
+    if (!draftLoaded || restoredRef.current) return
     restoredRef.current = true
-    if (draft.values && Object.keys(draft.values).length > 0) {
+    if (draft?.values && Object.keys(draft.values).length > 0) {
+      const restoredType = (draft.values.type || 'single') as SubmissionReleaseType
+      prevReleaseTypeRef.current = restoredType
       setValues((prev) => ({ ...prev, ...draft.values }))
       if (draft.tracks?.length) setTracks(draft.tracks)
       if (typeof draft.trackCount === 'number') setTrackCount(draft.trackCount)
-      if (draft.coverArtVerified) setCoverArtVerified(true)
+      // Force re-verification after restore (stale draft flag is not trustworthy)
+      setCoverArtVerified(false)
       setShowDraftBanner(true)
+    } else {
+      prevReleaseTypeRef.current = 'single'
     }
+    allowPersistRef.current = true
   }, [draftLoaded, draft])
 
   // Restore step after steps rebuild from restored type
@@ -206,9 +217,9 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     }
   }, [wizardSteps, draft?.stepId, showDraftBanner])
 
-  // Persist draft
+  // Persist draft (after restore decision)
   useEffect(() => {
-    if (!draftLoaded || !artist?.id) return
+    if (!draftLoaded || !artist?.id || !allowPersistRef.current) return
     const handle = setTimeout(() => {
       setDraft({
         values,
@@ -231,23 +242,35 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     setDraft,
   ])
 
+  // Only reset track count when the release *type* actually changes (not on draft restore)
   useEffect(() => {
+    const prev = prevReleaseTypeRef.current
+    if (prev === null) {
+      prevReleaseTypeRef.current = releaseType
+      return
+    }
+    if (prev === releaseType) return
+    prevReleaseTypeRef.current = releaseType
     const rule = getTypeRuleForRelease(typeRules, releaseType)
     const nextCount = rule?.trackCountMode === 'fixed_1' ? 1 : (rule?.minTracks ?? 2)
     setTrackCount(nextCount)
   }, [releaseType, typeRules])
 
+  // Resize track rows when count / track fields change — do not depend on all release values
   useEffect(() => {
     const count = userSpecifiedTracks ? trackCount : 1
-    setTracks((prev) => buildTrackRows(count, visibleTrackFields, prev, values))
-  }, [trackCount, userSpecifiedTracks, visibleTrackFields, values])
+    setTracks((prev) => buildTrackRows(count, visibleTrackFields, prev, valuesRef.current))
+  }, [trackCount, userSpecifiedTracks, visibleTrackFields])
 
   // Keep active index in range when steps change (e.g. type switch)
   useEffect(() => {
     if (activeIndex >= wizardSteps.length) {
       setActiveIndex(Math.max(0, wizardSteps.length - 1))
     }
-    setMaxReachableIndex((m) => Math.min(m, Math.max(wizardSteps.length - 1, 0)))
+    setMaxReachableIndex((m) => {
+      const maxStep = Math.max(wizardSteps.length - 1, 0)
+      return m > maxStep ? maxStep : m
+    })
   }, [wizardSteps.length, activeIndex])
 
   useEffect(() => {
@@ -285,6 +308,15 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     })
   }
 
+  const coverField = useMemo(
+    () => visibleReleaseFields.find((f) => f.fieldKey === 'cover_art_url') ?? null,
+    [visibleReleaseFields],
+  )
+  const coverNeedsVerification = Boolean(
+    coverField &&
+      (coverField.isRequired || (values.cover_art_url ?? '').trim().length > 0),
+  )
+
   const validateCurrentStep = (): boolean => {
     if (!activeStep) return true
     const errors: Record<string, string> = {}
@@ -303,9 +335,9 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
         const trackCountError = validateTrackCount(activeTypeRule, trackCount, tracks.length)
         if (trackCountError) errors.track_count = trackCountError
       }
-      // Cover verification on distribution step when cover field is present
-      if (activeStep.fields.some((f) => f.fieldKey === 'cover_art_url')) {
-        if ((values.cover_art_url ?? '').trim() && !coverArtVerified) {
+      // Cover verification when the cover field is on this step and needs check
+      if (activeStep.fields.some((f) => f.fieldKey === 'cover_art_url') && coverNeedsVerification) {
+        if (!coverArtVerified) {
           errors.cover_art_url = t('releases_submit_cover_check_required')
         }
       }
@@ -365,7 +397,7 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
       }
     }
 
-    if (!coverArtVerified) {
+    if (coverNeedsVerification && !coverArtVerified) {
       errors.cover_art_url = t('releases_submit_cover_check_required')
     }
 
@@ -388,7 +420,7 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
   }
 
   const submit = async () => {
-    if (!coverArtVerified) {
+    if (coverNeedsVerification && !coverArtVerified) {
       toast.error(t('releases_submit_cover_check_required'))
       return
     }
@@ -525,7 +557,7 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
         })
       }
     }
-    if (!coverArtVerified) {
+    if (coverNeedsVerification && !coverArtVerified) {
       const dist = wizardSteps.find((s) => s.fields.some((f) => f.fieldKey === 'cover_art_url'))
       issues.push({
         label: t('releases_submit_cover_check_heading'),
@@ -548,6 +580,7 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     visibleReleaseFields,
     values,
     coverArtVerified,
+    coverNeedsVerification,
     visibleTrackFields,
     tracks,
     tracksComplete,
@@ -559,13 +592,17 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
   const discardDraft = () => {
     clearDraft()
     setShowDraftBanner(false)
-    setValues(buildInitialValues(formSchema, artist))
+    const initial = buildInitialValues(formSchema, artist)
+    setValues(initial)
+    prevReleaseTypeRef.current = (initial.type || 'single') as SubmissionReleaseType
     setTracks(
       buildTrackRows(1, filterFieldsForType(allTrackFields, 'single', { type: 'single' }), [], {}),
     )
+    setTrackCount(1)
     setCoverArtVerified(false)
     setActiveIndex(0)
     setMaxReachableIndex(0)
+    allowPersistRef.current = true
   }
 
   return (
@@ -608,13 +645,13 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
           backLabel={t('submission_wizard_back')}
           nextDisabled={
             activeStep.kind === 'review'
-              ? submitting || !coverArtVerified || reviewIssues.length > 0
+              ? submitting || reviewIssues.length > 0 || (coverNeedsVerification && !coverArtVerified)
               : false
           }
           hideNext={false}
-          getStepLabel={(step) => defaultStepLabel(step, (key, values) => t(key as Parameters<typeof t>[0], values))}
+          getStepLabel={(step) => defaultStepLabel(step, (key, vals) => t(key as Parameters<typeof t>[0], vals))}
           footerExtra={
-            activeStep.kind === 'review' ? (
+            activeStep.kind === 'review' && coverNeedsVerification ? (
               <span className="text-xs text-muted-foreground">
                 {coverArtVerified
                   ? t('releases_submit_cover_check_ok')
@@ -752,24 +789,22 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
                               idPrefix={track.id}
                               error={fieldErrors[`${track.id}:${field.fieldKey}`]}
                             />
-                            {field.fieldType !== 'boolean' && (
-                              <button
-                                type="button"
-                                className="text-xs text-primary hover:underline"
-                                onClick={() => {
-                                  setTracks((rows) =>
-                                    applyFieldToAllTracks(
-                                      rows,
-                                      field.fieldKey,
-                                      track.values[field.fieldKey] ?? '',
-                                    ),
-                                  )
-                                  toast.success(t('submission_wizard_apply_all_done'))
-                                }}
-                              >
-                                {t('submission_wizard_apply_all')}
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              className="text-xs text-primary hover:underline"
+                              onClick={() => {
+                                setTracks((rows) =>
+                                  applyFieldToAllTracks(
+                                    rows,
+                                    field.fieldKey,
+                                    track.values[field.fieldKey] ?? (field.fieldType === 'boolean' ? 'false' : ''),
+                                  ),
+                                )
+                                toast.success(t('submission_wizard_apply_all_done'))
+                              }}
+                            >
+                              {t('submission_wizard_apply_all')}
+                            </button>
                           </div>
                         ))}
                       </AccordionContent>
@@ -785,43 +820,47 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
               <div className="rounded-md border border-border p-4 space-y-2">
                 <h3 className="text-sm font-semibold">{t('submission_wizard_review_summary')}</h3>
                 <dl className="grid gap-2 text-sm sm:grid-cols-2">
-                  {visibleReleaseFields
-                    .filter((f) => f.fieldKey !== 'type' || true)
-                    .slice(0, 12)
-                    .map((field) => {
-                      const raw = values[field.fieldKey] ?? ''
-                      if (!raw.trim() && field.fieldType !== 'boolean') return null
-                      return (
-                        <div key={field.id}>
-                          <dt className="text-muted-foreground text-xs">
-                            {getFieldLabel(field, locale)}
-                          </dt>
-                          <dd className="font-medium break-all">
-                            {field.fieldType === 'boolean'
-                              ? raw === 'true'
-                                ? 'Yes'
-                                : 'No'
-                              : raw}
-                          </dd>
-                        </div>
-                      )
-                    })}
-                  <div>
-                    <dt className="text-muted-foreground text-xs">{t('releases_submit_tracks_heading')}</dt>
-                    <dd className="font-medium">
-                      {tracksComplete}/{tracks.length} {t('submission_wizard_track_complete').toLowerCase()}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground text-xs">
-                      {t('releases_submit_cover_check_heading')}
-                    </dt>
-                    <dd className="font-medium">
-                      {coverArtVerified
-                        ? t('submission_wizard_review_cover_ok')
-                        : t('submission_wizard_review_cover_missing')}
-                    </dd>
-                  </div>
+                  {visibleReleaseFields.map((field) => {
+                    const raw = values[field.fieldKey] ?? ''
+                    if (!raw.trim() && field.fieldType !== 'boolean') return null
+                    return (
+                      <div key={field.id}>
+                        <dt className="text-muted-foreground text-xs">
+                          {getFieldLabel(field, locale)}
+                        </dt>
+                        <dd className="font-medium break-all">
+                          {field.fieldType === 'boolean'
+                            ? raw === 'true'
+                              ? t('submission_wizard_yes')
+                              : t('submission_wizard_no')
+                            : raw}
+                        </dd>
+                      </div>
+                    )
+                  })}
+                  {visibleTrackFields.length > 0 && (
+                    <div>
+                      <dt className="text-muted-foreground text-xs">{t('releases_submit_tracks_heading')}</dt>
+                      <dd className="font-medium">
+                        {t('submission_wizard_tracks_progress', {
+                          done: String(tracksComplete),
+                          total: String(tracks.length),
+                        })}
+                      </dd>
+                    </div>
+                  )}
+                  {coverField && (
+                    <div>
+                      <dt className="text-muted-foreground text-xs">
+                        {t('releases_submit_cover_check_heading')}
+                      </dt>
+                      <dd className="font-medium">
+                        {coverArtVerified
+                          ? t('submission_wizard_review_cover_ok')
+                          : t('submission_wizard_review_cover_missing')}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
               </div>
 
