@@ -42,7 +42,17 @@ describe('buildTrackInsert', () => {
       song_title: { value: 'My Song', fieldType: 'text' },
     })
 
+    expect(row.submission_id).toBe('sub-1')
     expect(row.track_number).toBe(2)
     expect(row.title).toBe('My Song')
+  })
+
+  it('omits submission_id when null (RPC assigns it)', () => {
+    const row = buildTrackInsert(null, 1, 0, {
+      song_title: { value: 'A', fieldType: 'text' },
+    })
+    expect(row.submission_id).toBeUndefined()
+    expect(row.track_number).toBe(1)
+    expect(row.title).toBe('A')
   })
 })

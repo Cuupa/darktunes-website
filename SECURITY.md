@@ -60,12 +60,16 @@ IP rate limiter (`src/lib/ipRateLimit.ts`) in addition to other guards:
 | `/api/journalist-applications` | 3 requests | 30 minutes | POST only |
 | `/api/page-events` | 120 requests | 10 minutes | Consent-gated analytics only; service-role insert |
 | `/api/vitals` | 120 requests | 10 minutes | Critical vitals logged to `app_logs` |
+| `/api/portal/cover-art-check` | 30 / user+IP | 10 minutes | `checkDistributedRateLimit` |
+| `/api/portal/submit-release` | 20 / user+IP | 10 minutes | distributed (Upstash when configured) |
+| `/api/portal/submit-video` | 20 / user+IP | 10 minutes | distributed (Upstash when configured) |
 
 **Website engagement privacy**: `page_events` are recorded only when visitors accept the analytics cookie (`darktunes_consent=accepted`). Session identifiers are hashed server-side (`hashSessionForPageEvents`); no raw IPs are stored. Admin/portal/press/editor routes are excluded from tracking.
 
-**Limitation**: the in-memory store is per-instance and not shared across
-Vercel serverless pods. For stricter enforcement, pair with a Vercel WAF or
-Upstash Redis rate limiter.
+**Distributed limits** (`src/lib/rateLimitDistributed.ts`): when `UPSTASH_REDIS_REST_URL` +
+`UPSTASH_REDIS_REST_TOKEN` are set, portal submit/cover routes share a fixed window via
+Redis (`INCR` + `EXPIRE` only on first hit). Without Upstash, falls back to the in-memory
+limiter (per serverless instance). Pair public routes with a Vercel WAF for defense in depth.
 
 ## Upload Size Limits (enforced in Route Handlers)
 

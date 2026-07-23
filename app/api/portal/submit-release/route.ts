@@ -21,6 +21,8 @@ import { validateReleaseSubmissionByType } from '@/lib/submissions/submissionTyp
 import { verifyCoverArtUrl } from '@/lib/submissions/coverArtCheck'
 import { verifyCoverArtToken } from '@/lib/submissions/coverArtToken'
 import type { SubmissionFieldType } from '@/lib/submissions/fieldTypes'
+import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
+import { getClientIp } from '@/lib/ipRateLimit'
 
 const trackInputSchema = z.object({
   trackNumber: z.number().int().min(1),
@@ -60,6 +62,12 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId, {
     requireArtistId: true,
   })
+
+  const ip = getClientIp(req)
+  const rl = await checkDistributedRateLimit(`submit-release:${user.id}:${ip}`, 20, 10 * 60_000)
+  if (rl.limited) {
+    throw new ApiError(429, 'Too many release submissions. Please wait and try again.')
+  }
 
   const body = bodySchema.parse(await req.json())
   const formData = (body.formData ?? {}) as Record<string, unknown>
@@ -147,8 +155,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         }
       }
       return buildTrackInsert(
-        // placeholder — RPC assigns submission_id
-        '00000000-0000-0000-0000-000000000000',
+        // RPC assigns submission_id inside the transaction
+        null,
         track.trackNumber,
         index,
         fieldValues,

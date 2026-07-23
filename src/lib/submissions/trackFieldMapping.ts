@@ -34,17 +34,28 @@ const TRACK_KEY_TO_COLUMN: Record<string, keyof TrackInsert> = {
   duration: 'duration_seconds',
 }
 
+/** Track row fields without submission_id (RPC assigns it inside the transaction). */
+export type TrackInsertPayload = Omit<TrackInsert, 'submission_id'> & {
+  submission_id?: string
+}
+
+/**
+ * Build a track insert row.
+ * Pass `submissionId` for direct inserts; omit/null when the atomic RPC assigns id.
+ */
 export function buildTrackInsert(
-  submissionId: string,
+  submissionId: string | null,
   trackNumber: number,
   displayOrder: number,
   fieldValues: Record<string, { value: string; fieldType: SubmissionFieldType }>,
-): TrackInsert {
-  const row: TrackInsert = {
-    submission_id: submissionId,
+): TrackInsertPayload {
+  const row: TrackInsertPayload = {
     track_number: trackNumber,
     display_order: displayOrder,
     form_data: null,
+  }
+  if (submissionId) {
+    row.submission_id = submissionId
   }
   const extras: Record<string, unknown> = {}
 

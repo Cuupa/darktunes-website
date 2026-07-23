@@ -16,8 +16,11 @@ function upstashConfigured(): boolean {
 }
 
 /**
- * Sliding-window-ish limit via Redis INCR + EXPIRE (fixed window of windowMs).
- * Good enough for abuse prevention; not a perfect sliding window.
+ * Fixed-window limit via Redis INCR + EXPIRE only on first hit (atomic Lua).
+ *
+ * EXPIRE must run only when INCR returns 1. Calling EXPIRE on every request
+ * extends the window under continuous traffic so the counter never resets
+ * until a full quiet period (trailing window) — wrong for a fixed window.
  */
 async function checkUpstash(
   key: string,
@@ -29,16 +32,22 @@ async function checkUpstash(
   const redisKey = `rl:${key}`
   const windowSec = Math.max(1, Math.ceil(windowMs / 1000))
 
+  // Atomic: INCR then EXPIRE only when this is the first hit in the window.
+  const script = `
+local c = redis.call('INCR', KEYS[1])
+if c == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return c
+`.trim()
+
   const res = await fetch(`${base}/pipeline`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify([
-      ['INCR', redisKey],
-      ['EXPIRE', redisKey, windowSec],
-    ]),
+    body: JSON.stringify([['EVAL', script, '1', redisKey, String(windowSec)]]),
     signal: AbortSignal.timeout(3_000),
   })
 

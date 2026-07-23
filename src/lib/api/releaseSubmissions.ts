@@ -80,7 +80,11 @@ export async function createReleaseSubmission(
 export async function createReleaseSubmissionWithTracksAtomic(
   db: DbClient,
   submission: Insert,
-  tracks: Database['public']['Tables']['release_submission_tracks']['Insert'][],
+  tracks: Array<
+    Omit<Database['public']['Tables']['release_submission_tracks']['Insert'], 'submission_id'> & {
+      submission_id?: string
+    }
+  >,
 ): Promise<ReleaseSubmission> {
   const pSubmission: Record<string, unknown> = {
     artist_id: submission.artist_id,
