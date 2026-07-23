@@ -161,6 +161,8 @@ Wired into `npm run ci`:
 
 Inventory dump: `npm run api:inventory` (`scripts/extract-api-routes.mjs`).
 
+**Golden route tests:** `tests/helpers/api/routeTestkit.ts` + unit tests under `tests/unit/portal/*Route.test.ts` (401 / 403 / 2xx). After `vi.resetModules()`, throw auth errors via `rejectApiError()` so `instanceof ApiError` matches the route graph.
+
 **New portal mutations:** prefer `withPortalMembershipWrite` + `portalMemberWrite` + Zod allowlist — never raw body to `artists`.
 
 **New columns on evolved tables (`artists`, `artist_epks`):** always add `ADD COLUMN IF NOT EXISTS` next to the CREATE definition.

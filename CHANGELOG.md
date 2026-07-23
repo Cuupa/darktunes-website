@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Portal profile hometown 500:** Idempotent `artists.hometown` (and related) `ADD COLUMN IF NOT EXISTS` so existing prod DBs get the column after epk→artists consolidation; roster-only profile saves no longer fail hard on EPK read errors.
 
 ### Changed
-- **API SOTA foundation (Phase A/B):** `npm run verify:schema-columns` blocks CREATE-only column drift on critical tables; `npm run verify:api-contracts` requires `withErrorHandler` + recognized portal/admin auth patterns; both wired into `npm run ci`.
+- **API SOTA foundation (Phase A/B):** `npm run verify:schema-columns` blocks CREATE-only column drift on critical tables; `npm run verify:api-contracts` requires `withErrorHandler` + recognized portal/admin auth patterns; both wired into `npm run ci`. Golden route tests (401/403/200) for profile, billing-profile, and messages/send via `tests/helpers/api/routeTestkit.ts`.
 - **Assets storage bar:** Sum via service-role RPC/pagination; refresh after upload/delete; configurable limit via `NEXT_PUBLIC_R2_STORAGE_LIMIT_BYTES`.
 - **Asset → artist folder placement:** Assigning artists always moves the file into the artist folder (single) or primary `collabs` subfolder (multi); creates missing artist folders under `artists/`. Never treats a collabs folder as the artist root.
 - **Portal mailbox i18n:** Compose/reply/trash strings use `portal` message keys (en/de).
