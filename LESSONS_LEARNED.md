@@ -111,6 +111,12 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-07-23 — Cover art CORS vs client-side checks
+
+**Never verify remote cover URLs in the browser when artists use Drive/Dropbox:** `Image` + CORS `fetch` fail silently on hosts without ACAO → submit permanently blocked. Run dimension/format checks **server-side** (allowlist + SSRF guards), normalize Drive share URLs to download endpoints, and re-verify on submit so clients cannot spoof `coverArtVerified`.
+
+**Wizard steps from `field_group`, not hard-coded keys:** Admin-customizable forms stay maintainable when the portal derives steps from schema groups; only bookend steps (type / tracks / review) are fixed.
+
 ### 2026-07-22 — Sync cover storms, fake progress, Odesli thrash
 
 **Parallel queue executors storm R2 DNS:** Admin pollers that `POST /api/sync` every few seconds while a prior `waitUntil` is still alive multiply concurrent cover uploads → `getaddrinfo EBUSY` on R2. Fix with a single-flight executor lease + client kicks only when `running === 0`, lower release/R2 concurrency, and retry transient DNS.

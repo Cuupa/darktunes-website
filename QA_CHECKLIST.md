@@ -19,6 +19,16 @@
 - [ ] Review CSP and security headers in production deployment
 - [ ] Run vulnerability scan (`npm audit --production --audit-level=high`)
 
+## Portal release submission
+- [ ] `/portal/releases/new` stepped wizard; `?step=` updates; progress + Back/Continue work
+- [ ] Cover: public Drive JPEG 3000×3000 verifies; private/wrong size/format show clear errors
+- [ ] Cover token allows submit without re-download fail; double-click Submit does not create two rows
+- [ ] Album: track focus mode + show-all; copy-from-previous / apply-to-all; incomplete tracks block review
+- [ ] Draft: refresh restores from server when online; Start over clears local + server draft
+- [ ] Review completeness bar, clickable URLs, cover preview when verified
+- [ ] Prefill from last submission; video form uses wizard shell
+- [ ] Admin wizard group maps to artist step; apply `submission_form_drafts` from reset.sql
+
 ## Settlements / invoices
 - [ ] Approve draft statement once → single `statement_payout`; second approve fails
 - [ ] Create correction → original still visible to artist; approve correction → original superseded, ledger delta only

@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Portal release submission wizard:** guided multi-step flow (type → field groups → tracks → review) driven by `field_group`; track focus mode, copy/apply-all, `?step=` URL, review completeness, prefill from last submission.
+- **Server submission drafts:** `submission_form_drafts` + portal draft API (release/video); local IndexedDB cache.
+- **Cover art verification:** server JPEG 3000×3000 check with stable error codes, retries, and short-lived HMAC token so submit can skip re-download; no R2 during form.
+- **Required idempotency** on release submit (UUID); duplicate key returns prior submission when known.
+- **Video submission wizard** shell parity with release form.
+- **Admin wizard groups:** submission form manager can set each field’s wizard group (`metadata`, `distribution`, `rights`, `track`, custom).
+
 ### Fixed
+- **Release submit blocked by Drive CORS:** cover art check no longer runs in the browser against CORS-blocked hosts.
 - **Sync reliability (covers / queue / Odesli):** R2 cover uploads retry transient DNS errors (`getaddrinfo EBUSY`) and are concurrency-capped; iTunes release concurrency lowered to 2. Queue executor is single-flight (`sync_executor_lease`) with a ~280s budget (`maxDuration` 300). Admin progress uses backlog drain (not 24h `done`) and only shows 100% when drained; poller re-kicks only when `running === 0`. Odesli throttled to ~4 req/s, does not retry 429 in-request, and batches artist `platform_links`. iTunes 200-collection cap is logged when hit.
 - **Sync → frontend stale data**: queue executor now revalidates public tags **and** list paths (`revalidatePublicContent`) at batch end; YouTube/sync-api/artist routes share the same helper. Admin full release sync polls the queue, reloads the list, and busts public cache instead of reloading immediately after `{ accepted: true }`. Video CRUD/sync also revalidates the `videos` tag. `GET /api/sync/queue` returns queue stats (no longer aliases POST enqueue). `/api/sync` accepts `verifySyncTrigger` (admin/editor), matching the queue route.
 - **Settlements — ledger double-booking**: statement-linked invoice payments no longer post a second negative ledger row when `invoice_liability` already exists; open balance returns to zero after full pay.

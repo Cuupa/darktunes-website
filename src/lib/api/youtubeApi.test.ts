@@ -270,7 +270,7 @@ describe('fetchYouTubeChannelVideos', () => {
     }
   })
 
-  it('derives the uploads playlist ID by replacing UC with UU', async () => {
+  it('derives the uploads playlist ID by replacing UC with UULF', async () => {
     const mockFetch = vi.fn()
       .mockResolvedValueOnce(
         new Response(JSON.stringify(mockFetchPage([])), { status: 200 }),
@@ -281,7 +281,8 @@ describe('fetchYouTubeChannelVideos', () => {
     try {
       await fetchYouTubeChannelVideos('UCLFuCYsYBaq3j0gM4wWo82LkQ', 'key', 10)
       const calledUrl = new URL((mockFetch.mock.calls[0] as [string])[0])
-      expect(calledUrl.searchParams.get('playlistId')).toBe('UULFuCYsYBaq3j0gM4wWo82LkQ')
+      // UC + rest → UULF + rest (e.g. UCLF… → UULFLF…)
+      expect(calledUrl.searchParams.get('playlistId')).toBe('UULFLFuCYsYBaq3j0gM4wWo82LkQ')
     } finally {
       globalThis.fetch = origFetch
     }

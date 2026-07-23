@@ -1,122 +1,163 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+/**
+ * Cover art verification for release submissions.
+ * Remote URLs are checked server-side (JPEG 3000×3000). No R2 storage during the form.
+ */
+
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useTranslations } from 'next-intl'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { coverCodeToI18nKey, type CoverArtErrorCode } from '@/lib/submissions/coverArtCodes'
+import type { CoverArtCheckStatus } from '@/lib/submissions/coverArtCheck'
 
 interface CoverArtAnalyzerProps {
   url: string
-  onVerified: (verified: boolean) => void
+  onVerified: (verified: boolean, token?: string | null) => void
+  autoCheck?: boolean
 }
 
-type CheckState = 'idle' | 'verifying' | 'ok' | 'wrong_size' | 'wrong_format' | 'blocked' | 'verified_with_warning'
+type UiState = 'idle' | 'verifying' | CoverArtCheckStatus
 
 interface SizeInfo {
   width: number
   height: number
 }
 
-/** Check JPEG magic bytes (FF D8 FF) using range request */
-async function checkJpegMagicBytes(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(url, {
-      headers: { Range: 'bytes=0-11' },
-      // avoid CORS issues — use no-cors will hide response, so we try cors first
-      mode: 'cors',
-      cache: 'no-store',
-    })
-    if (!res.ok && res.status !== 206) return false
-    const buf = await res.arrayBuffer()
-    const bytes = new Uint8Array(buf)
-    // JPEG magic bytes: FF D8 FF
-    return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
-  } catch {
-    return false
-  }
-}
-
-/** Load an image via new Image() and return its natural dimensions */
-function checkImageDimensions(url: string): Promise<SizeInfo> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
-    img.onerror = () => reject(new Error('Image load failed'))
-    img.src = url
-  })
-}
-
-export function CoverArtAnalyzer({ url, onVerified }: CoverArtAnalyzerProps) {
+export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArtAnalyzerProps) {
   const t = useTranslations('portal')
-  const [state, setState] = useState<CheckState>('idle')
+  const [state, setState] = useState<UiState>('idle')
+  const [code, setCode] = useState<CoverArtErrorCode | null>(null)
   const [sizeInfo, setSizeInfo] = useState<SizeInfo | null>(null)
+  const lastCheckedUrl = useRef<string>('')
+  const requestIdRef = useRef(0)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onVerifiedRef = useRef(onVerified)
+  onVerifiedRef.current = onVerified
 
   const verify = useCallback(async () => {
-    if (!url.trim()) return
+    const trimmed = url.trim()
+    if (!trimmed) return
+
+    const requestId = ++requestIdRef.current
     setState('verifying')
-    onVerified(false)
+    setCode(null)
+    onVerifiedRef.current(false, null)
+    setSizeInfo(null)
 
     try {
-      // Check dimensions first
-      let dims: SizeInfo
-      try {
-        dims = await checkImageDimensions(url)
-      } catch {
-        // Image could not be loaded
-        setState('blocked')
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (requestId !== requestIdRef.current) return
+      if (!session?.access_token) {
+        setState('fetch_failed')
+        setCode('COVER_FETCH_FAILED')
         return
       }
 
-      setSizeInfo(dims)
+      const res = await fetch('/api/portal/cover-art-check', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: trimmed }),
+      })
 
-      if (dims.width !== 3000 || dims.height !== 3000) {
-        setState('wrong_size')
+      if (requestId !== requestIdRef.current) return
+
+      if (!res.ok) {
+        setState('fetch_failed')
+        setCode('COVER_FETCH_FAILED')
+        onVerifiedRef.current(false, null)
         return
       }
 
-      // Check JPEG format via magic bytes
-      const isJpeg = await checkJpegMagicBytes(url)
-      if (!isJpeg) {
-        // Fall back: check URL extension for CORS-blocked responses
-        const lower = url.toLowerCase()
-        const extensionOk = lower.includes('.jpg') || lower.includes('.jpeg')
-        if (!extensionOk) {
-          setState('wrong_format')
-          return
-        }
-        // CORS prevents byte-level check but dimensions are correct and extension is JPEG —
-        // treat as verified so the artist can submit.
-        setState('verified_with_warning')
-        onVerified(true)
-        return
+      const data = (await res.json()) as {
+        status: CoverArtCheckStatus
+        code?: CoverArtErrorCode
+        verified: boolean
+        width?: number
+        height?: number
+        token?: string
       }
 
-      setState('ok')
-      onVerified(true)
+      if (requestId !== requestIdRef.current) return
+
+      if (data.width != null && data.height != null) {
+        setSizeInfo({ width: data.width, height: data.height })
+      }
+
+      lastCheckedUrl.current = trimmed
+      setState(data.status)
+      setCode(data.code ?? null)
+      onVerifiedRef.current(data.verified === true, data.token ?? null)
     } catch {
-      setState('blocked')
+      if (requestId !== requestIdRef.current) return
+      setState('fetch_failed')
+      setCode('COVER_FETCH_FAILED')
+      onVerifiedRef.current(false, null)
     }
-  }, [url, onVerified])
+  }, [url])
+
+  useEffect(() => {
+    if (!autoCheck) return
+    const trimmed = url.trim()
+    if (!trimmed) {
+      // Avoid re-notifying parent on every mount/render when already cleared
+      if (lastCheckedUrl.current === '' ) return
+      requestIdRef.current += 1
+      lastCheckedUrl.current = ''
+      setState('idle')
+      setCode(null)
+      onVerifiedRef.current(false, null)
+      return
+    }
+    if (trimmed === lastCheckedUrl.current) return
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      void verify()
+    }, 700)
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [url, autoCheck, verify])
 
   const getMessage = (): string => {
+    if (state === 'verifying') return t('releases_submit_cover_check_verifying')
+    if (state === 'idle') return ''
+    if (code === 'COVER_WRONG_SIZE' || state === 'wrong_size') {
+      return t('releases_submit_cover_check_wrong_size')
+        .replace('{{width}}', String(sizeInfo?.width ?? '?'))
+        .replace('{{height}}', String(sizeInfo?.height ?? '?'))
+    }
+    if (code) {
+      const key = coverCodeToI18nKey(code) as Parameters<typeof t>[0]
+      try {
+        return t(key)
+      } catch {
+        // fall through
+      }
+    }
     switch (state) {
       case 'ok':
         return t('releases_submit_cover_check_ok')
-      case 'wrong_size': {
-        const msg = t('releases_submit_cover_check_wrong_size')
-        return msg
-          .replace('{{width}}', String(sizeInfo?.width ?? '?'))
-          .replace('{{height}}', String(sizeInfo?.height ?? '?'))
-      }
       case 'wrong_format':
         return t('releases_submit_cover_check_wrong_format')
-      case 'blocked':
+      case 'forbidden_host':
+      case 'invalid_url':
         return t('releases_submit_cover_check_blocked')
-      case 'verified_with_warning':
-        return t('releases_submit_cover_check_verified_with_warning')
-      case 'verifying':
-        return t('releases_submit_cover_check_verifying')
+      case 'not_image':
+      case 'fetch_failed':
+        return t('releases_submit_cover_check_drive_help')
+      case 'too_large':
+        return t('releases_submit_cover_check_too_large')
       default:
         return ''
     }
@@ -125,7 +166,7 @@ export function CoverArtAnalyzer({ url, onVerified }: CoverArtAnalyzerProps) {
   const badgeVariant =
     state === 'ok'
       ? 'default'
-      : state === 'verifying' || state === 'verified_with_warning'
+      : state === 'verifying'
         ? 'secondary'
         : state === 'idle'
           ? 'outline'
@@ -134,7 +175,8 @@ export function CoverArtAnalyzer({ url, onVerified }: CoverArtAnalyzerProps) {
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium">{t('releases_submit_cover_check_heading')}</p>
-      <div className="flex items-center gap-3">
+      <p className="text-xs text-muted-foreground">{t('releases_submit_cover_check_hint')}</p>
+      <div className="flex flex-wrap items-center gap-3">
         <Button
           type="button"
           variant="outline"
@@ -142,10 +184,12 @@ export function CoverArtAnalyzer({ url, onVerified }: CoverArtAnalyzerProps) {
           disabled={!url.trim() || state === 'verifying'}
           onClick={() => void verify()}
         >
-          {state === 'verifying' ? t('releases_submit_cover_check_verifying') : 'Check Cover Art'}
+          {state === 'verifying'
+            ? t('releases_submit_cover_check_verifying')
+            : t('releases_submit_cover_check_button')}
         </Button>
         {state !== 'idle' && (
-          <Badge variant={badgeVariant} className="text-xs">
+          <Badge variant={badgeVariant} className="text-xs max-w-full whitespace-normal">
             {getMessage()}
           </Badge>
         )}
