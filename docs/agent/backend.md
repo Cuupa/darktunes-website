@@ -149,6 +149,22 @@ Users tab: `users.ts` DAL + `/api/admin/users/*` (admin only). Feature flags: `s
 
 **Migrate back:** verify prod policies with `scripts/verify-portal-rls.sql` → dual-path canary (`PORTAL_WRITES_USE_USER_JWT=1`) → flip tables by risk. Full plan: [portal-write-auth.md](portal-write-auth.md).
 
+## API contract CI (SOTA foundation)
+
+Wired into `npm run ci`:
+
+| Script | Purpose |
+|--------|---------|
+| `verify:portal-rls` | Expected portal RLS policy names ⊆ `reset.sql` |
+| `verify:schema-columns` | Critical tables: CREATE columns have matching `ADD COLUMN IF NOT EXISTS` (prevents hometown-class drift) |
+| `verify:api-contracts` | Every route uses `withErrorHandler`; portal mutations / admin routes have recognized auth helpers |
+
+Inventory dump: `npm run api:inventory` (`scripts/extract-api-routes.mjs`).
+
+**New portal mutations:** prefer `withPortalMembershipWrite` + `portalMemberWrite` + Zod allowlist — never raw body to `artists`.
+
+**New columns on evolved tables (`artists`, `artist_epks`):** always add `ADD COLUMN IF NOT EXISTS` next to the CREATE definition.
+
 ## Error logging
 
 Non-fatal errors → `app_logs` (service role). Visible in Admin System tab.
