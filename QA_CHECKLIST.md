@@ -20,12 +20,14 @@
 - [ ] Run vulnerability scan (`npm audit --production --audit-level=high`)
 
 ## Portal release submission
-- [ ] `/portal/releases/new` shows stepped wizard (type → groups → tracks → review); progress + Back/Continue work
-- [ ] Cover art: public Google Drive JPEG 3000×3000 verifies successfully; private/unshared Drive link shows clear error
-- [ ] Cover art wrong size/format blocks Continue on files step and blocks final submit
-- [ ] Album: set track count, fill tracks, copy-from-previous and apply-to-all work; incomplete tracks block review submit
-- [ ] Draft autosave: refresh mid-form restores values; “Start over” clears draft
-- [ ] Admin → Submission form: change field wizard group; artist wizard shows field on the matching step
+- [ ] `/portal/releases/new` stepped wizard; `?step=` updates; progress + Back/Continue work
+- [ ] Cover: public Drive JPEG 3000×3000 verifies; private/wrong size/format show clear errors
+- [ ] Cover token allows submit without re-download fail; double-click Submit does not create two rows
+- [ ] Album: track focus mode + show-all; copy-from-previous / apply-to-all; incomplete tracks block review
+- [ ] Draft: refresh restores from server when online; Start over clears local + server draft
+- [ ] Review completeness bar, clickable URLs, cover preview when verified
+- [ ] Prefill from last submission; video form uses wizard shell
+- [ ] Admin wizard group maps to artist step; apply `submission_form_drafts` from reset.sql
 
 ## Settlements / invoices
 - [ ] Approve draft statement once → single `statement_payout`; second approve fails
