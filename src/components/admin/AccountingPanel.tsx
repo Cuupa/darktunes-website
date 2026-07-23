@@ -886,10 +886,10 @@ function SosGeneratorPanel() {
             tabIndex={activeSubTab === tab.id ? 0 : -1}
             onClick={() => setActiveSubTab(tab.id)}
             onKeyDown={(event) => handleSubTabKeyDown(event, tab.id)}
-            className={`px-3 py-2 text-sm font-medium rounded-t-md transition-colors flex items-center gap-1 whitespace-nowrap ${
+            className={`px-3 py-2.5 text-sm font-medium rounded-t-md transition-colors flex items-center gap-1.5 whitespace-nowrap border-b-2 ${
               activeSubTab === tab.id
-                ? 'border border-b-0 border-border bg-background text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'border-primary bg-primary/10 text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30'
             }`}
           >
             {tab.label}
@@ -898,9 +898,9 @@ function SosGeneratorPanel() {
         <div className="flex-1" />
 
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
-          className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground mb-0.5"
+          className="h-8 gap-1.5 text-xs mb-0.5"
           onClick={() => setViewMode('guided')}
         >
           <Sparkle size={13} aria-hidden="true" />
@@ -910,7 +910,7 @@ function SosGeneratorPanel() {
         {/* Presets sheet */}
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground mb-0.5">
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs mb-0.5">
               <BookmarkSimple size={13} /> {t.presets}
             </Button>
           </SheetTrigger>
@@ -942,7 +942,7 @@ function SosGeneratorPanel() {
         {/* CSV import profiles */}
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground mb-0.5">
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs mb-0.5">
               <Table size={13} /> {t.csvProfiles}
             </Button>
           </SheetTrigger>

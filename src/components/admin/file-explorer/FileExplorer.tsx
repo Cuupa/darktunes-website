@@ -51,6 +51,17 @@ export function FileExplorer({
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null)
   const [tagsAsset, setTagsAsset] = useState<Asset | null>(null)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [storageStatsRevision, setStorageStatsRevision] = useState(0)
+
+  const bumpStorageStats = useCallback(() => {
+    setStorageStatsRevision((n) => n + 1)
+  }, [])
+
+  const reloadExplorer = explorer.reload
+  const handleUploadComplete = useCallback(() => {
+    reloadExplorer()
+    bumpStorageStats()
+  }, [bumpStorageStats, reloadExplorer])
 
   const artistNames = useMemo(
     () => Object.fromEntries(artists.map((artist) => [artist.id, artist.name])),
@@ -191,11 +202,12 @@ export function FileExplorer({
       }
 
       explorer.clearSelection()
+      bumpStorageStats()
       toast.success('Selection deleted')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Delete failed')
     }
-  }, [explorer])
+  }, [bumpStorageStats, explorer])
 
   const handleAssetTags = useCallback((asset: Asset) => {
     setTagsAsset(asset)
@@ -262,8 +274,10 @@ export function FileExplorer({
       explorer.clearSelection()
       toast.success(ids.length > 1 ? `${ids.length} files deleted` : 'File deleted')
     }
-    void deleteAll().catch((error) => toast.error(error instanceof Error ? error.message : 'Delete failed'))
-  }, [explorer, resolveAssetTargets])
+    void deleteAll()
+      .then(() => bumpStorageStats())
+      .catch((error) => toast.error(error instanceof Error ? error.message : 'Delete failed'))
+  }, [bumpStorageStats, explorer, resolveAssetTargets])
 
   const handleContextAssetMove = useCallback((assetId: string, folderId: string | null) => {
     const ids = resolveAssetTargets(assetId)
@@ -282,8 +296,10 @@ export function FileExplorer({
       explorer.clearSelection()
       toast.success(ids.length > 1 ? `${ids.length} folders deleted` : 'Folder deleted')
     }
-    void deleteAll().catch((error) => toast.error(error instanceof Error ? error.message : 'Delete failed'))
-  }, [explorer, resolveFolderTargets])
+    void deleteAll()
+      .then(() => bumpStorageStats())
+      .catch((error) => toast.error(error instanceof Error ? error.message : 'Delete failed'))
+  }, [bumpStorageStats, explorer, resolveFolderTargets])
 
   const handleContextFolderMove = useCallback((folderId: string, parentId: string | null) => {
     const ids = resolveFolderTargets(folderId)
@@ -380,6 +396,7 @@ export function FileExplorer({
                 onDeleteSelected={() => void deleteSelected()}
                 onUpload={() => uploadRef.current?.openPicker()}
                 authToken={explorer.token}
+                storageStatsRevision={storageStatsRevision}
                 pressFilters={explorer.pressFilters}
                 onPressFiltersChange={handlePressFiltersChange}
                 selectedFileCount={selectedFileCount}
@@ -387,7 +404,7 @@ export function FileExplorer({
                 artists={artistOptions}
               />
               <ExplorerBreadcrumb path={explorer.folderPath} onNavigate={navigate} />
-              <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} onUploadComplete={explorer.reload}>
+              <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} onUploadComplete={handleUploadComplete}>
                 {explorer.viewMode === 'grid' ? (
                   <FileGrid {...sharedGridListProps} />
                 ) : (
@@ -434,6 +451,7 @@ export function FileExplorer({
             onDeleteSelected={() => void deleteSelected()}
             onUpload={() => uploadRef.current?.openPicker()}
             authToken={explorer.token}
+            storageStatsRevision={storageStatsRevision}
             pressFilters={explorer.pressFilters}
             onPressFiltersChange={handlePressFiltersChange}
             selectedFileCount={selectedFileCount}
@@ -454,7 +472,7 @@ export function FileExplorer({
         )}
         <ExplorerBreadcrumb path={explorer.folderPath} onNavigate={navigate} />
         <div className="min-h-0 flex-1 overflow-hidden">
-          <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} onUploadComplete={explorer.reload}>
+          <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} onUploadComplete={handleUploadComplete}>
             {explorer.viewMode === 'grid' ? (
               <FileGrid {...sharedGridListProps} />
             ) : (

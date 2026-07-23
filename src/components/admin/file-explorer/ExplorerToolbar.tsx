@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select'
 import type { BulkPressAction, PressFilters, SortDir, SortField, ViewMode } from '@/hooks/useFileExplorer'
 
-const R2_FREE_TIER_BYTES = 10 * 1024 * 1024 * 1024 // 10 GB
+const DEFAULT_LIMIT_BYTES = 10 * 1024 * 1024 * 1024 // 10 GB
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -39,6 +39,8 @@ interface ExplorerToolbarProps {
   onUpload: () => void
   /** Token used to authenticate the storage-stats API call. */
   authToken?: string | null
+  /** Bump after upload/delete to re-fetch storage stats. */
+  storageStatsRevision?: number
   pressFilters?: PressFilters
   onPressFiltersChange?: (filters: PressFilters) => void
   selectedFileCount?: number
@@ -61,6 +63,7 @@ export function ExplorerToolbar({
   onDeleteSelected,
   onUpload,
   authToken,
+  storageStatsRevision = 0,
   pressFilters,
   onPressFiltersChange,
   selectedFileCount = 0,
@@ -68,6 +71,7 @@ export function ExplorerToolbar({
   artists = [],
 }: ExplorerToolbarProps) {
   const [usedBytes, setUsedBytes] = useState<number | null>(null)
+  const [limitBytes, setLimitBytes] = useState(DEFAULT_LIMIT_BYTES)
   const [bulkKitArtistId, setBulkKitArtistId] = useState<string>('label')
 
   const fetchStats = useCallback(() => {
@@ -75,10 +79,13 @@ export function ExplorerToolbar({
     void fetch('/api/admin/assets/storage-stats', {
       headers: { Authorization: 'Bearer ' + authToken },
     })
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => (r.ok ? r.json() : null))
       .then((json) => {
         if (json && typeof json === 'object' && 'usedBytes' in json) {
           setUsedBytes(json.usedBytes as number)
+          if ('limitBytes' in json && typeof json.limitBytes === 'number' && json.limitBytes > 0) {
+            setLimitBytes(json.limitBytes)
+          }
         }
       })
       .catch(() => undefined)
@@ -86,9 +93,9 @@ export function ExplorerToolbar({
 
   useEffect(() => {
     fetchStats()
-  }, [fetchStats])
+  }, [fetchStats, storageStatsRevision])
 
-  const usedPct = usedBytes !== null ? Math.min(100, (usedBytes / R2_FREE_TIER_BYTES) * 100) : null
+  const usedPct = usedBytes !== null ? Math.min(100, (usedBytes / limitBytes) * 100) : null
 
   const updatePressFilter = (patch: Partial<PressFilters>) => {
     if (!pressFilters || !onPressFiltersChange) return
@@ -226,13 +233,15 @@ export function ExplorerToolbar({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {usedPct !== null && (
-          <div className="flex min-w-40 flex-col gap-1">
+        {usedPct !== null && usedBytes !== null && (
+          <div className="flex min-w-40 flex-col gap-1" title="Catalog total from assets table">
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>R2 Storage</span>
-              <span>{formatBytes(usedBytes!)} / 10 GB</span>
+              <span>Storage</span>
+              <span>
+                {formatBytes(usedBytes)} / {formatBytes(limitBytes)}
+              </span>
             </div>
-            <Progress value={usedPct} className="h-1.5" aria-label="R2 storage usage" />
+            <Progress value={usedPct} className="h-1.5" aria-label="Asset storage usage" />
           </div>
         )}
         <span className="text-sm text-muted-foreground">{itemCount} item(s)</span>

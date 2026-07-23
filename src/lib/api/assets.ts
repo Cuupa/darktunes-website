@@ -188,8 +188,17 @@ export async function updateAsset(
       .update({ artist_id: primaryArtistId })
       .eq('id', id)
     if (syncErr) throw new Error(syncErr.message)
-    // Auto-assign to artist folder (single) or collabs subfolder (multi)
-    await ensureCollabsFolders(db, id, updates.artistIds)
+    // Move into artist folder (single) or collabs under primary (multi)
+    if (updates.artistIds.length > 0) {
+      await ensureArtistFolderPlacement(db, id, updates.artistIds)
+      const { data: refreshed, error: refreshErr } = await db
+        .from('assets')
+        .select('*')
+        .eq('id', id)
+        .single()
+      if (refreshErr) throw new Error(refreshErr.message)
+      if (refreshed) data = refreshed
+    }
   }
 
   const asset = rowToAsset(data)
@@ -199,112 +208,174 @@ export async function updateAsset(
   return asset
 }
 
-async function ensureCollabsFolders(db: DbClient, assetId: string, artistIds: string[]): Promise<void> {
+/**
+ * Ensure each artist has a dedicated folder under the top-level "artists" root
+ * (same layout as `create_artist_asset_folder` trigger), then place the asset:
+ * - 1 artist → that artist's folder
+ * - 2+ artists → primary artist's "collabs" subfolder
+ *
+ * Always updates folder_id on assign (not only when null).
+ */
+async function ensureArtistFolderPlacement(
+  db: DbClient,
+  assetId: string,
+  artistIds: string[],
+): Promise<void> {
   if (artistIds.length === 0) return
 
-  // Batch-fetch root folders for all artists in one query
-  const { data: rootFolders } = await db
+  const primaryArtistId = artistIds[0]
+  if (!primaryArtistId) return
+
+  const folderIdByArtist = await resolveArtistFolderIds(db, artistIds)
+  const primaryFolderId = folderIdByArtist.get(primaryArtistId)
+  if (!primaryFolderId) return
+
+  let targetFolderId = primaryFolderId
+
+  if (artistIds.length > 1) {
+    targetFolderId = await ensureCollabsSubfolder(db, primaryFolderId, primaryArtistId)
+  }
+
+  const { error } = await db
+    .from('assets')
+    .update({ folder_id: targetFolderId })
+    .eq('id', assetId)
+  if (error) throw new Error(error.message)
+}
+
+async function ensureArtistsRootFolder(db: DbClient): Promise<string> {
+  const { data: existing } = await db
     .from('asset_folders')
-    .select('id, artist_id')
-    .in('artist_id', artistIds)
+    .select('id')
+    .eq('name', 'artists')
     .is('parent_id', null)
+    .maybeSingle()
 
-  // Filter out null artist_id values BEFORE creating Set
-  const validRootFolders = (rootFolders ?? []).filter(
-    (f): f is { id: string; artist_id: string } => f.artist_id !== null
-  )
+  if (existing?.id) return existing.id
 
-  // For artists without a root folder, fall back to any folder linked to that artist
-  const artistsWithRoot = new Set(validRootFolders.map((f) => f.artist_id))
-  const artistsWithoutRoot = artistIds.filter((id) => !artistsWithRoot.has(id))
-
-  let fallbackFolders: { id: string; artist_id: string }[] = []
-  if (artistsWithoutRoot.length > 0) {
-    // Fetch the first folder for each artist that lacks a root folder
-    const { data: fb } = await db
-      .from('asset_folders')
-      .select('id, artist_id')
-      .in('artist_id', artistsWithoutRoot)
-    
-    // Filter out null artist_id values
-    const validFallbackFolders = (fb ?? []).filter(
-      (f): f is { id: string; artist_id: string } => f.artist_id !== null
-    )
-    
-    // Keep only one folder per artist (the first found)
-    const seen = new Set<string>()
-    fallbackFolders = validFallbackFolders.filter((f) => {
-      if (seen.has(f.artist_id)) return false
-      seen.add(f.artist_id)
-      return true
-    })
-  }
-
-  // Build parentId map: artistId → folderId
-  const parentIdByArtist = new Map<string, string>()
-  for (const f of [...validRootFolders, ...fallbackFolders]) {
-    if (!parentIdByArtist.has(f.artist_id)) {
-      parentIdByArtist.set(f.artist_id, f.id)
-    }
-  }
-
-  // Batch-fetch existing "collabs" subfolders for all parent folders
-  const parentIds = [...parentIdByArtist.values()]
-  const { data: existingCollabs } = await db
+  const { data: created, error } = await db
     .from('asset_folders')
-    .select('id, parent_id')
-    .in('parent_id', parentIds)
-    .ilike('name', 'collabs')
+    .insert({ name: 'artists', parent_id: null, artist_id: null, created_by: null })
+    .select('id')
+    .single()
+  if (error) throw new Error(error.message)
+  if (!created) throw new Error('Failed to create artists root folder')
+  return created.id
+}
 
-  // Filter out null parent_id values before creating Map
-  const validCollabs = (existingCollabs ?? []).filter(
-    (f): f is { id: string; parent_id: string } => f.parent_id !== null
-  )
+/**
+ * Map artistId → dedicated folder id (not "collabs").
+ * Creates missing folders under the "artists" root when needed.
+ */
+async function resolveArtistFolderIds(
+  db: DbClient,
+  artistIds: string[],
+): Promise<Map<string, string>> {
+  const result = new Map<string, string>()
+  if (artistIds.length === 0) return result
 
-  const collabsByParent = new Map<string, string>(
-    validCollabs.map((f) => [f.parent_id, f.id])
-  )
+  const { data: folders, error } = await db
+    .from('asset_folders')
+    .select('id, artist_id, name, parent_id')
+    .in('artist_id', artistIds)
+  if (error) throw new Error(error.message)
 
-  // Batch-insert missing "collabs" folders
-  const toInsert = artistIds
-    .map((artistId) => {
-      const parentId = parentIdByArtist.get(artistId)
-      if (!parentId || collabsByParent.has(parentId)) return null
-      return { name: 'collabs', parent_id: parentId, artist_id: artistId }
-    })
-    .filter((row): row is { name: string; parent_id: string; artist_id: string } => row !== null)
+  // Prefer dedicated non-collabs folders; one per artist
+  for (const folder of folders ?? []) {
+    if (!folder.artist_id) continue
+    if (folder.name.toLowerCase() === 'collabs') continue
+    if (!result.has(folder.artist_id)) {
+      result.set(folder.artist_id, folder.id)
+    }
+  }
 
-  if (toInsert.length > 0) {
-    const { data: created } = await db
+  // If only a "collabs" folder exists, prefer its parent (the artist folder)
+  for (const folder of folders ?? []) {
+    if (!folder.artist_id || result.has(folder.artist_id)) continue
+    if (folder.name.toLowerCase() !== 'collabs') continue
+    if (folder.parent_id) {
+      result.set(folder.artist_id, folder.parent_id)
+    }
+  }
+
+  const missing = artistIds.filter((id) => !result.has(id))
+  if (missing.length === 0) return result
+
+  const artistsRootId = await ensureArtistsRootFolder(db)
+  const { data: artists, error: artistsErr } = await db
+    .from('artists')
+    .select('id, name')
+    .in('id', missing)
+  if (artistsErr) throw new Error(artistsErr.message)
+
+  for (const artist of artists ?? []) {
+    const { data: created, error: createErr } = await db
       .from('asset_folders')
-      .upsert(toInsert, { onConflict: 'parent_id,name', ignoreDuplicates: false })
-      .select('id, parent_id')
-    
-    // Filter out null parent_id values before using in Map
-    const validCreated = (created ?? []).filter(
-      (row): row is { id: string; parent_id: string } => row.parent_id !== null
-    )
-    
-    for (const row of validCreated) {
-      collabsByParent.set(row.parent_id, row.id)
+      .insert({
+        name: artist.name,
+        parent_id: artistsRootId,
+        artist_id: artist.id,
+        created_by: null,
+      })
+      .select('id')
+      .single()
+
+    if (createErr) {
+      // Race: folder may have been created concurrently — re-fetch non-collabs
+      const { data: racedRows } = await db
+        .from('asset_folders')
+        .select('id, name')
+        .eq('artist_id', artist.id)
+      const raced = (racedRows ?? []).find((f) => f.name.toLowerCase() !== 'collabs')
+      if (raced?.id) {
+        result.set(artist.id, raced.id)
+        continue
+      }
+      throw new Error(createErr.message)
     }
+    if (created) result.set(artist.id, created.id)
   }
 
-  // Set the asset's folder_id if it has none (non-destructive, use the first artist's collabs folder)
-  const { data: assetRow } = await db.from('assets').select('folder_id').eq('id', assetId).single()
-  if (!assetRow?.folder_id) {
-    // Pick the collabs folder of the first artist that has one
-    for (const artistId of artistIds) {
-      const parentId = parentIdByArtist.get(artistId)
-      if (parentId) {
-        const collabsFolderId = collabsByParent.get(parentId)
-        if (collabsFolderId) {
-          await db.from('assets').update({ folder_id: collabsFolderId }).eq('id', assetId)
-          break
-        }
-      }
-    }
+  return result
+}
+
+async function ensureCollabsSubfolder(
+  db: DbClient,
+  parentFolderId: string,
+  artistId: string,
+): Promise<string> {
+  const { data: existing } = await db
+    .from('asset_folders')
+    .select('id')
+    .eq('parent_id', parentFolderId)
+    .ilike('name', 'collabs')
+    .maybeSingle()
+
+  if (existing?.id) return existing.id
+
+  const { data: created, error } = await db
+    .from('asset_folders')
+    .insert({
+      name: 'collabs',
+      parent_id: parentFolderId,
+      artist_id: artistId,
+      created_by: null,
+    })
+    .select('id')
+    .single()
+
+  if (error) {
+    const { data: raced } = await db
+      .from('asset_folders')
+      .select('id')
+      .eq('parent_id', parentFolderId)
+      .ilike('name', 'collabs')
+      .maybeSingle()
+    if (raced?.id) return raced.id
+    throw new Error(error.message)
   }
+  if (!created) throw new Error('Failed to create collabs folder')
+  return created.id
 }
 
 export async function getAssetByHash(db: DbClient, hash: string): Promise<Asset | null> {

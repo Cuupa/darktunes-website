@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Message compose pages:** Admin `/admin/messages/compose` and portal `/portal/messages/compose` replace dismissible compose overlays.
+- **Custom role assignment:** Admin user detail can assign custom roles (`GET/PUT /api/admin/users/:id/custom-roles`) with RBAC audit entries.
+- **Accounting guided setup:** Month picker component, structured label address fields, legal/bank optional section; clearer subtab/action styling.
+- **Asset storage stats RPC:** `get_assets_storage_stats()` for accurate catalog storage totals (no PostgREST 1000-row undercount).
 - **P0 portal security/reliability:** `verify:portal-rls` static gate; `artistId` required on submit/drafts mutations; distributed rate-limit helper (Upstash optional); `withIdempotency` + video submit / invoice payment keys; atomic `create_release_submission_with_tracks` RPC; documents upload via `portalMemberWrite` canary.
 - **Portal release submission wizard:** guided multi-step flow (type → field groups → tracks → review) driven by `field_group`; track focus mode, copy/apply-all, `?step=` URL, review completeness, prefill from last submission.
 - **Server submission drafts:** `submission_form_drafts` + portal draft API (release/video); local IndexedDB cache.
@@ -17,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Admin wizard groups:** submission form manager can set each field’s wizard group (`metadata`, `distribution`, `rights`, `track`, custom).
 
 ### Fixed
+- **Assets storage bar:** Sum via service-role RPC/pagination; refresh after upload/delete; configurable limit via `NEXT_PUBLIC_R2_STORAGE_LIMIT_BYTES`.
+- **Asset → artist folder placement:** Assigning artists always moves the file into the artist folder (single) or primary `collabs` subfolder (multi); creates missing artist folders under `artists/`. Never treats a collabs folder as the artist root.
+- **Portal mailbox i18n:** Compose/reply/trash strings use `portal` message keys (en/de).
+- **Message compose draft:** URL prefill (reply artist/subject) is not overwritten by a stale localStorage draft.
+- **Accounting address fields:** Structured address inputs stay in sync with preset/server loads without mid-edit re-parse glitches.
 - **Distributed rate limit fixed window:** Upstash path EXPIRE only on first INCR (atomic EVAL); continuous traffic no longer extends the window incorrectly.
 - **Invoice payment idempotency:** client type requires UUID; settlement center always sends a key (fallback generate).
 - **Release submit rate limit** aligned with video submit (20 / 10 min / user+IP).
