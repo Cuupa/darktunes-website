@@ -1,11 +1,17 @@
 export const dynamic = 'force-dynamic'
 
+import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getFormSchema } from '@/lib/api/submissionFormSchema'
 import { getReleaseTypeRules } from '@/lib/api/submissionReleaseTypeRules'
 import { ReleaseSubmissionForm } from './_components/ReleaseSubmissionForm'
-export default async function NewReleasePage({ searchParams }: { searchParams: Promise<{ artistId?: string }> }) {
+
+export default async function NewReleasePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ artistId?: string }>
+}) {
   const { artistId } = await searchParams
   const supabase = await createServerSupabaseClient()
 
@@ -19,5 +25,9 @@ export default async function NewReleasePage({ searchParams }: { searchParams: P
     getReleaseTypeRules(supabase).catch(() => []),
   ])
 
-  return <ReleaseSubmissionForm artist={artist} formSchema={formSchema} typeRules={typeRules} />
+  return (
+    <Suspense fallback={<p className="text-muted-foreground p-4">Loading…</p>}>
+      <ReleaseSubmissionForm artist={artist} formSchema={formSchema} typeRules={typeRules} />
+    </Suspense>
+  )
 }

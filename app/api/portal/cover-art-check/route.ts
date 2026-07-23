@@ -3,6 +3,7 @@
  *
  * Server-side cover art verification for artist release submissions.
  * Avoids browser CORS failures on Google Drive and other hosts.
+ * Returns a short-lived signed token on success so submit can skip re-download.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -11,6 +12,7 @@ import { withErrorHandler, ApiError } from '@/lib/errors'
 import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
 import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
 import { verifyCoverArtUrl } from '@/lib/submissions/coverArtCheck'
+import { mintCoverArtToken } from '@/lib/submissions/coverArtToken'
 
 const bodySchema = z.object({
   url: z.string().min(1).max(2048),
@@ -31,5 +33,16 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     r2PublicUrl: serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
   })
 
-  return NextResponse.json(result)
+  if (!result.verified || result.width == null || result.height == null) {
+    return NextResponse.json(result)
+  }
+
+  const token = mintCoverArtToken(serverEnv.API_CREDENTIALS_ENCRYPTION_KEY, {
+    url: body.url,
+    width: result.width,
+    height: result.height,
+    format: result.format ?? 'jpeg',
+  })
+
+  return NextResponse.json({ ...result, token })
 })

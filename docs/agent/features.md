@@ -92,13 +92,15 @@ Enterprise SOS + invoice lifecycle. Workflow helpers: `src/lib/sos/statementWork
 | Field schema | `submission_form_schema` (`field_scope`: `release` \| `track`; `field_group` drives wizard steps; optional `type_rules` JSONB per release type) |
 | Track count rules | `submission_release_type_rules` (`fixed_1` for single; `user_specified` + min/max for album/ep/compilation) |
 | Wizard steps | `src/lib/submissions/wizardSteps.ts` — type → groups (`metadata` / `distribution` / `rights` / custom) → tracks → review |
-| Cover art | Public URL only (e.g. Drive). `POST /api/portal/cover-art-check` verifies JPEG 3000×3000 server-side (no R2 storage during form). Submit re-verifies. |
-| Draft autosave | IndexedDB via `useLocalKV` key `release-submission-draft:{artistId}` |
+| Cover art | Public URL (Drive etc.). `POST /api/portal/cover-art-check` → JPEG 3000×3000 + short-lived HMAC token. Submit accepts token or re-verifies. No R2 during form. |
+| Drafts | Server: `submission_form_drafts` (`form_type` release\|video) via `GET/PUT/DELETE /api/portal/submission-form-drafts`; local IndexedDB cache |
+| Idempotency | Required `idempotencyKey` UUID on release submit; 409 returns prior `submissionId` when known |
+| Wizard UX | `?step=` URL sync; track focus mode for multi-track; review completeness; template from last submission |
 | Rule resolution | `src/lib/submissions/fieldTypeRules.ts` — shared by portal UI + submit route |
 | Admin UI | `SubmissionFormManager` — Fields (incl. wizard group), Track rules, Rules per type |
 | Admin APIs | `PUT /api/admin/submission-form-schema`, `PUT /api/admin/submission-release-type-rules` |
 
-Artists are guided step-by-step; only fields visible/required for the selected type appear. Admins assign **wizard group** per field so custom fields land on the right step without code changes.
+Artists are guided step-by-step; only fields visible/required for the selected type appear. Admins assign **wizard group** per field so custom fields land on the right step without code changes. Video form uses the same wizard shell.
 
 **Draft catalog release:** Admin POST `/api/admin/release-submissions/[id]` `{ action: 'create_draft_release' }` → hidden `releases` row + `release_submissions.release_id` link + `sync_policy=manual_until_street`. Accept status alone does **not** create a catalog row.
 

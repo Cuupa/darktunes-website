@@ -8,8 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Portal release submission wizard:** guided multi-step flow (type → field groups → tracks → review) driven by `field_group`; track copy/apply-all helpers; local draft autosave.
-- **Server-side cover art verification:** `POST /api/portal/cover-art-check` verifies JPEG 3000×3000 from a public URL (e.g. Drive); no R2 storage during the form. Submit re-checks server-side.
+- **Portal release submission wizard:** guided multi-step flow (type → field groups → tracks → review) driven by `field_group`; track focus mode, copy/apply-all, `?step=` URL, review completeness, prefill from last submission.
+- **Server submission drafts:** `submission_form_drafts` + portal draft API (release/video); local IndexedDB cache.
+- **Cover art verification:** server JPEG 3000×3000 check with stable error codes, retries, and short-lived HMAC token so submit can skip re-download; no R2 during form.
+- **Required idempotency** on release submit (UUID); duplicate key returns prior submission when known.
+- **Video submission wizard** shell parity with release form.
 - **Admin wizard groups:** submission form manager can set each field’s wizard group (`metadata`, `distribution`, `rights`, `track`, custom).
 
 ### Fixed

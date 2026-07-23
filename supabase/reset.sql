@@ -4901,6 +4901,50 @@ CREATE POLICY "submission_release_type_rules: editor+ write" ON public.submissio
   WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
+-- TABLE: submission_form_drafts
+-- In-progress portal submission wizards (release / video). One draft per
+-- user+artist+form_type. Payload is JSON (values, tracks, step, etc.).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.submission_form_drafts (
+  id          UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  artist_id   UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  user_id     UUID        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  form_type   TEXT        NOT NULL CHECK (form_type IN ('release', 'video')),
+  payload     JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (artist_id, user_id, form_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_submission_form_drafts_artist
+  ON public.submission_form_drafts (artist_id);
+
+DROP TRIGGER IF EXISTS trg_submission_form_drafts_updated_at ON public.submission_form_drafts;
+CREATE TRIGGER trg_submission_form_drafts_updated_at
+  BEFORE UPDATE ON public.submission_form_drafts
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.submission_form_drafts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "submission_form_drafts: member all own" ON public.submission_form_drafts;
+CREATE POLICY "submission_form_drafts: member all own" ON public.submission_form_drafts
+  FOR ALL
+  USING (
+    user_id = auth.uid()
+    AND EXISTS (
+      SELECT 1 FROM public.artist_members am
+      WHERE am.artist_id = submission_form_drafts.artist_id AND am.user_id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    user_id = auth.uid()
+    AND EXISTS (
+      SELECT 1 FROM public.artist_members am
+      WHERE am.artist_id = submission_form_drafts.artist_id AND am.user_id = auth.uid()
+    )
+  );
+
+-- ---------------------------------------------------------------------------
 -- TABLE: portal_faq_categories / portal_faq_items
 -- Admin-managed FAQ for the Artist Portal (/portal/help, shown above static help).
 -- ---------------------------------------------------------------------------

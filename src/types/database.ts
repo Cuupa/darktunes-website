@@ -3987,6 +3987,36 @@ export interface Database {
         }
         Relationships: []
       }
+      submission_form_drafts: {
+        Row: {
+          id: string
+          artist_id: string
+          user_id: string
+          form_type: 'release' | 'video'
+          payload: Record<string, unknown>
+          updated_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          user_id: string
+          form_type: 'release' | 'video'
+          payload?: Record<string, unknown>
+          updated_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          user_id?: string
+          form_type?: 'release' | 'video'
+          payload?: Record<string, unknown>
+          updated_at?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       submission_form_schema: {
         Row: {
           id: string

@@ -2,10 +2,7 @@
 
 /**
  * Cover art verification for release submissions.
- *
- * Remote URLs (e.g. Google Drive) are checked server-side to avoid browser CORS.
- * We intentionally do NOT upload covers to R2 during the form — that would fill
- * object storage with abandoned drafts. Artists host files (Drive etc.) and paste a URL.
+ * Remote URLs are checked server-side (JPEG 3000×3000). No R2 storage during the form.
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
@@ -13,14 +10,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useTranslations } from 'next-intl'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { coverCodeToI18nKey, type CoverArtErrorCode } from '@/lib/submissions/coverArtCodes'
 import type { CoverArtCheckStatus } from '@/lib/submissions/coverArtCheck'
 
 interface CoverArtAnalyzerProps {
   url: string
-  onVerified: (verified: boolean) => void
-  /** Optional: called when parent should clear/update URL (unused for check-only). */
-  onUrlChange?: (url: string) => void
-  /** When true, re-check automatically after the URL settles (debounced). */
+  onVerified: (verified: boolean, token?: string | null) => void
   autoCheck?: boolean
 }
 
@@ -34,6 +29,7 @@ interface SizeInfo {
 export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArtAnalyzerProps) {
   const t = useTranslations('portal')
   const [state, setState] = useState<UiState>('idle')
+  const [code, setCode] = useState<CoverArtErrorCode | null>(null)
   const [sizeInfo, setSizeInfo] = useState<SizeInfo | null>(null)
   const lastCheckedUrl = useRef<string>('')
   const requestIdRef = useRef(0)
@@ -47,7 +43,8 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
 
     const requestId = ++requestIdRef.current
     setState('verifying')
-    onVerifiedRef.current(false)
+    setCode(null)
+    onVerifiedRef.current(false, null)
     setSizeInfo(null)
 
     try {
@@ -58,6 +55,7 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
       if (requestId !== requestIdRef.current) return
       if (!session?.access_token) {
         setState('fetch_failed')
+        setCode('COVER_FETCH_FAILED')
         return
       }
 
@@ -74,15 +72,18 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
 
       if (!res.ok) {
         setState('fetch_failed')
-        onVerifiedRef.current(false)
+        setCode('COVER_FETCH_FAILED')
+        onVerifiedRef.current(false, null)
         return
       }
 
       const data = (await res.json()) as {
         status: CoverArtCheckStatus
+        code?: CoverArtErrorCode
         verified: boolean
         width?: number
         height?: number
+        token?: string
       }
 
       if (requestId !== requestIdRef.current) return
@@ -93,11 +94,13 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
 
       lastCheckedUrl.current = trimmed
       setState(data.status)
-      onVerifiedRef.current(data.verified === true)
+      setCode(data.code ?? null)
+      onVerifiedRef.current(data.verified === true, data.token ?? null)
     } catch {
       if (requestId !== requestIdRef.current) return
       setState('fetch_failed')
-      onVerifiedRef.current(false)
+      setCode('COVER_FETCH_FAILED')
+      onVerifiedRef.current(false, null)
     }
   }, [url])
 
@@ -108,7 +111,8 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
       requestIdRef.current += 1
       lastCheckedUrl.current = ''
       setState('idle')
-      onVerifiedRef.current(false)
+      setCode(null)
+      onVerifiedRef.current(false, null)
       return
     }
     if (trimmed === lastCheckedUrl.current) return
@@ -124,14 +128,24 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
   }, [url, autoCheck, verify])
 
   const getMessage = (): string => {
+    if (state === 'verifying') return t('releases_submit_cover_check_verifying')
+    if (state === 'idle') return ''
+    if (code === 'COVER_WRONG_SIZE' || state === 'wrong_size') {
+      return t('releases_submit_cover_check_wrong_size')
+        .replace('{{width}}', String(sizeInfo?.width ?? '?'))
+        .replace('{{height}}', String(sizeInfo?.height ?? '?'))
+    }
+    if (code) {
+      const key = coverCodeToI18nKey(code) as Parameters<typeof t>[0]
+      try {
+        return t(key)
+      } catch {
+        // fall through
+      }
+    }
     switch (state) {
       case 'ok':
         return t('releases_submit_cover_check_ok')
-      case 'wrong_size': {
-        return t('releases_submit_cover_check_wrong_size')
-          .replace('{{width}}', String(sizeInfo?.width ?? '?'))
-          .replace('{{height}}', String(sizeInfo?.height ?? '?'))
-      }
       case 'wrong_format':
         return t('releases_submit_cover_check_wrong_format')
       case 'forbidden_host':
@@ -142,8 +156,6 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
         return t('releases_submit_cover_check_drive_help')
       case 'too_large':
         return t('releases_submit_cover_check_too_large')
-      case 'verifying':
-        return t('releases_submit_cover_check_verifying')
       default:
         return ''
     }

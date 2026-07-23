@@ -5,6 +5,10 @@
 
 import sharp from 'sharp'
 import {
+  coverStatusToCode,
+  type CoverArtErrorCode,
+} from '@/lib/submissions/coverArtCodes'
+import {
   extractGoogleDriveFileId,
   isAllowedCoverArtUrl,
   isJpegMagicBytes,
@@ -25,6 +29,7 @@ export type CoverArtCheckStatus =
 
 export interface CoverArtCheckResult {
   status: CoverArtCheckStatus
+  code: CoverArtErrorCode
   verified: boolean
   width?: number
   height?: number
@@ -35,6 +40,16 @@ export interface CoverArtCheckResult {
 const MAX_BYTES = 20 * 1024 * 1024
 const FETCH_TIMEOUT_MS = 15_000
 const MAX_REDIRECTS = 5
+const FETCH_RETRIES = 2
+
+function withCode(
+  result: Omit<CoverArtCheckResult, 'code'> & { code?: CoverArtErrorCode },
+): CoverArtCheckResult {
+  return {
+    ...result,
+    code: result.code ?? coverStatusToCode(result.status),
+  }
+}
 
 export async function verifyCoverArtUrl(
   rawUrl: string,
@@ -47,45 +62,54 @@ export async function verifyCoverArtUrl(
   const r2PublicUrl = options?.r2PublicUrl
   const trimmed = rawUrl.trim()
   if (!trimmed) {
-    return { status: 'invalid_url', verified: false, message: 'Missing cover art URL' }
+    return withCode({ status: 'invalid_url', verified: false, message: 'Missing cover art URL' })
   }
 
   let parsed: URL
   try {
     parsed = new URL(trimmed)
   } catch {
-    return { status: 'invalid_url', verified: false, message: 'Invalid cover art URL' }
+    return withCode({ status: 'invalid_url', verified: false, message: 'Invalid cover art URL' })
   }
 
   if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    return { status: 'invalid_url', verified: false, message: 'Cover art URL must be http(s)' }
+    return withCode({
+      status: 'invalid_url',
+      verified: false,
+      message: 'Cover art URL must be http(s)',
+    })
   }
 
   const candidates = buildFetchCandidates(trimmed, r2PublicUrl)
   if (candidates.length === 0) {
-    return {
+    return withCode({
       status: 'forbidden_host',
       verified: false,
       message: 'Cover art host is not allowed',
-    }
+    })
   }
 
   let lastError: CoverArtCheckStatus = 'fetch_failed'
   let lastMessage: string | undefined
   for (const candidate of candidates) {
-    try {
-      const result = await fetchAndInspect(candidate, fetchFn, r2PublicUrl)
-      if (result.verified) return result
-      // Prefer informative failures over generic fetch_failed
-      if (result.status !== 'fetch_failed') return result
-      lastError = result.status
-      lastMessage = result.message
-    } catch {
-      lastError = 'fetch_failed'
+    for (let attempt = 0; attempt < FETCH_RETRIES; attempt += 1) {
+      try {
+        const result = await fetchAndInspect(candidate, fetchFn, r2PublicUrl)
+        if (result.verified) return withCode(result)
+        // Prefer informative failures over generic fetch_failed
+        if (result.status !== 'fetch_failed') return withCode(result)
+        lastError = result.status
+        lastMessage = result.message
+      } catch {
+        lastError = 'fetch_failed'
+      }
+      if (attempt + 1 < FETCH_RETRIES) {
+        await new Promise((r) => setTimeout(r, 150 * (attempt + 1)))
+      }
     }
   }
 
-  return {
+  return withCode({
     status: lastError,
     verified: false,
     message:
@@ -93,7 +117,7 @@ export async function verifyCoverArtUrl(
       (lastError === 'fetch_failed'
         ? 'Could not download cover art. For Google Drive, share the file as “Anyone with the link”.'
         : undefined),
-  }
+  })
 }
 
 function buildFetchCandidates(raw: string, r2PublicUrl?: string): string[] {
@@ -121,7 +145,7 @@ async function fetchAndInspect(
   url: string,
   fetchFn: typeof fetch,
   r2PublicUrl?: string,
-): Promise<CoverArtCheckResult> {
+): Promise<Omit<CoverArtCheckResult, 'code'>> {
   const response = await fetchWithRedirectGuard(url, fetchFn, r2PublicUrl)
   if (!response.ok) {
     return {

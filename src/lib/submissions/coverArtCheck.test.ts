@@ -24,12 +24,14 @@ describe('verifyCoverArtUrl', () => {
     const r = await verifyCoverArtUrl('not-a-url')
     expect(r.verified).toBe(false)
     expect(r.status).toBe('invalid_url')
+    expect(r.code).toBe('COVER_INVALID_URL')
   })
 
   it('rejects forbidden hosts', async () => {
     const r = await verifyCoverArtUrl('https://evil.example.com/cover.jpg')
     expect(r.verified).toBe(false)
     expect(r.status).toBe('forbidden_host')
+    expect(r.code).toBe('COVER_FORBIDDEN_HOST')
   })
 
   function mockImageResponse(buf: Buffer, contentType = 'image/jpeg') {

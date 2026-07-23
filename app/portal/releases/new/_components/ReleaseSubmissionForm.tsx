@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl'
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -43,7 +43,7 @@ import type { Artist, SubmissionFormField, SubmissionReleaseTypeRule } from '@/t
 import {
   SubmissionWizardShell,
   defaultStepLabel,
-} from './SubmissionWizardShell'
+} from '@/components/portal/SubmissionWizardShell'
 
 interface ReleaseSubmissionFormProps {
   artist: Artist | null
@@ -56,12 +56,12 @@ interface TrackRow {
   values: Record<string, string>
 }
 
-interface DraftState {
+interface DraftPayload {
   values: Record<string, string>
   tracks: TrackRow[]
   trackCount: number
   stepId: string
-  coverArtVerified: boolean
+  coverArtCheckToken?: string | null
 }
 
 function emptyTrackValues(trackFields: SubmissionFormField[]): Record<string, string> {
@@ -131,13 +131,23 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
   const t = useTranslations('portal')
   const locale = useLocale()
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const draftKey = `release-submission-draft:${artist?.id ?? 'anon'}`
-  const [draft, setDraft, clearDraft, draftLoaded] = useLocalKV<DraftState>(draftKey)
+  const [localDraft, setLocalDraft, clearLocalDraft, draftLoaded] = useLocalKV<DraftPayload>(draftKey)
   const restoredRef = useRef(false)
   const headingFocusRef = useRef(false)
   const prevReleaseTypeRef = useRef<SubmissionReleaseType | null>(null)
   // Suppress draft persist until initial restore decision is done
   const allowPersistRef = useRef(false)
+  const idempotencyKeyRef = useRef(
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  )
+  const [coverArtCheckToken, setCoverArtCheckToken] = useState<string | null>(null)
+  const [trackFocusIndex, setTrackFocusIndex] = useState(0)
+  const [showAllTracks, setShowAllTracks] = useState(false)
 
   const releaseFields = useMemo(
     () => formSchema.filter((f) => f.fieldScope === 'release').sort((a, b) => a.displayOrder - b.displayOrder),
@@ -188,58 +198,134 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     [visibleReleaseFields, visibleTrackFields],
   )
 
-  // Restore draft once IndexedDB loads (never trust coverArtVerified — re-check)
+  const applyDraftPayload = useCallback((payload: DraftPayload) => {
+    if (!payload.values || Object.keys(payload.values).length === 0) return false
+    const restoredType = (payload.values.type || 'single') as SubmissionReleaseType
+    prevReleaseTypeRef.current = restoredType
+    setValues((prev) => ({ ...prev, ...payload.values }))
+    if (payload.tracks?.length) setTracks(payload.tracks)
+    if (typeof payload.trackCount === 'number') setTrackCount(payload.trackCount)
+    setCoverArtVerified(false)
+    setCoverArtCheckToken(null)
+    return true
+  }, [])
+
+  // Restore: prefer server draft, fall back to IndexedDB
   useEffect(() => {
     if (!draftLoaded || restoredRef.current) return
     restoredRef.current = true
-    if (draft?.values && Object.keys(draft.values).length > 0) {
-      const restoredType = (draft.values.type || 'single') as SubmissionReleaseType
-      prevReleaseTypeRef.current = restoredType
-      setValues((prev) => ({ ...prev, ...draft.values }))
-      if (draft.tracks?.length) setTracks(draft.tracks)
-      if (typeof draft.trackCount === 'number') setTrackCount(draft.trackCount)
-      // Force re-verification after restore (stale draft flag is not trustworthy)
-      setCoverArtVerified(false)
-      setShowDraftBanner(true)
-    } else {
-      prevReleaseTypeRef.current = 'single'
-    }
-    allowPersistRef.current = true
-  }, [draftLoaded, draft])
 
-  // Restore step after steps rebuild from restored type
+    const restore = async () => {
+      let applied = false
+      if (artist?.id) {
+        try {
+          const supabase = createBrowserSupabaseClient()
+          const {
+            data: { session },
+          } = await supabase.auth.getSession()
+          if (session?.access_token) {
+            const res = await fetch(
+              `/api/portal/submission-form-drafts?artistId=${encodeURIComponent(artist.id)}&formType=release`,
+              { headers: { Authorization: `Bearer ${session.access_token}` } },
+            )
+            if (res.ok) {
+              const data = (await res.json()) as { draft?: { payload?: DraftPayload } | null }
+              const payload = data.draft?.payload
+              if (payload && applyDraftPayload(payload as DraftPayload)) {
+                applied = true
+                setShowDraftBanner(true)
+              }
+            }
+          }
+        } catch {
+          // offline / error → local
+        }
+      }
+      if (!applied && localDraft && applyDraftPayload(localDraft)) {
+        setShowDraftBanner(true)
+      }
+      if (!applied) prevReleaseTypeRef.current = 'single'
+      allowPersistRef.current = true
+    }
+    void restore()
+  }, [draftLoaded, localDraft, artist?.id, applyDraftPayload])
+
+  // Restore step from draft banner or ?step=
   useEffect(() => {
-    if (!draft?.stepId || !showDraftBanner) return
-    const idx = wizardSteps.findIndex((s) => s.id === draft.stepId)
+    const stepParam = searchParams.get('step')
+    if (stepParam) {
+      const idx = wizardSteps.findIndex((s) => s.id === stepParam)
+      if (idx >= 0) {
+        setActiveIndex(idx)
+        setMaxReachableIndex((m) => Math.max(m, idx))
+        return
+      }
+    }
+    if (!localDraft?.stepId || !showDraftBanner) return
+    const idx = wizardSteps.findIndex((s) => s.id === localDraft.stepId)
     if (idx >= 0) {
       setActiveIndex(idx)
       setMaxReachableIndex((m) => Math.max(m, idx))
     }
-  }, [wizardSteps, draft?.stepId, showDraftBanner])
+  }, [wizardSteps, localDraft?.stepId, showDraftBanner, searchParams])
 
-  // Persist draft (after restore decision)
+  // Sync step → URL
+  useEffect(() => {
+    const stepId = wizardSteps[activeIndex]?.id
+    if (!stepId) return
+    const params = new URLSearchParams(searchParams.toString())
+    if (params.get('step') === stepId) return
+    params.set('step', stepId)
+    if (artist?.id) params.set('artistId', artist.id)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [activeIndex, wizardSteps, pathname, router, searchParams, artist?.id])
+
+  // Persist draft (local + server)
   useEffect(() => {
     if (!draftLoaded || !artist?.id || !allowPersistRef.current) return
+    const payload: DraftPayload = {
+      values,
+      tracks,
+      trackCount,
+      stepId: wizardSteps[activeIndex]?.id ?? 'type',
+      coverArtCheckToken,
+    }
     const handle = setTimeout(() => {
-      setDraft({
-        values,
-        tracks,
-        trackCount,
-        stepId: wizardSteps[activeIndex]?.id ?? 'type',
-        coverArtVerified,
-      })
-    }, 400)
+      setLocalDraft(payload)
+      void (async () => {
+        try {
+          const supabase = createBrowserSupabaseClient()
+          const {
+            data: { session },
+          } = await supabase.auth.getSession()
+          if (!session?.access_token) return
+          await fetch(
+            `/api/portal/submission-form-drafts?artistId=${encodeURIComponent(artist.id)}&formType=release`,
+            {
+              method: 'PUT',
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ payload }),
+            },
+          )
+        } catch {
+          // keep local only
+        }
+      })()
+    }, 600)
     return () => clearTimeout(handle)
   }, [
     values,
     tracks,
     trackCount,
     activeIndex,
-    coverArtVerified,
+    coverArtCheckToken,
     wizardSteps,
     draftLoaded,
     artist?.id,
-    setDraft,
+    setLocalDraft,
   ])
 
   // Only reset track count when the release *type* actually changes (not on draft restore)
@@ -285,7 +371,10 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
 
   const setFieldValue = (key: string, value: string) => {
     setValues((prev) => ({ ...prev, [key]: value }))
-    if (key === 'cover_art_url') setCoverArtVerified(false)
+    if (key === 'cover_art_url') {
+      setCoverArtVerified(false)
+      setCoverArtCheckToken(null)
+    }
     setFieldErrors((prev) => {
       const next = { ...prev }
       delete next[key]
@@ -293,8 +382,9 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     })
   }
 
-  const handleCoverArtVerified = useCallback((verified: boolean) => {
+  const handleCoverArtVerified = useCallback((verified: boolean, token?: string | null) => {
     setCoverArtVerified(verified)
+    setCoverArtCheckToken(verified ? (token ?? null) : null)
   }, [])
 
   const setTrackValue = (trackId: string, key: string, value: string) => {
@@ -442,6 +532,8 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
 
       const standardBody: Record<string, unknown> = {
         coverArtVerified: true,
+        coverArtCheckToken: coverArtCheckToken ?? undefined,
+        idempotencyKey: idempotencyKeyRef.current,
       }
       const formData: Record<string, unknown> = {}
 
@@ -464,7 +556,11 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
         values: track.values,
       }))
 
-      const res = await fetch('/api/portal/submit-release', {
+      const submitUrl = artist?.id
+        ? `/api/portal/submit-release?artistId=${encodeURIComponent(artist.id)}`
+        : '/api/portal/submit-release'
+
+      const res = await fetch(submitUrl, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -484,7 +580,20 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
         return
       }
 
-      clearDraft()
+      clearLocalDraft()
+      if (artist?.id) {
+        void fetch(
+          `/api/portal/submission-form-drafts?artistId=${encodeURIComponent(artist.id)}&formType=release`,
+          {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          },
+        )
+      }
+      idempotencyKeyRef.current =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`
       toast.success(t('releases_submit_success'))
       router.push('/portal/releases/submissions')
       router.refresh()
@@ -590,7 +699,7 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
   ])
 
   const discardDraft = () => {
-    clearDraft()
+    clearLocalDraft()
     setShowDraftBanner(false)
     const initial = buildInitialValues(formSchema, artist)
     setValues(initial)
@@ -600,10 +709,65 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     )
     setTrackCount(1)
     setCoverArtVerified(false)
+    setCoverArtCheckToken(null)
     setActiveIndex(0)
     setMaxReachableIndex(0)
+    setTrackFocusIndex(0)
     allowPersistRef.current = true
+    if (artist?.id) {
+      void (async () => {
+        try {
+          const supabase = createBrowserSupabaseClient()
+          const {
+            data: { session },
+          } = await supabase.auth.getSession()
+          if (!session?.access_token) return
+          await fetch(
+            `/api/portal/submission-form-drafts?artistId=${encodeURIComponent(artist.id)}&formType=release`,
+            {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            },
+          )
+        } catch {
+          // ignore
+        }
+      })()
+    }
+    idempotencyKeyRef.current =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`
   }
+
+  const requiredFieldStats = useMemo(() => {
+    let total = 0
+    let filled = 0
+    for (const field of visibleReleaseFields) {
+      if (!field.isRequired || field.fieldType === 'boolean') continue
+      total += 1
+      if ((values[field.fieldKey] ?? '').trim()) filled += 1
+    }
+    for (const track of tracks) {
+      for (const field of visibleTrackFields) {
+        if (!field.isRequired || field.fieldType === 'boolean') continue
+        total += 1
+        if ((track.values[field.fieldKey] ?? '').trim()) filled += 1
+      }
+    }
+    if (coverNeedsVerification) {
+      total += 1
+      if (coverArtVerified) filled += 1
+    }
+    return { total, filled }
+  }, [
+    visibleReleaseFields,
+    visibleTrackFields,
+    values,
+    tracks,
+    coverNeedsVerification,
+    coverArtVerified,
+  ])
 
   return (
     <div className="space-y-6">
@@ -707,6 +871,57 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
                     : t('submission_wizard_type_hint_single')}
                 </p>
               )}
+              {activeStep.kind === 'type' && artist?.id && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        const supabase = createBrowserSupabaseClient()
+                        const {
+                          data: { session },
+                        } = await supabase.auth.getSession()
+                        if (!session?.access_token) return
+                        const res = await fetch(
+                          `/api/portal/release-submissions?artistId=${encodeURIComponent(artist.id)}`,
+                          { headers: { Authorization: `Bearer ${session.access_token}` } },
+                        )
+                        if (!res.ok) {
+                          toast.error(t('submission_wizard_template_empty'))
+                          return
+                        }
+                        const list = (await res.json()) as Array<{
+                          genre?: string | null
+                          notes?: string | null
+                          spotifyUrl?: string | null
+                          appleMusicUrl?: string | null
+                          youtubeUrl?: string | null
+                        }>
+                        const last = Array.isArray(list) ? list[0] : null
+                        if (!last) {
+                          toast.error(t('submission_wizard_template_empty'))
+                          return
+                        }
+                        setValues((prev) => ({
+                          ...prev,
+                          ...(last.genre ? { genre: last.genre } : {}),
+                          ...(last.notes ? { notes: last.notes } : {}),
+                          ...(last.spotifyUrl ? { spotify_url: last.spotifyUrl } : {}),
+                          ...(last.appleMusicUrl ? { apple_music_url: last.appleMusicUrl } : {}),
+                          ...(last.youtubeUrl ? { youtube_url: last.youtubeUrl } : {}),
+                        }))
+                        toast.success(t('submission_wizard_template_done'))
+                      } catch {
+                        toast.error(t('submission_wizard_template_empty'))
+                      }
+                    })()
+                  }}
+                >
+                  {t('submission_wizard_use_template')}
+                </Button>
+              )}
             </div>
           )}
 
@@ -719,110 +934,269 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
                     total: String(tracks.length),
                   })}
                 </p>
-                <Badge variant="secondary">
-                  {tracksComplete}/{tracks.length}
-                </Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary">
+                    {tracksComplete}/{tracks.length}
+                  </Badge>
+                  {tracks.length > 3 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAllTracks((v) => !v)}
+                    >
+                      {showAllTracks
+                        ? t('submission_wizard_tracks_focus_mode')
+                        : t('submission_wizard_tracks_show_all')}
+                    </Button>
+                  )}
+                </div>
               </div>
 
-              <Accordion type="multiple" defaultValue={tracks[0] ? [tracks[0].id] : []} className="space-y-2">
-                {tracks.map((track, index) => {
-                  const complete = isTrackRowComplete(track.values, visibleTrackFields)
-                  return (
-                    <AccordionItem
-                      key={track.id}
-                      value={track.id}
-                      className="rounded-md border border-border px-3"
-                    >
-                      <AccordionTrigger className="hover:no-underline">
-                        <span className="flex items-center gap-2 text-sm font-medium">
-                          {t('releases_submit_track_label', { n: index + 1 })}
-                          {track.values.song_title ? (
-                            <span className="font-normal text-muted-foreground truncate max-w-[12rem]">
-                              — {track.values.song_title}
-                            </span>
-                          ) : null}
-                          <Badge variant={complete ? 'default' : 'outline'} className="text-[10px]">
-                            {complete
-                              ? t('submission_wizard_track_complete')
-                              : t('submission_wizard_track_incomplete')}
-                          </Badge>
-                        </span>
-                      </AccordionTrigger>
-                      <AccordionContent className="space-y-3 pb-4">
-                        {index > 0 && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              const prev = tracks[index - 1]
-                              if (!prev) return
-                              setTracks((rows) =>
-                                rows.map((tr) =>
-                                  tr.id === track.id
-                                    ? {
-                                        ...tr,
-                                        values: copyTrackValues(
-                                          prev.values,
-                                          tr.values,
-                                          COPYABLE_TRACK_KEYS.filter((k) =>
-                                            visibleTrackFields.some((f) => f.fieldKey === k),
-                                          ),
+              {!showAllTracks && tracks.length > 1 ? (
+                <div className="space-y-3 rounded-md border border-border p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium">
+                      {t('releases_submit_track_label', { n: trackFocusIndex + 1 })}
+                      {tracks[trackFocusIndex]?.values.song_title
+                        ? ` — ${tracks[trackFocusIndex]?.values.song_title}`
+                        : ''}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={trackFocusIndex <= 0}
+                        onClick={() => setTrackFocusIndex((i) => Math.max(0, i - 1))}
+                      >
+                        {t('submission_wizard_track_prev')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={trackFocusIndex >= tracks.length - 1}
+                        onClick={() =>
+                          setTrackFocusIndex((i) => Math.min(tracks.length - 1, i + 1))
+                        }
+                      >
+                        {t('submission_wizard_track_next')}
+                      </Button>
+                    </div>
+                  </div>
+                  {tracks[trackFocusIndex] && (
+                    <div className="space-y-3">
+                      {trackFocusIndex > 0 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const prev = tracks[trackFocusIndex - 1]
+                            const track = tracks[trackFocusIndex]
+                            if (!prev || !track) return
+                            setTracks((rows) =>
+                              rows.map((tr) =>
+                                tr.id === track.id
+                                  ? {
+                                      ...tr,
+                                      values: copyTrackValues(
+                                        prev.values,
+                                        tr.values,
+                                        COPYABLE_TRACK_KEYS.filter((k) =>
+                                          visibleTrackFields.some((f) => f.fieldKey === k),
                                         ),
-                                      }
-                                    : tr,
+                                      ),
+                                    }
+                                  : tr,
+                              ),
+                            )
+                            toast.success(t('submission_wizard_copy_prev_done'))
+                          }}
+                        >
+                          {t('submission_wizard_copy_prev')}
+                        </Button>
+                      )}
+                      {visibleTrackFields.map((field) => (
+                        <div key={`${tracks[trackFocusIndex]!.id}-${field.id}`} className="space-y-1">
+                          <SchemaDrivenField
+                            field={field}
+                            locale={locale}
+                            value={tracks[trackFocusIndex]!.values[field.fieldKey] ?? ''}
+                            onChange={(v) =>
+                              setTrackValue(tracks[trackFocusIndex]!.id, field.fieldKey, v)
+                            }
+                            idPrefix={tracks[trackFocusIndex]!.id}
+                            error={
+                              fieldErrors[`${tracks[trackFocusIndex]!.id}:${field.fieldKey}`]
+                            }
+                          />
+                          <button
+                            type="button"
+                            className="text-xs text-primary hover:underline"
+                            onClick={() => {
+                              setTracks((rows) =>
+                                applyFieldToAllTracks(
+                                  rows,
+                                  field.fieldKey,
+                                  tracks[trackFocusIndex]!.values[field.fieldKey] ??
+                                    (field.fieldType === 'boolean' ? 'false' : ''),
                                 ),
                               )
-                              toast.success(t('submission_wizard_copy_prev_done'))
+                              toast.success(t('submission_wizard_apply_all_done'))
                             }}
                           >
-                            {t('submission_wizard_copy_prev')}
-                          </Button>
-                        )}
-                        {visibleTrackFields.map((field) => (
-                          <div key={`${track.id}-${field.id}`} className="space-y-1">
-                            <SchemaDrivenField
-                              field={field}
-                              locale={locale}
-                              value={track.values[field.fieldKey] ?? ''}
-                              onChange={(v) => setTrackValue(track.id, field.fieldKey, v)}
-                              idPrefix={track.id}
-                              error={fieldErrors[`${track.id}:${field.fieldKey}`]}
-                            />
-                            <button
+                            {t('submission_wizard_apply_all')}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Accordion type="multiple" defaultValue={tracks[0] ? [tracks[0].id] : []} className="space-y-2">
+                  {tracks.map((track, index) => {
+                    const complete = isTrackRowComplete(track.values, visibleTrackFields)
+                    return (
+                      <AccordionItem
+                        key={track.id}
+                        value={track.id}
+                        className="rounded-md border border-border px-3"
+                      >
+                        <AccordionTrigger className="hover:no-underline">
+                          <span className="flex items-center gap-2 text-sm font-medium">
+                            {t('releases_submit_track_label', { n: index + 1 })}
+                            {track.values.song_title ? (
+                              <span className="font-normal text-muted-foreground truncate max-w-[12rem]">
+                                — {track.values.song_title}
+                              </span>
+                            ) : null}
+                            <Badge variant={complete ? 'default' : 'outline'} className="text-[10px]">
+                              {complete
+                                ? t('submission_wizard_track_complete')
+                                : t('submission_wizard_track_incomplete')}
+                            </Badge>
+                          </span>
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-3 pb-4">
+                          {index > 0 && (
+                            <Button
                               type="button"
-                              className="text-xs text-primary hover:underline"
+                              variant="outline"
+                              size="sm"
                               onClick={() => {
+                                const prev = tracks[index - 1]
+                                if (!prev) return
                                 setTracks((rows) =>
-                                  applyFieldToAllTracks(
-                                    rows,
-                                    field.fieldKey,
-                                    track.values[field.fieldKey] ?? (field.fieldType === 'boolean' ? 'false' : ''),
+                                  rows.map((tr) =>
+                                    tr.id === track.id
+                                      ? {
+                                          ...tr,
+                                          values: copyTrackValues(
+                                            prev.values,
+                                            tr.values,
+                                            COPYABLE_TRACK_KEYS.filter((k) =>
+                                              visibleTrackFields.some((f) => f.fieldKey === k),
+                                            ),
+                                          ),
+                                        }
+                                      : tr,
                                   ),
                                 )
-                                toast.success(t('submission_wizard_apply_all_done'))
+                                toast.success(t('submission_wizard_copy_prev_done'))
                               }}
                             >
-                              {t('submission_wizard_apply_all')}
-                            </button>
-                          </div>
-                        ))}
-                      </AccordionContent>
-                    </AccordionItem>
-                  )
-                })}
-              </Accordion>
+                              {t('submission_wizard_copy_prev')}
+                            </Button>
+                          )}
+                          {visibleTrackFields.map((field) => (
+                            <div key={`${track.id}-${field.id}`} className="space-y-1">
+                              <SchemaDrivenField
+                                field={field}
+                                locale={locale}
+                                value={track.values[field.fieldKey] ?? ''}
+                                onChange={(v) => setTrackValue(track.id, field.fieldKey, v)}
+                                idPrefix={track.id}
+                                error={fieldErrors[`${track.id}:${field.fieldKey}`]}
+                              />
+                              <button
+                                type="button"
+                                className="text-xs text-primary hover:underline"
+                                onClick={() => {
+                                  setTracks((rows) =>
+                                    applyFieldToAllTracks(
+                                      rows,
+                                      field.fieldKey,
+                                      track.values[field.fieldKey] ??
+                                        (field.fieldType === 'boolean' ? 'false' : ''),
+                                    ),
+                                  )
+                                  toast.success(t('submission_wizard_apply_all_done'))
+                                }}
+                              >
+                                {t('submission_wizard_apply_all')}
+                              </button>
+                            </div>
+                          ))}
+                        </AccordionContent>
+                      </AccordionItem>
+                    )
+                  })}
+                </Accordion>
+              )}
             </div>
           )}
 
           {activeStep.kind === 'review' && (
             <div className="space-y-4">
-              <div className="rounded-md border border-border p-4 space-y-2">
-                <h3 className="text-sm font-semibold">{t('submission_wizard_review_summary')}</h3>
+              <div className="rounded-md border border-border p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">{t('submission_wizard_review_summary')}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {t('submission_wizard_completeness', {
+                      filled: String(requiredFieldStats.filled),
+                      total: String(requiredFieldStats.total),
+                    })}
+                  </p>
+                </div>
+                <div
+                  className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+                  role="progressbar"
+                  aria-valuenow={
+                    requiredFieldStats.total
+                      ? Math.round((requiredFieldStats.filled / requiredFieldStats.total) * 100)
+                      : 100
+                  }
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <div
+                    className="h-full bg-primary transition-all"
+                    style={{
+                      width: `${
+                        requiredFieldStats.total
+                          ? Math.round((requiredFieldStats.filled / requiredFieldStats.total) * 100)
+                          : 100
+                      }%`,
+                    }}
+                  />
+                </div>
+                {values.cover_art_url?.trim() && coverArtVerified && (
+                  <div
+                    className="h-20 w-20 rounded-md border border-border bg-cover bg-center"
+                    role="img"
+                    aria-label={t('releases_submit_cover_check_heading')}
+                    style={{
+                      backgroundImage: `url(${JSON.stringify(values.cover_art_url)})`,
+                    }}
+                  />
+                )}
                 <dl className="grid gap-2 text-sm sm:grid-cols-2">
                   {visibleReleaseFields.map((field) => {
                     const raw = values[field.fieldKey] ?? ''
                     if (!raw.trim() && field.fieldType !== 'boolean') return null
+                    const isUrl = field.fieldType === 'url' || field.fieldKey.endsWith('_url')
                     return (
                       <div key={field.id}>
                         <dt className="text-muted-foreground text-xs">
@@ -833,7 +1207,18 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
                             ? raw === 'true'
                               ? t('submission_wizard_yes')
                               : t('submission_wizard_no')
-                            : raw}
+                            : isUrl && raw.trim() ? (
+                                <a
+                                  href={raw}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline"
+                                >
+                                  {raw}
+                                </a>
+                              ) : (
+                                raw
+                              )}
                         </dd>
                       </div>
                     )
