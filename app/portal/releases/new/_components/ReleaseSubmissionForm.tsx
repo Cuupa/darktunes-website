@@ -252,7 +252,15 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
       allowPersistRef.current = true
     }
     void restore()
-  }, [draftLoaded, artist?.id, applyDraftPayload, localDraft])
+    // localDraft is read once when draftLoaded flips true (IndexedDB already resolved).
+    // Do not re-run on every localDraft write from persist.
+  }, [draftLoaded, artist?.id, applyDraftPayload])
+
+  // Stable key so effects do not re-fire when wizardSteps is a new array with same ids
+  const wizardStepIdsKey = useMemo(
+    () => wizardSteps.map((s) => s.id).join('|'),
+    [wizardSteps],
+  )
 
   // Apply restored draft step once wizard steps are ready
   useEffect(() => {
@@ -264,30 +272,43 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
       setMaxReachableIndex((m) => Math.max(m, idx))
       restoredStepIdRef.current = null
     }
-  }, [wizardSteps])
+  }, [wizardStepIdsKey, wizardSteps])
 
-  // URL ?step= — only navigate to already-reachable steps (no skip-ahead)
-  useEffect(() => {
-    const stepParam = searchParams.get('step')
-    if (!stepParam || wizardSteps.length === 0) return
-    const idx = wizardSteps.findIndex((s) => s.id === stepParam)
-    if (idx < 0) return
-    if (idx <= maxReachableIndex) {
-      setActiveIndex((current) => (current === idx ? current : idx))
-    }
-  }, [searchParams, wizardSteps, maxReachableIndex])
-
-  // Sync step → URL (replace only when step id actually differs)
+  // Write active step → URL only (one direction). Reading URL on load is covered by
+  // draft restore + optional initial stepParam below — never both write and read in a cycle.
+  const lastWrittenStepRef = useRef<string | null>(null)
   useEffect(() => {
     const stepId = wizardSteps[activeIndex]?.id
-    if (!stepId) return
-    const current = searchParams.get('step')
-    if (current === stepId) return
-    const params = new URLSearchParams(searchParams.toString())
+    if (!stepId || typeof window === 'undefined') return
+    if (lastWrittenStepRef.current === stepId) return
+    lastWrittenStepRef.current = stepId
+    const params = new URLSearchParams(window.location.search)
     params.set('step', stepId)
     if (artist?.id) params.set('artistId', artist.id)
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }, [activeIndex, wizardSteps, pathname, router, searchParams, artist?.id])
+  }, [activeIndex, wizardStepIdsKey, wizardSteps, pathname, router, artist?.id])
+
+  // One-shot: if URL already has a reachable step (e.g. refresh after draft raised maxReachable), apply it
+  const didInitStepFromUrlRef = useRef(false)
+  useEffect(() => {
+    if (didInitStepFromUrlRef.current || wizardSteps.length === 0) return
+    // Wait a tick so draft step restore can raise maxReachableIndex first
+    const t = window.setTimeout(() => {
+      if (didInitStepFromUrlRef.current) return
+      didInitStepFromUrlRef.current = true
+      const stepParam = searchParams.get('step')
+      if (!stepParam) return
+      const idx = wizardSteps.findIndex((s) => s.id === stepParam)
+      if (idx < 0) return
+      setMaxReachableIndex((maxR) => {
+        if (idx <= maxR) {
+          setActiveIndex((cur) => (cur === idx ? cur : idx))
+        }
+        return maxR
+      })
+    }, 0)
+    return () => window.clearTimeout(t)
+  }, [wizardStepIdsKey, wizardSteps, searchParams])
 
   // Persist draft (local + server)
   useEffect(() => {
@@ -352,21 +373,35 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
   }, [releaseType, typeRules])
 
   // Resize track rows when count / track fields change — do not depend on all release values
+  const trackFieldKeys = useMemo(
+    () => visibleTrackFields.map((f) => f.fieldKey).join('|'),
+    [visibleTrackFields],
+  )
   useEffect(() => {
     const count = userSpecifiedTracks ? trackCount : 1
-    setTracks((prev) => buildTrackRows(count, visibleTrackFields, prev, valuesRef.current))
-  }, [trackCount, userSpecifiedTracks, visibleTrackFields])
+    setTracks((prev) => {
+      const next = buildTrackRows(count, visibleTrackFields, prev, valuesRef.current)
+      // Bail out if structure unchanged to avoid update loops
+      if (
+        next.length === prev.length &&
+        next.every((row, i) => row.id === prev[i]?.id && row.values === prev[i]?.values)
+      ) {
+        return prev
+      }
+      return next
+    })
+  }, [trackCount, userSpecifiedTracks, trackFieldKeys, visibleTrackFields])
 
   // Keep active index in range when steps change (e.g. type switch)
   useEffect(() => {
-    if (activeIndex >= wizardSteps.length) {
-      setActiveIndex(Math.max(0, wizardSteps.length - 1))
-    }
+    const len = wizardSteps.length
+    if (len === 0) return
+    setActiveIndex((i) => (i >= len ? Math.max(0, len - 1) : i))
     setMaxReachableIndex((m) => {
-      const maxStep = Math.max(wizardSteps.length - 1, 0)
+      const maxStep = Math.max(len - 1, 0)
       return m > maxStep ? maxStep : m
     })
-  }, [wizardSteps.length, activeIndex])
+  }, [wizardSteps.length])
 
   useEffect(() => {
     if (!headingFocusRef.current) {

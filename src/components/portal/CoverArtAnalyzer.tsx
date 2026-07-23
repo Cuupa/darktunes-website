@@ -108,6 +108,8 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
     if (!autoCheck) return
     const trimmed = url.trim()
     if (!trimmed) {
+      // Avoid re-notifying parent on every mount/render when already cleared
+      if (lastCheckedUrl.current === '' ) return
       requestIdRef.current += 1
       lastCheckedUrl.current = ''
       setState('idle')
