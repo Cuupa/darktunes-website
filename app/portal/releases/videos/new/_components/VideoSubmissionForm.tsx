@@ -1,7 +1,7 @@
 'use client'
 
 import { useLocale, useTranslations } from 'next-intl'
-import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
+import { useMemo, useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { SchemaDrivenField } from '@/components/submissions/SchemaDrivenField'
@@ -43,11 +43,6 @@ export function VideoSubmissionForm({ formSchema, artist }: VideoSubmissionFormP
   const [activeIndex, setActiveIndex] = useState(0)
   const [maxReachableIndex, setMaxReachableIndex] = useState(0)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const idempotencyKeyRef = useRef(
-    typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-  )
 
   const visibleFields = useMemo(
     () => [...formSchema].filter((f) => f.isVisible).sort((a, b) => a.displayOrder - b.displayOrder),
@@ -155,7 +150,6 @@ export function VideoSubmissionForm({ formSchema, artist }: VideoSubmissionFormP
         body: JSON.stringify({
           ...standardBody,
           formData: Object.keys(formData).length > 0 ? formData : null,
-          idempotencyKey: idempotencyKeyRef.current,
         }),
       })
 

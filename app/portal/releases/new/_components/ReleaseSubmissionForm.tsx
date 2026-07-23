@@ -198,6 +198,8 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     [visibleReleaseFields, visibleTrackFields],
   )
 
+  const restoredStepIdRef = useRef<string | null>(null)
+
   const applyDraftPayload = useCallback((payload: DraftPayload) => {
     if (!payload.values || Object.keys(payload.values).length === 0) return false
     const restoredType = (payload.values.type || 'single') as SubmissionReleaseType
@@ -205,12 +207,14 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     setValues((prev) => ({ ...prev, ...payload.values }))
     if (payload.tracks?.length) setTracks(payload.tracks)
     if (typeof payload.trackCount === 'number') setTrackCount(payload.trackCount)
+    // Never trust draft verification — CoverArtAnalyzer re-checks the URL
     setCoverArtVerified(false)
     setCoverArtCheckToken(null)
+    if (payload.stepId) restoredStepIdRef.current = payload.stepId
     return true
   }, [])
 
-  // Restore: prefer server draft, fall back to IndexedDB
+  // Restore: prefer server draft, fall back to IndexedDB (once)
   useEffect(() => {
     if (!draftLoaded || restoredRef.current) return
     restoredRef.current = true
@@ -248,33 +252,38 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
       allowPersistRef.current = true
     }
     void restore()
-  }, [draftLoaded, localDraft, artist?.id, applyDraftPayload])
+  }, [draftLoaded, artist?.id, applyDraftPayload, localDraft])
 
-  // Restore step from draft banner or ?step=
+  // Apply restored draft step once wizard steps are ready
   useEffect(() => {
-    const stepParam = searchParams.get('step')
-    if (stepParam) {
-      const idx = wizardSteps.findIndex((s) => s.id === stepParam)
-      if (idx >= 0) {
-        setActiveIndex(idx)
-        setMaxReachableIndex((m) => Math.max(m, idx))
-        return
-      }
-    }
-    if (!localDraft?.stepId || !showDraftBanner) return
-    const idx = wizardSteps.findIndex((s) => s.id === localDraft.stepId)
+    const stepId = restoredStepIdRef.current
+    if (!stepId || wizardSteps.length === 0) return
+    const idx = wizardSteps.findIndex((s) => s.id === stepId)
     if (idx >= 0) {
       setActiveIndex(idx)
       setMaxReachableIndex((m) => Math.max(m, idx))
+      restoredStepIdRef.current = null
     }
-  }, [wizardSteps, localDraft?.stepId, showDraftBanner, searchParams])
+  }, [wizardSteps])
 
-  // Sync step → URL
+  // URL ?step= — only navigate to already-reachable steps (no skip-ahead)
+  useEffect(() => {
+    const stepParam = searchParams.get('step')
+    if (!stepParam || wizardSteps.length === 0) return
+    const idx = wizardSteps.findIndex((s) => s.id === stepParam)
+    if (idx < 0) return
+    if (idx <= maxReachableIndex) {
+      setActiveIndex((current) => (current === idx ? current : idx))
+    }
+  }, [searchParams, wizardSteps, maxReachableIndex])
+
+  // Sync step → URL (replace only when step id actually differs)
   useEffect(() => {
     const stepId = wizardSteps[activeIndex]?.id
     if (!stepId) return
+    const current = searchParams.get('step')
+    if (current === stepId) return
     const params = new URLSearchParams(searchParams.toString())
-    if (params.get('step') === stepId) return
     params.set('step', stepId)
     if (artist?.id) params.set('artistId', artist.id)
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })

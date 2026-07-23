@@ -9,6 +9,7 @@ import { getReleaseTypeRules } from '@/lib/api/submissionReleaseTypeRules'
 import {
   checkAndClaimIdempotencyKey,
   getIdempotencyKeyRecord,
+  releaseIdempotencyKey,
   updateIdempotencyKeyResourceId,
 } from '@/lib/api/idempotency'
 import { sendSubmissionNotificationEmail } from '@/lib/email/sendSubmissionNotificationEmail'
@@ -76,134 +77,146 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw new ApiError(409, 'Duplicate request: this submission was already processed')
   }
 
-  const [schemaFields, typeRules] = await Promise.all([
-    getFormSchema(supabase, 'release'),
-    getReleaseTypeRules(supabase),
-  ])
+  try {
+    const [schemaFields, typeRules] = await Promise.all([
+      getFormSchema(supabase, 'release'),
+      getReleaseTypeRules(supabase),
+    ])
 
-  const standardBody: Record<string, unknown> = { ...body, releaseDate: coerceReleaseDate(body.releaseDate) }
-  const tracks = body.tracks ?? []
-
-  validateReleaseSubmissionByType({
-    releaseType: body.type,
-    trackCount: body.trackCount,
-    tracks,
-    schemaFields,
-    typeRules,
-    standardBody,
-    formData,
-  })
-
-  // Cover integrity: accept short-lived signed token, else re-verify server-side
-  const coverFieldInSchema = schemaFields.some(
-    (f) => f.fieldKey === 'cover_art_url' && f.fieldScope === 'release' && f.isVisible,
-  )
-  if (coverFieldInSchema || body.coverArtUrl) {
-    const { serverEnv } = await import('@/lib/env.server')
-    let coverOk = false
-    if (body.coverArtCheckToken) {
-      const tokenResult = verifyCoverArtToken(
-        serverEnv.API_CREDENTIALS_ENCRYPTION_KEY,
-        body.coverArtCheckToken,
-        body.coverArtUrl,
-      )
-      coverOk = tokenResult.ok
+    const standardBody: Record<string, unknown> = {
+      ...body,
+      releaseDate: coerceReleaseDate(body.releaseDate),
     }
-    if (!coverOk) {
-      const coverCheck = await verifyCoverArtUrl(body.coverArtUrl, {
-        r2PublicUrl: serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
-      })
-      if (!coverCheck.verified) {
-        throw new ApiError(
-          400,
-          coverCheck.message ??
-            `Cover art verification failed (${coverCheck.code}). Expected JPEG 3000×3000.`,
+    const tracks = body.tracks ?? []
+
+    validateReleaseSubmissionByType({
+      releaseType: body.type,
+      trackCount: body.trackCount,
+      tracks,
+      schemaFields,
+      typeRules,
+      standardBody,
+      formData,
+    })
+
+    // Cover integrity: accept short-lived signed token, else re-verify server-side
+    const coverFieldInSchema = schemaFields.some(
+      (f) => f.fieldKey === 'cover_art_url' && f.fieldScope === 'release' && f.isVisible,
+    )
+    if (coverFieldInSchema || body.coverArtUrl) {
+      const { serverEnv } = await import('@/lib/env.server')
+      let coverOk = false
+      if (body.coverArtCheckToken) {
+        const tokenResult = verifyCoverArtToken(
+          serverEnv.API_CREDENTIALS_ENCRYPTION_KEY,
+          body.coverArtCheckToken,
+          body.coverArtUrl,
         )
+        coverOk = tokenResult.ok
       }
-    }
-  }
-
-  const releaseType = body.type ?? 'single'
-  const trackFields = filterArtistTrackFields(
-    filterFieldsForType(
-      schemaFields.filter((f) => f.fieldScope === 'track'),
-      releaseType,
-      { type: releaseType },
-    ),
-  )
-
-  const submission = await createReleaseSubmission(supabase, {
-    artist_id: artist.id,
-    title: body.title,
-    audio_download_url: body.audioDownloadUrl,
-    cover_art_url: body.coverArtUrl,
-    cover_art_verified: true,
-    release_date: coerceReleaseDate(body.releaseDate),
-    type: body.type ?? null,
-    genre: body.genre ?? null,
-    catalog_number: body.catalogNumber ?? null,
-    isrc: body.isrc ?? null,
-    label_copy: body.labelCopy ?? null,
-    spotify_url: body.spotifyUrl ?? null,
-    apple_music_url: body.appleMusicUrl ?? null,
-    youtube_url: body.youtubeUrl ?? null,
-    notes: body.notes ?? null,
-    form_data: Object.keys(formData).length > 0 ? formData : null,
-  })
-
-  if (tracks.length > 0) {
-    const inserts = tracks.map((track, index) => {
-      const fieldValues: Record<string, { value: string; fieldType: SubmissionFieldType }> = {}
-      for (const field of trackFields) {
-        fieldValues[field.fieldKey] = {
-          value: track.values[field.fieldKey] ?? '',
-          fieldType: field.fieldType,
+      if (!coverOk) {
+        const coverCheck = await verifyCoverArtUrl(body.coverArtUrl, {
+          r2PublicUrl: serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
+        })
+        if (!coverCheck.verified) {
+          throw new ApiError(
+            400,
+            coverCheck.message ??
+              `Cover art verification failed (${coverCheck.code}). Expected JPEG 3000×3000.`,
+          )
         }
       }
-      return buildTrackInsert(submission.id, track.trackNumber, index, fieldValues)
+    }
+
+    const releaseType = body.type ?? 'single'
+    const trackFields = filterArtistTrackFields(
+      filterFieldsForType(
+        schemaFields.filter((f) => f.fieldScope === 'track'),
+        releaseType,
+        { type: releaseType },
+      ),
+    )
+
+    const submission = await createReleaseSubmission(supabase, {
+      artist_id: artist.id,
+      title: body.title,
+      audio_download_url: body.audioDownloadUrl,
+      cover_art_url: body.coverArtUrl,
+      cover_art_verified: true,
+      release_date: coerceReleaseDate(body.releaseDate),
+      type: body.type ?? null,
+      genre: body.genre ?? null,
+      catalog_number: body.catalogNumber ?? null,
+      isrc: body.isrc ?? null,
+      label_copy: body.labelCopy ?? null,
+      spotify_url: body.spotifyUrl ?? null,
+      apple_music_url: body.appleMusicUrl ?? null,
+      youtube_url: body.youtubeUrl ?? null,
+      notes: body.notes ?? null,
+      form_data: Object.keys(formData).length > 0 ? formData : null,
     })
-    await createReleaseSubmissionTracks(supabase, inserts)
+
+    if (tracks.length > 0) {
+      const inserts = tracks.map((track, index) => {
+        const fieldValues: Record<string, { value: string; fieldType: SubmissionFieldType }> = {}
+        for (const field of trackFields) {
+          fieldValues[field.fieldKey] = {
+            value: track.values[field.fieldKey] ?? '',
+            fieldType: field.fieldType,
+          }
+        }
+        return buildTrackInsert(submission.id, track.trackNumber, index, fieldValues)
+      })
+      await createReleaseSubmissionTracks(supabase, inserts)
+    }
+
+    const { data: recipientProfiles } = await serviceRole
+      .from('users')
+      .select('id')
+      .in('role', ['admin', 'editor'])
+
+    const recipients = (recipientProfiles ?? []).map((profile) => ({
+      recipient_id: profile.id,
+      type: 'artist_release_submission',
+      entity_type: 'release_submission',
+      entity_id: submission.id,
+      entity_name: submission.title,
+      sender_id: user.id,
+      read: false,
+    }))
+
+    if (recipients.length > 0) {
+      await serviceRole.from('editor_notifications').insert(recipients)
+    }
+
+    const { resendApiKey: storedResendKey, resendFromEmail: storedFromEmail } =
+      await getEmailCredentials(serviceRole)
+    const resendApiKey = storedResendKey ?? ''
+    const resendFromEmail = storedFromEmail ?? ''
+    const labelNotificationEmail = process.env.LABEL_NOTIFICATION_EMAIL ?? ''
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://darktunes.com').replace(/\/$/, '')
+    void sendSubmissionNotificationEmail(
+      {
+        type: 'release',
+        title: submission.title,
+        artistName: artist.name,
+        submittedAt: new Date().toISOString(),
+        adminUrl: `${siteUrl}/admin`,
+      },
+      { resendApiKey, resendFromEmail, labelNotificationEmail, fetch },
+    ).catch((err: unknown) =>
+      console.error(
+        '[submit-release] Email notification error:',
+        err instanceof Error ? err.message : err,
+      ),
+    )
+
+    await updateIdempotencyKeyResourceId(serviceRole, body.idempotencyKey, submission.id)
+
+    return NextResponse.json({ submissionId: submission.id })
+  } catch (err) {
+    // Allow client retry with the same key after validation / transient failures
+    await releaseIdempotencyKey(serviceRole, body.idempotencyKey)
+    throw err
   }
-
-  const { data: recipientProfiles } = await serviceRole
-    .from('users')
-    .select('id')
-    .in('role', ['admin', 'editor'])
-
-  const recipients = (recipientProfiles ?? []).map((profile) => ({
-    recipient_id: profile.id,
-    type: 'artist_release_submission',
-    entity_type: 'release_submission',
-    entity_id: submission.id,
-    entity_name: submission.title,
-    sender_id: user.id,
-    read: false,
-  }))
-
-  if (recipients.length > 0) {
-    await serviceRole.from('editor_notifications').insert(recipients)
-  }
-
-  const { resendApiKey: storedResendKey, resendFromEmail: storedFromEmail } =
-    await getEmailCredentials(serviceRole)
-  const resendApiKey = storedResendKey ?? ''
-  const resendFromEmail = storedFromEmail ?? ''
-  const labelNotificationEmail = process.env.LABEL_NOTIFICATION_EMAIL ?? ''
-  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? 'https://darktunes.com').replace(/\/$/, '')
-  void sendSubmissionNotificationEmail(
-    {
-      type: 'release',
-      title: submission.title,
-      artistName: artist.name,
-      submittedAt: new Date().toISOString(),
-      adminUrl: `${siteUrl}/admin`,
-    },
-    { resendApiKey, resendFromEmail, labelNotificationEmail, fetch },
-  ).catch((err: unknown) =>
-    console.error('[submit-release] Email notification error:', err instanceof Error ? err.message : err),
-  )
-
-  void updateIdempotencyKeyResourceId(serviceRole, body.idempotencyKey, submission.id)
-
-  return NextResponse.json({ submissionId: submission.id })
 })
