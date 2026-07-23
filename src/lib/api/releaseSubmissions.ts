@@ -72,6 +72,75 @@ export async function createReleaseSubmission(
   return rowToSubmission(data)
 }
 
+/**
+ * Atomic insert of submission + tracks via SECURITY DEFINER RPC
+ * (public.create_release_submission_with_tracks). Call with service-role
+ * after membership validation.
+ */
+export async function createReleaseSubmissionWithTracksAtomic(
+  db: DbClient,
+  submission: Insert,
+  tracks: Database['public']['Tables']['release_submission_tracks']['Insert'][],
+): Promise<ReleaseSubmission> {
+  const pSubmission: Record<string, unknown> = {
+    artist_id: submission.artist_id,
+    title: submission.title,
+    audio_download_url: submission.audio_download_url,
+    cover_art_url: submission.cover_art_url,
+    cover_art_verified: submission.cover_art_verified ?? false,
+    release_date: submission.release_date ?? null,
+    type: submission.type ?? null,
+    genre: submission.genre ?? null,
+    catalog_number: submission.catalog_number ?? null,
+    isrc: submission.isrc ?? null,
+    label_copy: submission.label_copy ?? null,
+    spotify_url: submission.spotify_url ?? null,
+    apple_music_url: submission.apple_music_url ?? null,
+    youtube_url: submission.youtube_url ?? null,
+    notes: submission.notes ?? null,
+    form_data: submission.form_data ?? null,
+  }
+
+  const pTracks = tracks.map((t) => ({
+    track_number: t.track_number,
+    display_order: t.display_order,
+    title: t.title ?? null,
+    isrc: t.isrc ?? null,
+    composer: t.composer ?? null,
+    author: t.author ?? null,
+    genre: t.genre ?? null,
+    language: t.language ?? null,
+    gema: t.gema ?? null,
+    explicit: t.explicit ?? null,
+    live: t.live ?? null,
+    cover: t.cover ?? null,
+    instrumental: t.instrumental ?? null,
+    preview_start_seconds: t.preview_start_seconds ?? null,
+    duration_seconds: t.duration_seconds ?? null,
+    form_data: t.form_data ?? null,
+  }))
+
+  // RPC is defined in reset.sql; Database.Functions is still Record<string, never>
+  // until a full type regen — call via untyped client surface.
+  const { data: id, error } = await (db as unknown as {
+    rpc: (
+      fn: string,
+      args: { p_submission: Record<string, unknown>; p_tracks: unknown },
+    ) => Promise<{ data: string | null; error: { message: string } | null }>
+  }).rpc('create_release_submission_with_tracks', {
+    p_submission: pSubmission,
+    p_tracks: pTracks,
+  })
+  if (error) throw new Error(error.message)
+  if (!id || typeof id !== 'string') {
+    throw new Error('No id returned from create_release_submission_with_tracks')
+  }
+
+  const created = await getReleaseSubmissionById(db, id)
+  if (!created) throw new Error('Submission created but could not be reloaded')
+  return created
+}
+
 export async function updateReleaseSubmissionStatus(
   db: DbClient,
   id: string,

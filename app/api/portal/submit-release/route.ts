@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-import { createReleaseSubmission } from '@/lib/api/releaseSubmissions'
-import { createReleaseSubmissionTracks } from '@/lib/api/releaseSubmissionTracks'
+import { createReleaseSubmissionWithTracksAtomic } from '@/lib/api/releaseSubmissions'
 import { getFormSchema } from '@/lib/api/submissionFormSchema'
 import { getReleaseTypeRules } from '@/lib/api/submissionReleaseTypeRules'
 import {
@@ -58,7 +57,9 @@ const bodySchema = z.object({
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
-  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId, {
+    requireArtistId: true,
+  })
 
   const body = bodySchema.parse(await req.json())
   const formData = (body.formData ?? {}) as Record<string, unknown>
@@ -137,38 +138,46 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       ),
     )
 
-    const submission = await createReleaseSubmission(supabase, {
-      artist_id: artist.id,
-      title: body.title,
-      audio_download_url: body.audioDownloadUrl,
-      cover_art_url: body.coverArtUrl,
-      cover_art_verified: true,
-      release_date: coerceReleaseDate(body.releaseDate),
-      type: body.type ?? null,
-      genre: body.genre ?? null,
-      catalog_number: body.catalogNumber ?? null,
-      isrc: body.isrc ?? null,
-      label_copy: body.labelCopy ?? null,
-      spotify_url: body.spotifyUrl ?? null,
-      apple_music_url: body.appleMusicUrl ?? null,
-      youtube_url: body.youtubeUrl ?? null,
-      notes: body.notes ?? null,
-      form_data: Object.keys(formData).length > 0 ? formData : null,
+    const trackInserts = tracks.map((track, index) => {
+      const fieldValues: Record<string, { value: string; fieldType: SubmissionFieldType }> = {}
+      for (const field of trackFields) {
+        fieldValues[field.fieldKey] = {
+          value: track.values[field.fieldKey] ?? '',
+          fieldType: field.fieldType,
+        }
+      }
+      return buildTrackInsert(
+        // placeholder — RPC assigns submission_id
+        '00000000-0000-0000-0000-000000000000',
+        track.trackNumber,
+        index,
+        fieldValues,
+      )
     })
 
-    if (tracks.length > 0) {
-      const inserts = tracks.map((track, index) => {
-        const fieldValues: Record<string, { value: string; fieldType: SubmissionFieldType }> = {}
-        for (const field of trackFields) {
-          fieldValues[field.fieldKey] = {
-            value: track.values[field.fieldKey] ?? '',
-            fieldType: field.fieldType,
-          }
-        }
-        return buildTrackInsert(submission.id, track.trackNumber, index, fieldValues)
-      })
-      await createReleaseSubmissionTracks(supabase, inserts)
-    }
+    // Atomic submission + tracks (service role RPC after membership check)
+    const submission = await createReleaseSubmissionWithTracksAtomic(
+      serviceRole,
+      {
+        artist_id: artist.id,
+        title: body.title,
+        audio_download_url: body.audioDownloadUrl,
+        cover_art_url: body.coverArtUrl,
+        cover_art_verified: true,
+        release_date: coerceReleaseDate(body.releaseDate),
+        type: body.type ?? null,
+        genre: body.genre ?? null,
+        catalog_number: body.catalogNumber ?? null,
+        isrc: body.isrc ?? null,
+        label_copy: body.labelCopy ?? null,
+        spotify_url: body.spotifyUrl ?? null,
+        apple_music_url: body.appleMusicUrl ?? null,
+        youtube_url: body.youtubeUrl ?? null,
+        notes: body.notes ?? null,
+        form_data: Object.keys(formData).length > 0 ? formData : null,
+      },
+      trackInserts,
+    )
 
     const { data: recipientProfiles } = await serviceRole
       .from('users')

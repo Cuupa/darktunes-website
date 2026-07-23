@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **P0 portal security/reliability:** `verify:portal-rls` static gate; `artistId` required on submit/drafts mutations; distributed rate-limit helper (Upstash optional); `withIdempotency` + video submit / invoice payment keys; atomic `create_release_submission_with_tracks` RPC; documents upload via `portalMemberWrite` canary.
 - **Portal release submission wizard:** guided multi-step flow (type → field groups → tracks → review) driven by `field_group`; track focus mode, copy/apply-all, `?step=` URL, review completeness, prefill from last submission.
 - **Server submission drafts:** `submission_form_drafts` + portal draft API (release/video); local IndexedDB cache.
 - **Cover art verification:** server JPEG 3000×3000 check with stable error codes, retries, and short-lived HMAC token so submit can skip re-download; no R2 during form.
