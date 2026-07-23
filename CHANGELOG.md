@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Admin wizard groups:** submission form manager can set each field’s wizard group (`metadata`, `distribution`, `rights`, `track`, custom).
 
 ### Fixed
+- **Portal profile hometown 500:** Idempotent `artists.hometown` (and related) `ADD COLUMN IF NOT EXISTS` so existing prod DBs get the column after epk→artists consolidation; roster-only profile saves no longer fail hard on EPK read errors.
 - **Assets storage bar:** Sum via service-role RPC/pagination; refresh after upload/delete; configurable limit via `NEXT_PUBLIC_R2_STORAGE_LIMIT_BYTES`.
 - **Asset → artist folder placement:** Assigning artists always moves the file into the artist folder (single) or primary `collabs` subfolder (multi); creates missing artist folders under `artists/`. Never treats a collabs folder as the artist root.
 - **Portal mailbox i18n:** Compose/reply/trash strings use `portal` message keys (en/de).

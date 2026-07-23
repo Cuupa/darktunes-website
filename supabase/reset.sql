@@ -589,6 +589,15 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS tiktok_url     TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS bandcamp_url   TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS shop_url       TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS founding_year  INTEGER;
+-- hometown lived on artist_epks until Track 2/3 consolidation; without this
+-- ADD COLUMN, existing prod DBs (CREATE TABLE IF NOT EXISTS no-ops) miss it and
+-- portal profile PUT returns 500 ("Could not find the 'hometown' column").
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS hometown       TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS country        TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS email          TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS vat_number     TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS is_eu_non_german BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS notes          TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS soundcloud_url TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS logo_url       TEXT;
