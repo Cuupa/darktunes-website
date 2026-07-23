@@ -92,7 +92,7 @@ Enterprise SOS + invoice lifecycle. Workflow helpers: `src/lib/sos/statementWork
 | Field schema | `submission_form_schema` (`field_scope`: `release` \| `track`; `field_group` drives wizard steps; optional `type_rules` JSONB per release type) |
 | Track count rules | `submission_release_type_rules` (`fixed_1` for single; `user_specified` + min/max for album/ep/compilation) |
 | Wizard steps | `src/lib/submissions/wizardSteps.ts` — type → groups (`metadata` / `distribution` / `rights` / custom) → tracks → review |
-| Cover art check | `POST /api/portal/cover-art-check` + `verifyCoverArtUrl` (server-side, Drive-aware); re-checked on `POST /api/portal/submit-release` |
+| Cover art | Prefer client upload: local JPEG + 3000×3000 check (`coverArtClientValidate`) → `POST /api/portal/upload-release-cover` (R2). Optional public URL path: `POST /api/portal/cover-art-check`. Submit re-verifies server-side. |
 | Draft autosave | IndexedDB via `useLocalKV` key `release-submission-draft:{artistId}` |
 | Rule resolution | `src/lib/submissions/fieldTypeRules.ts` — shared by portal UI + submit route |
 | Admin UI | `SubmissionFormManager` — Fields (incl. wizard group), Track rules, Rules per type |

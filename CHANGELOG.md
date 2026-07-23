@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Portal release submission wizard:** guided multi-step flow (type → field groups → tracks → review) driven by `field_group`; track copy/apply-all helpers; local draft autosave.
+- **Cover art client upload:** artists upload JPEG covers in the browser; 3000×3000 + JPEG validated client-side before `POST /api/portal/upload-release-cover` (R2). Optional public URL + server check still available.
 - **Server-side cover art verification:** `POST /api/portal/cover-art-check` verifies JPEG 3000×3000 (Google Drive share links supported); submit re-checks server-side.
 - **Admin wizard groups:** submission form manager can set each field’s wizard group (`metadata`, `distribution`, `rights`, `track`, custom).
 

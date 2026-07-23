@@ -514,17 +514,24 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
       <div key={field.id}>
         {field.fieldKey === 'cover_art_url' ? (
           <div className="space-y-2">
-            <SchemaDrivenField
-              field={field}
-              locale={locale}
-              value={values[field.fieldKey] ?? ''}
-              onChange={(v) => setFieldValue(field.fieldKey, v)}
-              error={fieldErrors[field.fieldKey]}
-            />
+            <Label className="text-sm font-medium">
+              {field.fieldLabels[locale] ?? field.fieldLabels.en ?? field.fieldKey}
+              {field.isRequired && (
+                <span className="text-destructive ml-1" aria-hidden="true">
+                  *
+                </span>
+              )}
+            </Label>
             <CoverArtAnalyzer
               url={values.cover_art_url ?? ''}
               onVerified={handleCoverArtVerified}
+              onUrlChange={(v) => setFieldValue('cover_art_url', v)}
             />
+            {fieldErrors[field.fieldKey] && (
+              <p className="text-sm text-destructive" role="alert">
+                {fieldErrors[field.fieldKey]}
+              </p>
+            )}
           </div>
         ) : (
           <SchemaDrivenField
