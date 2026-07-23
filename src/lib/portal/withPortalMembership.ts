@@ -35,17 +35,29 @@ export interface PortalMembershipContext {
 
 /**
  * Authenticate the portal Bearer token and resolve the active artist membership.
- * @throws ApiError 401/403
+ *
+ * @param options.requireArtistId — when true (default for write helpers), missing
+ *   artistId throws 400 instead of falling back to the first membership.
+ * @throws ApiError 400/401/403
  */
 export async function withPortalMembership(
   req: NextRequest,
   artistId?: string | null,
+  options?: { requireArtistId?: boolean },
 ): Promise<PortalMembershipContext> {
+  // Default false preserves list/read fallbacks; write routes must pass requireArtistId: true
+  // or use withPortalMembershipWrite().
+  const requireArtistId = options?.requireArtistId === true
+  const trimmed = typeof artistId === 'string' ? artistId.trim() : ''
+  if (requireArtistId && !trimmed) {
+    throw new ApiError(400, 'artistId is required')
+  }
+
   const { token, user, supabase: userDb } = await authenticatePortalBearer(req)
 
   let artist: Artist | null
   try {
-    artist = await resolvePortalArtist(userDb, user.id, artistId ?? undefined)
+    artist = await resolvePortalArtist(userDb, user.id, trimmed || undefined)
   } catch (err) {
     const msg = err instanceof Error ? err.message : ''
     if (msg.startsWith('FORBIDDEN')) {
@@ -64,6 +76,16 @@ export async function withPortalMembership(
     userDb,
     serviceDb,
   }
+}
+
+/**
+ * Same as withPortalMembership but requires artistId (alias for write routes).
+ */
+export async function withPortalMembershipWrite(
+  req: NextRequest,
+  artistId?: string | null,
+): Promise<PortalMembershipContext> {
+  return withPortalMembership(req, artistId, { requireArtistId: true })
 }
 
 /**

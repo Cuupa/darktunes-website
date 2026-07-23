@@ -9,6 +9,8 @@
 --   3. Manual band-member write test still required after this script passes
 --
 -- This script is read-only.
+--
+-- Also run: npm run verify:portal-rls  (static check: expected ⊆ reset.sql)
 
 -- ---------------------------------------------------------------------------
 -- 1) Expected portal write policies (membership-based)
@@ -32,7 +34,14 @@ WITH expected(table_name, policy_name) AS (
     ('epk_share_links', 'epk_share_links: artist insert own'),
     ('epk_share_links', 'epk_share_links: artist update own'),
     ('epk_versions', 'epk_versions: artist insert own'),
-    ('label_messages', 'label_messages: artist own read')
+    ('label_messages', 'label_messages: artist own read'),
+    ('release_submissions', 'release_submissions: artist insert own'),
+    ('release_submissions', 'release_submissions: artist read own'),
+    ('release_submission_tracks', 'release_submission_tracks: artist insert own'),
+    ('release_submission_tracks', 'release_submission_tracks: artist read own'),
+    ('video_submissions', 'video_submissions: artist insert own'),
+    ('video_submissions', 'video_submissions: artist read own'),
+    ('submission_form_drafts', 'submission_form_drafts: member all own')
 )
 SELECT
   e.table_name,
@@ -69,7 +78,11 @@ WHERE schemaname = 'public'
     'epk_fonts',
     'epk_share_links',
     'epk_versions',
-    'label_messages'
+    'label_messages',
+    'release_submissions',
+    'release_submission_tracks',
+    'video_submissions',
+    'submission_form_drafts'
   )
 ORDER BY tablename, policyname;
 

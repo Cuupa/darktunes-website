@@ -474,6 +474,8 @@ export function useSettlementCenter({
           )
         }
 
+        const idempotencyKey =
+          paymentIdempotencyKeys[target.invoiceId] ?? crypto.randomUUID()
         await recordInvoicePayment(
           token,
           target.invoiceId,
@@ -481,7 +483,7 @@ export function useSettlementCenter({
             amountCents,
             paymentMethod,
             paymentReference: paymentReference.trim() || undefined,
-            idempotencyKey: paymentIdempotencyKeys[target.invoiceId],
+            idempotencyKey,
           },
           interpolate(t.settlementPaymentFailedFor, { artist: target.artistName }),
         )

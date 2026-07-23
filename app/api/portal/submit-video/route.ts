@@ -7,6 +7,9 @@ import { getFormSchema } from '@/lib/api/submissionFormSchema'
 import { sendSubmissionNotificationEmail } from '@/lib/email/sendSubmissionNotificationEmail'
 import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
+import { withIdempotency } from '@/lib/api/idempotency'
+import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
+import { getClientIp } from '@/lib/ipRateLimit'
 
 const bodySchema = z.object({
   title: z.string().min(1),
@@ -20,6 +23,7 @@ const bodySchema = z.object({
   targetPublishDate: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   formData: z.record(z.string(), z.unknown()).nullable().optional(),
+  idempotencyKey: z.string().uuid(),
 })
 
 const STANDARD_FIELD_TO_BODY_KEY: Record<string, string> = {
@@ -37,9 +41,16 @@ const STANDARD_FIELD_TO_BODY_KEY: Record<string, string> = {
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
-  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId, {
+    requireArtistId: true,
+  })
+
+  const ip = getClientIp(req)
+  const rl = await checkDistributedRateLimit(`submit-video:${user.id}:${ip}`, 20, 10 * 60_000)
+  if (rl.limited) throw new ApiError(429, 'Too many video submissions. Please wait and try again.')
 
   const body = bodySchema.parse(await req.json())
+  const serviceRole = await createServiceRoleSupabaseClient()
 
   const schemaFields = await getFormSchema(supabase, 'video')
   for (const field of schemaFields) {
@@ -53,22 +64,32 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }
   }
 
-  const submission = await createVideoSubmission(supabase, {
-    artist_id: artist.id,
-    title: body.title,
-    download_url: body.downloadUrl,
-    description: body.description ?? null,
-    thumbnail_url: body.thumbnailUrl ?? null,
-    youtube_title: body.youtubeTitle ?? null,
-    youtube_description: body.youtubeDescription ?? null,
-    youtube_tags: body.youtubeTags,
-    youtube_category: body.youtubeCategory ?? null,
-    target_publish_date: body.targetPublishDate ?? null,
-    notes: body.notes ?? null,
-    form_data: body.formData ?? null,
+  const idem = await withIdempotency(serviceRole, body.idempotencyKey, 'submit-video', async () => {
+    return createVideoSubmission(supabase, {
+      artist_id: artist.id,
+      title: body.title,
+      download_url: body.downloadUrl,
+      description: body.description ?? null,
+      thumbnail_url: body.thumbnailUrl ?? null,
+      youtube_title: body.youtubeTitle ?? null,
+      youtube_description: body.youtubeDescription ?? null,
+      youtube_tags: body.youtubeTags,
+      youtube_category: body.youtubeCategory ?? null,
+      target_publish_date: body.targetPublishDate ?? null,
+      notes: body.notes ?? null,
+      form_data: body.formData ?? null,
+    })
   })
 
-  const serviceRole = await createServiceRoleSupabaseClient()
+  if (idem.status === 'duplicate') {
+    if (idem.resourceId) {
+      return NextResponse.json({ submissionId: idem.resourceId, duplicate: true })
+    }
+    throw new ApiError(409, 'Duplicate request: this submission was already processed')
+  }
+
+  const submission = idem.value
+
   const { data: recipientProfiles } = await serviceRole
     .from('users')
     .select('id')

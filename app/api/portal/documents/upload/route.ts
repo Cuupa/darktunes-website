@@ -9,13 +9,11 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { createArtistDocument } from '@/lib/api/artistDocuments'
 import { createR2Client } from '@/lib/r2Utils'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
-import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
-import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { withPortalMembershipWrite, portalMemberWrite } from '@/lib/portal/withPortalMembership'
 
 const MAX_BYTES = 20 * 1024 * 1024 // 20 MB
 
@@ -36,8 +34,6 @@ function getExtension(filename: string): string {
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, user } = await authenticatePortalBearer(req)
-
   const formData = await req.formData()
   const artistIdField = formData.get('artistId')
   const artistId =
@@ -45,12 +41,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       ? artistIdField.trim()
       : new URL(req.url).searchParams.get('artistId')
 
-  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch((err) => {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  })
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
+  const ctx = await withPortalMembershipWrite(req, artistId)
+  const { artist } = ctx
 
   const file = formData.get('file')
   const label = formData.get('label')
@@ -84,6 +76,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const buffer = Buffer.from(await file.arrayBuffer())
   const contentType = mimeOk ? file.type : (ext === '.pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
 
+  // R2 always uses env credentials (not RLS)
   await s3.send(
     new PutObjectCommand({
       Bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
@@ -94,16 +87,20 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }),
   )
 
-  const serviceDb = await createServiceRoleSupabaseClient()
-  const doc = await createArtistDocument(serviceDb, {
-    artistId: artist.id,
-    label: label.slice(0, 255),
-    category,
-    filePath: key,
-    fileSizeBytes: file.size,
-    mimeType: contentType,
-    notes: typeof notes === 'string' ? notes.slice(0, 1000) : undefined,
-  })
+  const { value: doc } = await portalMemberWrite(
+    ctx,
+    { route: 'POST /api/portal/documents/upload', table: 'artist_documents', operation: 'insert' },
+    (db) =>
+      createArtistDocument(db, {
+        artistId: artist.id,
+        label: label.slice(0, 255),
+        category,
+        filePath: key,
+        fileSizeBytes: file.size,
+        mimeType: contentType,
+        notes: typeof notes === 'string' ? notes.slice(0, 1000) : undefined,
+      }),
+  )
 
   return NextResponse.json({ document: doc }, { status: 201 })
 })

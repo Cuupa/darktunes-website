@@ -21,6 +21,7 @@ type DbClient = SupabaseClient<Database>
 export type IdempotencyResourceType =
   | 'sos-confirm'
   | 'submit-release'
+  | 'submit-video'
   | 'payout-request'
   | 'invoice-payment'
 
@@ -122,5 +123,40 @@ export async function updateIdempotencyKeyResourceId(
   if (error) {
     // Non-fatal — the primary protection is the INSERT above
     console.warn('[idempotency] Failed to update resource_id:', error.message)
+  }
+}
+
+export type WithIdempotencyResult<T> =
+  | { status: 'ok'; value: T }
+  | { status: 'duplicate'; resourceId: string | null }
+
+/**
+ * Claim an idempotency key, run work, attach resource id, release on failure.
+ */
+export async function withIdempotency<T extends { id?: string } | string>(
+  db: DbClient,
+  key: string,
+  resourceType: IdempotencyResourceType,
+  work: () => Promise<T>,
+): Promise<WithIdempotencyResult<T>> {
+  const claimed = await checkAndClaimIdempotencyKey(db, key, resourceType)
+  if (!claimed) {
+    const existing = await getIdempotencyKeyRecord(db, key)
+    return { status: 'duplicate', resourceId: existing?.resourceId ?? null }
+  }
+
+  try {
+    const value = await work()
+    const resourceId =
+      typeof value === 'string' ? value : value && typeof value === 'object' && 'id' in value
+        ? String((value as { id?: string }).id ?? '')
+        : ''
+    if (resourceId) {
+      await updateIdempotencyKeyResourceId(db, key, resourceId)
+    }
+    return { status: 'ok', value }
+  } catch (err) {
+    await releaseIdempotencyKey(db, key)
+    throw err
   }
 }

@@ -92,7 +92,8 @@ export type RecordInvoicePaymentInput = {
   amountCents: number
   paymentMethod: string
   paymentReference?: string
-  idempotencyKey?: string
+  /** Required by API (UUID). Client must send the same key on retries. */
+  idempotencyKey: string
 }
 
 export async function recordInvoicePayment(

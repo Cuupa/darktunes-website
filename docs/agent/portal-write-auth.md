@@ -67,10 +67,15 @@ R2 uploads stay server-side with env credentials (not RLS).
 
 ### Phase 1 — Verify production RLS vs `reset.sql`
 
-Run against **production** (Supabase SQL editor or CI with service role read of `pg_policies`):
+**Static CI (always):** `npm run verify:portal-rls` — asserts every expected policy name in
+`scripts/verify-portal-rls.sql` has a matching `CREATE POLICY` in `supabase/reset.sql`.
+Wired into `npm run ci`.
+
+**Live (optional):** set `VERIFY_PORTAL_RLS_DATABASE_URL` (Postgres connection string) and re-run
+`npm run verify:portal-rls` (requires `pg`). Or run the SQL file in Supabase SQL editor:
 
 ```sql
--- scripts/verify-portal-rls.sql (same queries live in repo)
+-- scripts/verify-portal-rls.sql
 ```
 
 **Pass criteria:**

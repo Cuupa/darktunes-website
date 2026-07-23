@@ -19,7 +19,7 @@ const paymentSchema = z.object({
   amountCents: z.number().int().positive(),
   paymentMethod: z.enum(['sepa', 'paypal', 'manual', 'other']),
   paymentReference: z.string().max(200).optional(),
-  idempotencyKey: z.string().uuid().optional(),
+  idempotencyKey: z.string().uuid(),
 })
 
 export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
@@ -38,22 +38,20 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
   const supabase = await createServerSupabaseClient()
   const serviceSupabase = await createServiceRoleSupabaseClient()
 
-  if (parsed.data.idempotencyKey) {
-    const claimed = await checkAndClaimIdempotencyKey(
-      serviceSupabase,
-      parsed.data.idempotencyKey,
-      'invoice-payment',
-    )
-    if (!claimed) {
-      const existingKey = await getIdempotencyKeyRecord(serviceSupabase, parsed.data.idempotencyKey)
-      if (existingKey?.resourceId) {
-        const replayed = await getAdminInvoiceById(supabase, existingKey.resourceId)
-        if (replayed) {
-          return NextResponse.json({ invoice: replayed })
-        }
+  const claimed = await checkAndClaimIdempotencyKey(
+    serviceSupabase,
+    parsed.data.idempotencyKey,
+    'invoice-payment',
+  )
+  if (!claimed) {
+    const existingKey = await getIdempotencyKeyRecord(serviceSupabase, parsed.data.idempotencyKey)
+    if (existingKey?.resourceId) {
+      const replayed = await getAdminInvoiceById(supabase, existingKey.resourceId)
+      if (replayed) {
+        return NextResponse.json({ invoice: replayed, duplicate: true })
       }
-      throw new ApiError(409, 'Duplicate payment request')
     }
+    throw new ApiError(409, 'Duplicate payment request')
   }
 
   try {
@@ -111,15 +109,11 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
       },
     })
 
-    if (parsed.data.idempotencyKey) {
-      await updateIdempotencyKeyResourceId(serviceSupabase, parsed.data.idempotencyKey, invoice.id)
-    }
+    await updateIdempotencyKeyResourceId(serviceSupabase, parsed.data.idempotencyKey, invoice.id)
 
     return NextResponse.json({ invoice })
   } catch (err) {
-    if (parsed.data.idempotencyKey) {
-      await releaseIdempotencyKey(serviceSupabase, parsed.data.idempotencyKey)
-    }
+    await releaseIdempotencyKey(serviceSupabase, parsed.data.idempotencyKey)
     throw err
   }
 })

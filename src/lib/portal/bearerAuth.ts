@@ -46,15 +46,25 @@ export async function authenticatePortalBearer(req: NextRequest): Promise<Portal
 export async function authenticatePortalBearerWithArtist(
   req: NextRequest,
   artistId?: string | null,
+  options?: { requireArtistId?: boolean },
 ): Promise<PortalBearerAuthWithArtist> {
+  // Default false: read/list may omit artistId (first membership). Mutations pass true.
+  const requireArtistId = options?.requireArtistId === true
+  const trimmed = typeof artistId === 'string' ? artistId.trim() : ''
+  if (requireArtistId && !trimmed) {
+    throw new ApiError(400, 'artistId is required')
+  }
+
   const auth = await authenticatePortalBearer(req)
-  const artist = await resolvePortalArtist(auth.supabase, auth.user.id, artistId ?? undefined).catch(
-    (err) => {
-      const msg = err instanceof Error ? err.message : ''
-      if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-      throw err
-    },
-  )
+  const artist = await resolvePortalArtist(
+    auth.supabase,
+    auth.user.id,
+    trimmed || undefined,
+  ).catch((err) => {
+    const msg = err instanceof Error ? err.message : ''
+    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
+    throw err
+  })
   if (!artist) throw new ApiError(403, 'No artist linked to this account')
   return { ...auth, artist }
 }

@@ -31,7 +31,9 @@ function parseFormType(req: NextRequest): 'release' | 'video' {
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId, {
+    requireArtistId: true,
+  })
   const formType = parseFormType(req)
   const draft = await getSubmissionFormDraft(supabase, artist.id, user.id, formType)
   return NextResponse.json({ draft })
@@ -39,7 +41,9 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 
 export const PUT = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId, {
+    requireArtistId: true,
+  })
   const formType = parseFormType(req)
   const body = putBodySchema.parse(await req.json())
 
@@ -59,7 +63,9 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
 
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId, {
+    requireArtistId: true,
+  })
   const formType = parseFormType(req)
   await deleteSubmissionFormDraft(supabase, artist.id, user.id, formType)
   return NextResponse.json({ ok: true })

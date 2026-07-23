@@ -4604,6 +4604,118 @@ CREATE TABLE IF NOT EXISTS public.release_submission_tracks (
 CREATE INDEX IF NOT EXISTS idx_release_submission_tracks_submission
   ON public.release_submission_tracks (submission_id, display_order);
 
+-- Atomic insert: release_submissions + tracks (service_role after membership check)
+CREATE OR REPLACE FUNCTION public.create_release_submission_with_tracks(
+  p_submission JSONB,
+  p_tracks JSONB DEFAULT '[]'::jsonb
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_id UUID;
+  v_track JSONB;
+  v_i INT := 0;
+BEGIN
+  INSERT INTO public.release_submissions (
+    artist_id,
+    title,
+    audio_download_url,
+    cover_art_url,
+    cover_art_verified,
+    release_date,
+    type,
+    genre,
+    catalog_number,
+    isrc,
+    label_copy,
+    spotify_url,
+    apple_music_url,
+    youtube_url,
+    notes,
+    form_data
+  ) VALUES (
+    (p_submission->>'artist_id')::uuid,
+    p_submission->>'title',
+    p_submission->>'audio_download_url',
+    p_submission->>'cover_art_url',
+    COALESCE((p_submission->>'cover_art_verified')::boolean, false),
+    NULLIF(p_submission->>'release_date', '')::date,
+    NULLIF(p_submission->>'type', '')::public.release_type,
+    NULLIF(p_submission->>'genre', ''),
+    NULLIF(p_submission->>'catalog_number', ''),
+    NULLIF(p_submission->>'isrc', ''),
+    NULLIF(p_submission->>'label_copy', ''),
+    NULLIF(p_submission->>'spotify_url', ''),
+    NULLIF(p_submission->>'apple_music_url', ''),
+    NULLIF(p_submission->>'youtube_url', ''),
+    NULLIF(p_submission->>'notes', ''),
+    CASE
+      WHEN p_submission ? 'form_data' AND p_submission->'form_data' IS NOT NULL
+        AND jsonb_typeof(p_submission->'form_data') = 'object'
+      THEN p_submission->'form_data'
+      ELSE NULL
+    END
+  )
+  RETURNING id INTO v_id;
+
+  IF p_tracks IS NOT NULL AND jsonb_typeof(p_tracks) = 'array' THEN
+    FOR v_track IN SELECT * FROM jsonb_array_elements(p_tracks)
+    LOOP
+      INSERT INTO public.release_submission_tracks (
+        submission_id,
+        track_number,
+        display_order,
+        title,
+        isrc,
+        composer,
+        author,
+        genre,
+        language,
+        gema,
+        explicit,
+        live,
+        cover,
+        instrumental,
+        preview_start_seconds,
+        duration_seconds,
+        form_data
+      ) VALUES (
+        v_id,
+        COALESCE((v_track->>'track_number')::int, v_i + 1),
+        COALESCE((v_track->>'display_order')::int, v_i),
+        NULLIF(v_track->>'title', ''),
+        NULLIF(v_track->>'isrc', ''),
+        NULLIF(v_track->>'composer', ''),
+        NULLIF(v_track->>'author', ''),
+        NULLIF(v_track->>'genre', ''),
+        NULLIF(v_track->>'language', ''),
+        CASE WHEN v_track ? 'gema' THEN (v_track->>'gema')::boolean ELSE NULL END,
+        CASE WHEN v_track ? 'explicit' THEN (v_track->>'explicit')::boolean ELSE NULL END,
+        CASE WHEN v_track ? 'live' THEN (v_track->>'live')::boolean ELSE NULL END,
+        CASE WHEN v_track ? 'cover' THEN (v_track->>'cover')::boolean ELSE NULL END,
+        CASE WHEN v_track ? 'instrumental' THEN (v_track->>'instrumental')::boolean ELSE NULL END,
+        CASE WHEN v_track ? 'preview_start_seconds' THEN (v_track->>'preview_start_seconds')::int ELSE NULL END,
+        CASE WHEN v_track ? 'duration_seconds' THEN (v_track->>'duration_seconds')::int ELSE NULL END,
+        CASE
+          WHEN v_track ? 'form_data' AND jsonb_typeof(v_track->'form_data') = 'object'
+          THEN v_track->'form_data'
+          ELSE NULL
+        END
+      );
+      v_i := v_i + 1;
+    END LOOP;
+  END IF;
+
+  RETURN v_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.create_release_submission_with_tracks(JSONB, JSONB) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.create_release_submission_with_tracks(JSONB, JSONB) TO service_role;
+
 -- ---------------------------------------------------------------------------
 -- TABLE: video_submissions
 -- Artist-submitted music video drafts for label/YouTube processing.

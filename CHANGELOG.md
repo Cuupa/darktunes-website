@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **P0 portal security/reliability:** `verify:portal-rls` static gate; `artistId` required on submit/drafts mutations; distributed rate-limit helper (Upstash optional); `withIdempotency` + video submit / invoice payment keys; atomic `create_release_submission_with_tracks` RPC; documents upload via `portalMemberWrite` canary.
 - **Portal release submission wizard:** guided multi-step flow (type → field groups → tracks → review) driven by `field_group`; track focus mode, copy/apply-all, `?step=` URL, review completeness, prefill from last submission.
 - **Server submission drafts:** `submission_form_drafts` + portal draft API (release/video); local IndexedDB cache.
 - **Cover art verification:** server JPEG 3000×3000 check with stable error codes, retries, and short-lived HMAC token so submit can skip re-download; no R2 during form.
@@ -16,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Admin wizard groups:** submission form manager can set each field’s wizard group (`metadata`, `distribution`, `rights`, `track`, custom).
 
 ### Fixed
+- **Distributed rate limit fixed window:** Upstash path EXPIRE only on first INCR (atomic EVAL); continuous traffic no longer extends the window incorrectly.
+- **Invoice payment idempotency:** client type requires UUID; settlement center always sends a key (fallback generate).
+- **Release submit rate limit** aligned with video submit (20 / 10 min / user+IP).
+- **Atomic track insert payload** no longer uses a placeholder submission UUID (RPC assigns id).
 - **Release submit blocked by Drive CORS:** cover art check no longer runs in the browser against CORS-blocked hosts.
 - **Sync reliability (covers / queue / Odesli):** R2 cover uploads retry transient DNS errors (`getaddrinfo EBUSY`) and are concurrency-capped; iTunes release concurrency lowered to 2. Queue executor is single-flight (`sync_executor_lease`) with a ~280s budget (`maxDuration` 300). Admin progress uses backlog drain (not 24h `done`) and only shows 100% when drained; poller re-kicks only when `running === 0`. Odesli throttled to ~4 req/s, does not retry 429 in-request, and batches artist `platform_links`. iTunes 200-collection cap is logged when hit.
 - **Sync → frontend stale data**: queue executor now revalidates public tags **and** list paths (`revalidatePublicContent`) at batch end; YouTube/sync-api/artist routes share the same helper. Admin full release sync polls the queue, reloads the list, and busts public cache instead of reloading immediately after `{ accepted: true }`. Video CRUD/sync also revalidates the `videos` tag. `GET /api/sync/queue` returns queue stats (no longer aliases POST enqueue). `/api/sync` accepts `verifySyncTrigger` (admin/editor), matching the queue route.
