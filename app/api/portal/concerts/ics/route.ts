@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler } from '@/lib/errors'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import type { Concert } from '@/types'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 
 /** Escape special characters in iCalendar text values. */
 function icsEscape(str: string): string {
@@ -59,9 +59,14 @@ function buildVEvent(concert: Concert): string {
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const ctx = await withPortalMembershipWrite(req, artistId)
+  const { artist } = ctx
 
-  const concerts = await getConcertsByArtistId(supabase, artist.id)
+  const { value: concerts } = await portalMemberWrite(
+    ctx,
+    { route: 'GET /api/portal/concerts/ics', table: 'concerts', operation: 'select' },
+    (db) => getConcertsByArtistId(db, artist.id),
+  )
 
   const prodId = `-//darkTunes//Artist Portal//EN`
   const vEvents = concerts.map((c) => buildVEvent(c)).join('\r\n')

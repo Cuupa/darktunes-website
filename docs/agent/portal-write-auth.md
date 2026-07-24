@@ -58,12 +58,17 @@ Membership verified with bearer client, then **service role** for writes on
 - Uploads: photo / rider / asset / release-cover
 - Invoices GET/POST/PATCH + statement view
 - Messages inbox / send / folders / [id] PATCH
+- Concerts + ICS export
+- Checklist toggle
+- Submit release / video + submission drafts + list submissions
+- Interview request PATCH
+- Tour Planner (all routes via `authenticateTourPlannerRequest` → membership write)
 
 R2 uploads stay server-side with env credentials (not RLS).
 
 **Auth:** `authenticatePortalBearer` accepts **Bearer** (preferred) or **cookie session** (dual-auth window for older clients). Portal UI should send Bearer via `getPortalAuthHeaders()`.
 
-**Still migrating (ad-hoc / partial):** concerts, tour-planner, checklist, submit-release/video — see API SOTA plan Phase C remainder.
+**Read-only / no artist pin (Bearer only):** FAQ, EPK templates list, cover-art-check (rate-limited), proxy-image.
 
 ## Phase plan — migrate back without reintroducing 500s
 

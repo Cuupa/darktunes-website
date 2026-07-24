@@ -32,8 +32,24 @@ describe('authenticatePortalBearer', () => {
     createBearerAuthSupabaseClient.mockResolvedValue({ from: vi.fn() })
   })
 
-  it('throws when Authorization header is missing', async () => {
-    await expect(authenticatePortalBearer(makeRequest(null))).rejects.toBeInstanceOf(ApiError)
+  it('throws 401 when Bearer and cookie session are both missing', async () => {
+    getUser.mockResolvedValue({ data: { user: null }, error: { message: 'no session' } })
+    await expect(authenticatePortalBearer(makeRequest(null))).rejects.toMatchObject({
+      status: 401,
+    })
+    expect(createBearerAuthSupabaseClient).not.toHaveBeenCalled()
+  })
+
+  it('accepts cookie session when Authorization header is missing (dual-auth)', async () => {
+    getUser.mockResolvedValue({ data: { user: { id: 'cookie-user' } }, error: null })
+    const cookieClient = { auth: { getUser }, from: vi.fn() }
+    createServerSupabaseClient.mockResolvedValue(cookieClient)
+
+    const result = await authenticatePortalBearer(makeRequest(null))
+    expect(result.user.id).toBe('cookie-user')
+    expect(result.token).toBe('')
+    expect(result.supabase).toBe(cookieClient)
+    expect(createBearerAuthSupabaseClient).not.toHaveBeenCalled()
   })
 
   it('returns bearer-authenticated client for valid token', async () => {
