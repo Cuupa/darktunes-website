@@ -45,6 +45,13 @@ export default defineConfig({
   /* Reporter: 'list' for concise terminal output; HTML report always generated. */
   reporter: [['list'], ['html', { open: 'never' }]],
 
+  /* Ensures the local Supabase stack (Docker) is up, healthy, and its fixture
+   * auth users exist before any test runs; optionally stops it afterward.
+   * See tests/e2e/global-setup.ts for why this can't provision from scratch
+   * (webServer below already starts before globalSetup runs). */
+  globalSetup: './tests/e2e/global-setup.ts',
+  globalTeardown: './tests/e2e/global-teardown.ts',
+
   use: {
     /* Base URL used by page.goto('/') etc. */
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000',
@@ -109,13 +116,21 @@ export default defineConfig({
     env: {
       /* Ensure the server binds to the expected port. */
       PORT: '3000',
-      /* Placeholders so `next build` succeeds when CI secrets are unset (empty string). */
+      /* Local-stack defaults (Supabase CLI's well-known local dev demo
+       * credentials — public, identical for every project using default
+       * supabase/config.toml, safe to hardcode). Used only when
+       * .env.e2e.local hasn't been loaded above (e.g. before the first
+       * `npm run db:e2e:start`) so a plain `next build` still succeeds and,
+       * once tests/e2e/global-setup.ts brings the stack up, actually points
+       * at a real backend instead of an unreachable fake domain. */
       NEXT_PUBLIC_SUPABASE_URL:
-        process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co',
+        process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321',
       NEXT_PUBLIC_SUPABASE_ANON_KEY:
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key-for-ci-build',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
       SUPABASE_SERVICE_ROLE_KEY:
-        process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-role-key-for-ci',
+        process.env.SUPABASE_SERVICE_ROLE_KEY ||
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU',
       CLOUDFLARE_R2_ACCOUNT_ID: process.env.CLOUDFLARE_R2_ACCOUNT_ID || 'placeholder-r2-account',
       CLOUDFLARE_R2_ACCESS_KEY_ID:
         process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || 'placeholder-r2-access-key',

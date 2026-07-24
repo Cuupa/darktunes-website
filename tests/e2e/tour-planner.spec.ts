@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { getTestUser, loginAsAdmin, loginAsArtist } from '../helpers/auth'
-import { isSupabaseE2EConfigured } from '../helpers/supabase'
+import { loginAsAdmin, loginAsArtist } from '../helpers/auth'
 
 test.describe('Tour planner — API security', () => {
   test('portal tour-planner endpoints reject unauthenticated requests', async ({ request }) => {
@@ -19,11 +18,6 @@ test.describe('Tour planner — API security', () => {
 
 test.describe('Tour planner — route access', () => {
   test('unauthenticated users are redirected from portal tour planner', async ({ page }) => {
-    if (!isSupabaseE2EConfigured()) {
-      test.skip(true, 'Supabase env missing')
-      return
-    }
-
     await page.goto('/portal/tour-planner', { waitUntil: 'domcontentloaded' })
     await expect(page).toHaveURL(/\/login/)
     expect(page.url()).toContain('returnTo')
@@ -32,11 +26,6 @@ test.describe('Tour planner — route access', () => {
 
 test.describe('Tour planner — portal UI', () => {
   test('artist can open tour planner when configured', async ({ page }) => {
-    if (!getTestUser('artist')) {
-      test.skip(true, 'E2E_ARTIST credentials not configured')
-      return
-    }
-
     await loginAsArtist(page)
     await page.goto('/portal/tour-planner', { waitUntil: 'domcontentloaded' })
 
@@ -47,11 +36,6 @@ test.describe('Tour planner — portal UI', () => {
 
 test.describe('Tour planner — admin read-only', () => {
   test('admin can open tour planner overview', async ({ page }) => {
-    if (!getTestUser('admin')) {
-      test.skip(true, 'E2E_ADMIN credentials not configured')
-      return
-    }
-
     await loginAsAdmin(page)
     await page.goto('/admin/tour-planner', { waitUntil: 'domcontentloaded' })
 

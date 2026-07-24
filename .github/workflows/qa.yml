@@ -27,23 +27,49 @@ jobs:
   e2e-tests:
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key-for-ci-build' }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY != '' && secrets.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-service-role-key-for-ci' }}
-      CLOUDFLARE_R2_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_R2_ACCOUNT_ID != '' && secrets.CLOUDFLARE_R2_ACCOUNT_ID || 'placeholder-r2-account' }}
-      CLOUDFLARE_R2_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID != '' && secrets.CLOUDFLARE_R2_ACCESS_KEY_ID || 'placeholder-r2-access-key' }}
-      CLOUDFLARE_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY != '' && secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY || 'placeholder-r2-secret-key' }}
-      CLOUDFLARE_R2_BUCKET_NAME: ${{ secrets.CLOUDFLARE_R2_BUCKET_NAME != '' && secrets.CLOUDFLARE_R2_BUCKET_NAME || 'placeholder-bucket' }}
-      CLOUDFLARE_R2_PUBLIC_URL: ${{ secrets.CLOUDFLARE_R2_PUBLIC_URL != '' && secrets.CLOUDFLARE_R2_PUBLIC_URL || 'https://cdn.placeholder.example' }}
+      # Cloudflare R2 isn't exercised by any E2E test (no test hits real
+      # object storage) — static placeholders just satisfy env validation.
+      # Safe to keep set for every step, unlike the Supabase vars below.
+      CLOUDFLARE_R2_ACCOUNT_ID: placeholder-r2-account
+      CLOUDFLARE_R2_ACCESS_KEY_ID: placeholder-r2-access-key
+      CLOUDFLARE_R2_SECRET_ACCESS_KEY: placeholder-r2-secret-key
+      CLOUDFLARE_R2_BUCKET_NAME: placeholder-bucket
+      CLOUDFLARE_R2_PUBLIC_URL: https://cdn.placeholder.example
+      # Have global-teardown.ts stop the Docker stack at the end of the run
+      # (default off locally so iterative dev doesn't repay container startup
+      # cost every time — see tests/e2e/global-teardown.ts).
+      E2E_STOP_DB_AFTER_TESTS: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Ensure psql client is available
+        run: command -v psql >/dev/null || (sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client)
       - run: npm ci
       - run: npx playwright install --with-deps
+      # Starts the local Supabase stack (Docker), applies supabase/reset.sql,
+      # seeds fixture content + auth users, and writes .env.e2e.local — see
+      # scripts/e2e-db-setup.mjs and E2E-TESTS.md Phase 1/2. No repo secrets
+      # involved: everything comes from this freshly provisioned local stack.
+      - run: npm run db:e2e:start
+      # `next build`'s "Collecting page data" step imports server route
+      # modules, which import src/lib/env.server.ts and fail fast if these
+      # vars are missing/invalid — but the build itself never talks to
+      # Supabase, so placeholders are enough here. Scoped to this step only
+      # so they don't shadow the real .env.e2e.local values written above:
+      # playwright.config.ts's dotenv.config() doesn't override vars already
+      # present in the environment, so if these were set job-wide the real
+      # local-stack credentials would never reach the Playwright run below.
       - run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key-for-ci-build
+          SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key-for-ci
       - run: SKIP_BUILD=1 npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: always()

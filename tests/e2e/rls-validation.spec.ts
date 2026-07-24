@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
-import { isSupabaseEnvConfigured } from '@/lib/supabase/isConfigured'
 
 const SENSITIVE_TABLES = [
   'artists',
@@ -21,9 +20,10 @@ test('RLS is enabled on all sensitive tables', async () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!isSupabaseEnvConfigured() || !url || !serviceKey) {
-    test.skip(true, 'Real Supabase service role env vars are missing')
-    return
+  if (!url || !serviceKey) {
+    throw new Error(
+      'Missing NEXT_PUBLIC_SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY — run `npm run db:e2e:start` to provision the local Supabase stack.',
+    )
   }
 
   const client = createClient(url, serviceKey, {

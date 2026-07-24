@@ -7,7 +7,9 @@ export interface TestUserCredentials {
   password: string
 }
 
-export function getTestUser(role: TestUserRole): TestUserCredentials | null {
+/** Reads fixture credentials without throwing — used only where a role is one
+ * of several acceptable options (see getPressDashboardUser). */
+function readTestUser(role: TestUserRole): TestUserCredentials | null {
   const prefix = role.toUpperCase()
   const email = process.env[`E2E_${prefix}_EMAIL`]
   const password = process.env[`E2E_${prefix}_PASSWORD`]
@@ -16,9 +18,22 @@ export function getTestUser(role: TestUserRole): TestUserCredentials | null {
   return { email, password }
 }
 
+/** A DB is always available for E2E runs (see tests/e2e/global-setup.ts),
+ * which seeds all three fixture accounts — so this throws instead of
+ * returning null when credentials are unexpectedly missing. */
+export function getTestUser(role: TestUserRole): TestUserCredentials {
+  const creds = readTestUser(role)
+  if (!creds) {
+    const prefix = role.toUpperCase()
+    throw new Error(
+      `Missing E2E_${prefix}_EMAIL/E2E_${prefix}_PASSWORD — run \`npm run db:e2e:start\` to provision the local Supabase stack and fixture users.`,
+    )
+  }
+  return creds
+}
+
 export async function loginAsAdmin(page: Page): Promise<void> {
   const creds = getTestUser('admin')
-  if (!creds) throw new Error('Missing E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD')
 
   await page.goto('/admin/login', { waitUntil: 'domcontentloaded' })
   await page.getByLabel('Email').fill(creds.email)
@@ -29,13 +44,18 @@ export async function loginAsAdmin(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/admin(\?|$)/)
 }
 
-export function getPressDashboardUser(): TestUserCredentials | null {
-  return getTestUser('journalist') ?? getTestUser('admin')
+export function getPressDashboardUser(): TestUserCredentials {
+  const creds = readTestUser('journalist') ?? readTestUser('admin')
+  if (!creds) {
+    throw new Error(
+      'Missing E2E_JOURNALIST/E2E_ADMIN credentials — run `npm run db:e2e:start` to provision the local Supabase stack and fixture users.',
+    )
+  }
+  return creds
 }
 
 export async function loginForPressDashboard(page: Page): Promise<void> {
   const creds = getPressDashboardUser()
-  if (!creds) throw new Error('Missing E2E_JOURNALIST or E2E_ADMIN credentials')
 
   await page.goto('/login?returnTo=/press/dashboard/press-kit', { waitUntil: 'domcontentloaded' })
   await page.getByLabel(/email/i).fill(creds.email)
@@ -48,7 +68,6 @@ export async function loginForPressDashboard(page: Page): Promise<void> {
 
 export async function loginAsArtist(page: Page): Promise<void> {
   const creds = getTestUser('artist')
-  if (!creds) throw new Error('Missing E2E_ARTIST_EMAIL/E2E_ARTIST_PASSWORD')
 
   await page.goto('/portal/login', { waitUntil: 'domcontentloaded' })
   await page.getByLabel(/email/i).fill(creds.email)

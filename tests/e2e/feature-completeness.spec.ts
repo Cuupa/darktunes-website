@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
-import { getTestUser, loginAsAdmin } from '../helpers/auth'
-import { getVisibleArtists, isSupabaseE2EConfigured } from '../helpers/supabase'
+import { loginAsAdmin } from '../helpers/auth'
+import { getVisibleArtists } from '../helpers/supabase'
 
 /** Tabs on `/admin` (AdminDashboard TAB_DEFS). */
 const ADMIN_DASHBOARD_TABS = [
@@ -50,11 +50,6 @@ test.describe('Feature completeness', () => {
   })
 
   test('artist detail shows bio, releases, and concerts sections', async ({ page }) => {
-    if (!isSupabaseE2EConfigured()) {
-      test.skip(true, 'Supabase env missing for artist route checks')
-      return
-    }
-
     const artists = await getVisibleArtists(1)
     if (artists.length === 0) {
       test.skip(true, 'No visible artist found')
@@ -69,11 +64,6 @@ test.describe('Feature completeness', () => {
   })
 
   test('admin dashboard tabs are visible for admin role', async ({ page }) => {
-    if (!getTestUser('admin')) {
-      test.skip(true, 'Missing E2E admin credentials')
-      return
-    }
-
     await loginAsAdmin(page)
 
     for (const tabLabel of ADMIN_DASHBOARD_TABS) {
@@ -82,11 +72,6 @@ test.describe('Feature completeness', () => {
   })
 
   test('admin sidebar links are visible for admin role', async ({ page }) => {
-    if (!getTestUser('admin')) {
-      test.skip(true, 'Missing E2E admin credentials')
-      return
-    }
-
     await loginAsAdmin(page)
 
     const nav = page.getByRole('navigation', { name: 'Admin sections' })
@@ -96,11 +81,6 @@ test.describe('Feature completeness', () => {
   })
 
   test('admin features page shows global and portal sections', async ({ page }) => {
-    if (!getTestUser('admin')) {
-      test.skip(true, 'Missing E2E admin credentials')
-      return
-    }
-
     await loginAsAdmin(page)
     await page.goto('/admin/features', { waitUntil: 'domcontentloaded' })
 

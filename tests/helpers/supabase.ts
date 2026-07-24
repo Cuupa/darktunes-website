@@ -6,18 +6,19 @@ type TestClient = SupabaseClient<Database>
 type ArtistRouteRow = Pick<Database['public']['Tables']['artists']['Row'], 'slug'>
 type ReleaseRouteRow = Pick<Database['public']['Tables']['releases']['Row'], 'id'>
 
-import { isSupabaseEnvConfigured } from '@/lib/supabase/isConfigured'
-
+/** A DB is always available for E2E runs (see tests/e2e/global-setup.ts), so
+ * this throws instead of silently falling back to a placeholder client. */
 function getSupabaseConfig() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  const configured = isSupabaseEnvConfigured()
 
-  return {
-    configured,
-    url: url ?? 'https://placeholder.supabase.co',
-    anonKey: anonKey ?? 'placeholder-anon-key',
+  if (!url || !anonKey) {
+    throw new Error(
+      'Missing NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY — run `npm run db:e2e:start` to provision the local Supabase stack.',
+    )
   }
+
+  return { url, anonKey }
 }
 
 export function createTestSupabaseClient(): TestClient {
@@ -28,9 +29,6 @@ export function createTestSupabaseClient(): TestClient {
 }
 
 export async function getVisibleArtists(limit = 20): Promise<ArtistRouteRow[]> {
-  const { configured } = getSupabaseConfig()
-  if (!configured) return []
-
   const client = createTestSupabaseClient()
   const { data, error } = await client
     .from('artists')
@@ -44,9 +42,6 @@ export async function getVisibleArtists(limit = 20): Promise<ArtistRouteRow[]> {
 }
 
 export async function getVisibleReleases(limit = 20): Promise<ReleaseRouteRow[]> {
-  const { configured } = getSupabaseConfig()
-  if (!configured) return []
-
   const client = createTestSupabaseClient()
   const { data, error } = await client
     .from('releases')
@@ -57,8 +52,4 @@ export async function getVisibleReleases(limit = 20): Promise<ReleaseRouteRow[]>
 
   if (error) throw error
   return (data ?? []).filter((row): row is ReleaseRouteRow => Boolean(row.id))
-}
-
-export function isSupabaseE2EConfigured() {
-  return getSupabaseConfig().configured
 }

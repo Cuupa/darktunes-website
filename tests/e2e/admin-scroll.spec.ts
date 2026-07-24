@@ -1,13 +1,8 @@
 import { expect, test } from '@playwright/test'
-import { getTestUser, loginAsAdmin } from '../helpers/auth'
+import { loginAsAdmin } from '../helpers/auth'
 
 test.describe('Admin table wheel scroll', () => {
   test('submission form table scrolls vertically with mouse wheel over a row', async ({ page }) => {
-    if (!getTestUser('admin')) {
-      test.skip(true, 'Missing E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD')
-      return
-    }
-
     await loginAsAdmin(page)
     await page.goto('/admin/submission-form', { waitUntil: 'domcontentloaded' })
 
