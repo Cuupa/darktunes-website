@@ -1,10 +1,10 @@
+import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * POST /api/admin/sos/import-batches/[id]/multipart/part — upload one multipart chunk to R2
  */
 
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { MAX_BRONZE_MULTIPART_PART_BYTES } from '@/lib/sos/bronzeUploadLimits'
 import {
@@ -16,16 +16,7 @@ import { ApiError, withErrorHandler } from '@/lib/errors'
 
 const MAX_PART_BYTES = MAX_BRONZE_MULTIPART_PART_BYTES
 
-async function requireAdmin() {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error || !user) throw new ApiError(401, 'Unauthorized')
-  const role = await getUserRoleWithClient(supabase, user.id)
-  if (!role || !['admin'].includes(role)) throw new ApiError(403, 'Forbidden')
-}
+
 
 function extractBatchIdFromPath(pathname: string): string | null {
   const match = pathname.match(/\/import-batches\/([^/]+)\/multipart\/part\/?$/)
@@ -33,7 +24,7 @@ function extractBatchIdFromPath(pathname: string): string | null {
 }
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  await requireAdmin()
+  await requireAdminFromRequest(req)
   const id = extractBatchIdFromPath(new URL(req.url).pathname)
   if (!id) throw new ApiError(400, 'Invalid import batch multipart part path')
 

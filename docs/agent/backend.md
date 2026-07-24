@@ -19,7 +19,21 @@
 
 ## Admin route auth
 
-Use `src/lib/adminAuth.ts`: `extractBearerToken`, `verifyAdminOrEditor`, `verifyAdmin`, `verifyPermission`, `verifySyncTrigger`. All admin routes wrap `withErrorHandler`.
+Use `src/lib/adminAuth.ts`. **Preferred (Phase D):**
+
+```ts
+const { userId } = await requireAdminFromRequest(req) // admin only, Bearer or cookie
+// or
+const { userId, serviceClient } = await requireAdminWithServiceClient(req)
+// or
+await requireAdminOrEditorFromRequest(req)
+```
+
+Legacy token helpers still valid: `extractBearerToken` + `verifyAdmin` / `verifyAdminOrEditor` / `verifyPermission` / `verifySyncTrigger`.
+
+Dual auth: **Bearer first**, cookie session fallback (admin UI often uses cookies without Authorization header).
+
+All admin routes wrap `withErrorHandler`.
 
 `RolePermissionKey`: `can_publish_news`, `can_edit_news`, `can_manage_artists`, `can_manage_releases`, `can_manage_videos`, `can_view_admin_panel`.
 

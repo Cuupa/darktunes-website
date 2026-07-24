@@ -1,25 +1,16 @@
+import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * GET /api/admin/sos/import-batches/[id]/presign-download — presigned GET URL for browser → R2 download
  */
 
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getImportBatchById } from '@/lib/api/distributorImportBatches'
 import { generateBronzePresignedDownloadUrl } from '@/lib/sos/bronzePresignedUpload'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
-async function requireAdmin() {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error || !user) throw new ApiError(401, 'Unauthorized')
-  const role = await getUserRoleWithClient(supabase, user.id)
-  if (!role || !['admin'].includes(role)) throw new ApiError(403, 'Forbidden')
-}
+
 
 function extractBatchIdFromPath(pathname: string): string | null {
   const match = pathname.match(/\/import-batches\/([^/]+)\/presign-download\/?$/)
@@ -27,7 +18,7 @@ function extractBatchIdFromPath(pathname: string): string | null {
 }
 
 export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  await requireAdmin()
+  await requireAdminFromRequest(req)
   const id = extractBatchIdFromPath(new URL(req.url).pathname)
   if (!id) throw new ApiError(400, 'Invalid presign-download path')
 

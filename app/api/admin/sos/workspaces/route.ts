@@ -1,3 +1,4 @@
+import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * GET  /api/admin/sos/workspaces?periodStart=...&periodEnd=... — load workspace for period
  * POST /api/admin/sos/workspaces — upsert workspace (rules config + bronze batches) for a period
@@ -7,7 +8,6 @@
 
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   deleteWorkspaceForPeriod,
@@ -18,20 +18,10 @@ import {
 import { assertSettlementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
-async function requireAccountingRole() {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error || !user) throw new ApiError(401, 'Unauthorized')
-  const role = await getUserRoleWithClient(supabase, user.id)
-  if (!role || !['admin'].includes(role)) throw new ApiError(403, 'Forbidden')
-  return { user, supabase }
-}
+
 
 export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  await requireAccountingRole()
+  await requireAdminFromRequest(req)
 
   const periodStart = req.nextUrl.searchParams.get('periodStart')
   const periodEnd = req.nextUrl.searchParams.get('periodEnd')
@@ -47,7 +37,8 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
 })
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  const { user } = await requireAccountingRole()
+  const { userId } = await requireAdminFromRequest(req)
+  const user = { id: userId }
   const body = await req.json()
 
   const {
@@ -86,7 +77,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
 })
 
 export const DELETE = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  await requireAccountingRole()
+  await requireAdminFromRequest(req)
 
   const periodStart = req.nextUrl.searchParams.get('periodStart')
   const periodEnd = req.nextUrl.searchParams.get('periodEnd')

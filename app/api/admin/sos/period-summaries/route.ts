@@ -1,3 +1,4 @@
+import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * app/api/admin/sos/period-summaries/route.ts
  *
@@ -6,7 +7,6 @@
  */
 
 import { NextResponse } from 'next/server'
-import { getUserRoleWithClient } from '@/lib/getUserRole'
 import type { NextRequest } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
@@ -17,13 +17,7 @@ import {
 import { assertSettlementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
-async function requireAccountingRole() {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) throw new ApiError(401, 'Unauthorized')
-  const role = await getUserRoleWithClient(supabase, user.id)
-  if (!role || !['admin'].includes(role)) throw new ApiError(403, 'Forbidden')
-}
+
 
 function summaryToApiRow(summary: SosPeriodSummary) {
   return {
@@ -40,15 +34,15 @@ function summaryToApiRow(summary: SosPeriodSummary) {
   }
 }
 
-export const GET = withErrorHandler(async (): Promise<NextResponse> => {
-  await requireAccountingRole()
+export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
+  await requireAdminFromRequest(req)
   const serviceSupabase = await createServiceRoleSupabaseClient()
   const summaries = await listSosPeriodSummaries(serviceSupabase)
   return NextResponse.json({ summaries: summaries.map(summaryToApiRow) })
 })
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  await requireAccountingRole()
+  await requireAdminFromRequest(req)
   const body = await req.json()
   const {
     period_start,
