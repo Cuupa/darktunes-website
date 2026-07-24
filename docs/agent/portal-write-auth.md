@@ -46,16 +46,20 @@ If production matches `reset.sql`, member policies already allow portal users vi
 
 ## Current code posture (after PR)
 
-Membership verified with bearer client, then **service role** for writes on:
+Membership verified with bearer client, then **service role** for writes on
+(via `withPortalMembershipWrite` + `portalMemberWrite` canary):
 
 - `PUT /api/portal/profile`
 - Onboarding server actions (`artist_epks`, `artists`, welcome message)
 - EPK document / restore / fonts / share
-- Fan page document / publish
+- Fan page document / publish / preview-token
 - Billing profile
-- Document vault upload/download/delete
+- Document vault upload / download / delete
 
 R2 uploads stay server-side with env credentials (not RLS).
+
+**Still migrating (ad-hoc auth):** messages (cookie), concerts, invoices, uploads
+(photo/rider/asset), tour-planner, checklist, submit-release/video — see API SOTA plan Phase C.
 
 ## Phase plan — migrate back without reintroducing 500s
 

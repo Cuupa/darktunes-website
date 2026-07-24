@@ -1,15 +1,16 @@
 /**
  * POST — Fan Page publish workflow (draft / review / direct)
+ *
+ * Membership via withPortalMembershipWrite; publish write via portalMemberWrite.
+ * editor_notifications stay service-role forever (staff-only table).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
-import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { getFanPageDocumentState, publishFanPage } from '@/lib/api/fanPageDocument'
 import { validateFanPageForPublish, canHardPublish } from '@/lib/fan-page/publishValidation'
-import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 import { revalidateTag } from 'next/cache'
 
 const bodySchema = z.object({
@@ -18,18 +19,19 @@ const bodySchema = z.object({
   force: z.boolean().optional(),
 })
 
+const ROUTE = 'POST /api/portal/fan-page/publish'
+
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, user } = await authenticatePortalBearer(req)
   const body = bodySchema.parse(await req.json())
+  const ctx = await withPortalMembershipWrite(req, body.artist_id)
+  const { artist, user, serviceDb } = ctx
 
-  const artist = await resolvePortalArtist(supabase, user.id, body.artist_id).catch((err) => {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  })
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
-
-  const state = await getFanPageDocumentState(supabase, artist.id, artist, null)
+  // Read path: canary-aware (same membership-scoped client policy as writes)
+  const { value: state } = await portalMemberWrite(
+    ctx,
+    { route: ROUTE, table: 'artist_landing_pages', operation: 'select' },
+    (db) => getFanPageDocumentState(db, artist.id, artist, null),
+  )
   const warnings = validateFanPageForPublish(state.document)
 
   if (
@@ -44,24 +46,27 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw new ApiError(403, 'Direct publish not allowed for this artist')
   }
 
-  // Membership verified — publish state writes use service-role so band members
-  // are not blocked by legacy RLS on artist_landing_pages.
-  const serviceRole = await createServiceRoleSupabaseClient()
-  const result = await publishFanPage(serviceRole, {
-    artistId: artist.id,
-    mode: body.mode,
-    landingPublishTrusted: artist.landingPublishTrusted ?? false,
-    userId: user.id,
-  })
+  const { value: result } = await portalMemberWrite(
+    ctx,
+    { route: ROUTE, table: 'artist_landing_pages', operation: 'update' },
+    (db) =>
+      publishFanPage(db, {
+        artistId: artist.id,
+        mode: body.mode,
+        landingPublishTrusted: artist.landingPublishTrusted ?? false,
+        userId: user.id,
+      }),
+  )
 
+  // Staff notifications — always service role (artists have no INSERT on editor_notifications)
   if (body.mode === 'submit_review') {
-    const { data: recipients } = await serviceRole
+    const { data: recipients } = await serviceDb
       .from('users')
       .select('id')
       .in('role', ['admin', 'editor'])
 
     if (recipients?.length) {
-      await serviceRole.from('editor_notifications').insert(
+      await serviceDb.from('editor_notifications').insert(
         recipients.map((r) => ({
           recipient_id: r.id,
           type: 'landing_page_review',

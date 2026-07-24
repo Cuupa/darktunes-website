@@ -4,6 +4,9 @@
  * GET    — list custom EPK fonts for the active artist (+ global fonts)
  * POST   — upload a font file to R2 and register in epk_fonts
  * DELETE — remove an artist-owned font (R2 object + DB row)
+ *
+ * Membership via withPortalMembershipWrite; DB ops via portalMemberWrite.
+ * R2 always uses env credentials.
  */
 
 import { randomUUID } from 'crypto'
@@ -11,9 +14,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { resolvePortalArtist } from '@/lib/api/artistProfiles'
-import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
-import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   buildEpkFontPublicUrl,
   createEpkFont,
@@ -21,6 +21,7 @@ import {
   listEpkFonts,
 } from '@/lib/api/epkFonts'
 import { createR2Client, deleteObjectFromR2 } from '@/lib/r2Utils'
+import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 
 const ALLOWED_FONT_TYPES = new Set([
   'font/woff2',
@@ -48,20 +49,20 @@ function familyFromFilename(filename: string): string {
   return filename.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim() || 'Custom Font'
 }
 
+function artistIdFromReq(req: NextRequest): string | null {
+  return new URL(req.url).searchParams.get('artistId')
+}
+
 export const GET = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, user } = await authenticatePortalBearer(req)
-  const artistId = new URL(req.url).searchParams.get('artistId')
+  const ctx = await withPortalMembershipWrite(req, artistIdFromReq(req))
+  const { artist } = ctx
 
-  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch((err) => {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  })
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
-
-  const serviceDb = await createServiceRoleSupabaseClient()
   const { serverEnv } = await import('@/lib/env.server')
-  const fonts = await listEpkFonts(serviceDb, artist.id)
+  const { value: fonts } = await portalMemberWrite(
+    ctx,
+    { route: 'GET /api/portal/epk/fonts', table: 'epk_fonts', operation: 'select' },
+    (db) => listEpkFonts(db, artist.id),
+  )
 
   return NextResponse.json({
     fonts: fonts.map((font) => ({
@@ -77,15 +78,8 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, user } = await authenticatePortalBearer(req)
-  const artistId = new URL(req.url).searchParams.get('artistId')
-
-  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch((err) => {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  })
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
+  const ctx = await withPortalMembershipWrite(req, artistIdFromReq(req))
+  const { artist } = ctx
 
   const formData = await req.formData()
   const file = formData.get('file')
@@ -132,13 +126,17 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       ? label.trim()
       : familyFromFilename(file.name)
 
-  const serviceDb = await createServiceRoleSupabaseClient()
-  const record = await createEpkFont(serviceDb, {
-    artist_id: artist.id,
-    name: familyName,
-    r2_key: r2Key,
-    mime_type: contentType,
-  })
+  const { value: record } = await portalMemberWrite(
+    ctx,
+    { route: 'POST /api/portal/epk/fonts', table: 'epk_fonts', operation: 'insert' },
+    (db) =>
+      createEpkFont(db, {
+        artist_id: artist.id,
+        name: familyName,
+        r2_key: r2Key,
+        mime_type: contentType,
+      }),
+  )
 
   return NextResponse.json({
     font: {
@@ -154,19 +152,15 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 })
 
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, user } = await authenticatePortalBearer(req)
-  const artistId = new URL(req.url).searchParams.get('artistId')
-
-  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch((err) => {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  })
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
+  const ctx = await withPortalMembershipWrite(req, artistIdFromReq(req))
+  const { artist } = ctx
 
   const body = deleteSchema.parse(await req.json())
-  const serviceDb = await createServiceRoleSupabaseClient()
-  const removed = await deleteEpkFont(serviceDb, body.id, artist.id)
+  const { value: removed } = await portalMemberWrite(
+    ctx,
+    { route: 'DELETE /api/portal/epk/fonts', table: 'epk_fonts', operation: 'delete' },
+    (db) => deleteEpkFont(db, body.id, artist.id),
+  )
   if (!removed) throw new ApiError(404, 'Font not found')
 
   if (removed.artistId) {
