@@ -11,6 +11,15 @@
  */
 
 import { defineConfig, devices } from '@playwright/test'
+import { config as loadEnv } from 'dotenv'
+
+/* Local Supabase stack credentials, written by `npm run db:e2e:start`
+ * (scripts/e2e-db-setup.mjs). Falls back to placeholders below when absent
+ * so `npm run test:e2e` still works for route-level tests that don't need a
+ * real backend. Loaded here (not relying on Next's own .env.local handling)
+ * so both the webServer's Next process AND the Playwright test runner itself
+ * (tests/helpers/*) see the same values. */
+loadEnv({ path: '.env.e2e.local', quiet: true })
 
 export default defineConfig({
   testDir: './tests',
