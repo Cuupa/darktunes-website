@@ -23,8 +23,7 @@ import { generateInvoiceNumber } from '@/lib/portal/invoiceNumber'
 import { generateInvoicePdf } from '@/lib/portal/invoicePdf'
 import { LABEL_BILLING_PARTY, LABEL_CLIENT_EMAIL } from '@/lib/portal/labelBilling'
 import { createR2Client } from '@/lib/r2Utils'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
-import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 
 const lineItemSchema = z.object({
@@ -54,16 +53,21 @@ function getLineItemSubtotal(lineItems: Array<{ qty: number; unit_price_cents: n
   return lineItems.reduce((sum, lineItem) => sum + lineItem.qty * lineItem.unit_price_cents, 0)
 }
 
+const ROUTE = 'POST /api/portal/invoices'
+
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artist_id')
   if (!artistId) throw new ApiError(400, 'artist_id is required')
 
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
-
+  const ctx = await withPortalMembershipWrite(req, artistId)
   const page = Math.max(1, parseInt(req.nextUrl.searchParams.get('page') ?? '1', 10))
-  const { invoices, total } = await listArtistInvoices(supabase, artist.id, page)
+  const { value } = await portalMemberWrite(
+    ctx,
+    { route: 'GET /api/portal/invoices', table: 'artist_invoices', operation: 'select' },
+    (db) => listArtistInvoices(db, ctx.artist.id, page),
+  )
 
-  return NextResponse.json({ invoices, total, page })
+  return NextResponse.json({ invoices: value.invoices, total: value.total, page })
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
@@ -74,19 +78,26 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   const input = parsed.data
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, input.artist_id)
+  const ctx = await withPortalMembershipWrite(req, input.artist_id)
+  const { artist, serviceDb } = ctx
 
-  const billingProfile = await getBillingProfile(supabase, artist.id)
+  const write = <T>(table: string, operation: string, fn: (db: typeof serviceDb) => Promise<T>) =>
+    portalMemberWrite(ctx, { route: ROUTE, table, operation }, fn).then((r) => r.value)
+
+  const billingProfile = await write('artist_billing_profiles', 'select', (db) =>
+    getBillingProfile(db, artist.id),
+  )
   if (!billingProfile || !isBillingProfileComplete(billingProfile)) {
     throw new ApiError(422, 'Billing profile is incomplete')
   }
 
   const { serverEnv } = await import('@/lib/env.server')
-  const serviceDb = await createServiceRoleSupabaseClient()
   const emailCredentials = await getEmailCredentials(serviceDb)
 
   const statement = input.statement_id
-    ? await getSalesStatementById(supabase, input.statement_id, artist.id)
+    ? await write('sales_statements', 'select', (db) =>
+        getSalesStatementById(db, input.statement_id!, artist.id),
+      )
     : null
 
   if (input.statement_id && !statement) {
@@ -102,7 +113,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   if (statement) {
-    const existingLinkedInvoice = await getArtistInvoiceByStatementId(supabase, artist.id, statement.id)
+    const existingLinkedInvoice = await write('artist_invoices', 'select', (db) =>
+      getArtistInvoiceByStatementId(db, artist.id, statement.id),
+    )
     if (existingLinkedInvoice) {
       throw new ApiError(409, 'An invoice for this statement already exists')
     }
@@ -115,7 +128,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   const issuedDate = input.issued_date ?? new Date().toISOString().slice(0, 10)
-  const internalInvoiceNumber = await generateInvoiceNumber(supabase, artist.id)
+  const internalInvoiceNumber = await write('artist_invoices', 'select', (db) =>
+    generateInvoiceNumber(db, artist.id),
+  )
   const effectiveTaxRate = billingProfile.isSmallBusiness ? 0 : input.tax_rate_pct
 
   const invoicePayload = {
@@ -135,21 +150,23 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   let settlementPeriodId: string | null = statement?.settlementPeriodId ?? null
   if (statement && !settlementPeriodId && statement.periodStart && statement.periodEnd) {
-    const period = await getOrCreateSettlementPeriod(
-      supabase,
-      statement.periodStart,
-      statement.periodEnd,
+    const period = await write('settlement_periods', 'upsert', (db) =>
+      getOrCreateSettlementPeriod(db, statement.periodStart!, statement.periodEnd!),
     )
     settlementPeriodId = period.id
-    await supabase
-      .from('sales_statements')
-      .update({ settlement_period_id: period.id })
-      .eq('id', statement.id)
+    await write('sales_statements', 'update', async (db) => {
+      await db
+        .from('sales_statements')
+        .update({ settlement_period_id: period.id })
+        .eq('id', statement.id)
+    })
   }
 
   if (settlementPeriodId) {
     try {
-      await assertSettlementPeriodWritableById(supabase, settlementPeriodId)
+      await write('settlement_periods', 'select', (db) =>
+        assertSettlementPeriodWritableById(db, settlementPeriodId!),
+      )
     } catch (err) {
       if (err instanceof SettlementPeriodNotWritableError) {
         throw new ApiError(422, err.message)
@@ -159,12 +176,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   }
 
   const invoice = statement
-    ? await createSosLinkedInvoice(supabase, {
-        ...invoicePayload,
-        statementId: statement.id,
-        settlementPeriodId,
-      })
-    : await createArtistInvoice(supabase, invoicePayload)
+    ? await write('artist_invoices', 'insert', (db) =>
+        createSosLinkedInvoice(db, {
+          ...invoicePayload,
+          statementId: statement.id,
+          settlementPeriodId,
+        }),
+      )
+    : await write('artist_invoices', 'insert', (db) => createArtistInvoice(db, invoicePayload))
 
   const pdfBytes = await generateInvoicePdf({
     invoiceNumber: input.artist_invoice_number,
@@ -211,31 +230,37 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   )
 
   const pdfUrl = `${serverEnv.CLOUDFLARE_R2_PUBLIC_URL.replace(/\/$/, '')}/${key}`
-  const updatedInvoice = await updateInvoice(supabase, invoice.id, artist.id, {
-    pdf_url: pdfUrl,
-    status: input.send_email ? 'sent' : 'draft',
-  })
+  const updatedInvoice = await write('artist_invoices', 'update', (db) =>
+    updateInvoice(db, invoice.id, artist.id, {
+      pdf_url: pdfUrl,
+      status: input.send_email ? 'sent' : 'draft',
+    }),
+  )
 
   if (
     statement &&
     ['label_approved', 'artist_notified', 'viewed'].includes(statement.status)
   ) {
-    await updateSalesStatementStatus(supabase, statement.id, 'invoiced')
+    await write('sales_statements', 'update', (db) =>
+      updateSalesStatementStatus(db, statement.id, 'invoiced'),
+    )
   }
 
   if (statement && settlementPeriodId) {
     // Net liability zeros statement_payout; cash still owed is tracked via unpaid invoice gross.
     const invoiceTotalEur = getLineItemSubtotal(input.line_items) / 100
-    await appendLedgerEntry(supabase, {
-      artistId: artist.id,
-      settlementPeriodId,
-      entryType: 'invoice_liability',
-      amountEur: -invoiceTotalEur,
-      currency: input.currency,
-      referenceType: 'artist_invoice',
-      referenceId: invoice.id,
-      description: `Invoice liability ${input.artist_invoice_number}`,
-    })
+    await write('settlement_ledger', 'insert', (db) =>
+      appendLedgerEntry(db, {
+        artistId: artist.id,
+        settlementPeriodId,
+        entryType: 'invoice_liability',
+        amountEur: -invoiceTotalEur,
+        currency: input.currency,
+        referenceType: 'artist_invoice',
+        referenceId: invoice.id,
+        description: `Invoice liability ${input.artist_invoice_number}`,
+      }),
+    )
   }
 
   if (input.send_email) {

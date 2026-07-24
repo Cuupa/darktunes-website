@@ -55,11 +55,15 @@ Membership verified with bearer client, then **service role** for writes on
 - Fan page document / publish / preview-token
 - Billing profile
 - Document vault upload / download / delete
+- Uploads: photo / rider / asset / release-cover
+- Invoices GET/POST/PATCH + statement view
+- Messages inbox / send / folders / [id] PATCH
 
 R2 uploads stay server-side with env credentials (not RLS).
 
-**Still migrating (ad-hoc auth):** messages (cookie), concerts, invoices, uploads
-(photo/rider/asset), tour-planner, checklist, submit-release/video — see API SOTA plan Phase C.
+**Auth:** `authenticatePortalBearer` accepts **Bearer** (preferred) or **cookie session** (dual-auth window for older clients). Portal UI should send Bearer via `getPortalAuthHeaders()`.
+
+**Still migrating (ad-hoc / partial):** concerts, tour-planner, checklist, submit-release/video — see API SOTA plan Phase C remainder.
 
 ## Phase plan — migrate back without reintroducing 500s
 

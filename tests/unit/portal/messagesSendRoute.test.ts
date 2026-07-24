@@ -1,6 +1,6 @@
 /**
- * Golden auth tests for POST /api/portal/messages/send (cookie-session path).
- * API SOTA Phase B3 — will migrate to Bearer in Phase C2.
+ * Golden auth tests for POST /api/portal/messages/send
+ * (membership write helpers + dual auth via withPortalMembershipWrite).
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,16 +11,17 @@ import {
   expectOk,
   expectUnauthorized,
   jsonRequest,
-  makeCookieSessionSupabase,
+  makePortalMembershipContext,
+  rejectApiError,
 } from '../../helpers/api/routeTestkit'
 
-const createServerSupabaseClientMock = vi.fn()
-const createServiceRoleSupabaseClientMock = vi.fn()
+const withPortalMembershipWriteMock = vi.fn()
+const portalMemberWriteMock = vi.fn()
 const sendPortalMessageMock = vi.fn()
 
-vi.mock('@/lib/supabase/server', () => ({
-  createServerSupabaseClient: createServerSupabaseClientMock,
-  createServiceRoleSupabaseClient: createServiceRoleSupabaseClientMock,
+vi.mock('@/lib/portal/withPortalMembership', () => ({
+  withPortalMembershipWrite: withPortalMembershipWriteMock,
+  portalMemberWrite: portalMemberWriteMock,
 }))
 
 vi.mock('@/lib/api/portalMessages', () => ({
@@ -42,12 +43,43 @@ const validBody = {
 describe('POST /api/portal/messages/send', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    createServerSupabaseClientMock.mockResolvedValue(
-      makeCookieSessionSupabase({ authenticated: true, membership: { id: 'mem-1' } }),
-    )
-    createServiceRoleSupabaseClientMock.mockResolvedValue(
-      makeCookieSessionSupabase({ authenticated: true }),
-    )
+    const ctx = makePortalMembershipContext({
+      serviceDb: {
+        from: (table: string) => {
+          if (table === 'artists') {
+            return {
+              select: () => ({
+                eq: () => ({
+                  maybeSingle: async () => ({ data: { name: 'Band' }, error: null }),
+                }),
+              }),
+            }
+          }
+          if (table === 'users') {
+            return {
+              select: () => ({
+                in: async () => ({ data: [], error: null }),
+              }),
+            }
+          }
+          return {
+            insert: async () => ({ error: null }),
+          }
+        },
+      },
+    })
+    withPortalMembershipWriteMock.mockResolvedValue(ctx)
+    portalMemberWriteMock.mockImplementation(async (_c, meta, write) => {
+      if (meta.table === 'artists' && meta.operation === 'select') {
+        return { value: { id: TEST_ARTIST_B_ID }, via: 'service_role', fellBack: false }
+      }
+      if (meta.table === 'portal_messages') {
+        const value = await write({})
+        return { value, via: 'service_role', fellBack: false }
+      }
+      const value = await write({})
+      return { value, via: 'service_role', fellBack: false }
+    })
     sendPortalMessageMock.mockResolvedValue({
       id: 'msg-1',
       subject: 'Hello',
@@ -58,9 +90,9 @@ describe('POST /api/portal/messages/send', () => {
     vi.clearAllMocks()
   })
 
-  it('golden: 401 without session', async () => {
-    createServerSupabaseClientMock.mockResolvedValue(
-      makeCookieSessionSupabase({ authenticated: false }),
+  it('golden: 401 without auth', async () => {
+    withPortalMembershipWriteMock.mockImplementation(() =>
+      rejectApiError(401, 'Missing authorization token'),
     )
     const { POST } = await loadRoute()
     const res = await POST(
@@ -74,13 +106,14 @@ describe('POST /api/portal/messages/send', () => {
   })
 
   it('golden: 403 when not a member of fromArtistId', async () => {
-    createServerSupabaseClientMock.mockResolvedValue(
-      makeCookieSessionSupabase({ authenticated: true, membership: null }),
+    withPortalMembershipWriteMock.mockImplementation(() =>
+      rejectApiError(403, 'No artist linked to this account'),
     )
     const { POST } = await loadRoute()
     const res = await POST(
       jsonRequest('/api/portal/messages/send', {
         method: 'POST',
+        bearer: 'tok',
         body: validBody,
       }),
     )
@@ -93,6 +126,7 @@ describe('POST /api/portal/messages/send', () => {
     const res = await POST(
       jsonRequest('/api/portal/messages/send', {
         method: 'POST',
+        bearer: 'tok',
         body: validBody,
       }),
     )
@@ -109,17 +143,17 @@ describe('POST /api/portal/messages/send', () => {
   })
 
   it('404 when recipient artist does not exist', async () => {
-    createServerSupabaseClientMock.mockResolvedValue(
-      makeCookieSessionSupabase({
-        authenticated: true,
-        membership: { id: 'mem-1' },
-        targetArtist: null,
-      }),
-    )
+    portalMemberWriteMock.mockImplementation(async (_c, meta, write) => {
+      if (meta.table === 'artists') {
+        return { value: null, via: 'service_role', fellBack: false }
+      }
+      return { value: await write({}), via: 'service_role', fellBack: false }
+    })
     const { POST } = await loadRoute()
     const res = await POST(
       jsonRequest('/api/portal/messages/send', {
         method: 'POST',
+        bearer: 'tok',
         body: validBody,
       }),
     )

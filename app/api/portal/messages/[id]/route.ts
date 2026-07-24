@@ -1,17 +1,13 @@
 /**
  * app/api/portal/messages/[id]/route.ts
  *
- * PATCH /api/portal/messages/:id
- * Update a portal message: star, mark read, move to folder, soft-delete, restore.
- *
- * Body: { starred?, readAt?, folderId?, deleted? }
- *
- * Security: caller must be a member of either the sender or recipient artist.
+ * PATCH — star, mark read, move folder, soft-delete, restore.
+ * Auth: Bearer (preferred) or cookie (dual-auth).
+ * Membership: user must belong to sender or recipient artist.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import {
   markPortalMessageRead,
@@ -20,6 +16,8 @@ import {
   softDeletePortalMessage,
   restorePortalMessage,
 } from '@/lib/api/portalMessages'
+import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 
 const patchSchema = z.object({
   starred: z.boolean().optional(),
@@ -34,18 +32,13 @@ function extractId(req: NextRequest): string {
 }
 
 export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) throw new ApiError(401, 'Unauthorized')
+  // Dual auth (Bearer or cookie)
+  const { user } = await authenticatePortalBearer(req)
+  const serviceDb = await createServiceRoleSupabaseClient()
 
   const messageId = extractId(req)
 
-  // Load message to check ownership
-  const { data: msg } = await supabase
+  const { data: msg } = await serviceDb
     .from('portal_messages')
     .select('id, from_artist_id, to_artist_id')
     .eq('id', messageId)
@@ -53,9 +46,8 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
 
   if (!msg) throw new ApiError(404, 'Message not found')
 
-  // Check user is member of sender or recipient artist
   const artistIds = [msg.from_artist_id, msg.to_artist_id].filter(Boolean) as string[]
-  const { data: membership } = await supabase
+  const { data: membership } = await serviceDb
     .from('artist_members')
     .select('id')
     .in('artist_id', artistIds)
@@ -73,19 +65,20 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
 
   const { starred, markRead, folderId, deleted } = parsed.data
 
+  // Membership verified — mutate via service role (band-member safe)
   if (starred !== undefined) {
-    await togglePortalMessageStar(supabase, messageId, starred)
+    await togglePortalMessageStar(serviceDb, messageId, starred)
   }
   if (markRead === true) {
-    await markPortalMessageRead(supabase, messageId)
+    await markPortalMessageRead(serviceDb, messageId)
   }
   if (folderId !== undefined) {
-    await movePortalMessage(supabase, messageId, folderId)
+    await movePortalMessage(serviceDb, messageId, folderId)
   }
   if (deleted === true) {
-    await softDeletePortalMessage(supabase, messageId)
+    await softDeletePortalMessage(serviceDb, messageId)
   } else if (deleted === false) {
-    await restorePortalMessage(supabase, messageId)
+    await restorePortalMessage(serviceDb, messageId)
   }
 
   return NextResponse.json({ success: true })

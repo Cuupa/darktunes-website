@@ -3,7 +3,7 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createR2Client } from '@/lib/r2Utils'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 
 const MAX_RELEASE_COVER_SIZE_BYTES = 5 * 1024 * 1024
 
@@ -35,7 +35,7 @@ async function uploadCoverToR2(
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
-  const { artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { artist } = await withPortalMembershipWrite(req, artistId)
 
   const formData = await req.formData()
   const file = formData.get('file')

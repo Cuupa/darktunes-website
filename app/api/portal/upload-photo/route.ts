@@ -18,7 +18,7 @@ import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createR2Client } from '@/lib/r2Utils'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 
 async function uploadPhotoToR2(
   file: File,
@@ -55,7 +55,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     typeof artistIdFromBody === 'string' && artistIdFromBody.trim()
       ? artistIdFromBody
       : artistIdFromQuery
-  const { artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const { artist } = await withPortalMembershipWrite(req, artistId)
 
   const file = formData.get('file')
   if (!(file instanceof File)) throw new ApiError(400, 'No file provided')

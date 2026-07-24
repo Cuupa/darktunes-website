@@ -16,11 +16,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { createR2Client } from '@/lib/r2Utils'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
-import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
+import { withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 
 const ALLOWED_RIDER_TYPES = new Set(['stage_plot', 'technical', 'hospitality'])
 const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
@@ -51,15 +50,8 @@ async function uploadPdfToR2(
 }
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, user } = await authenticatePortalBearer(req)
-
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch((err) => {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  })
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
+  const { artist } = await withPortalMembershipWrite(req, artistId)
 
   const riderType = req.nextUrl.searchParams.get('type') ?? ''
   if (!ALLOWED_RIDER_TYPES.has(riderType)) {
