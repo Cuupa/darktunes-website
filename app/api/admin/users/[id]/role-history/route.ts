@@ -1,4 +1,3 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * app/api/admin/users/[id]/role-history/route.ts
  *
@@ -8,9 +7,10 @@ import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/ad
  * Security: only admin users may call this endpoint.
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-import { ApiError, withErrorHandler } from '@/lib/errors'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { withErrorHandler } from '@/lib/errors'
 import { getRoleHistory, getBanHistory } from '@/lib/api/users'
 
 function extractId(req: NextRequest): string {

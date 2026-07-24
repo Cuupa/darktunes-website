@@ -1,4 +1,3 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * app/api/admin/sos/period-summaries/route.ts
  *
@@ -6,9 +5,11 @@ import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/ad
  * POST /api/admin/sos/period-summaries  — upsert a period summary (same path as Save to Portal)
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   listSosPeriodSummaries,
   upsertSosPeriodSummary,
@@ -16,8 +17,6 @@ import {
 } from '@/lib/api/sosPeriodSummaries'
 import { assertSettlementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-
-
 
 function summaryToApiRow(summary: SosPeriodSummary) {
   return {

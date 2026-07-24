@@ -1,12 +1,13 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * GET /api/admin/sos/presets/default — ensure and return the Default preset
  * PUT /api/admin/sos/presets/default — save settings to the Default preset
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   ensureDefaultRulesPreset,
   upsertRulesPresetByName,
@@ -14,8 +15,6 @@ import {
 } from '@/lib/api/sosRulesPresets'
 import { DEFAULT_PRESET_NAME, normalizeAccountingConfig } from '@/lib/sos/sosAccountingSettings'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-
-
 
 function presetResponse(preset: Awaited<ReturnType<typeof ensureDefaultRulesPreset>>) {
   return {

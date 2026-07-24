@@ -136,12 +136,28 @@ Users tab: `users.ts` DAL + `/api/admin/users/*` (admin only). Feature flags: `s
 
 ## Public rate limits (`ipRateLimit.ts`)
 
+In-process IP limits for unauthenticated public endpoints:
+
 | Route | Limit |
 |-------|-------|
 | `/api/contact` | 5 / 10 min |
 | `/api/auth/forgot-password` | 3 / 10 min |
 | `/api/journalist-applications` | 3 / 30 min |
 | `/api/page-events` | 120 / 10 min |
+
+## Portal / authenticated abuse guards (`rateLimitDistributed` + `portalUploadLimits`)
+
+Prefer **distributed** limits (Upstash when configured, else in-process) keyed by `userId:ip`. SSOT for upload size/MIME and portal rate numbers: `src/lib/uploads/portalUploadLimits.ts`.
+
+| Area | Default |
+|------|---------|
+| Portal file uploads (photo, rider, asset, cover, documents, fonts, tour tech) | 40 / 10 min |
+| Message send | 30 / 10 min |
+| EPK export | 10 / 10 min |
+| Client error log (`/api/log-error`) | 60 / 10 min |
+| Submit release / video | 20 / 10 min |
+
+Route handlers must import size limits from `portalUploadLimits` — no local `MAX_BYTES` copies.
 
 ## robots.txt & llms.txt
 

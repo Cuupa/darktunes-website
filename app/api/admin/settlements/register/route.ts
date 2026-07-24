@@ -4,7 +4,6 @@ import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { buildSettlementRegister } from '@/lib/api/settlementRegister'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 const querySchema = z.object({
   periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

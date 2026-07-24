@@ -327,16 +327,22 @@ describe('supabase/reset.sql — static analysis', () => {
     )
   })
 
-  it('does not declare artists.apple_music_url twice with an ALTER TABLE guard', () => {
-    const violations: string[] = []
-
-    for (let i = 0; i < lines.length; i++) {
-      const clean = stripComment(lines[i])
-      if (/^ALTER\s+TABLE\s+public\.artists\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+apple_music_url\b/i.test(clean)) {
-        violations.push(`Line ${i + 1}: redundant artists.apple_music_url ALTER TABLE guard`)
-      }
-    }
-
-    expect(violations, violations.join('\n')).toHaveLength(0)
+  it('guards artists CREATE columns with ADD COLUMN IF NOT EXISTS (prod CREATE is a no-op)', () => {
+    // CREATE TABLE IF NOT EXISTS does not add new columns on live DBs.
+    // SSOT: every non-structural artists column must appear in the idempotent
+    // ALTER block — enforced by `npm run verify:schema-columns` for the full set.
+    // apple_music_url is the historical canary (once CREATE-only; caused drift).
+    const hasAppleMusicGuard = lines.some((line) =>
+      /^ALTER\s+TABLE\s+public\.artists\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+apple_music_url\b/i.test(
+        stripComment(line),
+      ),
+    )
+    const hasHometownGuard = lines.some((line) =>
+      /^ALTER\s+TABLE\s+public\.artists\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+hometown\b/i.test(
+        stripComment(line),
+      ),
+    )
+    expect(hasAppleMusicGuard).toBe(true)
+    expect(hasHometownGuard).toBe(true)
   })
 })

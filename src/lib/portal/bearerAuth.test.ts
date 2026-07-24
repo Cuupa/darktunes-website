@@ -1,5 +1,4 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { ApiError } from '@/lib/errors'
 
 const getUser = vi.fn()
 const createBearerAuthSupabaseClient = vi.fn()

@@ -9,15 +9,14 @@ import { createR2Client, deleteObjectFromR2 } from '@/lib/r2Utils'
 import { createArtistAsset, deleteArtistAsset } from '@/lib/api/artistAssets'
 import { createAssetRecord } from '@/lib/api/assets'
 import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
+import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
+import { getClientIp } from '@/lib/ipRateLimit'
+import {
+  PORTAL_ASSET_MAX_BYTES,
+  PORTAL_ASSET_MIME,
+  PORTAL_UPLOAD_RATE,
+} from '@/lib/uploads/portalUploadLimits'
 
-const allowedTypes = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'application/pdf',
-  'application/zip',
-]
-const MAX_ASSET_SIZE_BYTES = 20 * 1024 * 1024
 const deleteSchema = z.object({ id: z.string() })
 
 function extFromMimeType(mimeType: string): string {
@@ -112,6 +111,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const { artist, user, serviceDb } = ctx
   const userId = user.id
 
+  const ip = getClientIp(req)
+  const rl = await checkDistributedRateLimit(
+    `upload-asset:${userId}:${ip}`,
+    PORTAL_UPLOAD_RATE.max,
+    PORTAL_UPLOAD_RATE.windowMs,
+  )
+  if (rl.limited) throw new ApiError(429, 'Too many uploads. Please wait and try again.')
+
   const formData = await req.formData()
   const file = formData.get('file')
   const label = formData.get('label')
@@ -119,9 +126,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   if (!(file instanceof File)) throw new ApiError(400, 'No file provided')
 
-  if (file.size > MAX_ASSET_SIZE_BYTES) throw new ApiError(413, 'File too large (max 20 MB)')
+  if (file.size > PORTAL_ASSET_MAX_BYTES) throw new ApiError(413, 'File too large (max 20 MB)')
 
-  if (!allowedTypes.includes(file.type)) {
+  if (!PORTAL_ASSET_MIME.has(file.type)) {
     throw new ApiError(415, 'Unsupported file type. Allowed: JPEG, PNG, WebP, PDF, ZIP')
   }
 

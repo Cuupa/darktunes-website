@@ -14,7 +14,6 @@ import {
 import { updateSalesStatementStatus } from '@/lib/api/salesStatements'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-
 const paymentSchema = z.object({
   amountCents: z.number().int().positive(),
   paymentMethod: z.enum(['sepa', 'paypal', 'manual', 'other']),

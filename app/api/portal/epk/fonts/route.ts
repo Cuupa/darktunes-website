@@ -22,6 +22,9 @@ import {
 } from '@/lib/api/epkFonts'
 import { createR2Client, deleteObjectFromR2 } from '@/lib/r2Utils'
 import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
+import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
+import { getClientIp } from '@/lib/ipRateLimit'
+import { PORTAL_FONT_MAX_BYTES, PORTAL_UPLOAD_RATE } from '@/lib/uploads/portalUploadLimits'
 
 const ALLOWED_FONT_TYPES = new Set([
   'font/woff2',
@@ -34,7 +37,6 @@ const ALLOWED_FONT_TYPES = new Set([
   'application/x-font-opentype',
   'application/octet-stream',
 ])
-const MAX_FONT_BYTES = 5 * 1024 * 1024
 
 const deleteSchema = z.object({ id: z.string().uuid() })
 
@@ -81,12 +83,20 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const ctx = await withPortalMembershipWrite(req, artistIdFromReq(req))
   const { artist } = ctx
 
+  const ip = getClientIp(req)
+  const rl = await checkDistributedRateLimit(
+    `epk-fonts-upload:${ctx.user.id}:${ip}`,
+    PORTAL_UPLOAD_RATE.max,
+    PORTAL_UPLOAD_RATE.windowMs,
+  )
+  if (rl.limited) throw new ApiError(429, 'Too many uploads. Please wait and try again.')
+
   const formData = await req.formData()
   const file = formData.get('file')
   const label = formData.get('name')
 
   if (!(file instanceof File)) throw new ApiError(400, 'No file provided')
-  if (file.size > MAX_FONT_BYTES) throw new ApiError(413, 'Font file too large (max 5 MB)')
+  if (file.size > PORTAL_FONT_MAX_BYTES) throw new ApiError(413, 'Font file too large (max 5 MB)')
 
   const contentType = file.type || 'application/octet-stream'
   const lowerName = file.name.toLowerCase()

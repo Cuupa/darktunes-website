@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { createReleaseSubmissionWithTracksAtomic } from '@/lib/api/releaseSubmissions'
 import { getFormSchema } from '@/lib/api/submissionFormSchema'
 import { getReleaseTypeRules } from '@/lib/api/submissionReleaseTypeRules'

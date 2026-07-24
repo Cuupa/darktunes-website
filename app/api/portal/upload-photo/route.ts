@@ -19,6 +19,13 @@ import { createR2Client } from '@/lib/r2Utils'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
 import { withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
+import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
+import { getClientIp } from '@/lib/ipRateLimit'
+import {
+  PORTAL_PHOTO_MAX_BYTES,
+  PORTAL_PHOTO_MIME,
+  PORTAL_UPLOAD_RATE,
+} from '@/lib/uploads/portalUploadLimits'
 
 async function uploadPhotoToR2(
   file: File,
@@ -55,16 +62,23 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     typeof artistIdFromBody === 'string' && artistIdFromBody.trim()
       ? artistIdFromBody
       : artistIdFromQuery
-  const { artist } = await withPortalMembershipWrite(req, artistId)
+  const ctx = await withPortalMembershipWrite(req, artistId)
+  const { artist } = ctx
+
+  const ip = getClientIp(req)
+  const rl = await checkDistributedRateLimit(
+    `upload-photo:${ctx.user.id}:${ip}`,
+    PORTAL_UPLOAD_RATE.max,
+    PORTAL_UPLOAD_RATE.windowMs,
+  )
+  if (rl.limited) throw new ApiError(429, 'Too many uploads. Please wait and try again.')
 
   const file = formData.get('file')
   if (!(file instanceof File)) throw new ApiError(400, 'No file provided')
 
-  const maxBytes = 5 * 1024 * 1024 // 5 MB
-  if (file.size > maxBytes) throw new ApiError(413, 'File too large (max 5 MB)')
+  if (file.size > PORTAL_PHOTO_MAX_BYTES) throw new ApiError(413, 'File too large (max 5 MB)')
 
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
-  if (!allowedTypes.includes(file.type)) {
+  if (!PORTAL_PHOTO_MIME.has(file.type)) {
     throw new ApiError(415, 'Unsupported file type. Allowed: JPEG, PNG, WebP, GIF')
   }
 

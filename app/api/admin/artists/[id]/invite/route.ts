@@ -1,4 +1,3 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * app/api/admin/artists/[id]/invite/route.ts
  *
@@ -13,6 +12,8 @@ import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/ad
  *   - Returns 400 if the artist has no email address set.
  */
 
+import { requireAdminWithServiceClient } from '@/lib/adminAuth'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { requestUserInvite } from '@/lib/auth/requestUserInvite'
 import { ApiError, buildApiError, withErrorHandler } from '@/lib/errors'
@@ -22,8 +23,6 @@ function extractArtistId(req: NextRequest): string {
   const segments = new URL(req.url).pathname.split('/')
   return segments[4]
 }
-
-
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const { userId: currentUserId, serviceClient: adminClient } = await requireAdminWithServiceClient(req)

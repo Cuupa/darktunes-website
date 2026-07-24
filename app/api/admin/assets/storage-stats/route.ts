@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { withErrorHandler } from '@/lib/errors'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-
 export interface StorageStatsResponse {
   usedBytes: number
   assetCount: number

@@ -4,7 +4,6 @@ import { reorderPressKit } from '@/lib/api/pressKit'
 import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 interface ReorderBody {
   artistId?: string | null
   orderedItemIds?: string[]

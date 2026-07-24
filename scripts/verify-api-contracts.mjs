@@ -84,8 +84,20 @@ function hasPortalAuth(content) {
     || /authenticatePortalBearerWithArtist/.test(content)
     || /authenticateTourPlannerRequest/.test(content)
     || /portalMemberWrite/.test(content)
-    // Messages still cookie-session (Phase C2 will move to Bearer)
-    || (/createServerSupabaseClient/.test(content) && /getUser\(/.test(content))
+  )
+}
+
+/** Mutations that intentionally skip artist membership pin (user-scoped only). */
+const PORTAL_MUTATION_NO_MEMBERSHIP_ALLOWLIST = new Set([
+  'app/api/portal/cover-art-check/route.ts',
+  'app/api/portal/proxy-image/route.ts',
+])
+
+function hasPortalMembershipWrite(content) {
+  return (
+    /withPortalMembershipWrite|withPortalMembership\b|portalMemberWrite|authenticateTourPlannerRequest/.test(
+      content,
+    )
   )
 }
 
@@ -133,6 +145,18 @@ function main() {
 
     if (isPortal && hasMutation(content) && !hasPortalAuth(content)) {
       errors.push(`${pathRel}: portal mutation without recognized portal auth helper`)
+    }
+
+    // Artist-scoped mutations must pin membership (allowlist: user-only actions)
+    if (
+      isPortal
+      && hasMutation(content)
+      && !PORTAL_MUTATION_NO_MEMBERSHIP_ALLOWLIST.has(pathRel)
+      && !hasPortalMembershipWrite(content)
+    ) {
+      errors.push(
+        `${pathRel}: portal mutation should use withPortalMembershipWrite/portalMemberWrite (or add to allowlist)`,
+      )
     }
 
     if (isAdmin && !isApiPublic(content, pathRel) && !hasAdminAuth(content)) {

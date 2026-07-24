@@ -1,11 +1,12 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * POST /api/admin/sos/import-batches/[id]/multipart/abort — cancel in-progress multipart upload
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   abortBronzeMultipartUpload,
   createBronzeMultipartR2Context,
@@ -14,8 +15,6 @@ import {
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
 const ABORT_BODY_MAX_BYTES = 512
-
-
 
 function extractBatchIdFromPath(pathname: string): string | null {
   const match = pathname.match(/\/import-batches\/([^/]+)\/multipart\/abort\/?$/)

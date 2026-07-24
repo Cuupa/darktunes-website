@@ -11,6 +11,9 @@ import { z } from 'zod'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { sendPortalMessage } from '@/lib/api/portalMessages'
 import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
+import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
+import { getClientIp } from '@/lib/ipRateLimit'
+import { PORTAL_MESSAGE_SEND_RATE } from '@/lib/uploads/portalUploadLimits'
 
 const sendSchema = z.object({
   fromArtistId: z.string().uuid(),
@@ -37,6 +40,16 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   }
 
   const ctx = await withPortalMembershipWrite(req, fromArtistId)
+
+  const ip = getClientIp(req)
+  const rl = await checkDistributedRateLimit(
+    `messages-send:${ctx.user.id}:${ip}`,
+    PORTAL_MESSAGE_SEND_RATE.max,
+    PORTAL_MESSAGE_SEND_RATE.windowMs,
+  )
+  if (rl.limited) {
+    throw new ApiError(429, 'Too many messages. Please wait and try again.')
+  }
 
   if (toArtistId) {
     const { value: targetArtist } = await portalMemberWrite(

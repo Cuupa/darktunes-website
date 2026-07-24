@@ -1,4 +1,3 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * GET  /api/admin/sos/workspaces?periodStart=...&periodEnd=... — load workspace for period
  * POST /api/admin/sos/workspaces — upsert workspace (rules config + bronze batches) for a period
@@ -6,9 +5,11 @@ import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/ad
  * Provides the enterprise shared state for accounting configuration.
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   deleteWorkspaceForPeriod,
   getWorkspaceForPeriod,
@@ -17,8 +18,6 @@ import {
 } from '@/lib/api/sosAccountingWorkspaces'
 import { assertSettlementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-
-
 
 export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   await requireAdminFromRequest(req)

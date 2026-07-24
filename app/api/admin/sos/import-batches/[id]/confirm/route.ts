@@ -1,17 +1,16 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * PATCH /api/admin/sos/import-batches/[id]/confirm — verify R2 content and store file hash
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getImportBatchById } from '@/lib/api/distributorImportBatches'
 import { writeAppLog } from '@/lib/appLog'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createR2Client, sha256HexFromR2Object } from '@/lib/r2Utils'
-
-
 
 function extractBatchIdFromPath(pathname: string): string | null {
   const match = pathname.match(/\/import-batches\/([^/]+)\/confirm\/?$/)

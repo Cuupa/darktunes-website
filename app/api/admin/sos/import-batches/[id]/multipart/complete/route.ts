@@ -1,11 +1,12 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * POST /api/admin/sos/import-batches/[id]/multipart/complete — finalize R2 multipart upload
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   completeBronzeMultipartUpload,
   createBronzeMultipartR2Context,
@@ -15,8 +16,6 @@ import {
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
 const COMPLETE_BODY_MAX_BYTES = 65_536
-
-
 
 function extractBatchIdFromPath(pathname: string): string | null {
   const match = pathname.match(/\/import-batches\/([^/]+)\/multipart\/complete\/?$/)

@@ -1,13 +1,14 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * GET  /api/admin/sos/import-batches — list bronze import batches
  * POST /api/admin/sos/import-batches — register a bronze CSV import (upload via [id]/upload)
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { randomUUID, createHash } from 'crypto'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   createImportBatch,
   findImportBatchByFileHash,
@@ -15,8 +16,6 @@ import {
 } from '@/lib/api/distributorImportBatches'
 import { assertSettlementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-
-
 
 export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   await requireAdminFromRequest(req)

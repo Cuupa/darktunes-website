@@ -4,8 +4,9 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createR2Client } from '@/lib/r2Utils'
 import { authenticateTourPlannerRequest, assertTourAccess } from '@/lib/portal/tourPlannerAuth'
-
-const MAX_BYTES = 10 * 1024 * 1024
+import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
+import { getClientIp } from '@/lib/ipRateLimit'
+import { PORTAL_TECH_DOC_MAX_BYTES, PORTAL_UPLOAD_RATE } from '@/lib/uploads/portalUploadLimits'
 
 async function uploadPdfToR2(
   file: File,
@@ -34,7 +35,15 @@ async function uploadPdfToR2(
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { supabase, artist } = await authenticateTourPlannerRequest(req, artistId)
+  const { supabase, artist, user } = await authenticateTourPlannerRequest(req, artistId)
+
+  const ip = getClientIp(req)
+  const rl = await checkDistributedRateLimit(
+    `tour-tech-upload:${user.id}:${ip}`,
+    PORTAL_UPLOAD_RATE.max,
+    PORTAL_UPLOAD_RATE.windowMs,
+  )
+  if (rl.limited) throw new ApiError(429, 'Too many uploads. Please wait and try again.')
 
   const formData = await req.formData()
   const file = formData.get('file')
@@ -42,7 +51,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   if (!(file instanceof File)) throw new ApiError(400, 'No file provided')
   if (!tourId || typeof tourId !== 'string') throw new ApiError(400, 'tourId is required')
-  if (file.size > MAX_BYTES) throw new ApiError(413, 'File too large (max 10 MB)')
+  if (file.size > PORTAL_TECH_DOC_MAX_BYTES) throw new ApiError(413, 'File too large (max 10 MB)')
 
   const isPdf =
     file.type === 'application/pdf' ||

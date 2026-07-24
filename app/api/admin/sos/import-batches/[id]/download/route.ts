@@ -1,4 +1,3 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * GET /api/admin/sos/import-batches/[id]/download — stream bronze CSV from R2 server-side
  *
@@ -6,14 +5,14 @@ import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/ad
  * (bucket CORS is not configured for www.darktunes.com).
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getImportBatchById } from '@/lib/api/distributorImportBatches'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createR2Client, downloadObjectFromR2 } from '@/lib/r2Utils'
-
-
 
 function extractBatchIdFromPath(pathname: string): string | null {
   const match = pathname.match(/\/import-batches\/([^/]+)\/download\/?$/)

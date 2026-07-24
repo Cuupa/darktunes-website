@@ -1,4 +1,3 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * app/api/admin/users/[id]/route.ts
  *
@@ -16,9 +15,10 @@ import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/ad
  *   { ban, reason } — ban / unban the user
  */
 
+import { requireAdminWithServiceClient } from '@/lib/adminAuth'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import {
   DISPLAY_NAME_MAX_LENGTH,
@@ -58,7 +58,6 @@ function extractId(req: NextRequest): string {
 }
 
 /** Shared auth + admin-role check. Returns { user, adminClient }. */
-
 
 // ---------------------------------------------------------------------------
 // Route handlers

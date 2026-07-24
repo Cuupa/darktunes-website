@@ -20,9 +20,11 @@ import { createR2Client } from '@/lib/r2Utils'
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
 import { withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
+import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
+import { getClientIp } from '@/lib/ipRateLimit'
+import { PORTAL_RIDER_MAX_BYTES, PORTAL_UPLOAD_RATE } from '@/lib/uploads/portalUploadLimits'
 
 const ALLOWED_RIDER_TYPES = new Set(['stage_plot', 'technical', 'hospitality'])
-const MAX_BYTES = 10 * 1024 * 1024 // 10 MB
 
 async function uploadPdfToR2(
   file: File,
@@ -51,7 +53,16 @@ async function uploadPdfToR2(
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artistId')
-  const { artist } = await withPortalMembershipWrite(req, artistId)
+  const ctx = await withPortalMembershipWrite(req, artistId)
+  const { artist } = ctx
+
+  const ip = getClientIp(req)
+  const rl = await checkDistributedRateLimit(
+    `upload-rider:${ctx.user.id}:${ip}`,
+    PORTAL_UPLOAD_RATE.max,
+    PORTAL_UPLOAD_RATE.windowMs,
+  )
+  if (rl.limited) throw new ApiError(429, 'Too many uploads. Please wait and try again.')
 
   const riderType = req.nextUrl.searchParams.get('type') ?? ''
   if (!ALLOWED_RIDER_TYPES.has(riderType)) {
@@ -62,7 +73,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const file = formData.get('file')
   if (!(file instanceof File)) throw new ApiError(400, 'No file provided')
 
-  if (file.size > MAX_BYTES) throw new ApiError(413, 'File too large (max 10 MB)')
+  if (file.size > PORTAL_RIDER_MAX_BYTES) throw new ApiError(413, 'File too large (max 10 MB)')
 
   const isPdf =
     file.type === 'application/pdf' ||

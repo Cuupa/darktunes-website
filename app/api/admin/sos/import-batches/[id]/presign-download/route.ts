@@ -1,16 +1,15 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * GET /api/admin/sos/import-batches/[id]/presign-download — presigned GET URL for browser → R2 download
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getImportBatchById } from '@/lib/api/distributorImportBatches'
 import { generateBronzePresignedDownloadUrl } from '@/lib/sos/bronzePresignedUpload'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-
-
 
 function extractBatchIdFromPath(pathname: string): string | null {
   const match = pathname.match(/\/import-batches\/([^/]+)\/presign-download\/?$/)

@@ -1,4 +1,3 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * app/api/admin/users/[id]/link-artist/route.ts
  *
@@ -12,9 +11,11 @@ import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/ad
  * Security: only users with role = 'admin' may call this endpoint.
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, buildApiError, withErrorHandler } from '@/lib/errors'
 
 // ---------------------------------------------------------------------------

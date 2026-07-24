@@ -1,4 +1,3 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * GET    /api/admin/sos/import-batches/[id] — fetch batch metadata + presigned download URL (server-side use only)
  *          Admin UI must load CSV via GET /download — never fetch downloadUrl from the browser (R2 CORS).
@@ -6,9 +5,11 @@ import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/ad
  * DELETE /api/admin/sos/import-batches/[id] — delete batch + its R2 object (confirmed or not)
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   deleteImportBatch,
   getImportBatchById,
@@ -16,8 +17,6 @@ import {
 } from '@/lib/api/distributorImportBatches'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createR2Client, deleteObjectFromR2 } from '@/lib/r2Utils'
-
-
 
 function extractBatchIdFromPath(pathname: string): string | null {
   const match = pathname.match(/\/import-batches\/([^/]+)\/?$/)

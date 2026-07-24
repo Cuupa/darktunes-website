@@ -10,7 +10,6 @@ import { z } from 'zod'
 import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-
 const putSchema = z.object({
   roleIds: z.array(z.string().uuid()),
 })

@@ -4,7 +4,6 @@ import { addToPressKit, getPressKitItems } from '@/lib/api/pressKit'
 import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 interface AddPressKitBody {
   assetId?: string
   artistId?: string | null

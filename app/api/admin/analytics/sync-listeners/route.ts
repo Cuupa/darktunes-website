@@ -1,16 +1,15 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * POST /api/admin/analytics/sync-listeners
  * Fetches Last.fm (and optional Soundcharts) listener trends for portal artists.
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextResponse, type NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { syncListenerMetricsForArtists } from '@/lib/analytics/syncListenerMetrics'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { getListenerAnalyticsCredentials } from '@/lib/secrets/getExternalCredentials'
-
-
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   await requireAdminFromRequest(req)

@@ -6,6 +6,8 @@
  * GET    /api/admin/genres        — list all genres (public, no auth required)
  * POST   /api/admin/genres        — create a genre (admin/editor auth required)
  * DELETE /api/admin/genres?id=<id> — delete a genre (admin/editor auth required)
+ *
+ * @api-public GET — intentional public catalogue for portal profile genre picker
  */
 
 import { NextRequest, NextResponse } from 'next/server'

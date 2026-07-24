@@ -1,12 +1,13 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * POST /api/admin/sos/import-batches/[id]/reprocess
  * Downloads Bronze CSV from R2, re-parses, and optionally persists gold metrics.
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getImportBatchById, updateImportBatchStatus } from '@/lib/api/distributorImportBatches'
 import { getWorkspaceForPeriod } from '@/lib/api/sosAccountingWorkspaces'
 import { createR2Client, downloadObjectFromR2 } from '@/lib/r2Utils'
@@ -14,8 +15,6 @@ import { reprocessBronzeCsvContent } from '@/lib/sos/bronzeReprocess'
 import type { BronzeDistributor } from '@/lib/sos/bronzeUpload'
 import { persistSosAnalyticsCore } from '@/lib/sos/persistSosAnalyticsCore'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-
-
 
 function extractBatchIdFromPath(pathname: string): string | null {
   const match = pathname.match(/\/import-batches\/([^/]+)\/reprocess\/?$/)

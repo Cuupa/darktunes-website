@@ -5,7 +5,6 @@ import { bulkAddToPressKit, bulkRemoveFromPressKitByAssetIds } from '@/lib/api/p
 import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 type BulkPressAction = 'approve' | 'unapprove' | 'addToKit' | 'removeFromKit'
 
 interface BulkPressBody {

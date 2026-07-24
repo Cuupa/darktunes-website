@@ -1,12 +1,13 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * PUT    /api/admin/sos/presets/:id  — update a preset (name and/or config)
  * DELETE /api/admin/sos/presets/:id  — delete a preset
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   deleteRulesPreset,
   updateRulesPreset,
@@ -14,8 +15,6 @@ import {
 } from '@/lib/api/sosRulesPresets'
 import { normalizeAccountingConfig } from '@/lib/sos/sosAccountingSettings'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-
-
 
 export const PUT = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   await requireAdminFromRequest(req)

@@ -1,4 +1,3 @@
-import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/adminAuth'
 /**
  * app/api/admin/send-external-email/route.ts
  *
@@ -13,8 +12,10 @@ import { requireAdminFromRequest, requireAdminWithServiceClient } from '@/lib/ad
  * Transport: Resend credentials from Admin → API Keys (encrypted in api_credentials).
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 

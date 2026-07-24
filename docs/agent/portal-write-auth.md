@@ -57,7 +57,7 @@ Membership verified with bearer client, then **service role** for writes on
 - Document vault upload / download / delete
 - Uploads: photo / rider / asset / release-cover
 - Invoices GET/POST/PATCH + statement view
-- Messages inbox / send / folders / [id] PATCH
+- Messages inbox / send / folders / [id] PATCH (message routes pin membership on sender or recipient artist after load)
 - Concerts + ICS export
 - Checklist toggle
 - Submit release / video + submission drafts + list submissions

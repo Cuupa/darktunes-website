@@ -1,7 +1,6 @@
 import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
-import { ApiError } from '@/lib/errors'
 import {
   TEST_ARTIST_ID,
   makePortalMembershipContext,
@@ -23,6 +22,10 @@ const editorNotificationsInsertMock = vi.fn()
 vi.mock('@/lib/portal/withPortalMembership', () => ({
   withPortalMembershipWrite: withPortalMembershipWriteMock,
   portalMemberWrite: portalMemberWriteMock,
+}))
+
+vi.mock('@/lib/rateLimitDistributed', () => ({
+  checkDistributedRateLimit: vi.fn().mockResolvedValue({ limited: false, remaining: 40 }),
 }))
 
 vi.mock('@/lib/r2Utils', () => ({
