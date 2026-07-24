@@ -14,14 +14,20 @@
  * Steps:
  *   1. `supabase start` (idempotent — no-ops if already running)
  *   2. Apply supabase/reset.sql via `psql`, TWICE (see note below)
- *   3. Apply supabase/e2e-fixtures.sql (content fixtures — artists/releases/news)
+ *   3. Apply supabase/e2e-grants.sql — re-grants anon/authenticated/
+ *      service_role table privileges that a hosted Supabase project sets up
+ *      automatically but a plain `psql`-applied schema does not (see that
+ *      file's header comment); without this, RLS policies are correctly
+ *      defined but Postgres denies with "permission denied for table ..."
+ *      before RLS is ever evaluated.
+ *   4. Apply supabase/e2e-fixtures.sql (content fixtures — artists/releases/news)
  *      NOTE: deliberately NOT named supabase/seed.sql — the Supabase CLI
  *      auto-runs a file with that exact name during `supabase start`,
  *      *before* reset.sql has been applied, which fails because none of the
  *      app tables exist yet. Keeping our own name means we control order.
- *   4. Bootstrap 3 fixture auth users (admin/artist/journalist) via the
+ *   5. Bootstrap 3 fixture auth users (admin/artist/journalist) via the
  *      GoTrue admin API and promote their public.users.role
- *   5. Write .env.e2e.local with everything Playwright needs
+ *   6. Write .env.e2e.local with everything Playwright needs
  *
  * Why apply reset.sql via `psql` and TWICE:
  * reset.sql has a handful of early statements (e.g. the deprecated
@@ -106,6 +112,10 @@ async function main() {
   // converges to a clean, fully-applied schema. See file header comment.
   applySqlFileViaPsql(status.dbUrl, 'supabase/reset.sql')
   applySqlFileViaPsql(status.dbUrl, 'supabase/reset.sql')
+  // reset.sql creates tables as `postgres` via a plain psql connection, which
+  // does not inherit the anon/authenticated/service_role grants a hosted
+  // Supabase project sets up automatically — see file header comment.
+  applySqlFileViaPsql(status.dbUrl, 'supabase/e2e-grants.sql')
   applySqlFileViaPsql(status.dbUrl, 'supabase/e2e-fixtures.sql')
 
   const envLines = [
@@ -113,6 +123,10 @@ async function main() {
     `NEXT_PUBLIC_SUPABASE_URL=${status.apiUrl}`,
     `NEXT_PUBLIC_SUPABASE_ANON_KEY=${status.anonKey}`,
     `SUPABASE_SERVICE_ROLE_KEY=${status.serviceRoleKey}`,
+    // Direct Postgres connection — needed by tests that must bypass
+    // PostgREST's public-schema-only exposure (e.g. querying pg_catalog for
+    // RLS validation; see tests/e2e/rls-validation.spec.ts).
+    `SUPABASE_DB_URL=${status.dbUrl}`,
   ]
 
   log('Bootstrapping fixture auth users...')

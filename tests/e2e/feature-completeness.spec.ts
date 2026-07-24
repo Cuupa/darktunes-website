@@ -2,32 +2,27 @@ import { test, expect } from '@playwright/test'
 import { loginAsAdmin } from '../helpers/auth'
 import { getVisibleArtists } from '../helpers/supabase'
 
-/** Tabs on `/admin` (AdminDashboard TAB_DEFS). */
-const ADMIN_DASHBOARD_TABS = [
-  'Artists',
-  'Releases',
-  'News',
-  'Videos',
-  'Events',
-  'Genres',
-  'Assets',
-  'Accreditations',
-  'Press Portal',
-  'Statements',
-  'Release Submissions',
-  'Video Submissions',
-  'Promo Log',
-  'Submission Form',
-  'Maintenance',
+/** Content stat cards on `/admin` (AdminOverview's "Content at a glance"). */
+const ADMIN_OVERVIEW_STATS = ['Artists', 'Releases', 'News', 'Videos']
+
+/** Quick-access section links on `/admin` (AdminOverview's SECTION_LINKS). */
+const ADMIN_OVERVIEW_SECTIONS = [
+  'Content',
+  'Accounting',
+  'Messages',
+  'Users',
+  'Feature Flags',
+  'Settings',
+  'System',
 ]
 
 /** Sidebar-only routes (AdminSidebarNav) — not dashboard tabs. */
 const ADMIN_SIDEBAR_LINKS = [
   'Dashboard',
   'Submission Form',
-  'Tour Planner',
+  'Tour Production',
   'Accounting',
-  'Label Intelligence',
+  'Analytics',
   'Messages',
   'Users',
   'Feature Flags',
@@ -46,7 +41,6 @@ test.describe('Feature completeness', () => {
     await expect(page.locator('#hero')).toBeVisible()
     await expect(page.locator('section#releases').first()).toBeVisible()
     await expect(page.locator('section#news').first()).toBeVisible()
-    await expect(page.locator('section#artists').first()).toBeVisible()
   })
 
   test('artist detail shows bio, releases, and concerts sections', async ({ page }) => {
@@ -63,11 +57,17 @@ test.describe('Feature completeness', () => {
     await expect(page.getByText(/concerts|konzerte|shows/i).first()).toBeVisible()
   })
 
-  test('admin dashboard tabs are visible for admin role', async ({ page }) => {
+  test('admin overview shows content stats and quick-access sections for admin role', async ({ page }) => {
     await loginAsAdmin(page)
 
-    for (const tabLabel of ADMIN_DASHBOARD_TABS) {
-      await expect(page.getByRole('tab', { name: tabLabel })).toBeVisible()
+    const stats = page.getByRole('region', { name: 'Content statistics' })
+    for (const statLabel of ADMIN_OVERVIEW_STATS) {
+      await expect(stats.getByText(statLabel, { exact: true })).toBeVisible()
+    }
+
+    const sections = page.getByRole('region', { name: 'Admin sections' })
+    for (const sectionLabel of ADMIN_OVERVIEW_SECTIONS) {
+      await expect(sections.getByRole('link', { name: sectionLabel })).toBeVisible()
     }
   })
 

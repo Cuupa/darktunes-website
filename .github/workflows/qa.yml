@@ -35,6 +35,11 @@ jobs:
       CLOUDFLARE_R2_SECRET_ACCESS_KEY: placeholder-r2-secret-key
       CLOUDFLARE_R2_BUCKET_NAME: placeholder-bucket
       CLOUDFLARE_R2_PUBLIC_URL: https://cdn.placeholder.example
+      # Required by src/lib/env.server.ts's Zod schema (64-char hex) wherever
+      # api_credentials encrypt/decrypt code runs (e.g. /portal at runtime,
+      # not just build) — no E2E test exercises real encrypted credentials,
+      # so a fixed placeholder is fine. Safe to keep set for every step.
+      API_CREDENTIALS_ENCRYPTION_KEY: a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8
       # Have global-teardown.ts stop the Docker stack at the end of the run
       # (default off locally so iterative dev doesn't repay container startup
       # cost every time — see tests/e2e/global-teardown.ts).

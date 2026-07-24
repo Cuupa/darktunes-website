@@ -19,14 +19,18 @@
 -- ---------------------------------------------------------------------------
 -- Artists
 -- ---------------------------------------------------------------------------
-INSERT INTO public.artists (id, name, slug, bio, genres, featured, country, is_visible)
+-- image_url + spotify_url on the visible artist keep isProfileComplete()
+-- (src/lib/api/artistProfiles.ts) satisfied, so authenticated-artist E2E
+-- specs land on /portal instead of being redirected to /portal/onboarding.
+INSERT INTO public.artists (id, name, slug, bio, genres, featured, country, is_visible, image_url, spotify_url)
 VALUES
   ('e2e00000-0000-0000-0000-000000000001', 'E2E Visible Artist', 'e2e-visible-artist',
    'Fixture artist used by Playwright E2E tests. Publicly visible.',
-   ARRAY['industrial', 'ebm'], TRUE, 'DE', TRUE),
+   ARRAY['industrial', 'ebm'], TRUE, 'DE', TRUE,
+   'https://placehold.co/600x600.png', 'https://open.spotify.com/artist/e2e-fixture'),
   ('e2e00000-0000-0000-0000-000000000002', 'E2E Hidden Artist', 'e2e-hidden-artist',
    'Fixture artist used by Playwright E2E tests. Hidden from public listings (is_visible = false).',
-   ARRAY['darkwave'], FALSE, 'DE', FALSE)
+   ARRAY['darkwave'], FALSE, 'DE', FALSE, NULL, NULL)
 ON CONFLICT (id) DO NOTHING;
 
 -- ---------------------------------------------------------------------------

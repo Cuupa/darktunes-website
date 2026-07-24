@@ -67,7 +67,33 @@ Local Playwright runs default to `http://localhost:3000`, which was being reclai
 Ran `tests/e2e/portal.spec.ts` against the real local Supabase stack end-to-end:
 - ✅ `unauthenticated users are redirected to /login`
 - ✅ `upload-asset API rejects unauthenticated requests` (401)
-- ❌ `authenticated portal overview renders when credentials are configured` — form fills correctly with the `e2e-artist` fixture credentials, "Sign In" is clicked, but the page never navigates to `/portal` within 15s and no visible error appears. Not yet root-caused; candidates to check first: the recently-added portal login rate limiter (`f7795f1e fix(portal): harden P0 rate limit...`) possibly triggered by repeated test runs against the same fixture account, or a client-side auth error that isn't surfaced in the UI. Flagged for Phase 7 (`/portal` coverage) rather than chased down here, since Phase 1's job — proving the local DB foundation itself works — is done: 2/3 tests already exercise real backend behavior (redirect + real 401 from a real route) correctly.
+- ❌ `authenticated portal overview renders when credentials are configured` — form fills correctly with the `e2e-artist` fixture credentials, "Sign In" is clicked, but the page never navigates to `/portal` within 15s and no visible error appears.
+
+### Root cause found and fixed (2026-07-24, later same day)
+The failure above was three independent local-stack-only bugs stacked on top of each other, found by tracing a Playwright trace's console/network logs and adding temporary proxy-side debug logging (reverted after diagnosis):
+
+1. **CSP blocked the browser from ever reaching the local Supabase stack.** `connect-src` in `src/lib/security/contentSecurityPolicy.ts` only allowed `https://*.supabase.co`, so `signInWithPassword` failed client-side with a silently-caught `TypeError: Failed to fetch` (CSP violation) — no request ever left the browser. Fixed: `buildContentSecurityPolicy()` now appends the configured `NEXT_PUBLIC_SUPABASE_URL` origin (+ its `ws(s)` equivalent) to `connect-src` **only when that URL's hostname is a loopback address** (`localhost`/`127.0.0.1`/`::1`) — real production Supabase URLs are always hosted, never loopback, so prod CSP is unaffected regardless of misconfiguration.
+2. **`anon`/`authenticated`/`service_role` had no table grants at all.** `reset.sql`'s tables are created by the `postgres` role over a plain `psql` connection, which — unlike a hosted Supabase project's Dashboard SQL editor — does not inherit the platform's default-privilege wiring. `\dp public.users` showed only `Dxt` (truncate/references/trigger) for those roles: RLS policies were correctly defined but Postgres denied at the GRANT layer *before* RLS was ever evaluated (`permission denied for table ...`). This also explained the `permission denied for table artists/news_posts` warnings seen during `generateStaticParams`. Fixed: new `supabase/e2e-grants.sql` (local-stack-only, NOT part of the production `reset.sql` SSOT) re-grants standard privileges + default privileges for future tables; applied by `scripts/e2e-db-setup.mjs` right after the two `reset.sql` passes.
+3. **Missing `API_CREDENTIALS_ENCRYPTION_KEY` crashed `/portal` and `/auth/callback` at runtime**, not just at build time — `src/lib/env.server.ts`'s Zod schema throws wherever code touching `api_credentials` executes. Fixed: added the same kind of fixed 64-hex-char placeholder already used for the Cloudflare R2 vars, to both `playwright.config.ts`'s `webServer.env` and `.github/workflows/qa.yml`'s job-level `env:`.
+4. **Once auth actually worked end-to-end, a 4th issue surfaced**: the e2e-artist fixture got redirected to `/portal/onboarding` instead of `/portal`, because `isProfileComplete()` (`src/lib/api/artistProfiles.ts`) requires an `image_url` and a social/streaming link, and the fixture artist had neither. Fixed: `supabase/e2e-fixtures.sql` now sets `image_url`/`spotify_url` on the visible fixture artist.
+
+All three `portal.spec.ts` tests pass now, verified against both an incrementally-updated stack and a full `npm run db:e2e:reset` (clean-slate Docker stack + fresh schema/grants/fixtures) to make sure the setup-script changes aren't order-dependent.
+
+Also fixed while regression-testing the above (pre-existing bugs unrelated to the root cause, but blocking other specs from proving anything):
+- `tests/e2e/rls-validation.spec.ts` was fundamentally unable to pass — it queried `pg_catalog.pg_tables` through the JS `supabase-js` client, but PostgREST only ever exposes the `public`/`graphql_public` schemas (`PGRST106: Invalid schema`). Rewritten to use a direct Postgres connection (new `SUPABASE_DB_URL`, written to `.env.e2e.local` by `scripts/e2e-db-setup.mjs`) via the `pg` package instead. Also dropped a stale table name (`artist_profiles`, which doesn't exist — the actual EPK table is `artist_epks`) in favor of `artist_billing_profiles`, and needed the same Node-20-has-no-native-WebSocket `ws` transport workaround already used in `scripts/e2e-db-lib.mjs`.
+- `tests/helpers/supabase.ts`'s `createTestSupabaseClient()` had the same missing `ws` transport workaround (silently would have failed the same way for any spec exercising it under Node 20). A bare `transport: ws` broke `next build`'s whole-project type-check in a way Playwright's transpile-only test run never surfaced (a pre-existing `@types/ws`/`WebSocketLikeConstructor` structural mismatch throws off this call's schema-name generic inference) — fixed by casting through `@supabase/realtime-js`'s own `WebSocketLikeConstructor` type instead of a bare/`any` cast.
+- `tests/e2e/tour-planner.spec.ts` had two stale assertions: a Playwright strict-mode violation (`getByRole('heading', { name: 'Tour Planner' })` matched both an `h1` and an `h2` on the admin page — scoped to `level: 1`), and the artist-facing page's heading was renamed from "Tour Planner" to "Tour Production" without updating the test.
+
+Not chased further (separate, narrower issues, flagged for their respective phases):
+- `tests/e2e/press-kit.spec.ts` — 3 journalist-dashboard tests fail with `net::ERR_ABORTED` navigating to `/press/dashboard/press-kit`. Distinct from the above; needs its own investigation under Phase 8.
+
+### `tests/e2e/feature-completeness.spec.ts` — 3 stale assertions fixed (2026-07-24)
+Found while re-verifying the fixes above (this spec's suite-level regression run first surfaced a red herring: local Playwright defaults to `http://localhost:3000`, which a completely unrelated project — `/home/simon/Projects/FinTrack` — had reclaimed again, exactly as previously documented; `reuseExistingServer: !CI` silently reused it, producing 15 false failures across every spec until the FinTrack process was stopped). Once isolated to the real darktunes server:
+- **"homepage key sections are visible"** expected a `section#artists` on the public homepage — that section doesn't exist in `app/_components/HomePageContent.tsx` (only `releases`/`videos`/`concerts`/`news`/`newsletter`). Removed the stale assertion.
+- **"admin dashboard tabs are visible for admin role"** expected Radix `tab` roles at `/admin` (`AdminDashboard.tsx`'s `TAB_DEFS`) — but `/admin` now renders `AdminOverview` (stat cards + quick-access section links); the old tabbed dashboard survives only at `/editor` for the `editor` role (`AdminDashboardWrapper`). Rewrote the test to check `AdminOverview`'s actual "Content statistics" stat cards and "Admin sections" quick-links instead of nonexistent tabs.
+- **"admin sidebar links are visible for admin role"**: `'Tour Planner'` → `'Tour Production'` (same rename as the tour-planner fix above) and `'Label Intelligence'` → `'Analytics'` (that one sidebar entry uses a `labelDictKey` i18n override — `admin.json`'s `labelIntelligence` key renders as "Analytics", matching the rename ANALYIZE_RESULT.md already recommended and the codebase had already partially applied).
+
+All 6 tests in this file pass now.
 
 ## Phase 2 — Playwright wiring
 
@@ -95,8 +121,10 @@ Ran `tests/e2e/portal.spec.ts` against the real local Supabase stack end-to-end:
 
 ## Phase 4 — Test isolation conventions
 
-- [ ] Document prefixed-fixture + cleanup convention once in `tests/helpers/`
-- [ ] Confirm `workers: 1` stays enforced for DB-backed local/CI runs
+**Status: done.**
+
+- [x] Document prefixed-fixture + cleanup convention once in `tests/helpers/` — `tests/helpers/README.md`
+- [x] Confirm `workers: 1` stays enforced for DB-backed local/CI runs — was previously `process.env.CI ? 1 : undefined` (parallel locally, contradicting the "Architecture decision" section above); now a fixed `1` everywhere
 
 ## Phase 5 — Coverage: Public frontend
 

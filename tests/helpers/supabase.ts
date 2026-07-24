@@ -1,4 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { WebSocketLikeConstructor } from '@supabase/realtime-js'
+import ws from 'ws'
 import type { Database } from '@/types/database'
 
 type TestClient = SupabaseClient<Database>
@@ -25,6 +27,12 @@ export function createTestSupabaseClient(): TestClient {
   const { url, anonKey } = getSupabaseConfig()
   return createClient<Database>(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    // Node 20 has no native WebSocket; supabase-js initializes a
+    // RealtimeClient unconditionally even though tests only use REST reads.
+    // Node 22+ wouldn't need this. `@types/ws`'s constructor signature isn't
+    // structurally identical to WebSocketLikeConstructor, and that mismatch
+    // otherwise throws off this call's schema-name inference — hence the cast.
+    realtime: { transport: ws as unknown as WebSocketLikeConstructor },
   })
 }
 

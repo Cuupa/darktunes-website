@@ -39,8 +39,12 @@ export default defineConfig({
   /* Retry once on CI to reduce flakiness caused by resource contention. */
   retries: process.env.CI ? 1 : 0,
 
-  /* Parallelism: 1 worker in CI to keep resource usage predictable. */
-  workers: process.env.CI ? 1 : undefined,
+  /* Parallelism: all DB-backed runs (local and CI) share one real Supabase
+   * stack and a fixed set of fixture users/rows (see tests/helpers/README.md),
+   * so tests run serially everywhere to avoid cross-test races on that shared
+   * state — this is a deliberate architecture decision, not just a CI cost
+   * control (see "Test isolation" in E2E-TESTS.md). */
+  workers: 1,
 
   /* Reporter: 'list' for concise terminal output; HTML report always generated. */
   reporter: [['list'], ['html', { open: 'never' }]],
@@ -139,6 +143,13 @@ export default defineConfig({
       CLOUDFLARE_R2_BUCKET_NAME: process.env.CLOUDFLARE_R2_BUCKET_NAME || 'placeholder-bucket',
       CLOUDFLARE_R2_PUBLIC_URL:
         process.env.CLOUDFLARE_R2_PUBLIC_URL || 'https://cdn.placeholder.example',
+      /* Required by src/lib/env.server.ts's Zod schema (64-char hex) wherever
+       * api_credentials encrypt/decrypt code runs — not just at build time,
+       * e.g. /portal at runtime. No E2E test exercises real encrypted
+       * credentials, so a fixed placeholder is fine. */
+      API_CREDENTIALS_ENCRYPTION_KEY:
+        process.env.API_CREDENTIALS_ENCRYPTION_KEY ||
+        'a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8',
     },
   },
 })

@@ -29,7 +29,11 @@ test.describe('Tour planner — portal UI', () => {
     await loginAsArtist(page)
     await page.goto('/portal/tour-planner', { waitUntil: 'domcontentloaded' })
 
-    await expect(page.getByRole('heading', { name: /tour planner|tourplaner/i })).toBeVisible({ timeout: 15_000 })
+    // Artist-facing UI calls this "Tour Production" (admin's read-only view
+    // below still says "Tour Planner" — see tests/e2e/tour-planner.spec.ts:42).
+    await expect(
+      page.getByRole('heading', { name: /tour (planner|production)|tourplaner/i, level: 1 }),
+    ).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText(/tours|touren/i).first()).toBeVisible()
   })
 })
@@ -39,7 +43,7 @@ test.describe('Tour planner — admin read-only', () => {
     await loginAsAdmin(page)
     await page.goto('/admin/tour-planner', { waitUntil: 'domcontentloaded' })
 
-    await expect(page.getByRole('heading', { name: 'Tour Planner' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Tour Planner', level: 1 })).toBeVisible()
     await expect(page.getByLabel(/artist|künstler/i)).toBeVisible()
   })
 })
