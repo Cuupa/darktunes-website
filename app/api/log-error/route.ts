@@ -5,12 +5,16 @@
  * Auth: any authenticated user (public-facing errors can be logged by users too)
  *
  * Body: { source, level?, message, details? }
- *   source  — 'r2' | 'supabase' | 'upload' | 'ui' | 'vercel' | string
+ *   source  — short origin tag (e.g. ui, sos.bronze.upload, admin.health)
  *   level   — 'error' | 'warn' | 'info' (defaults to 'error')
  *   message — human-readable error message
  *   details — optional JSON object with extra context
  *
  * Returns: { ok: true }
+ *
+ * Zammad auto-tickets: only for exact source `ui` (client crash reports).
+ * Never rewrite unknown sources to `ui` — that would open support tickets for
+ * operational SOS/admin logs.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -24,20 +28,8 @@ import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { getClientIp } from '@/lib/ipRateLimit'
 import { PORTAL_LOG_ERROR_RATE } from '@/lib/uploads/portalUploadLimits'
 
-/** Client UI crash reports only — excludes operational admin monitoring sources. */
+/** Client UI crash reports only — excludes operational admin/SOS monitoring sources. */
 const AUTO_ZAMMAD_SOURCES = new Set(['ui'])
-
-const ALLOWED_SOURCES = new Set([
-  'ui',
-  'r2',
-  'supabase',
-  'upload',
-  'vercel',
-  'portal',
-  'admin',
-  'epk',
-  'sync',
-])
 
 const bodySchema = z.object({
   source: z.string().min(1).max(64),
@@ -45,6 +37,15 @@ const bodySchema = z.object({
   level: z.enum(['error', 'warn', 'info']).optional(),
   details: z.record(z.string(), z.unknown()).optional(),
 })
+
+/** Keep tags readable; strip control / injection characters. Never rewrite to `ui`. */
+function sanitizeSource(raw: string): string {
+  const cleaned = raw
+    .trim()
+    .slice(0, 64)
+    .replace(/[^\w.\-:/]/g, '_')
+  return cleaned || 'unknown'
+}
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const supabase = await createServerSupabaseClient()
@@ -78,7 +79,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   }
 
   const { source: rawSource, message, level, details } = parsed.data
-  const source = ALLOWED_SOURCES.has(rawSource) ? rawSource : 'ui'
+  const source = sanitizeSource(rawSource)
   const resolvedLevel = level ?? 'error'
   const resolvedDetails = details ?? {}
 
