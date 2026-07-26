@@ -54,6 +54,21 @@ function routeIsProtected(flags: ReturnType<typeof classifyRoute>): boolean {
   )
 }
 
+/**
+ * Stamps the request-context headers that every pass-through response must carry.
+ *
+ * src/i18n/request.ts resolves its i18n namespace bundle from x-pathname, and
+ * app/portal/layout.tsx reads x-pathname / x-url. A response returned without
+ * them silently degrades to the public ('*') bundle, dropping route-specific
+ * namespaces — e.g. `portal` on /login, which then renders MISSING_MESSAGE.
+ * Redirects are exempt: the follow-up request is proxied again from scratch.
+ */
+function withRequestContext(res: NextResponse, request: NextRequest): NextResponse {
+  res.headers.set('x-pathname', request.nextUrl.pathname)
+  res.headers.set('x-url', request.url)
+  return res
+}
+
 function redirectUnauthenticatedToLogin(request: NextRequest): NextResponse {
   const loginUrl = request.nextUrl.clone()
   loginUrl.pathname = '/login'
@@ -80,12 +95,10 @@ export async function proxy(request: NextRequest) {
   const route = classifyRoute(pathname)
   const protectedRoute = routeIsProtected(route)
 
-  // Public routes (not protected, not login): inject x-pathname and return immediately
-  // to avoid unnecessary auth overhead on every public page request.
+  // Public routes (not protected, not login): inject request context and return
+  // immediately to avoid unnecessary auth overhead on every public page request.
   if (!protectedRoute && !route.isLoginPage) {
-    const res = NextResponse.next({ request })
-    res.headers.set('x-pathname', pathname)
-    return res
+    return withRequestContext(NextResponse.next({ request }), request)
   }
 
   // CI placeholder credentials: enforce route redirects without calling Supabase
@@ -94,9 +107,7 @@ export async function proxy(request: NextRequest) {
     if (protectedRoute && !route.isLoginPage && !route.isPortalAcceptInvitePage) {
       return redirectUnauthenticatedToLogin(request)
     }
-    const res = NextResponse.next({ request })
-    res.headers.set('x-pathname', pathname)
-    return res
+    return withRequestContext(NextResponse.next({ request }), request)
   }
 
   let supabaseResponse = NextResponse.next({ request })
@@ -139,12 +150,12 @@ export async function proxy(request: NextRequest) {
     if (user && (hasRecoveryCode || !hasExchangedCode)) {
       await supabase.auth.signOut()
     }
-    return supabaseResponse
+    return withRequestContext(supabaseResponse, request)
   }
 
   // Invite links must let the user set a password before role-based redirects.
   if (isLoginPage && request.nextUrl.searchParams.get('type') === 'invite') {
-    return supabaseResponse
+    return withRequestContext(supabaseResponse, request)
   }
 
   const isAdminRoute = route.isAdminRoute
@@ -165,7 +176,7 @@ export async function proxy(request: NextRequest) {
   // Central Login Redirection Logic for Authenticated Users
   if (isLoginPage && user && profileRole) {
     if (shouldStayOnLoginPage(request.nextUrl.searchParams)) {
-      return supabaseResponse
+      return withRequestContext(supabaseResponse, request)
     }
 
     const returnTo = request.nextUrl.searchParams.get('returnTo')
@@ -280,14 +291,9 @@ export async function proxy(request: NextRequest) {
     })
   }
 
-  // Forward the current pathname as a request header so Server Components
-  // (e.g. app/portal/layout.tsx) can read it without importing next/headers
-  // in a way that requires a client context.
-  supabaseResponse.headers.set('x-pathname', pathname)
-  // Forward the full URL (including query string) so portal layout can extract ?artistId
-  supabaseResponse.headers.set('x-url', request.url)
-
-  return supabaseResponse
+  // Forward the current pathname (for i18n bundle + nav state) and the full URL
+  // (so the portal layout can extract ?artistId) to Server Components.
+  return withRequestContext(supabaseResponse, request)
 }
 
 export const config = {
