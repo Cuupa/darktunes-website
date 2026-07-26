@@ -119,11 +119,50 @@ All 6 tests in this file pass now.
   - `npm run build` still needs *some* value for those three vars (`src/lib/env.server.ts`'s Zod schema throws during Next's "Collecting page data" build step if they're missing), so placeholders are supplied **step-scoped** to the build step only, not job-wide.
   - `E2E_STOP_DB_AFTER_TESTS=1` set at job level so `tests/e2e/global-teardown.ts` stops the Docker stack at the end of the CI run (kept off by default for local dev — see Phase 2).
 
+## Phase 3b — CI failures on GitHub runners (2026-07-26)
+
+**Status: root-caused and fixed.**
+
+The first real Actions run failed ~25 tests. Two independent causes:
+
+1. **The build ran against a placeholder Supabase project.** `qa.yml` started
+   the local stack, then ran `npm run build` with step-scoped
+   `NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co`. `NEXT_PUBLIC_*`
+   vars are **inlined at build time into both the client and the server
+   bundle**, so the whole application — `createBrowserSupabaseClient`,
+   `createPublicSupabaseClient`, `generateStaticParams` — pointed at an
+   unreachable domain no matter how the server process was configured
+   afterwards. That is the single explanation for every symptom in the run:
+   `signInWithPassword` never resolved (every auth-dependent test timed out at
+   ~16 s), `/artists/[slug]` and `/releases/[id]` returned non-200 (32 ms
+   failures), and the homepage rendered no data sections.
+   **Fix:** the build step now sources the real `.env.e2e.local` written by
+   the preceding `npm run db:e2e:start` (`set -a; . ./.env.e2e.local; set +a`),
+   scoped to that step so it can't shadow `playwright.config.ts`'s own dotenv
+   load.
+2. **`globalTimeout` truncated the run.** It was a flat 10 minutes for 208
+   serial tests (`workers: 1` × 3 browser projects). The pasted CI log simply
+   stops after test 42 — that is the global timeout firing, not a hang.
+   **Fix:** `globalTimeout: (process.env.CI ? 60 : 30) * 60_000`.
+
+The `API_CREDENTIALS_ENCRYPTION_KEY: expected string, received undefined`
+lines in that log predate commit `45b7529a`, which added the placeholder to
+both `playwright.config.ts`'s `webServer.env` and `qa.yml`'s job-level `env:`.
+No further change was needed; verified both are still present.
+
+### Local-only footgun, hit again while verifying the above
+`reuseExistingServer: !process.env.CI` means a **stale `next-server` left on
+port 3000 is silently reused instead of rebuilding**. One survived a previous
+Playwright run and made a whole verification pass test pre-fix code — the
+duplicate-`#videos` fix "didn't work" purely because the old bundle was still
+being served. `npm run kill` before a verification run. (CI is unaffected:
+`reuseExistingServer` is false there.)
+
 ## Phase 4 — Test isolation conventions
 
 **Status: done.**
 
-- [x] Document prefixed-fixture + cleanup convention once in `tests/helpers/` — `tests/helpers/README.md`
+- [x] Document prefixed-fixture + cleanup convention once in `tests/helpers/` — `tests/helpers/README.md`. **This file was checked off previously but had never actually been created**; written now, and extended with the `workers: 1` rationale, the shared-session/no-`mode: 'serial'` pattern used by the new section specs, and the shared IP rate-limit budget.
 - [x] Confirm `workers: 1` stays enforced for DB-backed local/CI runs — was previously `process.env.CI ? 1 : undefined` (parallel locally, contradicting the "Architecture decision" section above); now a fixed `1` everywhere
 
 ## Phase 5 — Coverage: Public frontend
@@ -135,71 +174,118 @@ All 6 tests in this file pass now.
 - [x] `tests/e2e/interactions.spec.ts` (existing)
 - [x] `tests/e2e/edgecases.spec.ts` (existing)
 - [x] `tests/e2e/responsive.spec.ts` (existing)
-- [ ] Contact form submission (real DB insert)
-- [ ] Newsletter signup + confirm flow
-- [ ] Promo-pool flow
-- [ ] Locale fallback behavior (non-en/de Accept-Language)
-- [ ] Artist/release/news detail pages against seeded slugs
+- [x] Contact form submission — `tests/e2e/public-flows.spec.ts`. **Corrected scope:** the original item said "real DB insert", but `app/api/contact/route.ts` writes no row — it emails via Resend when a key is configured in Admin → API Keys and otherwise just logs. The test drives the real form and asserts the endpoint's 200.
+- [x] Newsletter — `tests/e2e/public-flows.spec.ts`. **Corrected scope:** there is no double-opt-in flow left to confirm. Sign-up moved to the darkmerch.com Shopify embed and `app/api/newsletter/route.ts` answers 410 Gone. Covered: both newsletter pages render, the legacy endpoint still reports 410, and the homepage section embeds the Shopify iframe.
+- [x] Promo-pool flow — `tests/e2e/public-flows.spec.ts` (unauthenticated redirect; a signed-in non-journalist gets `PromoPoolAccessGate`, not the tracks)
+- [x] Locale fallback behavior (non-en/de Accept-Language) — `tests/e2e/public-flows.spec.ts`, asserted on `<html lang>`: `fr-FR` → `de` (`routing.defaultLocale`), `de-DE` → `de`, `en-US` → `en`
+- [x] Artist/release/news detail pages against seeded slugs — `tests/e2e/public-flows.spec.ts`
 
 ## Phase 6 — Coverage: `/admin`
 
-- [x] `tests/e2e/admin-scroll.spec.ts` (existing — scroll contract only, not feature coverage)
-- [ ] accounting
-- [ ] artists
-- [ ] assets
-- [ ] colors
-- [ ] content
-- [ ] events
-- [ ] features
-- [ ] messages
-- [ ] news
-- [ ] press
-- [ ] promo-log
-- [ ] release-submissions
-- [ ] releases
-- [ ] settings
-- [ ] statements
-- [ ] system
-- [ ] users
-- [ ] analytics
-- [ ] api-keys
-- [ ] support
-- [ ] tour-planner
-- [ ] fan-page-reviews
-- [ ] submission-form
-- [ ] genres
-- [ ] portal-faq
-- [ ] RBAC checks against `role_permissions` per section
+- [x] `tests/e2e/admin-scroll.spec.ts` (existing — scroll contract only, not feature coverage). **Still failing, pre-existing** — see "Known failures" below.
+
+**Status: done** — `tests/e2e/admin-sections.spec.ts`. One test per section, all
+27 sidebar routes plus 2 sub-routes, asserting the contract
+`app/admin/_components/AdminPageShell.tsx` gives every section: HTTP 200, no
+bounce to `/login`, a visible `<h1>` with the section's exact title, the
+sidebar entry for that route carrying `aria-current="page"`, and no
+`app/error.tsx` boundary. Verified: 29/29 green.
+
+- [x] accounting · artists · assets · colors · events · features · messages · news · press · promo-log · release-submissions · releases · settings · statements · system · users · analytics · api-keys · support · tour-planner · fan-page-reviews · submission-form · genres · portal-faq
+- [x] content — asserted as a redirect: `app/admin/content/page.tsx` is a legacy stub that `redirect()`s to `/admin/artists`
+- [x] Also covered beyond the original list: `/admin` overview, accreditations, videos, video-submissions, `/admin/news/new`, `/admin/messages/compose`
+- [x] RBAC checks — unauthenticated → `/login?returnTo=…`; an artist-role session → `/login?error=unauthorized` (proxy.ts bounces rather than rendering 403); an artist-role session against `/api/admin/users` → 401/403/404
+
+Note found while writing these: `AdminOverview`'s stat cards link to
+`/admin/content?tab=artists|releases|news|videos`, but `/admin/content` now
+redirects unconditionally to `/admin/artists` and drops the tab — so all four
+stat cards land on Artists. Not changed here (product behaviour, not a test
+concern), flagging it.
 
 ## Phase 7 — Coverage: `/portal`
 
 - [x] `tests/e2e/portal.spec.ts` (existing — login/redirect smoke only)
 - [x] `tests/e2e/tour-planner.spec.ts` (existing)
-- [ ] analytics
-- [ ] billing
-- [ ] calendar
-- [ ] documents
-- [ ] events
-- [ ] help
-- [ ] interviews
-- [ ] invoices
-- [ ] marketing
-- [ ] messages
-- [ ] profile
-- [ ] releases
-- [ ] settings
-- [ ] statements
-- [ ] tour
-- [ ] epk-builder
-- [ ] fan-page
+**Status: done** — `tests/e2e/portal-sections.spec.ts`. Portal pages have no
+shared shell and several render their heading in a client leaf, so the
+asserted contract is what they all share: HTTP 200, no bounce to `/login` or
+`/portal/onboarding`, the `Artist portal navigation` landmark, a visible
+heading, no error boundary. Verified: 21/21 green.
+
+- [x] analytics · billing · calendar · documents · events · help · interviews · invoices · marketing · messages · profile · releases · settings · statements
+- [x] tour — asserted as a redirect: `app/portal/tour/page.tsx` `redirect()`s to `/portal/events`
+- [x] epk-builder, fan-page — asserted as "renders **or** 404s", because both call `notFound()` when their feature flag is off; pinning one outcome would make the spec a flag-state assertion
+- [x] Also covered: `/portal/releases/submissions`, `/portal/releases/videos`
+- [x] Access control — unauthenticated → `/login?returnTo=…`; a journalist with no `artist_members` row → `/login?error=no_artist`
 
 ## Phase 8 — Coverage: `/press`
 
 - [x] `tests/e2e/press-kit.spec.ts` (existing)
-- [ ] Journalist application submission → admin accreditation review round trip
-- [ ] `/press/dashboard`
-- [ ] `/press/releases`
-- [ ] `/press/artists`
+**Status: done** — `tests/e2e/press-sections.spec.ts`. Verified: 18/18 green.
+
+- [x] Journalist application submission → admin accreditation review round trip — posts a real `journalist_applications` row with an `e2e-<testId>` outlet, confirms an admin can retrieve it, and deletes it in `afterAll` over a direct Postgres connection. **Verified through `GET /api/journalist-applications`, not the `/admin/accreditations` table** — a freshly submitted application does not show up in that table; which admin surface is meant to triage pending applications is an open question (below).
+- [x] `/press/dashboard` — plus every sibling section: press-kit, press-releases, interviews, accreditation, contact, download-history, profile, promo-pool. Each asserts the `Press dashboard navigation` landmark, a visible heading, no error boundary, and **no unresolved next-intl key** (a raw `pressKit.heading` would otherwise slip past a "a heading is visible" check).
+- [x] `/press/releases/[slug]` — there is no `/press/releases` index route, only the detail route; covered for an unknown slug
+- [x] `/press/artists/[slug]` — covered against the visible fixture artist's EPK
+- [x] Public: `/press` landing and `/press/apply` reachable without a session
+
+### Root cause of the long-standing `net::ERR_ABORTED` on `/press/dashboard/press-kit`
+Flagged in Phase 1 as "needs its own investigation under Phase 8". It was never
+a routing or access problem: `tests/helpers/auth.ts`'s
+`loginForPressDashboard()` signed in via `/login?returnTo=/press/dashboard/press-kit`
+and then waited for that URL — but the login screen routes an authenticated
+user to `resolveRedirectPath(role)`, which is `/press/dashboard` for a
+journalist. The wait therefore timed out, the `beforeAll` threw, and every
+subsequent `page.goto` in the block died with `ERR_ABORTED`. The helper now
+waits for the role's actual landing page and lets callers navigate onward.
+This single fix turned the whole press-kit + press-dashboard set green.
+
+## Known failures still open
+
+- **`tests/e2e/admin-scroll.spec.ts`** — `scrollTop` stays 0, so the wheel-over-row
+  contract is not being exercised. Pre-existing (fails on `main` too, not
+  introduced by this work). Shrinking the viewport to 1280×400 to force the
+  pane to overflow did not help, which suggests the element matched by
+  `[data-lenis-prevent].overflow-y-auto` on `/admin/submission-form` is not the
+  pane that actually scrolls — `ScrollableAppShell` renders that container with
+  `overflow-hidden` when `lockScroll` is set. Needs someone to confirm which
+  element owns the scroll on that page before the selector can be fixed.
+- **Visual regression snapshots** (`tests/e2e/visual.spec.ts`) fail locally by
+  design: `updateSnapshots` is `'none'` off CI and no baselines are committed
+  (per AGENTS.md). CI seeds them with `'missing'`. Not a regression.
+
+## Open questions (found while writing the new coverage, not resolved)
+
+1. **`/news/e2e-press-only-news` answers 200 to an anonymous visitor**, even
+   though `app/news/[slug]/page.tsx` uses `getPublicNewsPostBySlug()` (which
+   filters `is_press_only = false`) and calls `notFound()` on a null result.
+   The fixture is correct (`is_press_only = TRUE` in `supabase/e2e-fixtures.sql`).
+   Worth confirming whether press-gated content is actually readable by direct
+   link. `public-flows.spec.ts` asserts only the listing exclusion for now.
+2. **`/press/releases/<unknown-slug>` answers 200** rather than 404, despite the
+   route calling `notFound()`. Same shape as (1) — possibly one underlying
+   cause. The spec asserts only "does not hit the error boundary".
+3. **A submitted journalist application does not appear in `/admin/accreditations`.**
+   The row is created and an admin can read it via
+   `GET /api/journalist-applications`, so which admin UI is meant to triage
+   pending applications is unclear.
+4. **`getArtistBySlug()` is not visibility-filtered** — `is_visible = false`
+   artists stay reachable by direct URL on both `/artists/[slug]` and
+   `/press/artists/[slug]`, and are only excluded from listings. Confirmed
+   from source; documented as intended ("unlisted") in `public-flows.spec.ts`.
+   Flagging in case it was meant to be a hard gate.
+
+## App fixes made while getting the suite green
+
+- **Duplicate DOM ids on the homepage** (`app/_components/HomePageContent.tsx`):
+  the section wrappers for `releases`, `videos`, `news` and `newsletter` each
+  carried an `id` that the inner component (`Releases.tsx`, `Videos.tsx`,
+  `News.tsx`, `NewsletterSection.tsx`) already renders on its own `<section>`.
+  So `#videos`, `#releases`, `#news` and `#newsletter` each resolved to two
+  elements — invalid HTML, ambiguous anchor targets, and the direct cause of
+  the `interactions.spec.ts` "Video Modal" strict-mode violations. The wrapper
+  ids were removed; the inner `<section id="…" class="… scroll-mt-36">` keeps
+  the anchor offset that navigation relies on.
 
 ## Other existing E2E-adjacent specs (unaffected by this plan)
 

@@ -57,13 +57,20 @@ export function getPressDashboardUser(): TestUserCredentials {
 export async function loginForPressDashboard(page: Page): Promise<void> {
   const creds = getPressDashboardUser()
 
-  await page.goto('/login?returnTo=/press/dashboard/press-kit', { waitUntil: 'domcontentloaded' })
+  // Land on whatever the role's home is rather than passing
+  // ?returnTo=/press/dashboard/press-kit: the login screen routes an
+  // authenticated user to resolveRedirectPath(role) — /press/dashboard for a
+  // journalist, /admin for the admin fallback — so insisting on the press-kit
+  // URL here failed sign-in for a reason unrelated to the page under test,
+  // and every follow-up goto then died with ERR_ABORTED. Callers navigate to
+  // their own target afterwards.
+  await page.goto('/login', { waitUntil: 'domcontentloaded' })
   await page.getByLabel(/email/i).fill(creds.email)
   await page.getByLabel(/password/i).fill(creds.password)
   await page.getByRole('button', { name: /sign in/i }).click()
 
-  await page.waitForURL(/\/press\/dashboard\/press-kit/, { timeout: 15_000 })
-  await expect(page).toHaveURL(/\/press\/dashboard\/press-kit/)
+  await page.waitForURL(/\/(press\/dashboard|admin)(\/|\?|$)/, { timeout: 15_000 })
+  await expect(page).toHaveURL(/\/(press\/dashboard|admin)(\/|\?|$)/)
 }
 
 export async function loginAsArtist(page: Page): Promise<void> {

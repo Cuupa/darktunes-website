@@ -62,19 +62,21 @@ jobs:
       # scripts/e2e-db-setup.mjs and E2E-TESTS.md Phase 1/2. No repo secrets
       # involved: everything comes from this freshly provisioned local stack.
       - run: npm run db:e2e:start
-      # `next build`'s "Collecting page data" step imports server route
-      # modules, which import src/lib/env.server.ts and fail fast if these
-      # vars are missing/invalid — but the build itself never talks to
-      # Supabase, so placeholders are enough here. Scoped to this step only
-      # so they don't shadow the real .env.e2e.local values written above:
-      # playwright.config.ts's dotenv.config() doesn't override vars already
-      # present in the environment, so if these were set job-wide the real
-      # local-stack credentials would never reach the Playwright run below.
-      - run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key-for-ci-build
-          SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key-for-ci
+      # The build MUST see the *real* local-stack credentials written by the
+      # step above, not placeholders: NEXT_PUBLIC_* vars are inlined into the
+      # client bundle at build time, so a placeholder Supabase URL bakes an
+      # unreachable domain into every browser-side call — signInWithPassword
+      # included — and every auth-dependent E2E test then dies on a login
+      # timeout no matter how the server process is configured afterwards.
+      # `set -a` exports each assignment in .env.e2e.local (plain unquoted
+      # KEY=value lines, see scripts/e2e-db-setup.mjs) for this step only, so
+      # nothing shadows playwright.config.ts's own dotenv load below.
+      - name: Build against the local Supabase stack
+        run: |
+          set -a
+          . ./.env.e2e.local
+          set +a
+          npm run build
       - run: SKIP_BUILD=1 npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: always()

@@ -27,8 +27,13 @@ export default defineConfig({
   /* Maximum time a single test may run. */
   timeout: 30_000,
 
-  /* Maximum time for the full test suite. */
-  globalTimeout: 10 * 60_000,
+  /* Maximum time for the full test suite. With `workers: 1` (see below) the
+   * whole matrix — 3 browser projects over every tests/e2e spec — runs
+   * serially, so this must accommodate hundreds of sequential tests on CI's
+   * slower runners. The previous flat 10 min silently truncated CI runs
+   * mid-suite: reporting just stops partway through, which reads like a hang
+   * rather than a timeout. */
+  globalTimeout: (process.env.CI ? 60 : 30) * 60_000,
 
   /* Fail the build on CI if a test.only() accidentally gets committed. */
   forbidOnly: !!process.env.CI,

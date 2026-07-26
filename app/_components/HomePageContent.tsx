@@ -103,11 +103,13 @@ export function HomePageContent({
 
   function renderSection(section: HomepageSection) {
     switch (section) {
+      // Section wrappers carry no `id`: each inner component already renders
+      // its own <section id="…"> with the scroll-mt offset anchors rely on,
+      // and duplicating the id made those anchors resolve to two elements.
       case 'releases':
         return (
           <motion.div
             key="releases"
-            id="releases"
             initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
@@ -146,7 +148,7 @@ export function HomePageContent({
         )
       case 'videos':
         return (
-          <div key="videos" id="videos">
+          <div key="videos">
             <Videos
               videos={videos}
               placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
@@ -171,7 +173,7 @@ export function HomePageContent({
         )
       case 'news':
         return (
-          <div key="news" id="news">
+          <div key="news">
             <News
               news={news}
               heading={siteSettings.newsSectionHeading}
@@ -182,7 +184,7 @@ export function HomePageContent({
         )
       case 'newsletter':
         return (
-          <div key="newsletter" id="newsletter">
+          <div key="newsletter">
             <NewsletterSection
               heading={siteSettings.newsletterHeading}
               description={siteSettings.newsletterDescription}

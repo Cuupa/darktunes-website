@@ -12,6 +12,16 @@ test.describe('Admin table wheel scroll', () => {
     const tableRow = page.locator('table tbody tr').first()
     await expect(tableRow).toBeVisible({ timeout: 15_000 })
 
+    // Force the pane to overflow. The contract under test is that a wheel
+    // event over a table row reaches the scroll container instead of being
+    // swallowed by Lenis — not that this page happens to be taller than the
+    // viewport. At the project's 1920×1080 the section's content fits, so
+    // scrollTop stayed 0 and the contract was never actually exercised.
+    await page.setViewportSize({ width: 1280, height: 400 })
+    await expect
+      .poll(async () => scrollPane.evaluate((el) => el.scrollHeight - el.clientHeight))
+      .toBeGreaterThan(0)
+
     const before = await scrollPane.evaluate((el) => el.scrollTop)
     const rowBox = await tableRow.boundingBox()
     expect(rowBox).not.toBeNull()
