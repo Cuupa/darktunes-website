@@ -18,6 +18,7 @@ import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { sanitizeHtml } from '@/lib/sanitizeHtml'
+import { getPortalAuthHeaders } from '@/lib/portal/portalFetchAuth'
 import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js'
 import {
   PaperPlaneTilt,
@@ -121,7 +122,9 @@ export function PortalMailbox({ artistId, artists: _artists, initialMessages = [
     setIsLoading(true)
     try {
       const params = new URLSearchParams({ artistId, folder: String(folder) })
-      const res = await fetch(`/api/portal/messages/inbox?${params.toString()}`)
+      const res = await fetch(`/api/portal/messages/inbox?${params.toString()}`, {
+        headers: await getPortalAuthHeaders(),
+      })
       if (!res.ok) throw new Error('Failed to load messages')
       const data = (await res.json()) as {
         messages: PortalMessage[]
@@ -145,7 +148,9 @@ export function PortalMailbox({ artistId, artists: _artists, initialMessages = [
 
   const loadFolders = useCallback(async () => {
     try {
-      const res = await fetch(`/api/portal/messages/folders?artistId=${artistId}`)
+      const res = await fetch(`/api/portal/messages/folders?artistId=${artistId}`, {
+        headers: await getPortalAuthHeaders(),
+      })
       if (!res.ok) return
       const data = (await res.json()) as { folders: PortalMessageFolder[] }
       setFolders(data.folders)
@@ -248,7 +253,10 @@ export function PortalMailbox({ artistId, artists: _artists, initialMessages = [
     try {
       await fetch(`/api/portal/messages/${messageId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await getPortalAuthHeaders()),
+        },
         body: JSON.stringify({ markRead: true }),
       })
     } catch {
@@ -263,7 +271,10 @@ export function PortalMailbox({ artistId, artists: _artists, initialMessages = [
     try {
       await fetch(`/api/portal/messages/${messageId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await getPortalAuthHeaders()),
+        },
         body: JSON.stringify({ starred }),
       })
     } catch {
@@ -289,7 +300,10 @@ export function PortalMailbox({ artistId, artists: _artists, initialMessages = [
     try {
       await fetch(`/api/portal/messages/${messageId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await getPortalAuthHeaders()),
+        },
         body: JSON.stringify({ deleted: true }),
       })
       toast.success(t('messages_moved_trash'))
@@ -302,7 +316,10 @@ export function PortalMailbox({ artistId, artists: _artists, initialMessages = [
     try {
       await fetch(`/api/portal/messages/${messageId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await getPortalAuthHeaders()),
+        },
         body: JSON.stringify({ deleted: false }),
       })
       setMessages((prev) => prev.filter((m) => m.id !== messageId))
@@ -319,7 +336,10 @@ export function PortalMailbox({ artistId, artists: _artists, initialMessages = [
   const handleCreateFolder = useCallback(async (name: string) => {
     const res = await fetch('/api/portal/messages/folders', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(await getPortalAuthHeaders()),
+      },
       body: JSON.stringify({ artistId, name }),
     })
     if (!res.ok) throw new Error('Failed to create folder')
@@ -329,7 +349,10 @@ export function PortalMailbox({ artistId, artists: _artists, initialMessages = [
   const handleDeleteFolder = useCallback(async (folderId: string) => {
     const res = await fetch('/api/portal/messages/folders', {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(await getPortalAuthHeaders()),
+      },
       body: JSON.stringify({ folderId, artistId }),
     })
     if (!res.ok) throw new Error('Failed to delete folder')
@@ -340,7 +363,10 @@ export function PortalMailbox({ artistId, artists: _artists, initialMessages = [
   const handleRenameFolder = useCallback(async (folderId: string, newName: string) => {
     const res = await fetch('/api/portal/messages/folders', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(await getPortalAuthHeaders()),
+      },
       body: JSON.stringify({ folderId, artistId, name: newName }),
     })
     if (!res.ok) throw new Error('Failed to rename folder')
@@ -696,7 +722,10 @@ export function PortalMailbox({ artistId, artists: _artists, initialMessages = [
                         try {
                           const res = await fetch('/api/portal/messages/send', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: {
+                              'Content-Type': 'application/json',
+                              ...(await getPortalAuthHeaders()),
+                            },
                             body: JSON.stringify({
                               fromArtistId: artistId,
                               toArtistId: selectedMessage.fromArtistId,

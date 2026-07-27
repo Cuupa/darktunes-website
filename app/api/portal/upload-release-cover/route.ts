@@ -3,9 +3,14 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createR2Client } from '@/lib/r2Utils'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
-
-const MAX_RELEASE_COVER_SIZE_BYTES = 5 * 1024 * 1024
+import { withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
+import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
+import { getClientIp } from '@/lib/ipRateLimit'
+import {
+  PORTAL_COVER_MIME,
+  PORTAL_RELEASE_COVER_MAX_BYTES,
+  PORTAL_UPLOAD_RATE,
+} from '@/lib/uploads/portalUploadLimits'
 
 async function uploadCoverToR2(
   file: File,
@@ -35,16 +40,24 @@ async function uploadCoverToR2(
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
-  const { artist } = await authenticatePortalBearerWithArtist(req, artistId)
+  const ctx = await withPortalMembershipWrite(req, artistId)
+  const { artist } = ctx
+
+  const ip = getClientIp(req)
+  const rl = await checkDistributedRateLimit(
+    `upload-release-cover:${ctx.user.id}:${ip}`,
+    PORTAL_UPLOAD_RATE.max,
+    PORTAL_UPLOAD_RATE.windowMs,
+  )
+  if (rl.limited) throw new ApiError(429, 'Too many uploads. Please wait and try again.')
 
   const formData = await req.formData()
   const file = formData.get('file')
   if (!(file instanceof File)) throw new ApiError(400, 'No file provided')
 
-  if (file.size > MAX_RELEASE_COVER_SIZE_BYTES) throw new ApiError(413, 'File too large (max 5 MB)')
+  if (file.size > PORTAL_RELEASE_COVER_MAX_BYTES) throw new ApiError(413, 'File too large (max 5 MB)')
 
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
-  if (!allowedTypes.includes(file.type)) {
+  if (!PORTAL_COVER_MIME.has(file.type)) {
     throw new ApiError(415, 'Unsupported file type. Allowed: JPEG, PNG, WebP')
   }
 

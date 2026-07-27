@@ -4,7 +4,6 @@ import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { archivePeriodWithCarryForward } from '@/lib/api/settlementRegister'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 const bodySchema = z.object({
   nextPeriodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   nextPeriodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

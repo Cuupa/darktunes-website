@@ -12,7 +12,6 @@ import { logFinancialEvent } from '@/lib/api/financialAudit'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { notifyStatementArtist } from '@/lib/sos/notifyStatementArtist'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-
 const bulkApproveSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(200),
   notes: z.string().max(4000).optional(),

@@ -12,10 +12,10 @@
  *   - Returns 400 if the artist has no email address set.
  */
 
+import { requireAdminWithServiceClient } from '@/lib/adminAuth'
+
 import { NextRequest, NextResponse } from 'next/server'
 import { requestUserInvite } from '@/lib/auth/requestUserInvite'
-import { getUserRoleWithClient } from '@/lib/getUserRole'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, buildApiError, withErrorHandler } from '@/lib/errors'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 
@@ -24,25 +24,8 @@ function extractArtistId(req: NextRequest): string {
   return segments[4]
 }
 
-async function requireAdmin() {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) throw new ApiError(401, 'Unauthorized')
-
-  const role = await getUserRoleWithClient(supabase, user.id)
-
-  if (role !== 'admin') throw new ApiError(403, 'Forbidden')
-
-  const adminClient = await createServiceRoleSupabaseClient()
-  return { adminClient, currentUserId: user.id }
-}
-
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  const { adminClient, currentUserId } = await requireAdmin()
+  const { userId: currentUserId, serviceClient: adminClient } = await requireAdminWithServiceClient(req)
 
   const artistId = extractArtistId(req)
   if (!artistId) throw new ApiError(400, 'Missing artist ID')

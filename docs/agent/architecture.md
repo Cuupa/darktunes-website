@@ -42,10 +42,10 @@ Default to RSC. Add `"use client"` only for event handlers, browser APIs, hooks,
 | Context | Pattern |
 |---------|---------|
 | Public reads | RSC + `unstable_cache` |
-| Portal writes | Server Actions (`src/actions/portal/*.ts`) |
-| Admin writes | Route Handlers + JWT Bearer (not Server Actions) |
+| Portal writes | Route Handlers under `app/api/portal/**` — `withPortalMembershipWrite` + `portalMemberWrite` (Bearer preferred; cookie dual-auth fallback) |
+| Admin writes | Route Handlers under `app/api/admin/**` — `requireAdminFromRequest` / `requireAdminWithServiceClient` (Bearer or cookie) |
 | Cron / webhooks | Route Handlers |
-| SOS statement upload | Server Action `uploadStatement.ts` |
+| SOS statement upload | Server Action `uploadStatement.ts` (portal/admin PDF path) |
 
 Admin bronze CSV: never browser presigned R2 — use `/api/admin/sos/import-batches/*` (see `backend.md`).
 

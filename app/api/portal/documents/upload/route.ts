@@ -14,8 +14,9 @@ import { createR2Client } from '@/lib/r2Utils'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
 import { withPortalMembershipWrite, portalMemberWrite } from '@/lib/portal/withPortalMembership'
-
-const MAX_BYTES = 20 * 1024 * 1024 // 20 MB
+import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
+import { getClientIp } from '@/lib/ipRateLimit'
+import { PORTAL_DOCUMENT_MAX_BYTES, PORTAL_UPLOAD_RATE } from '@/lib/uploads/portalUploadLimits'
 
 const ALLOWED_MIME_TYPES = new Set([
   'application/pdf',
@@ -44,6 +45,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const ctx = await withPortalMembershipWrite(req, artistId)
   const { artist } = ctx
 
+  const ip = getClientIp(req)
+  const rl = await checkDistributedRateLimit(
+    `documents-upload:${ctx.user.id}:${ip}`,
+    PORTAL_UPLOAD_RATE.max,
+    PORTAL_UPLOAD_RATE.windowMs,
+  )
+  if (rl.limited) throw new ApiError(429, 'Too many uploads. Please wait and try again.')
+
   const file = formData.get('file')
   const label = formData.get('label')
   const category = formData.get('category')
@@ -55,7 +64,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw new ApiError(400, `category must be one of: ${[...CATEGORY_VALUES].join(', ')}`)
   }
 
-  if (file.size > MAX_BYTES) throw new ApiError(413, 'File too large (max 20 MB)')
+  if (file.size > PORTAL_DOCUMENT_MAX_BYTES) throw new ApiError(413, 'File too large (max 20 MB)')
 
   const ext = getExtension(file.name)
   const mimeOk = ALLOWED_MIME_TYPES.has(file.type)

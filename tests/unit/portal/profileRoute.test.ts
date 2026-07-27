@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
+import {
+  TEST_ARTIST_ID,
+  expectForbidden,
+  expectOk,
+  expectUnauthorized,
+  jsonRequest,
+  rejectApiError,
+} from '../../helpers/api/routeTestkit'
 
 const createServiceRoleSupabaseClientMock = vi.fn()
 const resolvePortalArtistMock = vi.fn()
@@ -37,20 +45,18 @@ async function loadRoute() {
 }
 
 describe('PUT /api/portal/profile', () => {
-  const artistId = '123e4567-e89b-12d3-a456-426614174000'
+  const artistId = TEST_ARTIST_ID
 
   beforeEach(() => {
     const eqMock = vi.fn().mockResolvedValue({ error: null })
     const updateMock = vi.fn(() => ({ eq: eqMock }))
     const fromMock = vi.fn(() => ({ update: updateMock }))
-
-    const bearerClient = { from: vi.fn() }
     const serviceClient = { from: fromMock }
 
     authenticatePortalBearerMock.mockResolvedValue({
       token: 'tok',
       user: { id: 'user-1' },
-      supabase: bearerClient,
+      supabase: { from: vi.fn() },
     })
     createServiceRoleSupabaseClientMock.mockResolvedValue(serviceClient)
 
@@ -62,6 +68,48 @@ describe('PUT /api/portal/profile', () => {
 
   afterEach(() => {
     vi.clearAllMocks()
+  })
+
+  // --- Golden auth matrix (API SOTA Phase B3) ---
+
+  it('golden: 401 without Bearer auth', async () => {
+    authenticatePortalBearerMock.mockImplementation(() =>
+      rejectApiError(401, 'Invalid or expired token'),
+    )
+    const { PUT } = await loadRoute()
+    const res = await PUT(
+      jsonRequest('/api/portal/profile', {
+        method: 'PUT',
+        body: { artist_id: artistId, hometown: 'Berlin' },
+      }),
+    )
+    await expectUnauthorized(res)
+  })
+
+  it('golden: 403 when not a member of the artist', async () => {
+    resolvePortalArtistMock.mockRejectedValue(new Error('FORBIDDEN: not a member of this artist'))
+    const { PUT } = await loadRoute()
+    const res = await PUT(
+      jsonRequest('/api/portal/profile', {
+        method: 'PUT',
+        bearer: 'tok',
+        body: { artist_id: artistId, hometown: 'Berlin' },
+      }),
+    )
+    await expectForbidden(res)
+  })
+
+  it('golden: 200 when hometown-only patch succeeds', async () => {
+    const { PUT } = await loadRoute()
+    const res = await PUT(
+      jsonRequest('/api/portal/profile', {
+        method: 'PUT',
+        bearer: 'tok',
+        body: { artist_id: artistId, hometown: 'Berlin, Germany' },
+      }),
+    )
+    await expectOk(res, 200)
+    expect(upsertArtistProfileMock).not.toHaveBeenCalled()
   })
 
   it('accepts empty URL strings and normalises them to null', async () => {

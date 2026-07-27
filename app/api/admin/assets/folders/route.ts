@@ -3,7 +3,6 @@ import { createFolder, getFolders } from '@/lib/api/assetFolders'
 import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 interface CreateFolderBody {
   name?: string
   parentId?: string | null

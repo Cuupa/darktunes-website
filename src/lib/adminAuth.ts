@@ -4,21 +4,29 @@
  * Shared server-side helpers for verifying admin/editor access
  * in Next.js Route Handlers.
  *
- * All admin API routes follow the same pattern:
- *   1. Extract the token from the Authorization header.
- *   2. Call verifyAdminOrEditor(token) — throws ApiError on failure.
- *   3. Proceed with the protected logic.
+ * Preferred (Phase D):
+ *   const { userId } = await requireAdminFromRequest(req)
+ *   // or requireAdminOrEditorFromRequest(req)
+ *
+ * Legacy token-only:
+ *   const token = extractBearerToken(req.headers.get('authorization'))
+ *   await verifyAdminOrEditor(token)
+ *
+ * Dual auth: Bearer first, then cookie session (admin UI often uses cookies).
  *
  * Permission checks merge system `role_permissions` with supplemental custom roles
  * via `resolveEffectiveAccess` from `src/lib/rbac/`.
  */
 
+import type { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { ApiError } from '@/lib/errors'
 import type { Database } from '@/types/database'
+import type { UserRole } from '@/types/users'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { resolveEffectiveAccess, hasPermissionKey } from '@/lib/rbac/resolveAccess'
 import { hasSyncTriggerAccess } from '@/lib/rbac/guards'
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 
 /** Granular permission keys from the role_permissions table. */
 export type RolePermissionKey =
@@ -139,4 +147,77 @@ export async function verifyPermission(
   }
 
   return userId
+}
+
+// ---------------------------------------------------------------------------
+// Request-level helpers (Phase D — Bearer + cookie dual auth)
+// ---------------------------------------------------------------------------
+
+export interface AdminRequestAuth {
+  userId: string
+  role: UserRole
+}
+
+/**
+ * Resolve the caller from Bearer JWT or cookie session, then enforce role.
+ */
+export async function verifyAdminRequest(
+  req: NextRequest,
+  options?: { adminOnly?: boolean },
+): Promise<AdminRequestAuth> {
+  const adminOnly = options?.adminOnly === true
+  const authHeader = req.headers.get('authorization')
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = extractBearerToken(authHeader)
+    const userId = adminOnly ? await verifyAdmin(token) : await verifyAdminOrEditor(token)
+    const client = createServiceRoleClient()
+    const role = await getUserRoleWithClient(client, userId)
+    if (!role) throw new ApiError(403, 'Forbidden')
+    return { userId, role }
+  }
+
+  // Cookie session fallback (admin UI often omits Bearer on fetch)
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser()
+  if (error || !user) throw new ApiError(401, 'Unauthorized')
+
+  const role = await getUserRoleWithClient(supabase, user.id)
+  if (!role) throw new ApiError(403, 'Forbidden')
+
+  if (adminOnly) {
+    if (role !== 'admin') throw new ApiError(403, 'Forbidden: admin role required')
+  } else if (!['admin', 'editor'].includes(role)) {
+    throw new ApiError(403, 'Forbidden')
+  }
+
+  return { userId: user.id, role }
+}
+
+/** Admin-only. Prefer for user management, SOS accounting, feature flags. */
+export async function requireAdminFromRequest(req: NextRequest): Promise<AdminRequestAuth> {
+  return verifyAdminRequest(req, { adminOnly: true })
+}
+
+/** Admin or editor. */
+export async function requireAdminOrEditorFromRequest(
+  req: NextRequest,
+): Promise<AdminRequestAuth> {
+  return verifyAdminRequest(req, { adminOnly: false })
+}
+
+/**
+ * Admin-only + service-role client — common pattern for user/invite/SOS routes.
+ */
+export async function requireAdminWithServiceClient(req: NextRequest): Promise<{
+  userId: string
+  role: UserRole
+  serviceClient: Awaited<ReturnType<typeof createServiceRoleSupabaseClient>>
+}> {
+  const auth = await requireAdminFromRequest(req)
+  const serviceClient = await createServiceRoleSupabaseClient()
+  return { userId: auth.userId, role: auth.role, serviceClient }
 }

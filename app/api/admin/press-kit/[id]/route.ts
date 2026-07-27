@@ -4,7 +4,6 @@ import { removeFromPressKit } from '@/lib/api/pressKit'
 import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 function extractId(req: NextRequest): string {
   const segments = new URL(req.url).pathname.split('/')
   return segments[segments.length - 1]

@@ -19,7 +19,21 @@
 
 ## Admin route auth
 
-Use `src/lib/adminAuth.ts`: `extractBearerToken`, `verifyAdminOrEditor`, `verifyAdmin`, `verifyPermission`, `verifySyncTrigger`. All admin routes wrap `withErrorHandler`.
+Use `src/lib/adminAuth.ts`. **Preferred (Phase D):**
+
+```ts
+const { userId } = await requireAdminFromRequest(req) // admin only, Bearer or cookie
+// or
+const { userId, serviceClient } = await requireAdminWithServiceClient(req)
+// or
+await requireAdminOrEditorFromRequest(req)
+```
+
+Legacy token helpers still valid: `extractBearerToken` + `verifyAdmin` / `verifyAdminOrEditor` / `verifyPermission` / `verifySyncTrigger`.
+
+Dual auth: **Bearer first**, cookie session fallback (admin UI often uses cookies without Authorization header).
+
+All admin routes wrap `withErrorHandler`.
 
 `RolePermissionKey`: `can_publish_news`, `can_edit_news`, `can_manage_artists`, `can_manage_releases`, `can_manage_videos`, `can_view_admin_panel`.
 
@@ -122,12 +136,28 @@ Users tab: `users.ts` DAL + `/api/admin/users/*` (admin only). Feature flags: `s
 
 ## Public rate limits (`ipRateLimit.ts`)
 
+In-process IP limits for unauthenticated public endpoints:
+
 | Route | Limit |
 |-------|-------|
 | `/api/contact` | 5 / 10 min |
 | `/api/auth/forgot-password` | 3 / 10 min |
 | `/api/journalist-applications` | 3 / 30 min |
 | `/api/page-events` | 120 / 10 min |
+
+## Portal / authenticated abuse guards (`rateLimitDistributed` + `portalUploadLimits`)
+
+Prefer **distributed** limits (Upstash when configured, else in-process) keyed by `userId:ip`. SSOT for upload size/MIME and portal rate numbers: `src/lib/uploads/portalUploadLimits.ts`.
+
+| Area | Default |
+|------|---------|
+| Portal file uploads (photo, rider, asset, cover, documents, fonts, tour tech) | 40 / 10 min |
+| Message send | 30 / 10 min |
+| EPK export | 10 / 10 min |
+| Client error log (`/api/log-error`) | 60 / 10 min |
+| Submit release / video | 20 / 10 min |
+
+Route handlers must import size limits from `portalUploadLimits` — no local `MAX_BYTES` copies.
 
 ## robots.txt & llms.txt
 
@@ -148,6 +178,24 @@ Users tab: `users.ts` DAL + `/api/admin/users/*` (admin only). Feature flags: `s
 **Helpers:** `withPortalMembership` + `portalMemberWrite` (`src/lib/portal/withPortalMembership.ts`). Profile PUT accepts **partial** payloads (dirty fields only).
 
 **Migrate back:** verify prod policies with `scripts/verify-portal-rls.sql` → dual-path canary (`PORTAL_WRITES_USE_USER_JWT=1`) → flip tables by risk. Full plan: [portal-write-auth.md](portal-write-auth.md).
+
+## API contract CI (SOTA foundation)
+
+Wired into `npm run ci`:
+
+| Script | Purpose |
+|--------|---------|
+| `verify:portal-rls` | Expected portal RLS policy names ⊆ `reset.sql` |
+| `verify:schema-columns` | Critical tables: CREATE columns have matching `ADD COLUMN IF NOT EXISTS` (prevents hometown-class drift) |
+| `verify:api-contracts` | Every route uses `withErrorHandler`; portal mutations / admin routes have recognized auth helpers |
+
+Inventory dump: `npm run api:inventory` (`scripts/extract-api-routes.mjs`).
+
+**Golden route tests:** `tests/helpers/api/routeTestkit.ts` + unit tests under `tests/unit/portal/*Route.test.ts` (401 / 403 / 2xx). After `vi.resetModules()`, throw auth errors via `rejectApiError()` so `instanceof ApiError` matches the route graph.
+
+**New portal mutations:** prefer `withPortalMembershipWrite` + `portalMemberWrite` + Zod allowlist — never raw body to `artists`.
+
+**New columns on evolved tables (`artists`, `artist_epks`):** always add `ADD COLUMN IF NOT EXISTS` next to the CREATE definition.
 
 ## Error logging
 

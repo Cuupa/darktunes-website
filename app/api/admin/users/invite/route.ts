@@ -2,33 +2,18 @@
  * app/api/admin/users/invite/route.ts
  *
  * POST /api/admin/users/invite
- *
- * Sends a branded invite email (Resend when configured) so a new user can set a
- * password and sign in. Requires a staff role (admin, artist, editor, or journalist).
- *
- * Security: only users with role = 'admin' may call this endpoint.
+ * Security: admin only (Bearer or cookie dual auth).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requestUserInvite } from '@/lib/auth/requestUserInvite'
-import { getUserRoleWithClient } from '@/lib/getUserRole'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { requireAdminWithServiceClient } from '@/lib/adminAuth'
 import { ApiError, buildApiError, withErrorHandler } from '@/lib/errors'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 import { INVITABLE_ROLES, type InvitableRole } from '@/types/users'
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) throw new ApiError(401, 'Unauthorized')
-
-  const callerRole = await getUserRoleWithClient(supabase, user.id)
-
-  if (callerRole !== 'admin') throw new ApiError(403, 'Forbidden')
+  const { userId, serviceClient: adminClient } = await requireAdminWithServiceClient(req)
 
   let body: Record<string, unknown> = {}
   try {
@@ -47,7 +32,6 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   }
   const role = roleRaw as InvitableRole
 
-  const adminClient = await createServiceRoleSupabaseClient()
   const { resendApiKey, resendFromEmail } = await getEmailCredentials(adminClient)
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://darktunes.com'
 
@@ -56,7 +40,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     {
       email,
       role,
-      grantedBy: user.id,
+      grantedBy: userId,
     },
     {
       resendApiKey,

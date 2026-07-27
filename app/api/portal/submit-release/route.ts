@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { createReleaseSubmissionWithTracksAtomic } from '@/lib/api/releaseSubmissions'
 import { getFormSchema } from '@/lib/api/submissionFormSchema'
 import { getReleaseTypeRules } from '@/lib/api/submissionReleaseTypeRules'
@@ -12,7 +11,7 @@ import {
   updateIdempotencyKeyResourceId,
 } from '@/lib/api/idempotency'
 import { sendSubmissionNotificationEmail } from '@/lib/email/sendSubmissionNotificationEmail'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 import { buildTrackInsert, filterArtistTrackFields } from '@/lib/submissions/trackFieldMapping'
 import { coerceReleaseDate } from '@/lib/submissions/submissionSchemaValidation'
@@ -59,9 +58,8 @@ const bodySchema = z.object({
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
-  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId, {
-    requireArtistId: true,
-  })
+  const ctx = await withPortalMembershipWrite(req, artistId)
+  const { user, artist, serviceDb: serviceRole, userDb: supabase } = ctx
 
   const ip = getClientIp(req)
   const rl = await checkDistributedRateLimit(`submit-release:${user.id}:${ip}`, 20, 10 * 60_000)
@@ -72,7 +70,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const body = bodySchema.parse(await req.json())
   const formData = (body.formData ?? {}) as Record<string, unknown>
 
-  const serviceRole = await createServiceRoleSupabaseClient()
+  // Idempotency keys — service role forever (system table)
   const claimed = await checkAndClaimIdempotencyKey(
     serviceRole,
     body.idempotencyKey,

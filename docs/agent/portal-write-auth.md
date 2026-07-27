@@ -46,16 +46,29 @@ If production matches `reset.sql`, member policies already allow portal users vi
 
 ## Current code posture (after PR)
 
-Membership verified with bearer client, then **service role** for writes on:
+Membership verified with bearer client, then **service role** for writes on
+(via `withPortalMembershipWrite` + `portalMemberWrite` canary):
 
 - `PUT /api/portal/profile`
 - Onboarding server actions (`artist_epks`, `artists`, welcome message)
 - EPK document / restore / fonts / share
-- Fan page document / publish
+- Fan page document / publish / preview-token
 - Billing profile
-- Document vault upload/download/delete
+- Document vault upload / download / delete
+- Uploads: photo / rider / asset / release-cover
+- Invoices GET/POST/PATCH + statement view
+- Messages inbox / send / folders / [id] PATCH (message routes pin membership on sender or recipient artist after load)
+- Concerts + ICS export
+- Checklist toggle
+- Submit release / video + submission drafts + list submissions
+- Interview request PATCH
+- Tour Planner (all routes via `authenticateTourPlannerRequest` → membership write)
 
 R2 uploads stay server-side with env credentials (not RLS).
+
+**Auth:** `authenticatePortalBearer` accepts **Bearer** (preferred) or **cookie session** (dual-auth window for older clients). Portal UI should send Bearer via `getPortalAuthHeaders()`.
+
+**Read-only / no artist pin (Bearer only):** FAQ, EPK templates list, cover-art-check (rate-limited), proxy-image.
 
 ## Phase plan — migrate back without reintroducing 500s
 

@@ -10,7 +10,7 @@ Distilled anti-patterns from project history. **Append session findings before o
 |--------------|------|
 | Files in `supabase/migrations/` | ⛔ Forbidden. Only `supabase/reset.sql` + `src/types/database.ts` |
 | Helpers after tables that use them | Order: extensions → enums → **functions** → tables → RLS → backfills |
-| Duplicate `ADD COLUMN` for columns already in `CREATE TABLE` | Guards only for columns added after initial definition |
+| CREATE-only columns on evolved tables (`artists`, …) | Live DBs no-op `CREATE TABLE IF NOT EXISTS` — every non-structural column needs `ADD COLUMN IF NOT EXISTS` (`verify:schema-columns`) |
 | Denormalised columns across related tables | Check `supabase/DB_REQUIREMENTS.md` first (3NF) |
 | `has_permission(auth.uid(), …)` | ✅ `has_permission('can_manage_releases')` — one arg only |
 | `CREATE TYPE IF NOT EXISTS` in Supabase SQL Editor | Use `DO $$ … IF NOT EXISTS (pg_type) …` blocks |

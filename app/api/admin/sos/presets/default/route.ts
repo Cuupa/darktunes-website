@@ -3,10 +3,11 @@
  * PUT /api/admin/sos/presets/default — save settings to the Default preset
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextResponse } from 'next/server'
-import { getUserRoleWithClient } from '@/lib/getUserRole'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   ensureDefaultRulesPreset,
   upsertRulesPresetByName,
@@ -14,15 +15,6 @@ import {
 } from '@/lib/api/sosRulesPresets'
 import { DEFAULT_PRESET_NAME, normalizeAccountingConfig } from '@/lib/sos/sosAccountingSettings'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-
-async function requireAdmin() {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) throw new ApiError(401, 'Unauthorized')
-  const role = await getUserRoleWithClient(supabase, user.id)
-  if (role !== 'admin') throw new ApiError(403, 'Forbidden')
-  return supabase
-}
 
 function presetResponse(preset: Awaited<ReturnType<typeof ensureDefaultRulesPreset>>) {
   return {
@@ -36,15 +28,15 @@ function presetResponse(preset: Awaited<ReturnType<typeof ensureDefaultRulesPres
   }
 }
 
-export const GET = withErrorHandler(async (): Promise<NextResponse> => {
-  await requireAdmin()
+export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
+  await requireAdminFromRequest(req)
   const serviceSupabase = await createServiceRoleSupabaseClient()
   const preset = await ensureDefaultRulesPreset(serviceSupabase)
   return NextResponse.json(presetResponse(preset))
 })
 
 export const PUT = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  await requireAdmin()
+  await requireAdminFromRequest(req)
   const body = await req.json()
   const { config } = body as { config?: Partial<RulesPresetConfig> }
   if (!config || typeof config !== 'object') throw new ApiError(400, 'config must be an object')

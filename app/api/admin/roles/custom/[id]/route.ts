@@ -13,7 +13,6 @@ import { z } from 'zod'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 function extractId(req: NextRequest): string {
   const segments = new URL(req.url).pathname.split('/')
   return segments[segments.length - 1]

@@ -576,7 +576,21 @@ CREATE TABLE IF NOT EXISTS public.artists (
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Idempotent column additions — no-ops on a fresh DB, safe on existing data
+-- Idempotent column additions — no-ops on a fresh DB, safe on existing data.
+-- CI: `npm run verify:schema-columns` requires every non-structural CREATE
+-- column on `artists` / `artist_epks` to appear here (CREATE TABLE IF NOT EXISTS
+-- is a no-op on live DBs).
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS name           TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS slug           TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS bio            TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS genres         TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS image_url      TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS spotify_url    TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS apple_music_url TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS instagram_url  TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS youtube_url    TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS website_url    TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS featured       BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS spotify_id     TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS discogs_id     TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS songkick_id    TEXT;
@@ -589,6 +603,15 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS tiktok_url     TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS bandcamp_url   TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS shop_url       TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS founding_year  INTEGER;
+-- hometown lived on artist_epks until Track 2/3 consolidation; without this
+-- ADD COLUMN, existing prod DBs (CREATE TABLE IF NOT EXISTS no-ops) miss it and
+-- portal profile PUT returns 500 ("Could not find the 'hometown' column").
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS hometown       TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS country        TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS email          TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS vat_number     TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS is_eu_non_german BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS notes          TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS soundcloud_url TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS logo_url       TEXT;
