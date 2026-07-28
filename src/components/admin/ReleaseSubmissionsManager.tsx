@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { horizontalScrollClass } from '@/components/ui/scroll-panel'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -15,6 +15,14 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { formatSecondsToDuration } from '@/lib/submissions/fieldValidation'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -29,19 +37,8 @@ const STATUS_LABELS: Record<SubmissionStatus, string> = {
   rejected: 'Rejected',
 }
 
-function statusBadgeVariant(status: SubmissionStatus) {
-  switch (status) {
-    case 'received': return 'secondary'
-    case 'reviewed': return 'outline'
-    case 'accepted': return 'default'
-    case 'rejected': return 'destructive'
-  }
-}
-
 export function ReleaseSubmissionsManager() {
   const tToast = useTranslations('admin.toast')
-
-
   const t = useTranslations('adminSubmissions')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
 
@@ -52,7 +49,15 @@ export function ReleaseSubmissionsManager() {
   const [newStatus, setNewStatus] = useState<SubmissionStatus>('received')
   const [adminReply, setAdminReply] = useState('')
   const [saving, setSaving] = useState(false)
-  const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null)
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
+  const [exporting, setExporting] = useState<string | null>(null)
+
+  const [columnsOpen, setColumnsOpen] = useState(false)
+  const [columnsLoading, setColumnsLoading] = useState(false)
+  const [columnsSaving, setColumnsSaving] = useState(false)
+  const [availableColumns, setAvailableColumns] = useState<string[]>([])
+  const [defaultColumns, setDefaultColumns] = useState<string[]>([])
+  const [draftColumns, setDraftColumns] = useState<string[]>([])
 
   const getToken = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -101,6 +106,51 @@ export function ReleaseSubmissionsManager() {
     }
   }
 
+  const patchStatus = async (id: string, status: SubmissionStatus, reply?: string) => {
+    const token = await getToken()
+    const res = await fetch('/api/admin/release-submissions/' + id, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        status,
+        ...(reply !== undefined ? { adminReply: reply || undefined } : {}),
+      }),
+    })
+    if (!res.ok) throw new Error('Failed')
+    return (await res.json()) as ReleaseSubmission
+  }
+
+  const updateListStatus = async (sub: ReleaseSubmission, status: SubmissionStatus) => {
+    if (sub.status === status) return
+    setStatusUpdatingId(sub.id)
+    const previous = sub.status
+    setSubmissions((list) =>
+      list.map((s) => (s.id === sub.id ? { ...s, status } : s)),
+    )
+    if (selected?.id === sub.id) {
+      setSelected({ ...selected, status })
+      setNewStatus(status)
+    }
+    try {
+      await patchStatus(sub.id, status)
+      toast.success(tToast('submission_updated'))
+    } catch {
+      setSubmissions((list) =>
+        list.map((s) => (s.id === sub.id ? { ...s, status: previous } : s)),
+      )
+      if (selected?.id === sub.id) {
+        setSelected({ ...selected, status: previous })
+        setNewStatus(previous)
+      }
+      toast.error(tToast('failed_update_submission'))
+    } finally {
+      setStatusUpdatingId(null)
+    }
+  }
+
   const createDraftRelease = async () => {
     if (!selected) return
     setSaving(true)
@@ -138,20 +188,10 @@ export function ReleaseSubmissionsManager() {
   }
 
   const saveStatus = async () => {
-
     if (!selected) return
     setSaving(true)
     try {
-      const token = await getToken()
-      const res = await fetch('/api/admin/release-submissions/' + selected.id, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus, adminReply: adminReply || undefined }),
-      })
-      if (!res.ok) throw new Error('Failed')
+      await patchStatus(selected.id, newStatus, adminReply)
       toast.success(tToast('submission_updated'))
       setSelected(null)
       await fetchSubmissions()
@@ -162,11 +202,15 @@ export function ReleaseSubmissionsManager() {
     }
   }
 
-  const downloadExport = async (format: 'csv' | 'xlsx') => {
-    setExporting(format)
+  const downloadExport = async (format: 'csv' | 'xlsx', ids?: string[]) => {
+    const key = ids?.length === 1 ? `${format}:${ids[0]}` : format
+    setExporting(key)
     try {
       const token = await getToken()
-      const res = await fetch(`/api/admin/release-submissions/export?format=${format}`, {
+      const params = new URLSearchParams({ format })
+      if (ids?.length === 1) params.set('id', ids[0])
+      else if (ids && ids.length > 1) params.set('ids', ids.join(','))
+      const res = await fetch(`/api/admin/release-submissions/export?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Export failed')
@@ -174,7 +218,9 @@ export function ReleaseSubmissionsManager() {
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `release-submissions.${format === 'xlsx' ? 'xlsx' : 'csv'}`
+      const disposition = res.headers.get('Content-Disposition')
+      const match = disposition?.match(/filename="([^"]+)"/)
+      anchor.download = match?.[1] ?? `release-submissions.${format === 'xlsx' ? 'xlsx' : 'csv'}`
       anchor.click()
       URL.revokeObjectURL(url)
       toast.success(t('export_done'))
@@ -183,6 +229,81 @@ export function ReleaseSubmissionsManager() {
     } finally {
       setExporting(null)
     }
+  }
+
+  const openColumnsDialog = async () => {
+    setColumnsOpen(true)
+    setColumnsLoading(true)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/admin/release-submissions/export-columns', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error('Failed')
+      const data = (await res.json()) as {
+        columns: string[]
+        defaults: string[]
+        available: string[]
+      }
+      setAvailableColumns(data.available)
+      setDefaultColumns(data.defaults)
+      setDraftColumns(data.columns)
+    } catch {
+      toast.error(t('export_columns_load_error'))
+      setColumnsOpen(false)
+    } finally {
+      setColumnsLoading(false)
+    }
+  }
+
+  const saveColumns = async () => {
+    if (draftColumns.length === 0) {
+      toast.error(t('export_columns_empty'))
+      return
+    }
+    setColumnsSaving(true)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/admin/release-submissions/export-columns', {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ columns: draftColumns }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      const data = (await res.json()) as { columns: string[] }
+      setDraftColumns(data.columns)
+      toast.success(t('export_columns_saved'))
+      setColumnsOpen(false)
+    } catch {
+      toast.error(t('export_columns_save_error'))
+    } finally {
+      setColumnsSaving(false)
+    }
+  }
+
+  const toggleColumn = (key: string, enabled: boolean) => {
+    setDraftColumns((prev) => {
+      if (enabled) {
+        if (prev.includes(key)) return prev
+        return [...prev, key]
+      }
+      return prev.filter((c) => c !== key)
+    })
+  }
+
+  const moveColumn = (index: number, dir: -1 | 1) => {
+    setDraftColumns((prev) => {
+      const next = [...prev]
+      const target = index + dir
+      if (target < 0 || target >= next.length) return prev
+      const tmp = next[index]
+      next[index] = next[target]
+      next[target] = tmp
+      return next
+    })
   }
 
   if (loading) return <p className="text-muted-foreground">{t('loading')}</p>
@@ -207,36 +328,97 @@ export function ReleaseSubmissionsManager() {
           >
             {exporting === 'xlsx' ? t('saving') : t('export_excel')}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={exporting !== null}
+            onClick={() => void openColumnsDialog()}
+          >
+            {t('export_columns')}
+          </Button>
         </div>
       )}
 
       {selected ? (
         <Card className="border-border">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>{selected.title}</span>
-              <Button variant="ghost" size="sm" onClick={() => setSelected(null)}>← Back</Button>
+            <CardTitle className="flex flex-wrap items-center justify-between gap-2">
+              <span className="min-w-0">
+                {selected.artistName ? (
+                  <>
+                    <span className="text-muted-foreground font-normal">{selected.artistName}</span>
+                    <span className="mx-2 text-muted-foreground">·</span>
+                  </>
+                ) : null}
+                {selected.title}
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={exporting !== null}
+                  onClick={() => void downloadExport('csv', [selected.id])}
+                >
+                  {exporting === `csv:${selected.id}` ? t('saving') : t('export_csv')}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={exporting !== null}
+                  onClick={() => void downloadExport('xlsx', [selected.id])}
+                >
+                  {exporting === `xlsx:${selected.id}` ? t('saving') : t('export_excel')}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setSelected(null)}>← Back</Button>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="font-medium">{t('submission_type')}: </span>{selected.type ?? '—'}</div>
-              <div><span className="font-medium">{t('submission_submitted')}: </span>{selected.releaseDate ?? '—'}</div>
+              <div>
+                <span className="font-medium">{t('submission_artist')}: </span>
+                {selected.artistName ?? '—'}
+              </div>
+              <div>
+                <span className="font-medium">{t('submission_type')}: </span>
+                {selected.type ?? '—'}
+              </div>
+              <div>
+                <span className="font-medium">{t('submission_release_date')}: </span>
+                {selected.releaseDate ?? '—'}
+              </div>
+              <div>
+                <span className="font-medium">{t('submission_submitted')}: </span>
+                {selected.createdAt ? new Date(selected.createdAt).toLocaleString() : '—'}
+              </div>
               <div><span className="font-medium">Genre: </span>{selected.genre ?? '—'}</div>
               <div><span className="font-medium">ISRC: </span>{selected.isrc ?? '—'}</div>
               <div><span className="font-medium">Catalog #: </span>{selected.catalogNumber ?? '—'}</div>
-              <div><span className="font-medium">Cover verified: </span>{selected.coverArtVerified ? '✅' : '❌'}</div>
+              <div>
+                <span className="font-medium">Cover verified: </span>
+                {selected.coverArtVerified ? '✅' : '❌'}
+              </div>
             </div>
             {selected.audioDownloadUrl && (
               <div>
-                <a href={selected.audioDownloadUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline">
+                <a
+                  href={selected.audioDownloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary underline"
+                >
                   Audio Download
                 </a>
               </div>
             )}
             {selected.coverArtUrl && (
               <div>
-                <a href={selected.coverArtUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline">
+                <a
+                  href={selected.coverArtUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary underline"
+                >
                   Cover Art
                 </a>
               </div>
@@ -263,6 +445,8 @@ export function ReleaseSubmissionsManager() {
                     <tr className="border-b border-border">
                       <th className="text-left py-1 pr-2">#</th>
                       <th className="text-left py-1 pr-2">Title</th>
+                      <th className="text-left py-1 pr-2">{t('submission_composer')}</th>
+                      <th className="text-left py-1 pr-2">{t('submission_author')}</th>
                       <th className="text-left py-1 pr-2">ISRC</th>
                       <th className="text-left py-1 pr-2">Duration</th>
                     </tr>
@@ -272,9 +456,13 @@ export function ReleaseSubmissionsManager() {
                       <tr key={track.id} className="border-b border-border">
                         <td className="py-1 pr-2">{track.trackNumber}</td>
                         <td className="py-1 pr-2">{track.title ?? '—'}</td>
+                        <td className="py-1 pr-2">{track.composer ?? '—'}</td>
+                        <td className="py-1 pr-2">{track.author ?? '—'}</td>
                         <td className="py-1 pr-2 font-mono text-xs">{track.isrc ?? '—'}</td>
                         <td className="py-1 pr-2">
-                          {track.durationSeconds != null ? formatSecondsToDuration(track.durationSeconds) : '—'}
+                          {track.durationSeconds != null
+                            ? formatSecondsToDuration(track.durationSeconds)
+                            : '—'}
                         </td>
                       </tr>
                     ))}
@@ -332,10 +520,13 @@ export function ReleaseSubmissionsManager() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
+                <th className="text-left py-2 pr-4">{t('submission_artist')}</th>
                 <th className="text-left py-2 pr-4">{t('submission_title')}</th>
                 <th className="text-left py-2 pr-4">{t('submission_type')}</th>
+                <th className="text-left py-2 pr-4">{t('submission_release_date')}</th>
                 <th className="text-left py-2 pr-4">{t('submission_submitted')}</th>
-                <th className="text-left py-2">{t('submission_status')}</th>
+                <th className="text-left py-2 pr-4">{t('submission_status')}</th>
+                <th className="text-left py-2">{t('actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -345,15 +536,60 @@ export function ReleaseSubmissionsManager() {
                   className="border-b border-border cursor-pointer hover:bg-muted/30"
                   onClick={() => void openDetail(sub)}
                 >
-                  <td className="py-2 pr-4 font-medium">{sub.title}</td>
+                  <td className="py-2 pr-4 font-medium">{sub.artistName ?? '—'}</td>
+                  <td className="py-2 pr-4">{sub.title}</td>
                   <td className="py-2 pr-4 capitalize">{sub.type ?? '—'}</td>
+                  <td className="py-2 pr-4 text-muted-foreground">
+                    {sub.releaseDate ?? '—'}
+                  </td>
                   <td className="py-2 pr-4 text-muted-foreground">
                     {sub.createdAt ? new Date(sub.createdAt).toLocaleDateString() : '—'}
                   </td>
-                  <td className="py-2">
-                    <Badge variant={statusBadgeVariant(sub.status)}>
-                      {STATUS_LABELS[sub.status]}
-                    </Badge>
+                  <td
+                    className="py-2 pr-4"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <Select
+                      value={sub.status}
+                      disabled={statusUpdatingId === sub.id}
+                      onValueChange={(v) => void updateListStatus(sub, v as SubmissionStatus)}
+                    >
+                      <SelectTrigger className="h-8 w-36" aria-label={t('submission_status')}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map((s) => (
+                          <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </td>
+                  <td
+                    className="py-2"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex flex-wrap gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2"
+                        disabled={exporting !== null}
+                        onClick={() => void downloadExport('csv', [sub.id])}
+                      >
+                        {exporting === `csv:${sub.id}` ? t('saving') : 'CSV'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2"
+                        disabled={exporting !== null}
+                        onClick={() => void downloadExport('xlsx', [sub.id])}
+                      >
+                        {exporting === `xlsx:${sub.id}` ? t('saving') : 'Excel'}
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -364,6 +600,96 @@ export function ReleaseSubmissionsManager() {
           )}
         </div>
       )}
+
+      <Dialog open={columnsOpen} onOpenChange={setColumnsOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" data-lenis-prevent>
+          <DialogHeader>
+            <DialogTitle>{t('export_columns')}</DialogTitle>
+            <DialogDescription>{t('export_columns_hint')}</DialogDescription>
+          </DialogHeader>
+          {columnsLoading ? (
+            <p className="text-sm text-muted-foreground">{t('loading')}</p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">{t('export_columns_order_hint')}</p>
+              <ul className="space-y-2">
+                {draftColumns.map((key, index) => (
+                  <li
+                    key={key}
+                    className="flex items-center gap-2 rounded border border-border px-2 py-1.5"
+                  >
+                    <Checkbox
+                      checked
+                      onCheckedChange={(checked) => toggleColumn(key, checked === true)}
+                      aria-label={key}
+                    />
+                    <span className="flex-1 text-sm font-mono truncate">{key}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2"
+                      disabled={index === 0}
+                      onClick={() => moveColumn(index, -1)}
+                    >
+                      ↑
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2"
+                      disabled={index === draftColumns.length - 1}
+                      onClick={() => moveColumn(index, 1)}
+                    >
+                      ↓
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              {availableColumns.filter((c) => !draftColumns.includes(c)).length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">{t('export_columns_available')}</p>
+                  <ul className="space-y-1">
+                    {availableColumns
+                      .filter((c) => !draftColumns.includes(c))
+                      .map((key) => (
+                        <li key={key} className="flex items-center gap-2 px-2 py-1">
+                          <Checkbox
+                            checked={false}
+                            onCheckedChange={(checked) => toggleColumn(key, checked === true)}
+                            aria-label={key}
+                          />
+                          <span className="text-sm font-mono text-muted-foreground">{key}</span>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={columnsLoading || columnsSaving}
+              onClick={() => setDraftColumns([...defaultColumns])}
+            >
+              {t('export_columns_reset')}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setColumnsOpen(false)}>
+              {t('cancel')}
+            </Button>
+            <Button
+              type="button"
+              disabled={columnsLoading || columnsSaving || draftColumns.length === 0}
+              onClick={() => void saveColumns()}
+            >
+              {columnsSaving ? t('saving') : t('export_columns_save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

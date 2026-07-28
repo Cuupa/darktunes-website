@@ -9,7 +9,18 @@ import {
   buildSubmissionExportRows,
   buildSubmissionsCsv,
   buildSubmissionsExcel,
+  collectAvailableExportKeys,
+  resolveExportColumns,
 } from '@/lib/submissions/submissionExport'
+import { getReleaseSubmissionExportColumns } from '@/lib/submissions/exportColumnSettings'
+
+function slugifyFilenamePart(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'submission'
+}
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const token = extractBearerToken(req.headers.get('authorization'))
@@ -22,10 +33,23 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   }
 
   const statusFilter = req.nextUrl.searchParams.get('status')
+  const singleId = req.nextUrl.searchParams.get('id')
+  const idsParam = req.nextUrl.searchParams.get('ids')
+  const idSet = new Set<string>()
+  if (singleId) idSet.add(singleId)
+  if (idsParam) {
+    for (const part of idsParam.split(',')) {
+      const trimmed = part.trim()
+      if (trimmed) idSet.add(trimmed)
+    }
+  }
 
   let submissions = await getAllReleaseSubmissions(supabase)
   if (statusFilter) {
     submissions = submissions.filter((s) => s.status === statusFilter)
+  }
+  if (idSet.size > 0) {
+    submissions = submissions.filter((s) => idSet.has(s.id))
   }
 
   const submissionIds = submissions.map((s) => s.id)
@@ -38,8 +62,13 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   }
 
   const artistIds = [...new Set(submissions.map((s) => s.artistId))]
-  const { data: artists } = await supabase.from('artists').select('id, name').in('id', artistIds)
-  const artistNames = new Map((artists ?? []).map((a) => [a.id, a.name]))
+  const artistNames = new Map<string, string>()
+  if (artistIds.length > 0) {
+    const { data: artists } = await supabase.from('artists').select('id, name').in('id', artistIds)
+    for (const a of artists ?? []) {
+      artistNames.set(a.id, a.name)
+    }
+  }
 
   const schemaFields = await getAllFormSchemaFields(supabase, 'release')
   const rows = buildSubmissionExportRows({
@@ -49,23 +78,38 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
     schemaFields,
   })
 
+  const available = collectAvailableExportKeys(rows, schemaFields)
+  const columnsQuery = req.nextUrl.searchParams.get('columns')
+  let columnOrder: string[]
+  if (columnsQuery) {
+    const fromQuery = columnsQuery.split(',').map((c) => c.trim()).filter(Boolean)
+    columnOrder = resolveExportColumns(fromQuery, available)
+  } else {
+    const saved = await getReleaseSubmissionExportColumns(supabase)
+    columnOrder = resolveExportColumns(saved, available)
+  }
+
   const stamp = new Date().toISOString().slice(0, 10)
+  let filenameBase = `release-submissions-${stamp}`
+  if (submissions.length === 1) {
+    filenameBase = `release-submission-${slugifyFilenamePart(submissions[0].title)}-${stamp}`
+  }
 
   if (format === 'xlsx') {
-    const buffer = await buildSubmissionsExcel(rows)
+    const buffer = await buildSubmissionsExcel(rows, columnOrder)
     return new NextResponse(buffer, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="release-submissions-${stamp}.xlsx"`,
+        'Content-Disposition': `attachment; filename="${filenameBase}.xlsx"`,
       },
     })
   }
 
-  const csv = buildSubmissionsCsv(rows)
+  const csv = buildSubmissionsCsv(rows, columnOrder)
   return new NextResponse(csv, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="release-submissions-${stamp}.csv"`,
+      'Content-Disposition': `attachment; filename="${filenameBase}.csv"`,
     },
   })
 })
