@@ -73,7 +73,10 @@ export function PortalNotificationBell({ artistId }: PortalNotificationBellProps
     })
 
     try {
-      await markPortalNotificationItemRead(supabase, item)
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      await markPortalNotificationItemRead(supabase, item, user?.id)
     } catch {
       void loadFeed()
     }

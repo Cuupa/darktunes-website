@@ -176,14 +176,15 @@ export async function markAllPortalMessagesRead(db: DbClient, artistId: string):
 export async function markPortalNotificationItemRead(
   db: DbClient,
   item: Pick<PortalNotificationItem, 'id' | 'kind'>,
+  userId?: string | null,
 ): Promise<void> {
   if (item.kind === 'label_message') {
-    await markMessageRead(db, item.id)
+    await markMessageRead(db, item.id, userId)
     return
   }
 
   if (item.kind === 'portal_message') {
-    await markPortalMessageRead(db, item.id)
+    await markPortalMessageRead(db, item.id, userId)
     return
   }
 

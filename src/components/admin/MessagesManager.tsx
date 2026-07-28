@@ -380,7 +380,10 @@ export function MessagesManager() {
   const handleMarkRead = useCallback(
     async (id: string) => {
       try {
-        const updated = await markMessageRead(supabase, id)
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser()
+        const updated = await markMessageRead(supabase, id, authUser?.id)
         setMessages((cur) => cur.map((m) => (m.id === id ? updated : m)))
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Failed to mark as read')
@@ -404,7 +407,10 @@ export function MessagesManager() {
   const handleMarkPortalRead = useCallback(
     async (id: string) => {
       try {
-        await markPortalMessageRead(supabase, id)
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser()
+        await markPortalMessageRead(supabase, id, authUser?.id)
         void supabase
           .from('notifications')
           .update({ read: true })

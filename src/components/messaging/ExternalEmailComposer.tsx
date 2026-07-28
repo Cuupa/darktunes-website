@@ -43,6 +43,7 @@ export function ExternalEmailComposer({
   onSent,
 }: ExternalEmailComposerProps) {
   const tErrors = useTranslations('errors')
+  const t = useTranslations('admin.messages')
   const [open, setOpen] = useState(false)
   const [to, setTo] = useState(defaultTo)
   const [subject, setSubject] = useState(defaultSubject)
@@ -52,9 +53,9 @@ export function ExternalEmailComposer({
   const [error, setError] = useState('')
 
   const handleSend = useCallback(async () => {
-    if (!to.trim()) { setError('Recipient is required.'); return }
-    if (!subject.trim()) { setError('Subject is required.'); return }
-    if (!html.trim()) { setError('Message body is required.'); return }
+    if (!to.trim()) { setError(t('external_recipient_required')); return }
+    if (!subject.trim()) { setError(t('external_subject_required')); return }
+    if (!html.trim()) { setError(t('external_body_required')); return }
     setSending(true)
     setError('')
     try {
@@ -72,7 +73,7 @@ export function ExternalEmailComposer({
         }
         return
       }
-      toast.success(`Email sent to ${to.trim()}`)
+      toast.success(t('external_sent', { email: to.trim() }))
       setOpen(false)
       setTo(defaultTo)
       setSubject(defaultSubject)
@@ -84,7 +85,7 @@ export function ExternalEmailComposer({
     } finally {
       setSending(false)
     }
-  }, [to, subject, html, replyTo, defaultTo, defaultSubject, defaultHtml, onSent, tErrors])
+  }, [to, subject, html, replyTo, defaultTo, defaultSubject, defaultHtml, onSent, tErrors, t])
 
   return (
     <Dialog
@@ -97,7 +98,7 @@ export function ExternalEmailComposer({
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5">
           <Globe size={16} aria-hidden="true" />
-          External Email
+          {t('external_button')}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-xl">

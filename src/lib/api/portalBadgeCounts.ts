@@ -7,10 +7,14 @@ import { safeCount } from '@/lib/api/safeCount'
 
 type DbClient = SupabaseClient<Database>
 
-export async function getPortalBadgeCounts(db: DbClient, artistId: string): Promise<PortalBadgeCounts> {
+export async function getPortalBadgeCounts(
+  db: DbClient,
+  artistId: string,
+  userId?: string | null,
+): Promise<PortalBadgeCounts> {
   const [labelUnread, portalUnread, interviews, statements, alerts] = await Promise.all([
-    getLabelUnreadCount(db, artistId).catch(() => 0),
-    getPortalPeerUnreadCount(db, artistId).catch(() => 0),
+    getLabelUnreadCount(db, artistId, userId).catch(() => 0),
+    getPortalPeerUnreadCount(db, artistId, userId).catch(() => 0),
     safeCount(
       db
         .from('interview_requests')

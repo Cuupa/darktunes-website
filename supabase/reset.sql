@@ -2645,6 +2645,20 @@ CREATE INDEX IF NOT EXISTS idx_message_attachments_message_id
   ON public.message_attachments (message_id);
 
 -- ---------------------------------------------------------------------------
+-- TABLE: message_receipts (per-user read state for label + portal messages)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.message_receipts (
+  message_source TEXT NOT NULL CHECK (message_source IN ('label', 'portal')),
+  message_id UUID NOT NULL,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  read_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (message_source, message_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_message_receipts_user
+  ON public.message_receipts (user_id, message_source, read_at DESC);
+
+-- ---------------------------------------------------------------------------
 -- TABLE: journalist_downloads
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.journalist_downloads (
@@ -2891,6 +2905,7 @@ ALTER TABLE public.label_messages        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_folders       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_rules         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_attachments   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_receipts      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.journalist_downloads  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.accreditation_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.editor_activity_log   ENABLE ROW LEVEL SECURITY;
@@ -4006,6 +4021,19 @@ CREATE POLICY "message_attachments: admin all" ON public.message_attachments
   FOR ALL
   USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: message_receipts
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "message_receipts: own all" ON public.message_receipts;
+DROP POLICY IF EXISTS "message_receipts: admin read" ON public.message_receipts;
+
+CREATE POLICY "message_receipts: own all" ON public.message_receipts
+  FOR ALL USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "message_receipts: admin read" ON public.message_receipts
+  FOR SELECT USING (public.get_my_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: journalist_downloads

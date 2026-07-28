@@ -3328,6 +3328,27 @@ export interface Database {
         }
         Relationships: []
       }
+      message_receipts: {
+        Row: {
+          message_source: string
+          message_id: string
+          user_id: string
+          read_at: string
+        }
+        Insert: {
+          message_source: string
+          message_id: string
+          user_id: string
+          read_at?: string
+        }
+        Update: {
+          message_source?: string
+          message_id?: string
+          user_id?: string
+          read_at?: string
+        }
+        Relationships: []
+      }
       message_attachments: {
         Row: {
           id: string

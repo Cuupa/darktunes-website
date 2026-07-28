@@ -176,7 +176,7 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
   const [featureFlags, badgeCounts, artistProfile, faqTree] = await Promise.all([
     getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>)),
     artist
-      ? getPortalBadgeCounts(supabase, artist.id).catch(() => ({
+      ? getPortalBadgeCounts(supabase, artist.id, user.id).catch(() => ({
           messages: 0,
           interviews: 0,
           statements: 0,

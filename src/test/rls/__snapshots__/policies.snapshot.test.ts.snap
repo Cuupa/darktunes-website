@@ -139,6 +139,8 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "message_attachments: admin all",
   "message_attachments: artist own read",
   "message_folders: admin all",
+  "message_receipts: admin read",
+  "message_receipts: own all",
   "message_rules: admin all",
   "message_templates: admin all",
   "news_post_artists: can_publish_news write",
@@ -318,6 +320,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "merch_orders",
   "message_attachments",
   "message_folders",
+  "message_receipts",
   "message_rules",
   "message_templates",
   "news_post_artists",
@@ -608,6 +611,10 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   ],
   "message_folders": [
     "message_folders: admin all",
+  ],
+  "message_receipts": [
+    "message_receipts: admin read",
+    "message_receipts: own all",
   ],
   "message_rules": [
     "message_rules: admin all",
