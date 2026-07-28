@@ -166,6 +166,33 @@
     "@typescript-eslint/typescript-estree": {
       "minimatch": "9.0.7"
     },
+    "@eslint/config-array": {
+      "minimatch": "9.0.7"
+    },
+    "@eslint/eslintrc": {
+      "minimatch": "9.0.7"
+    },
+    "eslint": {
+      "minimatch": "9.0.7"
+    },
+    "eslint-config-next": {
+      "minimatch": "9.0.7"
+    },
+    "@ts-morph/common": {
+      "minimatch": "9.0.7"
+    },
+    "archiver-utils": {
+      "minimatch": "9.0.7"
+    },
+    "fstream": {
+      "minimatch": "9.0.7"
+    },
+    "rimraf": {
+      "minimatch": "9.0.7"
+    },
+    "zip-stream": {
+      "minimatch": "9.0.7"
+    },
     "smol-toml": "1.6.1",
     "postcss": "^8.5.18",
     "@vercel/node": {
