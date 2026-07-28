@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Messaging M0 hardening:** Paginated message lists (50/100 cap), per-user `message_receipts` for multi-member unread, server-side message rules on insert, attachment MIME/size/URL allowlist SSOT, i18n for external email + empty thread state.
+- **Messaging M0–M1:** Paginated lists (50/100), per-user `message_receipts`, server-side rules on insert, attachment allowlist SSOT, domain send service with `sender_user_id` + `client_message_id` idempotency, unified artist mailbox search helper, i18n for external email.
 - **Notification platform (Phase 1–3):** Unified `notifications` table + `emitNotification()` catalog for staff and artist in-app alerts. Migrated release/video submit, fan-page review queue, press assets, portal messages-to-label. Fan-page approve/reject, release/video decisions, statement available, invoice payment, journalist applications. Admin/portal bells, history centers (`/admin|portal/notifications`), and per-event preferences (`notification_preferences`, in-app mute respected by emit).
 - **Invite link validity:** Admin → System → Invites configures how long invite links stay valid (24h–7 days, default 7 days). Invite emails show the exact UTC expiry. Durable tokens in `user_invites`; accept via `/auth/invite`.
 - **Resend invite (users + artists):** Admin users list/detail and roster artists (linked but never signed in) can resend a **new** invite link; previous open invites are revoked.

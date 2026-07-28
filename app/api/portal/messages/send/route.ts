@@ -9,12 +9,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { ApiError, withErrorHandler } from '@/lib/errors'
-import { sendPortalMessage } from '@/lib/api/portalMessages'
 import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { getClientIp } from '@/lib/ipRateLimit'
 import { PORTAL_MESSAGE_SEND_RATE } from '@/lib/uploads/portalUploadLimits'
 import { emitNotification } from '@/lib/notifications'
+import { sendPortalDomainMessage } from '@/lib/messaging/send'
 
 const sendSchema = z.object({
   fromArtistId: z.string().uuid(),
@@ -23,6 +23,7 @@ const sendSchema = z.object({
   subject: z.string().min(1, 'Subject is required').max(500),
   body: z.string().max(50000),
   bodyHtml: z.string().max(200000).nullable().optional(),
+  clientMessageId: z.string().uuid().optional(),
 })
 
 const ROUTE = 'POST /api/portal/messages/send'
@@ -35,7 +36,15 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     throw new ApiError(400, message, 'VALIDATION_ERROR')
   }
 
-  const { fromArtistId, toArtistId, toLabel, subject, body: msgBody, bodyHtml } = parsed.data
+  const {
+    fromArtistId,
+    toArtistId,
+    toLabel,
+    subject,
+    body: msgBody,
+    bodyHtml,
+    clientMessageId,
+  } = parsed.data
   if (!toLabel && !toArtistId) {
     throw new ApiError(400, 'Either toArtistId or toLabel must be provided')
   }
@@ -64,21 +73,24 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     if (!targetArtist) throw new ApiError(404, 'Recipient artist not found')
   }
 
-  const { value: message } = await portalMemberWrite(
+  const { value: sendResult } = await portalMemberWrite(
     ctx,
     { route: ROUTE, table: 'portal_messages', operation: 'insert' },
     (db) =>
-      sendPortalMessage(db, {
+      sendPortalDomainMessage(db, {
         fromArtistId: ctx.artist.id,
         toArtistId: toArtistId ?? null,
         toLabel,
         subject,
         body: msgBody,
         bodyHtml: bodyHtml ?? null,
+        senderUserId: ctx.user.id,
+        clientMessageId: clientMessageId ?? null,
       }),
   )
+  const message = sendResult.message
 
-  if (toLabel) {
+  if (toLabel && !sendResult.duplicate) {
     const { data: artist } = await ctx.serviceDb
       .from('artists')
       .select('name')
@@ -96,5 +108,8 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     })
   }
 
-  return NextResponse.json({ message }, { status: 201 })
+  return NextResponse.json(
+    { message, duplicate: sendResult.duplicate },
+    { status: sendResult.duplicate ? 200 : 201 },
+  )
 })

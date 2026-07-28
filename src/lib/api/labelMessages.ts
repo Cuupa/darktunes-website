@@ -35,6 +35,8 @@ function rowToMessage(row: MessageRow): LabelMessage {
     isExternal: row.is_external,
     forwardedFrom: row.forwarded_from,
     hasAttachments: row.has_attachments,
+    senderUserId: row.sender_user_id,
+    clientMessageId: row.client_message_id,
   }
 }
 
@@ -122,10 +124,29 @@ export async function sendMessage(
   subject: string,
   body: string,
   bodyHtml?: string,
+  opts?: { senderUserId?: string | null; clientMessageId?: string | null },
 ): Promise<LabelMessage> {
-  const payload: MessageInsert = { artist_id: artistId, subject, body, body_html: bodyHtml ?? null }
+  const payload: MessageInsert = {
+    artist_id: artistId,
+    subject,
+    body,
+    body_html: bodyHtml ?? null,
+    sender_user_id: opts?.senderUserId ?? null,
+    client_message_id: opts?.clientMessageId ?? null,
+  }
   const { data, error } = await db.from('label_messages').insert(payload).select().single()
-  if (error) throw new Error(error.message)
+  if (error) {
+    // Unique client_message_id — return existing
+    if (error.code === '23505' && opts?.clientMessageId) {
+      const { data: existing } = await db
+        .from('label_messages')
+        .select('*')
+        .eq('client_message_id', opts.clientMessageId)
+        .maybeSingle()
+      if (existing) return rowToMessage(existing)
+    }
+    throw new Error(error.message)
+  }
   if (!data) throw new Error('No data returned from sendMessage')
   const message = rowToMessage(data)
 

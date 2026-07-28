@@ -48,6 +48,8 @@ function rowToMessage(row: MsgRow): PortalMessage {
     deletedAt: row.deleted_at,
     folderId: row.folder_id,
     hasAttachments: row.has_attachments,
+    senderUserId: row.sender_user_id,
+    clientMessageId: row.client_message_id,
   }
 }
 
@@ -298,6 +300,8 @@ export interface SendMessageOpts {
   subject: string
   body: string
   bodyHtml?: string | null
+  senderUserId?: string | null
+  clientMessageId?: string | null
 }
 
 /** Sends a new portal message. Returns the created message. */
@@ -314,11 +318,23 @@ export async function sendPortalMessage(
       subject: opts.subject,
       body: opts.body,
       body_html: opts.bodyHtml ?? null,
+      sender_user_id: opts.senderUserId ?? null,
+      client_message_id: opts.clientMessageId ?? null,
     })
     .select()
     .single()
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    if (error.code === '23505' && opts.clientMessageId) {
+      const { data: existing } = await db
+        .from('portal_messages')
+        .select('*')
+        .eq('client_message_id', opts.clientMessageId)
+        .maybeSingle()
+      if (existing) return rowToMessage(existing)
+    }
+    throw new Error(error.message)
+  }
   const message = rowToMessage(data)
 
   try {

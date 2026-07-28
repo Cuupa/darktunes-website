@@ -2612,6 +2612,11 @@ ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS sender_email    TEXT;
 ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS is_external     BOOLEAN     NOT NULL DEFAULT FALSE;
 ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS forwarded_from  UUID        REFERENCES public.label_messages (id) ON DELETE SET NULL;
 ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS has_attachments BOOLEAN     NOT NULL DEFAULT FALSE;
+ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS sender_user_id UUID REFERENCES auth.users (id) ON DELETE SET NULL;
+ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS client_message_id UUID;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_label_messages_client_message_id
+  ON public.label_messages (client_message_id)
+  WHERE client_message_id IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- TABLE: message_rules
@@ -5737,10 +5742,18 @@ CREATE TABLE IF NOT EXISTS public.portal_messages (
   deleted_at      TIMESTAMPTZ,
   folder_id       UUID        REFERENCES public.portal_message_folders (id) ON DELETE SET NULL,
   has_attachments BOOLEAN     NOT NULL DEFAULT FALSE,
+  sender_user_id  UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  client_message_id UUID,
   search_vector   TSVECTOR    GENERATED ALWAYS AS (
     to_tsvector('english', coalesce(subject,'') || ' ' || coalesce(body,''))
   ) STORED
 );
+
+ALTER TABLE public.portal_messages ADD COLUMN IF NOT EXISTS sender_user_id UUID REFERENCES auth.users (id) ON DELETE SET NULL;
+ALTER TABLE public.portal_messages ADD COLUMN IF NOT EXISTS client_message_id UUID;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_portal_messages_client_message_id
+  ON public.portal_messages (client_message_id)
+  WHERE client_message_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_portal_msg_from    ON public.portal_messages (from_artist_id, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_portal_msg_to      ON public.portal_messages (to_artist_id,   sent_at DESC);

@@ -224,6 +224,10 @@ export interface LabelMessage {
   forwardedFrom?: string | null
   /** True when the message has associated file attachments. */
   hasAttachments?: boolean
+  /** Auth user who sent on behalf of the label (when known). */
+  senderUserId?: string | null
+  /** Client-supplied idempotency id for send retries. */
+  clientMessageId?: string | null
 }
 
 export interface ArtistReply {
@@ -1048,6 +1052,8 @@ export interface PortalMessage {
   deletedAt: string | null
   folderId: string | null
   hasAttachments: boolean
+  senderUserId?: string | null
+  clientMessageId?: string | null
   /** Populated by the API layer — sender artist name */
   fromArtistName?: string
   /** Populated by the API layer — recipient artist name */

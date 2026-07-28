@@ -3396,6 +3396,8 @@ export interface Database {
           is_external: boolean
           forwarded_from: string | null
           has_attachments: boolean
+          sender_user_id: string | null
+          client_message_id: string | null
         }
         Insert: {
           id?: string
@@ -3413,6 +3415,8 @@ export interface Database {
           is_external?: boolean
           forwarded_from?: string | null
           has_attachments?: boolean
+          sender_user_id?: string | null
+          client_message_id?: string | null
         }
         Update: {
           id?: string
@@ -3430,6 +3434,8 @@ export interface Database {
           is_external?: boolean
           forwarded_from?: string | null
           has_attachments?: boolean
+          sender_user_id?: string | null
+          client_message_id?: string | null
         }
         Relationships: []
       }
@@ -4673,6 +4679,8 @@ export interface Database {
           deleted_at: string | null
           folder_id: string | null
           has_attachments: boolean
+          sender_user_id: string | null
+          client_message_id: string | null
           search_vector: string | null
         }
         Insert: {
@@ -4689,6 +4697,8 @@ export interface Database {
           deleted_at?: string | null
           folder_id?: string | null
           has_attachments?: boolean
+          sender_user_id?: string | null
+          client_message_id?: string | null
         }
         Update: {
           id?: string
@@ -4704,6 +4714,8 @@ export interface Database {
           deleted_at?: string | null
           folder_id?: string | null
           has_attachments?: boolean
+          sender_user_id?: string | null
+          client_message_id?: string | null
         }
         Relationships: [
           {

@@ -24,6 +24,8 @@
 | Per-user read | `message_receipts` via `upsertMessageReceipt`; pass `userId` into mark-read / badge counts |
 | Rules | `applyMessageRulesOnInsert` / `applyPortalMessageRulesOnInsert` after send (server-side) |
 | Attachments | `assertMessageAttachmentAllowed` + `isAllowedAttachmentUrl` before metadata insert |
+| Domain send | Prefer `src/lib/messaging/send.ts` (`sendLabelMessage`, `sendPortalDomainMessage`) — sets `sender_user_id` + optional `client_message_id` |
+| Unified search | `searchArtistMailbox` in `src/lib/messaging/search.ts` |
 
 ### TRACK Tour Planner (`/portal/tour-planner`)
 
