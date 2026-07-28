@@ -12,6 +12,9 @@ const DRIVE_ID_QUERY_RE = /[?&]id=([a-zA-Z0-9_-]+)/i
 export const COVER_ART_HOSTNAME_PATTERNS: RegExp[] = [
   /^drive\.google\.com$/,
   /^docs\.google\.com$/,
+  // Google moved Drive downloads to this host (uc?export=download redirects here)
+  /^drive\.usercontent\.google\.com$/,
+  /^[^.]+\.usercontent\.google\.com$/,
   /^[^.]+\.googleusercontent\.com$/,
   /^lh\d+\.googleusercontent\.com$/,
   // Cloudflare R2
