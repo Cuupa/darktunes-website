@@ -465,13 +465,13 @@ export function EventManager({ concerts, artistId, allArtists = [], newsPosts = 
           <div className="space-y-2">
             <div className="rounded-md overflow-hidden border border-border" style={{ height: 200 }}>
               <iframe
-                title="Venue map preview"
+                title={t('tour_map_preview')}
                 src={osmMapUrl}
                 width="100%"
                 height="200"
                 loading="lazy"
                 className="block"
-                aria-label="OpenStreetMap venue preview"
+                aria-label={t('tour_map_preview_aria')}
               />
             </div>
             <a
@@ -489,13 +489,13 @@ export function EventManager({ concerts, artistId, allArtists = [], newsPosts = 
         {osmMapUrl && (!form.venueLat || !form.venueLng) && (
           <div className="rounded-md overflow-hidden border border-border" style={{ height: 200 }}>
             <iframe
-              title="Venue map preview"
+              title={t('tour_map_preview')}
               src={osmMapUrl}
               width="100%"
               height="200"
               loading="lazy"
               className="block"
-              aria-label="OpenStreetMap venue preview"
+              aria-label={t('tour_map_preview_aria')}
             />
           </div>
         )}

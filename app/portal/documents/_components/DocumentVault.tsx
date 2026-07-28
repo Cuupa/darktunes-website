@@ -52,6 +52,9 @@ function formatBytes(bytes: number | undefined): string {
 }
 
 export function DocumentVault({ documents: initialDocuments, artistId }: DocumentVaultProps) {
+  const tToast = useTranslations('portal')
+
+
   const t = useTranslations('portal')
 
   const [documents, setDocuments] = useState<ArtistDocument[]>(initialDocuments)
@@ -77,9 +80,10 @@ export function DocumentVault({ documents: initialDocuments, artistId }: Documen
   }
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+
     const file = e.target.files?.[0]
     if (!file || !uploadLabel.trim()) {
-      toast.error('Please provide a label before uploading')
+      toast.error(tToast('toast_provide_label_before_upload'))
       return
     }
     setUploading(true)

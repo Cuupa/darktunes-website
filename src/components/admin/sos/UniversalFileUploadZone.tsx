@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
 
  * UniversalFileUploadZone
@@ -658,6 +659,9 @@ export function UniversalFileUploadZone({
   onAddAliases,
   csvProfiles = [],
 }: UniversalFileUploadZoneProps) {
+  const tToast = useTranslations('admin.toast')
+
+
   const [isDragging, setIsDragging] = useState(false)
   const [sizeWarning, setSizeWarning] = useState<string | null>(null)
   const [typeError, setTypeError] = useState<string | null>(null)
@@ -733,7 +737,7 @@ export function UniversalFileUploadZone({
     if (rejected > 0) {
       const msg = `${rejected} file${rejected !== 1 ? 's' : ''} rejected — only CSV and XLSX files are accepted.`
       setTypeError(msg)
-      toast.error('Invalid file type', { description: msg })
+      toast.error(tToast('invalid_file_type'), { description: msg })
       setTimeout(() => setTypeError(null), 6000)
     }
 
@@ -748,7 +752,7 @@ export function UniversalFileUploadZone({
     for (const file of acceptedFiles) {
       await routeFile(file)
     }
-  }, [routeFile])
+  }, [routeFile, tToast])
 
   // ── Drag & drop ────────────────────────────────────────────────────────────
 
@@ -818,10 +822,10 @@ export function UniversalFileUploadZone({
   )
 
   const handleMappingCancel = useCallback(() => {
-    toast.info('Import cancelled')
+    toast.info(tToast('import_cancelled'))
     setPendingFile(null)
     setPendingHeaders([])
-  }, [])
+  }, [tToast])
 
   // ── Combined file list (all sources) ─────────────────────────────────────
 

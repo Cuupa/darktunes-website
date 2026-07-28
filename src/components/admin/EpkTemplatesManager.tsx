@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * src/components/admin/EpkTemplatesManager.tsx
  *
@@ -42,6 +43,9 @@ function createBlankTemplateDocument() {
 }
 
 export function EpkTemplatesManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [templates, setTemplates] = useState<EpkTemplate[]>([])
   const [loading, setLoading] = useState(true)
@@ -77,17 +81,18 @@ export function EpkTemplatesManager() {
   }, [loadTemplates])
 
   const handleCreate = async (event: React.FormEvent) => {
+
     event.preventDefault()
     let documentJson: unknown
     try {
       documentJson = JSON.parse(form.documentJson)
     } catch {
-      toast.error('Invalid document JSON')
+      toast.error(tToast('invalid_document_json'))
       return
     }
     const parsed = safeParseEpkDocumentV2(documentJson)
     if (!parsed.success) {
-      toast.error('Invalid document JSON')
+      toast.error(tToast('invalid_document_json'))
       return
     }
 
@@ -117,7 +122,7 @@ export function EpkTemplatesManager() {
         isPublished: false,
         documentJson: JSON.stringify(createBlankTemplateDocument(), null, 2),
       })
-      toast.success('EPK template created')
+      toast.success(tToast('epk_template_created'))
       await loadTemplates()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Create failed')
@@ -150,6 +155,7 @@ export function EpkTemplatesManager() {
   }
 
   const handleDelete = async (id: string) => {
+
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error('Not authenticated')
@@ -159,7 +165,7 @@ export function EpkTemplatesManager() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       if (!res.ok) throw new Error('Delete failed')
-      toast.success('Template deleted')
+      toast.success(tToast('template_deleted'))
       await loadTemplates()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Delete failed')

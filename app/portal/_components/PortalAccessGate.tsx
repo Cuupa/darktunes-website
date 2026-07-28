@@ -1,11 +1,12 @@
+'use client'
+
 /**
  * app/portal/_components/PortalAccessGate.tsx — Client Component
  *
  * Shown to authenticated users without artist portal membership.
  */
 
-'use client'
-
+import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Lock, EnvelopeSimple, SignOut } from '@phosphor-icons/react'
@@ -18,12 +19,13 @@ interface PortalAccessGateProps {
 }
 
 export function PortalAccessGate({ role }: PortalAccessGateProps) {
+  const tToast = useTranslations('portal')
   const router = useRouter()
 
   const handleSignOut = async () => {
     const supabase = createBrowserSupabaseClient()
     await supabase.auth.signOut()
-    toast.success('Signed out')
+    toast.success(tToast('toast_signed_out'))
     router.push('/login')
     router.refresh()
   }
@@ -70,7 +72,7 @@ export function PortalAccessGate({ role }: PortalAccessGateProps) {
           </Link>
           <Button
             variant="outline"
-            onClick={handleSignOut}
+            onClick={() => void handleSignOut()}
             className="min-w-[44px] min-h-[44px]"
           >
             <SignOut size={16} className="mr-2" aria-hidden="true" />

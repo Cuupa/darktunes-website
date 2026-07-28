@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * Export / import the full SOS accounting settings bundle as JSON backup.
  */
@@ -38,6 +39,9 @@ export function WorkspaceManager({
   csvImportProfiles,
   onImport,
 }: WorkspaceManagerProps) {
+  const tToast = useTranslations('admin.toast')
+
+
   const fileRef = useRef<HTMLInputElement>(null)
 
   const handleExport = useCallback(() => {
@@ -66,12 +70,10 @@ export function WorkspaceManager({
     a.download = `darktunes-sos-workspace-${date}.json`
     a.click()
     URL.revokeObjectURL(url)
-    toast.success('Workspace exported successfully')
-  }, [
-    appDefaults, emailConfig, artistMappings, compilationFilters, splitFees,
+    toast.success(tToast('workspace_exported'))
+  }, [appDefaults, emailConfig, artistMappings, compilationFilters, splitFees,
     manualRevenues, expenses, ignoredEntries, csvAliases, trackRevenueAssignments,
-    labelInfo, pdfSettings, csvImportProfiles,
-  ])
+    labelInfo, pdfSettings, csvImportProfiles, tToast])
 
   const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -97,14 +99,14 @@ export function WorkspaceManager({
           pdfSettings: bundle.pdfSettings,
           csvImportProfiles: bundle.csvImportProfiles,
         })
-        toast.success('Workspace imported successfully')
+        toast.success(tToast('workspace_imported'))
       } catch {
-        toast.error('Failed to parse workspace file. Make sure it is a valid JSON export.')
+        toast.error(tToast('failed_parse_workspace'))
       }
       if (fileRef.current) fileRef.current.value = ''
     }
     reader.readAsText(file)
-  }, [onImport])
+  }, [onImport, tToast])
 
   const totalRules =
     artistMappings.length + compilationFilters.length + splitFees.length +

@@ -44,7 +44,9 @@ const ReleaseSubmissionsManager = lazy(() => import('./ReleaseSubmissionsManager
 const VideoSubmissionsManager = lazy(() => import('./VideoSubmissionsManager').then((m) => ({ default: m.VideoSubmissionsManager })))
 const FanPageReviewsManager = lazy(() => import('./FanPageReviewsManager').then((m) => ({ default: m.FanPageReviewsManager })))
 const SubmissionFormManager = lazy(() => import('./SubmissionFormManager').then((m) => ({ default: m.SubmissionFormManager })))
-const AdminConcertsManager = lazy(() => import('./AdminConcertsManager').then((m) => ({ default: m.AdminConcertsManager })))
+const AdminConcertsManagerEmbedded = lazy(() =>
+  import('./AdminConcertsManager').then((m) => ({ default: m.AdminConcertsManagerEmbedded })),
+)
 const MaintenanceManager = lazy(() => import('./MaintenanceManager').then((m) => ({ default: m.MaintenanceManager })))
 const GenresManager = lazy(() => import('./GenresManager').then((m) => ({ default: m.GenresManager })))
 const RolesManager = lazy(() => import('./RolesManager').then((m) => ({ default: m.RolesManager })))
@@ -134,6 +136,9 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ contentOnly = false, standalone = true }: AdminDashboardProps) {
+  const tToast = useTranslations('admin.toast')
+
+
   const t = useTranslations('admin')
   const { user, profile, signOut, loading: authLoading } = useAuthContext()
   const router = useRouter()
@@ -189,11 +194,12 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
   }, [router, searchParams, contentOnly])
 
   const handleSignOut = async () => {
+
     const { error } = await signOut()
     if (error) {
-      toast.error('Failed to sign out')
+      toast.error(tToast('failed_sign_out'))
     } else {
-      toast.success('Signed out successfully')
+      toast.success(tToast('signed_out_success'))
       if (standalone && (contentOnly || isEditor)) {
         router.push('/login')
       }
@@ -307,7 +313,7 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
               releases:        <ReleasesManager />,
               news:            <NewsManager />,
               videos:          <VideosManager />,
-              events:          <AdminConcertsManager />,
+              events:          <AdminConcertsManagerEmbedded />,
               genres:          <GenresManager />,
               assets:          <AssetsManager variant="embedded" />,
               accreditations:  <AccreditationsManager />,

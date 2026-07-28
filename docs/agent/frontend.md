@@ -59,6 +59,8 @@ Public images via `getOptimizedImageUrl` / `getSquareThumbnail` (`imageUtils.ts`
 
 `en.json` / `de.json`; type from English baseline. RSC loads dict → props to clients. Locale: cookie → Accept-Language → `de`. New strings: both JSON files + prop chain.
 
+**Enterprise contract (mandatory):** `npm run check:i18n` — en/de parity, static key existence, zero hardcoded `toast.*`/`confirm` in portal/admin, admin/editor must load `portal` bundle, residual UI hardcodes only via shrinkable baseline (`scripts/i18n-hardcode-baseline.json`). See [i18n-audit-notes.md](./i18n-audit-notes.md).
+
 ## Responsive layout
 
 Mobile-first; fluid widths (`w-full`, `max-w-*`); no hardcoded structural pixels. Skeletons match loaded layout (zero CLS). `truncate` / `break-words` for overflow.

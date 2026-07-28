@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * src/components/admin/MaintenanceManager.tsx
  *
@@ -85,6 +86,9 @@ type ConfirmDialog =
 // ---------------------------------------------------------------------------
 
 export function MaintenanceManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [loading, setLoading] = useState<LoadingKey | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>(null)
@@ -150,6 +154,7 @@ export function MaintenanceManager() {
   }
 
   async function handleCleanOrphaned() {
+
     setLoading('clean-orphaned')
     try {
       const token = await getBearerToken()
@@ -165,7 +170,7 @@ export function MaintenanceManager() {
       if (deleted > 0) {
         toast.success(`Deleted ${deleted} orphaned release(s)`)
       } else {
-        toast.info('No orphaned releases found')
+        toast.info(tToast('no_orphaned_releases'))
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to clean orphaned releases')
@@ -260,6 +265,7 @@ export function MaintenanceManager() {
   }
 
   async function handleRevalidateAll() {
+
     setLoading('revalidate-all')
     try {
       const res = await fetch('/api/revalidate-content', {
@@ -269,7 +275,7 @@ export function MaintenanceManager() {
         credentials: 'include',
       })
       if (!res.ok) throw new Error(`Request failed (${res.status})`)
-      toast.success('All caches revalidated')
+      toast.success(tToast('all_caches_revalidated'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to revalidate caches')
     } finally {
@@ -278,6 +284,7 @@ export function MaintenanceManager() {
   }
 
   async function handleRequeueSyncJobs() {
+
     setLoading('requeue-sync-jobs')
     try {
       const result = await callMaintenanceApi('/api/sync/requeue')
@@ -285,7 +292,7 @@ export function MaintenanceManager() {
       if (requeued > 0) {
         toast.success(`${requeued} failed sync job(s) re-queued`)
       } else {
-        toast.info('No failed sync jobs to re-queue')
+        toast.info(tToast('no_failed_sync_jobs'))
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to re-queue sync jobs')
@@ -296,6 +303,7 @@ export function MaintenanceManager() {
   }
 
   async function handleRevalidateSiteSettings() {
+
     setLoading('revalidate-site-settings')
     try {
       const res = await fetch('/api/revalidate-site-settings', {
@@ -303,7 +311,7 @@ export function MaintenanceManager() {
         credentials: 'include',
       })
       if (!res.ok) throw new Error(`Request failed (${res.status})`)
-      toast.success('Site settings cache revalidated')
+      toast.success(tToast('site_settings_cache_revalidated'))
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Failed to revalidate site settings',

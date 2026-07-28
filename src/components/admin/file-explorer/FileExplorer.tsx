@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Sidebar } from '@phosphor-icons/react'
@@ -33,6 +34,9 @@ export function FileExplorer({
   className?: string
   variant?: 'fill' | 'embedded'
 }) {
+  const tToast = useTranslations('admin.toast')
+
+
   const heightClass =
     variant === 'fill'
       ? 'h-full min-h-0 flex-1'
@@ -106,11 +110,11 @@ export function FileExplorer({
   ) => {
     try {
       await explorer.bulkPressAction(action, kitArtistId)
-      toast.success('Bulk press action completed')
+      toast.success(tToast('bulk_press_completed'))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Bulk action failed')
     }
-  }, [explorer])
+  }, [explorer, tToast])
 
   const handleSavePress = useCallback(async (assetId: string, draft: AssetPressDraft) => {
     await explorer.updateAsset(assetId, {
@@ -169,11 +173,11 @@ export function FileExplorer({
     if (!nextName) return
     try {
       await explorer.renameFolder(folderId, nextName)
-      toast.success('Folder renamed')
+      toast.success(tToast('folder_renamed'))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to rename folder')
     }
-  }, [explorer])
+  }, [explorer, tToast])
 
   const renameAsset = useCallback(async (assetId: string, name: string) => {
     const nextName = name.trim()
@@ -181,11 +185,11 @@ export function FileExplorer({
     if (!nextName) return
     try {
       await explorer.updateAsset(assetId, { originalFilename: nextName })
-      toast.success('File renamed')
+      toast.success(tToast('file_renamed'))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to rename file')
     }
-  }, [explorer])
+  }, [explorer, tToast])
 
   const deleteSelected = useCallback(async () => {
     const fileIds = [...explorer.selectedIds].filter((id) => !id.startsWith('folder:'))
@@ -203,11 +207,11 @@ export function FileExplorer({
 
       explorer.clearSelection()
       bumpStorageStats()
-      toast.success('Selection deleted')
+      toast.success(tToast('selection_deleted'))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Delete failed')
     }
-  }, [bumpStorageStats, explorer])
+  }, [bumpStorageStats, explorer, tToast])
 
   const handleAssetTags = useCallback((asset: Asset) => {
     setTagsAsset(asset)
@@ -217,20 +221,20 @@ export function FileExplorer({
     if (!tagsAsset) return
     try {
       await explorer.updateAsset(tagsAsset.id, { tags })
-      toast.success('Tags updated')
+      toast.success(tToast('tags_updated'))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to update tags')
     }
-  }, [explorer, tagsAsset])
+  }, [explorer, tagsAsset, tToast])
 
   const handleAssignArtists = useCallback(async (assetId: string, artistIds: string[]) => {
     try {
       await explorer.updateAsset(assetId, { artistIds })
-      toast.success('Artists assigned')
+      toast.success(tToast('artists_assigned'))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Assign failed')
     }
-  }, [explorer])
+  }, [explorer, tToast])
 
   const handleAssignRelease = useCallback(async (assetId: string, releaseId: string | null) => {
     try {
@@ -357,7 +361,7 @@ export function FileExplorer({
     onAssetRenameCommit: (assetId: string, name: string) => void renameAsset(assetId, name),
     onAssetDelete: (assetId: string) => handleContextAssetDelete(assetId),
     onAssetMove: (assetId: string, currentFolderId: string | null) => handleContextAssetMove(assetId, currentFolderId),
-    onAssetCopyUrl: (asset: Asset) => void navigator.clipboard.writeText(asset.publicUrl).then(() => toast.success('URL copied')),
+    onAssetCopyUrl: (asset: Asset) => void navigator.clipboard.writeText(asset.publicUrl).then(() => toast.success(tToast('url_copied'))),
     onAssetDownload: (asset: Asset) => window.open(asset.publicUrl, '_blank', 'noopener,noreferrer'),
     onAssetAssignArtists: (assetId: string, artistIds: string[]) => void handleAssignArtists(assetId, artistIds),
     onAssetAssignRelease: (assetId: string, releaseId: string | null) => void handleAssignRelease(assetId, releaseId),

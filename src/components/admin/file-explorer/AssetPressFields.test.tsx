@@ -102,7 +102,7 @@ describe('AssetPressFields', () => {
     expect(onAssetChange).toHaveBeenCalledWith(
       expect.objectContaining({ isPressApproved: true, pressSuggested: false }),
     )
-    expect(mockToastSuccess).toHaveBeenCalledWith('Marked as press photo')
+    expect(mockToastSuccess).toHaveBeenCalledWith('marked_as_press_photo')
   })
 
   it('saves edited metadata via onSave', async () => {
@@ -124,7 +124,7 @@ describe('AssetPressFields', () => {
         expect.objectContaining({ altText: 'New alt text', isPressApproved: true }),
       )
     })
-    expect(mockToastSuccess).toHaveBeenCalledWith('Press metadata saved')
+    expect(mockToastSuccess).toHaveBeenCalledWith('press_metadata_saved')
   })
 
   it('adds an approved asset to the label-wide press kit', async () => {
@@ -158,7 +158,7 @@ describe('AssetPressFields', () => {
         }),
       )
     })
-    expect(mockToastSuccess).toHaveBeenCalledWith('Added to press kit')
+    expect(mockToastSuccess).toHaveBeenCalledWith('added_to_press_kit')
   })
 
   it('shows an error when add-to-kit is attempted without auth', async () => {
@@ -175,7 +175,7 @@ describe('AssetPressFields', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
 
     await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith('Not authenticated')
+      expect(mockToastError).toHaveBeenCalledWith('not_authenticated')
     })
     expect(fetch).not.toHaveBeenCalled()
   })

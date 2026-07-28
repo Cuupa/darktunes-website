@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * src/components/admin/UserDetailPanel.tsx
  *
@@ -100,6 +101,9 @@ function isBanned(user: UserWithProfile): boolean {
 // ---------------------------------------------------------------------------
 
 export function UserDetailPanel() {
+  const tToast = useTranslations('admin.toast')
+
+
   const params = useParams()
   const router = useRouter()
   const userId = params['id'] as string
@@ -158,7 +162,7 @@ export function UserDetailPanel() {
       const { users } = (await usersRes.json()) as { users: UserWithProfile[] }
       const found = users.find((u) => u.id === userId)
       if (!found) {
-        toast.error('User not found')
+        toast.error(tToast('user_not_found'))
         router.push('/admin/users')
         return
       }
@@ -193,7 +197,7 @@ export function UserDetailPanel() {
     } finally {
       setIsLoading(false)
     }
-  }, [authHeaders, userId, router])
+  }, [authHeaders, userId, router, tToast])
 
   useEffect(() => { void load() }, [load])
 
@@ -249,6 +253,7 @@ export function UserDetailPanel() {
   }
 
   const saveCustomRoles = async () => {
+
     setIsMutating(true)
     try {
       const res = await fetch(`/api/admin/users/${userId}/custom-roles`, {
@@ -259,7 +264,7 @@ export function UserDetailPanel() {
       if (!res.ok) {
         throw new Error(((await res.json()) as { error?: string }).error ?? 'Failed to save custom roles')
       }
-      toast.success('Custom roles updated')
+      toast.success(tToast('custom_roles_updated'))
       setAssignedCustomRoleIds(pendingCustomRoleIds)
       setCustomRolesDirty(false)
     } catch (err) {
@@ -270,6 +275,7 @@ export function UserDetailPanel() {
   }
 
   const saveDisplayName = async () => {
+
     setIsMutating(true)
     try {
       const res = await fetch(`/api/admin/users/${userId}`, {
@@ -278,7 +284,7 @@ export function UserDetailPanel() {
         body: JSON.stringify({ displayName: displayNameValue.trim() || null }),
       })
       if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? 'Failed')
-      toast.success('Display name updated')
+      toast.success(tToast('display_name_updated'))
       await load()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update display name')
@@ -349,6 +355,7 @@ export function UserDetailPanel() {
   }
 
   const handleDelete = async () => {
+
     setIsMutating(true)
     try {
       const res = await fetch(`/api/admin/users/${userId}`, {
@@ -356,7 +363,7 @@ export function UserDetailPanel() {
         headers: await authHeaders(),
       })
       if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? 'Failed')
-      toast.success('User deleted')
+      toast.success(tToast('user_deleted'))
       router.push('/admin/users')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Delete failed')
@@ -366,6 +373,7 @@ export function UserDetailPanel() {
   }
 
   const handleLinkArtist = async () => {
+
     if (!linkArtistId) return
     setIsMutating(true)
     try {
@@ -375,7 +383,7 @@ export function UserDetailPanel() {
         body: JSON.stringify({ artistId: linkArtistId, memberRole: linkMemberRole }),
       })
       if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? 'Failed')
-      toast.success('Artist linked')
+      toast.success(tToast('artist_linked'))
       await load()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Link failed')
@@ -387,6 +395,7 @@ export function UserDetailPanel() {
   }
 
   const handleUnlinkArtist = async (artistId: string) => {
+
     setIsMutating(true)
     try {
       const res = await fetch(`/api/admin/users/${userId}/link-artist`, {
@@ -395,7 +404,7 @@ export function UserDetailPanel() {
         body: JSON.stringify({ artistId, remove: true }),
       })
       if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? 'Failed')
-      toast.success('Artist unlinked')
+      toast.success(tToast('artist_unlinked'))
       await load()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Unlink failed')

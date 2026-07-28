@@ -1,4 +1,6 @@
 'use client'
+
+import { useTranslations } from 'next-intl'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useForm, Controller, useFieldArray } from 'react-hook-form'
@@ -181,6 +183,9 @@ function Field({ id, label, error, children }: FieldProps) {
 // ---------------------------------------------------------------------------
 
 export function SiteSettingsManager({ value: settings, onChange: saveSettings, isLoading }: AdminPanelProps<SiteSettings>) {
+  const tToast = useTranslations('admin.toast')
+
+
   const {
     register,
     handleSubmit,
@@ -279,7 +284,7 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
       if (!res.ok) throw new Error(`Upload failed: ${await res.text()}`)
       const json = await res.json() as { publicUrl: string }
       setValue(fieldName, json.publicUrl, { shouldDirty: true })
-      toast.success('File uploaded successfully')
+      toast.success(tToast('file_uploaded_success'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Upload failed')
     } finally {
@@ -294,11 +299,12 @@ export function SiteSettingsManager({ value: settings, onChange: saveSettings, i
   }, [settings, reset])
 
   const onSubmit = async (data: FormData) => {
+
     try {
       // Merge form data with current settings so fields not rendered in this
       // form (featureToggles, rolePermissions) are never silently overwritten.
       await saveSettings({ ...settings, ...data, homepageSectionOrder: sectionOrder } as SiteSettings)
-      toast.success('Site settings saved successfully')
+      toast.success(tToast('site_settings_saved'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save settings')
     }

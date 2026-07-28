@@ -1,4 +1,6 @@
 'use client'
+
+import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -10,6 +12,9 @@ import { toast } from 'sonner'
 import { SignIn, User } from '@phosphor-icons/react'
 
 export function LoginForm() {
+  const tToast = useTranslations('admin.toast')
+
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -18,6 +23,7 @@ export function LoginForm() {
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
+
     e.preventDefault()
     setIsLoading(true)
 
@@ -29,14 +35,14 @@ export function LoginForm() {
       if (error) {
         toast.error(error.message)
       } else if (mode === 'signin') {
-        toast.success('Welcome back!')
+        toast.success(tToast('welcome_back'))
         router.refresh()
         router.push('/admin')
       } else {
-        toast.success('Account created successfully!')
+        toast.success(tToast('account_created'))
       }
     } catch {
-      toast.error('An unexpected error occurred')
+      toast.error(tToast('unexpected_error'))
     } finally {
       setIsLoading(false)
     }

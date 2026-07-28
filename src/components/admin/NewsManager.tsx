@@ -1,4 +1,6 @@
 'use client'
+
+import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -54,6 +56,9 @@ const STATUS_BADGE: Record<NewsPost['status'], { label: string; className: strin
 }
 
 export function NewsManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const router = useRouter()
   const cms = useCmsPaths()
   const { news, isLoading, createNewsPost, updateNewsPost, deleteNewsPost } = useNews()
@@ -176,6 +181,7 @@ export function NewsManager() {
   }
 
   const handleDuplicate = async (post: NewsPost) => {
+
     try {
       const timestamp = Date.now()
       await createNewsPost({
@@ -189,7 +195,7 @@ export function NewsManager() {
         featured: false,
         published_at: new Date().toISOString(),
       })
-      toast.success('Post duplicated as draft')
+      toast.success(tToast('post_duplicated_draft'))
       router.push(cms.newsList)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Duplicate failed')

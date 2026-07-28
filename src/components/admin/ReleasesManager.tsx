@@ -159,6 +159,9 @@ function formDataToInsert(data: ReleaseFormData): ReleaseInsert {
 }
 
 export function ReleasesManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const { releases, isLoading, isSyncing, syncProgress, createRelease, updateRelease, deleteRelease, syncAllReleases } = useReleases()
@@ -310,20 +313,23 @@ export function ReleasesManager() {
         } else {
           setSyncResult(outcome.legacyResult)
           toast.warning(
-            `Sync completed with ${outcome.legacyResult.totalErrors} error(s). ${totalSynced} item(s) synced. Click "View Errors" to see details.`,
+            tToast('sync_completed_with_errors', {
+              errors: outcome.legacyResult.totalErrors,
+              synced: totalSynced,
+            }),
             { duration: 8000 },
           )
         }
         return
       }
       if (outcome.drained) {
-        toast.success(
-          'Sync queue finished. Admin list reloaded and public cache revalidated.',
-        )
+        toast.success(tToast('sync_queue_finished'))
         return
       }
       toast.info(
-        `Sync still running in the background (${outcome.pending + outcome.running} job(s) left). List reloaded with current data; cron will finish the rest.`,
+        tToast('sync_still_running', {
+          count: outcome.pending + outcome.running,
+        }),
         { duration: 8000 },
       )
     } catch (err) {
@@ -332,6 +338,7 @@ export function ReleasesManager() {
   }
 
   const handleCleanupOrphaned = async () => {
+
     setIsCleaningUp(true)
     try {
       const {
@@ -355,7 +362,7 @@ export function ReleasesManager() {
       if (deleted > 0) {
         toast.success(`Deleted ${deleted} orphaned release(s)`)
       } else {
-        toast.info('No orphaned releases found')
+        toast.info(tToast('no_orphaned_releases'))
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
@@ -531,6 +538,7 @@ export function ReleasesManager() {
   }
 
   const handleMarkAllDone = async () => {
+
     const pending = checklistItems.filter((i) => !i.isCompleted)
     if (pending.length === 0) return
     try {
@@ -541,7 +549,7 @@ export function ReleasesManager() {
           return found ?? i
         }),
       )
-      toast.success('All checklist items marked as done')
+      toast.success(tToast('all_checklist_done'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     }

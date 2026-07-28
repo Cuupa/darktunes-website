@@ -41,6 +41,9 @@ function secretMaskStyle(hidden: boolean): CSSProperties | undefined {
 }
 
 export function ApiCredentialsManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const t = useTranslations('admin.apiKeys')
   const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
@@ -74,6 +77,7 @@ export function ApiCredentialsManager() {
   }, [fetchCredentials, tErrors])
 
   const saveCredential = async (key: string) => {
+
     const value = drafts[key] ?? ''
     setSavingKey(key)
     try {
@@ -101,7 +105,7 @@ export function ApiCredentialsManager() {
         delete next[key]
         return next
       })
-      toast.success('Credential saved')
+      toast.success(tToast('credential_saved'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
@@ -110,6 +114,7 @@ export function ApiCredentialsManager() {
   }
 
   const clearCredential = async (key: string) => {
+
     setSavingKey(key)
     try {
       const {
@@ -131,7 +136,7 @@ export function ApiCredentialsManager() {
         delete next[key]
         return next
       })
-      toast.success('Credential cleared')
+      toast.success(tToast('credential_cleared'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
