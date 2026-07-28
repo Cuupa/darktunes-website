@@ -918,6 +918,8 @@ export interface ReleaseSubmission {
   adminReplyAt: string | null
   /** Catalog release created from this submission (draft), if any */
   releaseId?: string | null
+  /** Admin list enrichment (not a DB column). */
+  artistName?: string | null
   createdAt: string
   updatedAt: string
 }
