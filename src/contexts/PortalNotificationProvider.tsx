@@ -74,13 +74,15 @@ export function PortalNotificationProvider({
     let isMounted = true
 
     const refreshBadges = () => {
-      void getPortalBadgeCounts(supabase, artistId)
-        .then((counts) => {
-          if (isMounted) setBadges(counts)
-        })
-        .catch(() => {
-          // non-fatal
-        })
+      void supabase.auth.getUser().then(({ data: { user } }) => {
+        void getPortalBadgeCounts(supabase, artistId, user?.id)
+          .then((counts) => {
+            if (isMounted) setBadges(counts)
+          })
+          .catch(() => {
+            // non-fatal
+          })
+      })
     }
 
     const channel = supabase

@@ -288,7 +288,10 @@ export function PortalMailbox({ artistId, artists: _artists, initialMessages = [
     )
     setUnreadCount((count) => Math.max(0, count - 1))
     try {
-      await markMessageRead(supabase, messageId)
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      await markMessageRead(supabase, messageId, user?.id)
     } catch {
       // non-fatal
     }

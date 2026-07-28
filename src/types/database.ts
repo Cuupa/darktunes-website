@@ -3328,6 +3328,84 @@ export interface Database {
         }
         Relationships: []
       }
+      message_receipts: {
+        Row: {
+          message_source: string
+          message_id: string
+          user_id: string
+          read_at: string
+        }
+        Insert: {
+          message_source: string
+          message_id: string
+          user_id: string
+          read_at?: string
+        }
+        Update: {
+          message_source?: string
+          message_id?: string
+          user_id?: string
+          read_at?: string
+        }
+        Relationships: []
+      }
+      message_internal_notes: {
+        Row: {
+          id: string
+          message_source: string
+          message_id: string
+          author_user_id: string
+          body: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          message_source: string
+          message_id: string
+          author_user_id: string
+          body: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          message_source?: string
+          message_id?: string
+          author_user_id?: string
+          body?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      message_events: {
+        Row: {
+          id: string
+          message_source: string
+          message_id: string
+          actor_user_id: string | null
+          event_type: string
+          payload: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          message_source: string
+          message_id: string
+          actor_user_id?: string | null
+          event_type: string
+          payload?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          message_source?: string
+          message_id?: string
+          actor_user_id?: string | null
+          event_type?: string
+          payload?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
       message_attachments: {
         Row: {
           id: string
@@ -3375,6 +3453,8 @@ export interface Database {
           is_external: boolean
           forwarded_from: string | null
           has_attachments: boolean
+          sender_user_id: string | null
+          client_message_id: string | null
         }
         Insert: {
           id?: string
@@ -3392,6 +3472,8 @@ export interface Database {
           is_external?: boolean
           forwarded_from?: string | null
           has_attachments?: boolean
+          sender_user_id?: string | null
+          client_message_id?: string | null
         }
         Update: {
           id?: string
@@ -3409,6 +3491,8 @@ export interface Database {
           is_external?: boolean
           forwarded_from?: string | null
           has_attachments?: boolean
+          sender_user_id?: string | null
+          client_message_id?: string | null
         }
         Relationships: []
       }
@@ -4652,6 +4736,11 @@ export interface Database {
           deleted_at: string | null
           folder_id: string | null
           has_attachments: boolean
+          sender_user_id: string | null
+          client_message_id: string | null
+          assignee_user_id: string | null
+          priority: string
+          tags: string[]
           search_vector: string | null
         }
         Insert: {
@@ -4668,6 +4757,11 @@ export interface Database {
           deleted_at?: string | null
           folder_id?: string | null
           has_attachments?: boolean
+          sender_user_id?: string | null
+          client_message_id?: string | null
+          assignee_user_id?: string | null
+          priority?: string
+          tags?: string[]
         }
         Update: {
           id?: string
@@ -4683,6 +4777,11 @@ export interface Database {
           deleted_at?: string | null
           folder_id?: string | null
           has_attachments?: boolean
+          sender_user_id?: string | null
+          client_message_id?: string | null
+          assignee_user_id?: string | null
+          priority?: string
+          tags?: string[]
         }
         Relationships: [
           {

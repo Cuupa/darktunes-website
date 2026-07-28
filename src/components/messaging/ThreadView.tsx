@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { sanitizeHtml as sanitizeHtmlSafe } from '@/lib/sanitizeHtml'
 import { StarFour } from '@phosphor-icons/react'
 import { motion, useReducedMotion } from 'framer-motion'
@@ -37,6 +38,7 @@ export function ThreadView({
   selectedIds,
   onToggleSelect,
 }: ThreadViewProps) {
+  const t = useTranslations('admin.messages')
   const prefersReducedMotion = useReducedMotion()
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -74,7 +76,11 @@ export function ThreadView({
   }, [artistNameById, messages])
 
   if (messages.length === 0) {
-    return <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">No messages found.</div>
+    return (
+      <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
+        {t('empty')}
+      </div>
+    )
   }
 
   return (

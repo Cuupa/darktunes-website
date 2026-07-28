@@ -795,6 +795,14 @@
     "statusBlockedDuplicate": "Duplicate",
     "statusBlockedUnconfigured": "Not sent"
   },
+  "messages": {
+    "external_button": "External Email",
+    "external_recipient_required": "Recipient is required.",
+    "external_subject_required": "Subject is required.",
+    "external_body_required": "Message body is required.",
+    "external_sent": "Email sent to {email}",
+    "empty": "No messages found."
+  },
   "notifications": {
     "title": "Notifications",
     "empty": "No notifications yet.",

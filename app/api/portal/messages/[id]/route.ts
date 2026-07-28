@@ -110,7 +110,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
     await portalMemberWrite(
       ctx,
       { route: ROUTE, table: 'portal_messages', operation: 'update' },
-      (db) => markPortalMessageRead(db, messageId),
+      (db) => markPortalMessageRead(db, messageId, ctx.user.id),
     )
   }
   if (folderId !== undefined) {
