@@ -1054,10 +1054,33 @@ export interface PortalMessage {
   hasAttachments: boolean
   senderUserId?: string | null
   clientMessageId?: string | null
+  /** Staff assignee for shared inbox (artist → label). */
+  assigneeUserId?: string | null
+  priority?: 'low' | 'normal' | 'high' | 'urgent' | string
+  tags?: string[]
   /** Populated by the API layer — sender artist name */
   fromArtistName?: string
   /** Populated by the API layer — recipient artist name */
   toArtistName?: string
+}
+
+export interface MessageInternalNote {
+  id: string
+  messageSource: 'label' | 'portal'
+  messageId: string
+  authorUserId: string
+  body: string
+  createdAt: string
+}
+
+export interface MessageEvent {
+  id: string
+  messageSource: 'label' | 'portal'
+  messageId: string
+  actorUserId: string | null
+  eventType: string
+  payload: Record<string, unknown>
+  createdAt: string
 }
 
 export interface PortalMessageFolder {

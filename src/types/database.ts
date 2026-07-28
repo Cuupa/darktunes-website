@@ -3349,6 +3349,63 @@ export interface Database {
         }
         Relationships: []
       }
+      message_internal_notes: {
+        Row: {
+          id: string
+          message_source: string
+          message_id: string
+          author_user_id: string
+          body: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          message_source: string
+          message_id: string
+          author_user_id: string
+          body: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          message_source?: string
+          message_id?: string
+          author_user_id?: string
+          body?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      message_events: {
+        Row: {
+          id: string
+          message_source: string
+          message_id: string
+          actor_user_id: string | null
+          event_type: string
+          payload: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          message_source: string
+          message_id: string
+          actor_user_id?: string | null
+          event_type: string
+          payload?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          message_source?: string
+          message_id?: string
+          actor_user_id?: string | null
+          event_type?: string
+          payload?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
       message_attachments: {
         Row: {
           id: string
@@ -4681,6 +4738,9 @@ export interface Database {
           has_attachments: boolean
           sender_user_id: string | null
           client_message_id: string | null
+          assignee_user_id: string | null
+          priority: string
+          tags: string[]
           search_vector: string | null
         }
         Insert: {
@@ -4699,6 +4759,9 @@ export interface Database {
           has_attachments?: boolean
           sender_user_id?: string | null
           client_message_id?: string | null
+          assignee_user_id?: string | null
+          priority?: string
+          tags?: string[]
         }
         Update: {
           id?: string
@@ -4716,6 +4779,9 @@ export interface Database {
           has_attachments?: boolean
           sender_user_id?: string | null
           client_message_id?: string | null
+          assignee_user_id?: string | null
+          priority?: string
+          tags?: string[]
         }
         Relationships: [
           {

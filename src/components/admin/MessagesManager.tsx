@@ -59,6 +59,7 @@ import { FolderTree, type FolderSelection } from '@/components/messaging/FolderT
 import { MessageRulesManager } from '@/components/messaging/MessageRulesManager'
 import { ExternalEmailComposer } from '@/components/messaging/ExternalEmailComposer'
 import { AttachmentViewer } from '@/components/messaging/AttachmentViewer'
+import { SharedInboxPanel } from '@/components/messaging/SharedInboxPanel'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { sanitizeHtml as sanitizeHtmlSafe } from '@/lib/sanitizeHtml'
 
@@ -89,6 +90,11 @@ function rowToPortalMessage(row: PortalMessageRow): PortalMessage {
     deletedAt: row.deleted_at,
     folderId: row.folder_id,
     hasAttachments: row.has_attachments,
+    senderUserId: row.sender_user_id,
+    clientMessageId: row.client_message_id,
+    assigneeUserId: row.assignee_user_id,
+    priority: row.priority,
+    tags: row.tags ?? [],
   }
 }
 
@@ -614,6 +620,8 @@ export function MessagesManager() {
                         </div>
                         <p className="text-xs text-muted-foreground truncate">
                           {artist?.name ?? 'Unknown artist'}
+                          {msg.assigneeUserId ? ' · claimed' : ''}
+                          {msg.priority && msg.priority !== 'normal' ? ` · ${msg.priority}` : ''}
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-1 shrink-0">
@@ -737,6 +745,16 @@ export function MessagesManager() {
               ) : (
                 <p className="text-sm whitespace-pre-wrap">{selectedFromArtistMessage.body}</p>
               )}
+              <SharedInboxPanel
+                message={selectedFromArtistMessage}
+                accessToken={session?.access_token}
+                currentUserId={session?.user?.id}
+                onMessageUpdated={(next) => {
+                  setFromArtistMessages((cur) =>
+                    cur.map((m) => (m.id === next.id ? { ...m, ...next } : m)),
+                  )
+                }}
+              />
               <div className="mt-6">
                 <Separator className="mb-4" />
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">

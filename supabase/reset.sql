@@ -2911,6 +2911,8 @@ ALTER TABLE public.message_folders       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_rules         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_attachments   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_receipts      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_internal_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_events        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.journalist_downloads  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.accreditation_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.editor_activity_log   ENABLE ROW LEVEL SECURITY;
@@ -4039,6 +4041,34 @@ CREATE POLICY "message_receipts: own all" ON public.message_receipts
 
 CREATE POLICY "message_receipts: admin read" ON public.message_receipts
   FOR SELECT USING (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: message_internal_notes (staff only)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "message_internal_notes: admin all" ON public.message_internal_notes;
+DROP POLICY IF EXISTS "message_internal_notes: editor read write" ON public.message_internal_notes;
+
+CREATE POLICY "message_internal_notes: admin all" ON public.message_internal_notes
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+CREATE POLICY "message_internal_notes: editor read write" ON public.message_internal_notes
+  FOR ALL USING (public.get_my_role() = 'editor')
+  WITH CHECK (public.get_my_role() = 'editor');
+
+-- ---------------------------------------------------------------------------
+-- RLS: message_events (staff read; insert via service role or staff)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "message_events: admin all" ON public.message_events;
+DROP POLICY IF EXISTS "message_events: editor insert read" ON public.message_events;
+
+CREATE POLICY "message_events: admin all" ON public.message_events
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+CREATE POLICY "message_events: editor insert read" ON public.message_events
+  FOR ALL USING (public.get_my_role() = 'editor')
+  WITH CHECK (public.get_my_role() = 'editor');
 
 -- ---------------------------------------------------------------------------
 -- RLS: journalist_downloads
@@ -5751,9 +5781,43 @@ CREATE TABLE IF NOT EXISTS public.portal_messages (
 
 ALTER TABLE public.portal_messages ADD COLUMN IF NOT EXISTS sender_user_id UUID REFERENCES auth.users (id) ON DELETE SET NULL;
 ALTER TABLE public.portal_messages ADD COLUMN IF NOT EXISTS client_message_id UUID;
+ALTER TABLE public.portal_messages ADD COLUMN IF NOT EXISTS assignee_user_id UUID REFERENCES auth.users (id) ON DELETE SET NULL;
+ALTER TABLE public.portal_messages ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'normal';
+ALTER TABLE public.portal_messages ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_portal_messages_client_message_id
   ON public.portal_messages (client_message_id)
   WHERE client_message_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_portal_messages_assignee
+  ON public.portal_messages (assignee_user_id)
+  WHERE assignee_user_id IS NOT NULL;
+
+-- Staff-only internal notes on a message (label or portal source)
+CREATE TABLE IF NOT EXISTS public.message_internal_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_source TEXT NOT NULL CHECK (message_source IN ('label', 'portal')),
+  message_id UUID NOT NULL,
+  author_user_id UUID NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_message_internal_notes_msg
+  ON public.message_internal_notes (message_source, message_id, created_at DESC);
+
+-- Audit trail for message ops (claim, read, delete, export, …)
+CREATE TABLE IF NOT EXISTS public.message_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_source TEXT NOT NULL CHECK (message_source IN ('label', 'portal')),
+  message_id UUID NOT NULL,
+  actor_user_id UUID REFERENCES auth.users (id) ON DELETE SET NULL,
+  event_type TEXT NOT NULL,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_message_events_msg
+  ON public.message_events (message_source, message_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_message_events_actor
+  ON public.message_events (actor_user_id, created_at DESC)
+  WHERE actor_user_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_portal_msg_from    ON public.portal_messages (from_artist_id, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_portal_msg_to      ON public.portal_messages (to_artist_id,   sent_at DESC);

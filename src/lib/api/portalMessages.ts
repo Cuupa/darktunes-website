@@ -50,6 +50,9 @@ function rowToMessage(row: MsgRow): PortalMessage {
     hasAttachments: row.has_attachments,
     senderUserId: row.sender_user_id,
     clientMessageId: row.client_message_id,
+    assigneeUserId: row.assignee_user_id,
+    priority: row.priority,
+    tags: row.tags ?? [],
   }
 }
 
