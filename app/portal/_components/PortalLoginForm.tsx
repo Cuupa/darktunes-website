@@ -17,6 +17,9 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { MusicNote, GoogleLogo, SpotifyLogo, Warning } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { PASSWORD_MIN_LENGTH } from '@/lib/auth/passwordPolicy'
+import { PasswordRequirements } from '@/components/auth/PasswordRequirements'
+import { getLocalizedPasswordPairError } from '@/components/auth/passwordPolicyUi'
 
 export function PortalLoginForm() {
   const t = useTranslations('portal')
@@ -35,13 +38,9 @@ export function PortalLoginForm() {
     setIsLoading(true)
 
     if (mode === 'register') {
-      if (password.length < 8) {
-        toast.error(t('register_password_too_short'))
-        setIsLoading(false)
-        return
-      }
-      if (password !== passwordConfirm) {
-        toast.error(t('register_password_mismatch'))
+      const policyError = getLocalizedPasswordPairError(password, passwordConfirm, (key) => t(key))
+      if (policyError) {
+        toast.error(policyError)
         setIsLoading(false)
         return
       }
@@ -157,9 +156,30 @@ export function PortalLoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={isRegister ? PASSWORD_MIN_LENGTH : undefined}
+                autoComplete={isRegister ? 'new-password' : 'current-password'}
                 disabled={isLoading}
                 className="bg-muted border-border"
               />
+              {isRegister && (
+                <PasswordRequirements
+                  password={password}
+                  heading={t('password_policy_heading')}
+                  labelFor={(id, fallback) => {
+                    const key = `password_req_${id}` as
+                      | 'password_req_length'
+                      | 'password_req_upper'
+                      | 'password_req_lower'
+                      | 'password_req_digit'
+                      | 'password_req_special'
+                    try {
+                      return t(key)
+                    } catch {
+                      return fallback
+                    }
+                  }}
+                />
+              )}
             </div>
             {isRegister && (
               <div className="space-y-2">
@@ -171,6 +191,8 @@ export function PortalLoginForm() {
                   value={passwordConfirm}
                   onChange={(e) => setPasswordConfirm(e.target.value)}
                   required
+                  minLength={PASSWORD_MIN_LENGTH}
+                  autoComplete="new-password"
                   disabled={isLoading}
                   className="bg-muted border-border"
                 />

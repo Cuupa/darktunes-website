@@ -365,6 +365,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "tour_tasks",
   "tours",
   "user_custom_roles",
+  "user_invites",
   "user_roles",
   "users",
   "video_submissions",

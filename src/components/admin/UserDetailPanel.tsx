@@ -306,6 +306,26 @@ export function UserDetailPanel() {
     }
   }
 
+  /** Re-issues a new invite link (revokes the previous one) for users who never signed in. */
+  const resendInvite = async () => {
+    if (!user?.email || user.last_sign_in_at) return
+    setIsMutating(true)
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/resend-invite`, {
+        method: 'POST',
+        headers: await authHeaders(),
+      })
+      if (!res.ok) {
+        throw new Error(((await res.json()) as { error?: string }).error ?? 'Failed')
+      }
+      toast.success(`New invite link sent to ${user.email}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to resend invite')
+    } finally {
+      setIsMutating(false)
+    }
+  }
+
   const handleBanToggle = async () => {
     if (!user) return
     const newBan = !isBanned(user)
@@ -479,15 +499,28 @@ export function UserDetailPanel() {
               </div>
             )}
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void sendPasswordReset()}
-            disabled={isMutating || banned || !user.email}
-          >
-            Send password reset email
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {!user.last_sign_in_at && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void resendInvite()}
+                disabled={isMutating || banned || !user.email}
+              >
+                Resend invite (new link)
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void sendPasswordReset()}
+              disabled={isMutating || banned || !user.email}
+            >
+              Send password reset email
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

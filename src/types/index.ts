@@ -654,6 +654,12 @@ export interface SiteSettings {
    * backward compatibility.
    */
   themeConfig?: import('@/config/themeConfig').ThemeConfig
+  /**
+   * How long admin invite links remain valid (hours).
+   * Min 24, max 168 (7 days). Default 168.
+   * Stored as site_settings.invite_link_expiry_hours.
+   */
+  inviteLinkExpiryHours: number
 }
 
 // ── Messaging ──────────────────────────────────────────────────────────────

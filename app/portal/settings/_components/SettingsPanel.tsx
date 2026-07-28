@@ -9,6 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { updatePortalPassword } from '../_actions/updatePassword'
+import { PASSWORD_MIN_LENGTH } from '@/lib/auth/passwordPolicy'
+import { PasswordRequirements } from '@/components/auth/PasswordRequirements'
+import { getLocalizedPasswordPairError } from '@/components/auth/passwordPolicyUi'
 
 interface SettingsPanelProps {
   email: string
@@ -51,13 +54,9 @@ export function SettingsPanel({ email, displayName: initialDisplayName }: Settin
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (newPassword.length < 8) {
-      toast.error(t('settings_password_too_short'))
-      return
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast.error(t('settings_password_mismatch'))
+    const policyError = getLocalizedPasswordPairError(newPassword, confirmPassword, (key) => t(key))
+    if (policyError) {
+      toast.error(policyError)
       return
     }
 
@@ -131,8 +130,26 @@ export function SettingsPanel({ email, displayName: initialDisplayName }: Settin
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
+                autoComplete="new-password"
                 required
+              />
+              <PasswordRequirements
+                password={newPassword}
+                heading={t('password_policy_heading')}
+                labelFor={(id, fallback) => {
+                  const key = `password_req_${id}` as
+                    | 'password_req_length'
+                    | 'password_req_upper'
+                    | 'password_req_lower'
+                    | 'password_req_digit'
+                    | 'password_req_special'
+                  try {
+                    return t(key)
+                  } catch {
+                    return fallback
+                  }
+                }}
               />
             </div>
             <div className="space-y-2">
@@ -142,7 +159,8 @@ export function SettingsPanel({ email, displayName: initialDisplayName }: Settin
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                minLength={8}
+                minLength={PASSWORD_MIN_LENGTH}
+                autoComplete="new-password"
                 required
               />
             </div>

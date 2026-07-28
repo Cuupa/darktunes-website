@@ -13,6 +13,10 @@ import {
   buildDefaultSeoDescription,
   readTenantBootstrap,
 } from '@/lib/brand/tenantDefaults'
+import {
+  INVITE_LINK_EXPIRY_HOURS_DEFAULT,
+  normalizeInviteLinkExpiryHours,
+} from '@/lib/auth/inviteLinkExpiry'
 
 type DbClient = SupabaseClient<Database>
 
@@ -111,6 +115,7 @@ function createSiteSettingsDefaults(): SiteSettings {
   themeGradientAccentFrom: '',
   themeGradientAccentTo: '',
   themeGradientAccentDir: '135deg',
+  inviteLinkExpiryHours: INVITE_LINK_EXPIRY_HOURS_DEFAULT,
   }
 }
 
@@ -282,6 +287,9 @@ function rowsToSettings(rows: { key: string; value: string }[]): SiteSettings {
     themeGradientAccentFrom: map['theme_gradient_accent_from'] ?? '',
     themeGradientAccentTo: map['theme_gradient_accent_to'] ?? '',
     themeGradientAccentDir: map['theme_gradient_accent_dir'] ?? '135deg',
+    inviteLinkExpiryHours: normalizeInviteLinkExpiryHours(
+      map['invite_link_expiry_hours'] ?? SITE_SETTINGS_DEFAULTS.inviteLinkExpiryHours,
+    ),
     themeConfig: parseThemeConfig(map['theme_config'] ?? null) ?? themeConfigFromFlatFields({
       themePrimary: map['theme_primary'],
       themeSecondary: map['theme_secondary'],

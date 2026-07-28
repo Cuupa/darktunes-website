@@ -121,6 +121,7 @@ describe('SiteSettings interface', () => {
     concertsLinkToPage: false,
     carouselAutoplayMs: 0,
     featureToggles: { promoPool: true, editorTools: true },
+    inviteLinkExpiryHours: 168,
   }
 
   it('can construct a valid SiteSettings object', () => {
