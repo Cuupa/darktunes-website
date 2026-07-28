@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { DateField } from '@/components/ui/date-field'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import type { ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
@@ -196,16 +197,13 @@ export function InvoiceForm({
                 onChange={(event) => setArtistInvoiceNumber(event.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="invoice-due-date">{t('invoice_due_date')}</Label>
-              <Input
-                id="invoice-due-date"
-                type="date"
-                required
-                value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
-              />
-            </div>
+            <DateField
+              id="invoice-due-date"
+              label={t('invoice_due_date')}
+              required
+              value={dueDate}
+              onChange={setDueDate}
+            />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

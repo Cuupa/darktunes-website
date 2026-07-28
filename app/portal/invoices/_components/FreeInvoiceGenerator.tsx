@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { DateField } from '@/components/ui/date-field'
 import { cn } from '@/lib/utils'
 import type { ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
 import type { GeneratePdfInput } from '../_actions/generatePdf'
@@ -394,25 +395,19 @@ export function FreeInvoiceGenerator({
                   onChange={(e) => setInvoiceNumber(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="gen-issued">{t('invoice_issued_date')}</Label>
-                <Input
-                  id="gen-issued"
-                  type="date"
-                  required
-                  value={issuedDate}
-                  onChange={(e) => setIssuedDate(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="gen-due">{t('invoice_due_date')}</Label>
-                <Input
-                  id="gen-due"
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                />
-              </div>
+              <DateField
+                id="gen-issued"
+                label={t('invoice_issued_date')}
+                required
+                value={issuedDate}
+                onChange={setIssuedDate}
+              />
+              <DateField
+                id="gen-due"
+                label={t('invoice_due_date')}
+                value={dueDate}
+                onChange={setDueDate}
+              />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">

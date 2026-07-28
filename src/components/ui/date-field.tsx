@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { format, parse } from 'date-fns'
+import { format, parse, isValid } from 'date-fns'
 import { CalendarBlank } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -10,9 +10,16 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { isValidIsoDate } from '@/lib/sos/accountingInputValidation'
 import { cn } from '@/lib/utils'
 
+/** How the controlled `value` / `onChange` string is encoded. */
+export type DateFieldStorageFormat = 'yyyy-MM-dd' | 'dd/MM/yyyy'
+
 export interface DateFieldProps {
   id: string
-  label: string
+  /**
+   * Visible label. Omit or pass empty when the caller renders its own label
+   * (then provide `aria-label` for accessibility).
+   */
+  label?: string
   value: string
   onChange: (value: string) => void
   description?: string
@@ -20,22 +27,48 @@ export interface DateFieldProps {
   className?: string
   disabled?: boolean
   required?: boolean
-  /** ISO date YYYY-MM-DD */
+  /** ISO date YYYY-MM-DD — only applied when storage is ISO */
   min?: string
-  /** ISO date YYYY-MM-DD */
+  /** ISO date YYYY-MM-DD — only applied when storage is ISO */
   max?: string
   placeholder?: string
+  /**
+   * Storage encoding for value/onChange.
+   * - `yyyy-MM-dd` (default): DB / API ISO dates
+   * - `dd/MM/yyyy`: submission schema `date_dmy` fields
+   */
+  storageFormat?: DateFieldStorageFormat
+  /** Accessible name when `label` is omitted */
+  'aria-label'?: string
 }
 
-function parseYmd(value: string): Date | undefined {
-  if (!isValidIsoDate(value)) return undefined
+function parseStoredDate(value: string, storageFormat: DateFieldStorageFormat): Date | undefined {
+  if (!value?.trim()) return undefined
+  const candidates =
+    storageFormat === 'dd/MM/yyyy'
+      ? ['dd/MM/yyyy', 'd/M/yyyy', 'dd.MM.yyyy', 'd.M.yyyy', 'yyyy-MM-dd']
+      : ['yyyy-MM-dd', 'dd/MM/yyyy', 'dd.MM.yyyy']
+  for (const fmt of candidates) {
+    const d = parse(value.trim(), fmt, new Date())
+    if (isValid(d)) return d
+  }
+  // ISO fast-path used by accounting validators
+  if (storageFormat === 'yyyy-MM-dd' && isValidIsoDate(value)) {
+    const d = parse(value, 'yyyy-MM-dd', new Date())
+    return isValid(d) ? d : undefined
+  }
+  return undefined
+}
+
+function parseIsoBound(value: string | undefined): Date | undefined {
+  if (!value || !isValidIsoDate(value)) return undefined
   const d = parse(value, 'yyyy-MM-dd', new Date())
-  return Number.isNaN(d.getTime()) ? undefined : d
+  return isValid(d) ? d : undefined
 }
 
 /**
- * Accessible date picker (YYYY-MM-DD) using Popover + Calendar.
- * Prefer over native `type="date"` for consistent admin CI and validation.
+ * Accessible date picker using Popover + Calendar.
+ * Prefer over native `type="date"` / plain text for consistent UX and validation.
  */
 export function DateField({
   id,
@@ -50,18 +83,23 @@ export function DateField({
   min,
   max,
   placeholder = 'Select date…',
+  storageFormat = 'yyyy-MM-dd',
+  'aria-label': ariaLabel,
 }: DateFieldProps) {
   const [open, setOpen] = useState(false)
-  const selected = parseYmd(value)
-  const minDate = min ? parseYmd(min) : undefined
-  const maxDate = max ? parseYmd(max) : undefined
+  const selected = parseStoredDate(value, storageFormat)
+  const minDate = parseIsoBound(min)
+  const maxDate = parseIsoBound(max)
+  const showLabel = Boolean(label)
 
   return (
     <div className={cn('space-y-2', className)}>
-      <Label htmlFor={id}>
-        {label}
-        {required ? <span className="text-destructive"> *</span> : null}
-      </Label>
+      {showLabel ? (
+        <Label htmlFor={id}>
+          {label}
+          {required ? <span className="text-destructive"> *</span> : null}
+        </Label>
+      ) : null}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -74,6 +112,7 @@ export function DateField({
               !value && 'text-muted-foreground',
               error && 'border-destructive aria-invalid:border-destructive',
             )}
+            aria-label={ariaLabel ?? (showLabel ? undefined : 'Date')}
             aria-required={required}
             aria-invalid={!!error}
             aria-haspopup="dialog"
@@ -89,7 +128,7 @@ export function DateField({
             selected={selected}
             onSelect={(day) => {
               if (!day) return
-              onChange(format(day, 'yyyy-MM-dd'))
+              onChange(format(day, storageFormat))
               setOpen(false)
             }}
             disabled={(date) => {

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { Switch } from '@/components/ui/switch'
 import {
   Select,
@@ -69,6 +70,11 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
   }, [value, reset])
 
   useEffect(() => {
+    // Keep releaseDate registered so RHF required validation still runs with DateField.
+    register('releaseDate', { required: true })
+  }, [register])
+
+  useEffect(() => {
     const supabase = createBrowserSupabaseClient()
     getArtists(supabase).then((rows) =>
       setArtists(rows.map((a) => ({ id: a.id, name: a.name })))
@@ -80,6 +86,7 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
   const isPromo = watch('isPromo')
   const syncPolicy = watch('syncPolicy')
   const type = watch('type')
+  const releaseDate = watch('releaseDate')
   const heroPrimaryBtnAction = watch('heroPrimaryBtnAction')
   const heroSecondaryBtnAction = watch('heroSecondaryBtnAction')
   const artistIds = watch('artistIds') ?? []
@@ -148,10 +155,14 @@ export function ReleaseForm({ value, onChange, isLoading }: Props) {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1">
-          <Label htmlFor="releaseDate">Release Date *</Label>
-          <Input id="releaseDate" type="date" {...register('releaseDate', { required: true })} disabled={isLoading} />
-        </div>
+        <DateField
+          id="releaseDate"
+          label="Release Date"
+          required
+          value={releaseDate ?? ''}
+          onChange={(v) => setValue('releaseDate', v, { shouldValidate: true, shouldDirty: true })}
+          disabled={isLoading}
+        />
         <div className="space-y-1">
           <Label htmlFor="type">Type *</Label>
           <Select

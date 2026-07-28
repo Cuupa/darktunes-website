@@ -14,7 +14,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { format, parseISO } from 'date-fns'
 import {
-  CalendarBlank,
   Camera,
   CurrencyEur,
   Image as ImageIcon,
@@ -29,6 +28,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -382,20 +382,14 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
             <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
               {/* Date + Description */}
               <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="promo-date" className="flex items-center gap-1">
-                    <CalendarBlank size={14} aria-hidden="true" />
-                    Date <span aria-hidden="true">*</span>
-                  </Label>
-                  <Input
-                    id="promo-date"
-                    type="date"
-                    required
-                    value={actionDate}
-                    onChange={(e) => setActionDate(e.target.value)}
-                    className="w-full"
-                  />
-                </div>
+                <DateField
+                  id="promo-date"
+                  label="Date"
+                  required
+                  value={actionDate}
+                  onChange={setActionDate}
+                  className="w-full"
+                />
                 <div className="space-y-1">
                   <Label htmlFor="promo-description">
                     Activity description <span aria-hidden="true">*</span>

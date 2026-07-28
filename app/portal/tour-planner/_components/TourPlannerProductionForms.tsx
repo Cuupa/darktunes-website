@@ -7,6 +7,7 @@ import { DownloadSimple, Trash, UploadSimple } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import {
   Select,
   SelectContent,
@@ -192,7 +193,7 @@ export function PerDiemsForm({ items, onSave }: { items: PerDiem[]; onSave: (ite
       <div className="grid gap-2 sm:grid-cols-3">
         <Input placeholder={t('tour_planner_person_name')} value={name} onChange={(e) => setName(e.target.value)} />
         <Input type="number" placeholder={t('tour_planner_amount')} value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
-        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label={t('tour_planner_stop_date')} />
+        <DateField id="tour-stop-date" value={date} onChange={setDate} aria-label={t('tour_planner_stop_date')} />
       </div>
       <div className="flex gap-2">
         <Button variant="outline" onClick={add}>{t('tour_planner_add')}</Button>

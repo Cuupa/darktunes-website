@@ -7,6 +7,7 @@ import type { AdminPanelProps } from '@/lib/component-contracts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { Switch } from '@/components/ui/switch'
 import { ArrowsClockwise, MagnifyingGlass } from '@phosphor-icons/react'
 import { extractYouTubeVideoId } from '@/lib/parsers/platformUrlParser'
@@ -60,6 +61,7 @@ export function VideoForm({ value, onChange, isLoading, artists }: Props) {
   const thumbnailUrl = watch('thumbnailUrl')
   const isVisible = watch('isVisible')
   const isShort = watch('isShort')
+  const publishedAt = watch('publishedAt')
 
   // Auto-extract YouTube ID when the user pastes a full URL
   const lastParsed = useRef('')
@@ -218,10 +220,13 @@ export function VideoForm({ value, onChange, isLoading, artists }: Props) {
             <Input id="artistName" {...register('artistName', { required: true })} disabled={isLoading} />
           )}
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="publishedAt">Published At</Label>
-          <Input id="publishedAt" type="date" {...register('publishedAt')} disabled={isLoading} />
-        </div>
+        <DateField
+          id="publishedAt"
+          label="Published At"
+          value={publishedAt ?? ''}
+          onChange={(v) => setValue('publishedAt', v, { shouldDirty: true })}
+          disabled={isLoading}
+        />
       </div>
 
       <div className="space-y-1">
