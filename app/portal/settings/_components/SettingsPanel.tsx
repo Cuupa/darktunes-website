@@ -138,8 +138,14 @@ export function SettingsPanel({ email, displayName: initialDisplayName }: Settin
                 password={newPassword}
                 heading={t('password_policy_heading')}
                 labelFor={(id, fallback) => {
+                  const key = `password_req_${id}` as
+                    | 'password_req_length'
+                    | 'password_req_upper'
+                    | 'password_req_lower'
+                    | 'password_req_digit'
+                    | 'password_req_special'
                   try {
-                    return t(`password_req_${id}` as 'password_req_length')
+                    return t(key)
                   } catch {
                     return fallback
                   }

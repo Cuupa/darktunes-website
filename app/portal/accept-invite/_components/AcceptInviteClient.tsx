@@ -38,9 +38,15 @@ export function AcceptInviteClient() {
   const [isLoading, setIsLoading] = useState(false)
   const [sessionReady, setSessionReady] = useState(false)
   const [sessionError, setSessionError] = useState<string | null>(null)
-  const labelFor = (id: string, fallback: string) => {
+  const labelFor = (id: 'length' | 'upper' | 'lower' | 'digit' | 'special', fallback: string) => {
+    const key = `password_req_${id}` as
+      | 'password_req_length'
+      | 'password_req_upper'
+      | 'password_req_lower'
+      | 'password_req_digit'
+      | 'password_req_special'
     try {
-      return t(`password_req_${id}` as 'password_req_length')
+      return t(key)
     } catch {
       return fallback
     }
