@@ -406,7 +406,7 @@ export function MessagesManager() {
       try {
         await markPortalMessageRead(supabase, id)
         void supabase
-          .from('editor_notifications')
+          .from('notifications')
           .update({ read: true })
           .eq('entity_id', id)
           .eq('type', 'artist_portal_message')

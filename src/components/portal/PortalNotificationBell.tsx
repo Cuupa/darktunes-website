@@ -30,7 +30,8 @@ export function PortalNotificationBell({ artistId }: PortalNotificationBellProps
   const [items, setItems] = useState<PortalNotificationItem[]>([])
   const [markingAll, setMarkingAll] = useState(false)
 
-  const total = badges.messages + badges.interviews + badges.statements
+  const total =
+    badges.messages + badges.interviews + badges.statements + (badges.alerts ?? 0)
   const ariaLabel =
     total > 0
       ? t('notifications_unreadAria', { count: total })
@@ -61,10 +62,15 @@ export function PortalNotificationBell({ artistId }: PortalNotificationBellProps
           : entry,
       ),
     )
-    setBadges((current) => ({
-      ...current,
-      messages: Math.max(0, current.messages - 1),
-    }))
+    setBadges((current) => {
+      if (item.kind === 'platform') {
+        return { ...current, alerts: Math.max(0, (current.alerts ?? 0) - 1) }
+      }
+      return {
+        ...current,
+        messages: Math.max(0, current.messages - 1),
+      }
+    })
 
     try {
       await markPortalNotificationItemRead(supabase, item)
@@ -74,7 +80,8 @@ export function PortalNotificationBell({ artistId }: PortalNotificationBellProps
   }, [loadFeed, setBadges, supabase])
 
   const handleMarkAllMessages = useCallback(async () => {
-    if (!artistId || badges.messages === 0 || markingAll) return
+    const markable = badges.messages + (badges.alerts ?? 0)
+    if (!artistId || markable === 0 || markingAll) return
 
     setMarkingAll(true)
     setItems((prev) =>
@@ -82,7 +89,7 @@ export function PortalNotificationBell({ artistId }: PortalNotificationBellProps
         item.canMarkRead ? { ...item, isUnread: false } : item,
       ),
     )
-    setBadges((current) => ({ ...current, messages: 0 }))
+    setBadges((current) => ({ ...current, messages: 0, alerts: 0 }))
 
     try {
       await markAllPortalMessagesRead(supabase, artistId)
@@ -92,9 +99,12 @@ export function PortalNotificationBell({ artistId }: PortalNotificationBellProps
     } finally {
       setMarkingAll(false)
     }
-  }, [artistId, badges.messages, loadFeed, markingAll, setBadges, supabase])
+  }, [artistId, badges.messages, badges.alerts, loadFeed, markingAll, setBadges, supabase])
 
   const messagesHref = artistId ? `/portal/messages?artistId=${artistId}` : '/portal/messages'
+  const centerHref = artistId
+    ? `/portal/notifications?artistId=${artistId}`
+    : '/portal/notifications'
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -106,20 +116,29 @@ export function PortalNotificationBell({ artistId }: PortalNotificationBellProps
           markAllLabel={t('notifications_markAllMessages')}
           markAllAriaLabel={t('notifications_markAllMessagesAria')}
           onMarkAll={handleMarkAllMessages}
-          markAllDisabled={badges.messages === 0 || markingAll || !artistId}
+          markAllDisabled={
+            (badges.messages === 0 && (badges.alerts ?? 0) === 0) || markingAll || !artistId
+          }
           isEmpty={items.length === 0}
           footer={
-            artistId ? (
-              <div className="border-t border-border px-1 pt-2">
+            <div className="space-y-1 border-t border-border px-1 pt-2">
+              <Link
+                href={centerHref}
+                onClick={() => setOpen(false)}
+                className="block text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {t('notifications_view_all')}
+              </Link>
+              {artistId ? (
                 <Link
                   href={messagesHref}
                   onClick={() => setOpen(false)}
-                  className="text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="block text-xs font-medium text-muted-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {t('notifications_viewAllMessages')}
                 </Link>
-              </div>
-            ) : null
+              ) : null}
+            </div>
           }
         >
           {items.map((item) => {
@@ -130,7 +149,9 @@ export function PortalNotificationBell({ artistId }: PortalNotificationBellProps
                   ? t('notifications_viewInterview')
                   : item.kind === 'statement'
                     ? t('notifications_viewStatement')
-                    : undefined
+                    : item.kind === 'platform'
+                      ? t('notifications_viewAlert')
+                      : undefined
 
             return (
               <NotificationListItem

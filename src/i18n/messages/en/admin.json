@@ -801,7 +801,50 @@
     "markAll": "Mark all read",
     "markAllAria": "Mark all notifications as read",
     "openAria": "Open notifications",
-    "unreadAria": "Open notifications, {count} unread"
+    "unreadAria": "Open notifications, {count} unread",
+    "viewAll": "View all notifications",
+    "centerTitle": "Notification center",
+    "centerDescription": "History of in-app alerts for your account.",
+    "filterAll": "All",
+    "filterUnread": "Unread",
+    "loadMore": "Load more",
+    "preferencesLink": "Preferences",
+    "preferencesTitle": "Notification preferences",
+    "preferencesDescription": "Choose which events send in-app and email alerts.",
+    "preferencesSave": "Save preferences",
+    "preferencesSaved": "Saved",
+    "channelInApp": "In-app",
+    "channelEmail": "Email",
+    "types": {
+      "release_submission": "Release submission",
+      "video_submission": "Video submission",
+      "landing_page_review": "Fan page awaiting review",
+      "press_asset": "Press asset suggestion",
+      "portal_message": "New message from artist",
+      "fan_page_decision": "Fan page review decision"
+    },
+    "actions": {
+      "review_release": "Review release",
+      "review_video": "Review video",
+      "review_fan_page": "Review fan page",
+      "review_asset": "Review asset",
+      "open_messages": "Open messages",
+      "open_fan_page": "Open fan page"
+    },
+    "typeLabels": {
+      "artist_release_submission": "Release submission (staff)",
+      "artist_video_submission": "Video submission (staff)",
+      "landing_page_review": "Fan page review queue",
+      "press_asset_suggestion": "Press asset suggestion",
+      "artist_portal_message": "Artist message to label",
+      "fan_page_review_decision": "Fan page decision",
+      "release_submission_decision": "Release decision",
+      "video_submission_decision": "Video decision",
+      "statement_available": "Statement available",
+      "invoice_payment_received": "Invoice payment",
+      "journalist_application_submitted": "Journalist application",
+      "journalist_application_decision": "Journalist decision"
+    }
   },
   "toast": {
     "failed_send_invite": "Failed to send invite",

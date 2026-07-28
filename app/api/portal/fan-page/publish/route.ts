@@ -2,7 +2,7 @@
  * POST — Fan Page publish workflow (draft / review / direct)
  *
  * Membership via withPortalMembershipWrite; publish write via portalMemberWrite.
- * editor_notifications stay service-role forever (staff-only table).
+ * Staff notifications via emitNotification (service role).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -12,6 +12,7 @@ import { getFanPageDocumentState, publishFanPage } from '@/lib/api/fanPageDocume
 import { validateFanPageForPublish, canHardPublish } from '@/lib/fan-page/publishValidation'
 import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 import { revalidateTag } from 'next/cache'
+import { emitNotification } from '@/lib/notifications'
 
 const bodySchema = z.object({
   artist_id: z.string().uuid(),
@@ -58,26 +59,16 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       }),
   )
 
-  // Staff notifications — always service role (artists have no INSERT on editor_notifications)
+  // Staff notifications — service role via platform emit
   if (body.mode === 'submit_review') {
-    const { data: recipients } = await serviceDb
-      .from('users')
-      .select('id')
-      .in('role', ['admin', 'editor'])
-
-    if (recipients?.length) {
-      await serviceDb.from('editor_notifications').insert(
-        recipients.map((r) => ({
-          recipient_id: r.id,
-          type: 'landing_page_review',
-          entity_type: 'artist',
-          entity_id: artist.id,
-          entity_name: `${artist.name} Fan Page`,
-          sender_id: user.id,
-          read: false,
-        })),
-      )
-    }
+    await emitNotification(serviceDb, {
+      type: 'landing_page_review',
+      entityId: artist.id,
+      entityName: `${artist.name} Fan Page`,
+      senderId: user.id,
+      artistId: artist.id,
+      // No dedupe: each submit-for-review should notify staff again
+    })
   }
 
   if (result.publishStatus === 'published') {

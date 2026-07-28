@@ -18,7 +18,7 @@ const EMPTY_BADGES: AdminNavBadges = {
   fanPageReviews: 0,
 }
 
-type EditorNotificationRow = Database['public']['Tables']['editor_notifications']['Row']
+type NotificationRow = Database['public']['Tables']['notifications']['Row']
 
 export function useAdminNavBadges(userId: string | null, enabled: boolean) {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
@@ -102,16 +102,16 @@ export function useAdminNavBadges(userId: string | null, enabled: boolean) {
     if (!enabled || !userId) return
 
     const channel = supabase
-      .channel(`admin-nav-editor-notifications-${userId}`)
+      .channel(`admin-nav-notifications-${userId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'editor_notifications',
-          filter: `recipient_id=eq.${userId}`,
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
         },
-        (_payload: RealtimePostgresInsertPayload<EditorNotificationRow>) => {
+        (_payload: RealtimePostgresInsertPayload<NotificationRow>) => {
           void refresh()
         },
       )

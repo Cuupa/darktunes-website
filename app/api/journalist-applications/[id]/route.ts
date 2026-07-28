@@ -12,6 +12,7 @@ import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { type NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { updateApplicationStatus } from '@/lib/api/journalistApplications'
+import { emitNotification } from '@/lib/notifications'
 import { z } from 'zod'
 
 const UpdateSchema = z.object({
@@ -41,6 +42,25 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
 
   // Role promotion/demotion is handled atomically by the database trigger
   // `trg_journalist_application_status_change`. No manual update is needed here.
+
+  if (application.userId) {
+    try {
+      await emitNotification(db, {
+        type: 'journalist_application_decision',
+        entityId: application.id,
+        entityName:
+          status === 'approved'
+            ? 'Your press application was approved'
+            : 'Your press application was rejected',
+        senderId: user.id,
+        userIds: [application.userId],
+        payload: { status },
+        dedupeKey: `journalist_application_decision:${application.id}:${status}`,
+      })
+    } catch (err) {
+      console.error('[journalist-applications] applicant notify failed:', err)
+    }
+  }
 
   return NextResponse.json({ application })
 })

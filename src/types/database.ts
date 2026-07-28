@@ -3641,6 +3641,75 @@ export interface Database {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          artist_id: string | null
+          type: string
+          entity_type: string
+          entity_id: string | null
+          entity_name: string | null
+          sender_id: string | null
+          payload: Json
+          dedupe_key: string | null
+          read: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          artist_id?: string | null
+          type: string
+          entity_type: string
+          entity_id?: string | null
+          entity_name?: string | null
+          sender_id?: string | null
+          payload?: Json
+          dedupe_key?: string | null
+          read?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          artist_id?: string | null
+          type?: string
+          entity_type?: string
+          entity_id?: string | null
+          entity_name?: string | null
+          sender_id?: string | null
+          payload?: Json
+          dedupe_key?: string | null
+          read?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      notification_preferences: {
+        Row: {
+          user_id: string
+          event_type: string
+          in_app: boolean
+          email: boolean
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          event_type: string
+          in_app?: boolean
+          email?: boolean
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          event_type?: string
+          in_app?: boolean
+          email?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       interview_requests: {
         Row: {
           id: string

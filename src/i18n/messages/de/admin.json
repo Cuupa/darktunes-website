@@ -801,7 +801,50 @@
     "markAll": "Alle gelesen",
     "markAllAria": "Alle Benachrichtigungen als gelesen markieren",
     "openAria": "Benachrichtigungen öffnen",
-    "unreadAria": "Benachrichtigungen öffnen, {count} ungelesen"
+    "unreadAria": "Benachrichtigungen öffnen, {count} ungelesen",
+    "viewAll": "Alle Benachrichtigungen",
+    "centerTitle": "Benachrichtigungszentrum",
+    "centerDescription": "Verlauf der In-App-Meldungen für dein Konto.",
+    "filterAll": "Alle",
+    "filterUnread": "Ungelesen",
+    "loadMore": "Mehr laden",
+    "preferencesLink": "Einstellungen",
+    "preferencesTitle": "Benachrichtigungs-Einstellungen",
+    "preferencesDescription": "Wähle, welche Ereignisse In-App- und E-Mail-Meldungen auslösen.",
+    "preferencesSave": "Einstellungen speichern",
+    "preferencesSaved": "Gespeichert",
+    "channelInApp": "In-App",
+    "channelEmail": "E-Mail",
+    "types": {
+      "release_submission": "Release-Einreichung",
+      "video_submission": "Video-Einreichung",
+      "landing_page_review": "Fan-Page wartet auf Review",
+      "press_asset": "Press-Asset-Vorschlag",
+      "portal_message": "Neue Nachricht vom Artist",
+      "fan_page_decision": "Fan-Page-Review-Entscheidung"
+    },
+    "actions": {
+      "review_release": "Release prüfen",
+      "review_video": "Video prüfen",
+      "review_fan_page": "Fan-Page prüfen",
+      "review_asset": "Asset prüfen",
+      "open_messages": "Nachrichten öffnen",
+      "open_fan_page": "Fan-Page öffnen"
+    },
+    "typeLabels": {
+      "artist_release_submission": "Release-Einreichung (Staff)",
+      "artist_video_submission": "Video-Einreichung (Staff)",
+      "landing_page_review": "Fan-Page-Review-Queue",
+      "press_asset_suggestion": "Press-Asset-Vorschlag",
+      "artist_portal_message": "Artist-Nachricht ans Label",
+      "fan_page_review_decision": "Fan-Page-Entscheidung",
+      "release_submission_decision": "Release-Entscheidung",
+      "video_submission_decision": "Video-Entscheidung",
+      "statement_available": "Abrechnung verfügbar",
+      "invoice_payment_received": "Rechnungszahlung",
+      "journalist_application_submitted": "Journalist-Bewerbung",
+      "journalist_application_decision": "Journalist-Entscheidung"
+    }
   },
   "toast": {
     "failed_send_invite": "Einladung konnte nicht gesendet werden",

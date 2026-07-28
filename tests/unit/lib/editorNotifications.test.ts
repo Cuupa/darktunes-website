@@ -17,6 +17,7 @@ function makeBuilder(data: unknown = null, error: unknown = null, count: number 
     select: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
+    range: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     in: vi.fn().mockReturnThis(),
@@ -36,22 +37,27 @@ function makeMockDb(
 
 const row = {
   id: 'notif-1',
-  recipient_id: 'user-1',
+  user_id: 'user-1',
+  artist_id: null,
   type: 'artist_portal_message',
   entity_type: 'portal_message',
   entity_id: 'msg-1',
   entity_name: 'Artist message',
   sender_id: 'sender-1',
+  payload: {},
+  dedupe_key: null,
   read: false,
   created_at: '2026-07-02T10:00:00Z',
 }
 
 describe('editorNotifications DAL', () => {
-  it('gets editor notifications', async () => {
+  it('gets editor notifications from unified table', async () => {
     const db = makeMockDb([row])
     const items = await getEditorNotifications(db, 'user-1')
     expect(items[0].entityName).toBe('Artist message')
+    expect(items[0].recipientId).toBe('user-1')
     expect(items[0].read).toBe(false)
+    expect(db.from).toHaveBeenCalledWith('notifications')
   })
 
   it('gets unread count', async () => {
@@ -63,12 +69,12 @@ describe('editorNotifications DAL', () => {
   it('marks one notification read', async () => {
     const db = makeMockDb(null)
     await markEditorNotificationRead(db, 'notif-1')
-    expect(db.from).toHaveBeenCalledWith('editor_notifications')
+    expect(db.from).toHaveBeenCalledWith('notifications')
   })
 
   it('marks all notifications read', async () => {
     const db = makeMockDb(null)
     await markAllEditorNotificationsRead(db, 'user-1')
-    expect(db.from).toHaveBeenCalledWith('editor_notifications')
+    expect(db.from).toHaveBeenCalledWith('notifications')
   })
 })

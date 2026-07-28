@@ -16,6 +16,7 @@ import {
   PORTAL_ASSET_MIME,
   PORTAL_UPLOAD_RATE,
 } from '@/lib/uploads/portalUploadLimits'
+import { emitNotification } from '@/lib/notifications'
 
 const deleteSchema = z.object({ id: z.string() })
 
@@ -231,26 +232,16 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     throw dbErr
   }
 
-  // Staff notifications — always service role
+  // Staff notifications — service role via platform emit
   if (pressSuggested && mainAssetId) {
-    const { data: recipientProfiles } = await serviceDb
-      .from('users')
-      .select('id')
-      .in('role', ['admin', 'editor'])
-
-    const recipients = (recipientProfiles ?? []).map((profile) => ({
-      recipient_id: profile.id,
+    await emitNotification(serviceDb, {
       type: 'press_asset_suggestion',
-      entity_type: 'asset',
-      entity_id: mainAssetId,
-      entity_name: `${artist.name}: ${file.name}`,
-      sender_id: userId,
-      read: false,
-    }))
-
-    if (recipients.length > 0) {
-      await serviceDb.from('editor_notifications').insert(recipients)
-    }
+      entityId: mainAssetId,
+      entityName: `${artist.name}: ${file.name}`,
+      senderId: userId,
+      artistId: artist.id,
+      dedupeKey: `press_asset_suggestion:${mainAssetId}`,
+    })
   }
 
   return NextResponse.json({ asset })

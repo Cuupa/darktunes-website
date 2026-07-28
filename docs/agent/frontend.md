@@ -98,8 +98,12 @@ Always `cn()` from `@/lib/utils` — never template literal class merging.
 
 Shared primitives in `src/components/notifications/` (`NotificationBellTrigger`, `NotificationPanel`, `NotificationListItem`). Relative timestamps via `src/lib/formatRelativeTime.ts`.
 
+**Platform (required for new events):** `src/lib/notifications/` — `NOTIFICATION_CATALOG` + `emitNotification(serviceDb, …)`. Do **not** insert into `notifications` / `editor_notifications` from route handlers. Service role only. Add catalog entry + i18n keys when shipping a new workflow.
+
 **Read semantics:** Opening the popover does **not** mark items read. A click marks the item read in the DB, then navigates. Header button runs bulk read (`markAllEditorNotificationsRead` / `markAllPortalMessagesRead`). Badge counts always reconcile from the DB after mutations — never hard-set to zero when more unread rows may exist.
 
-**Admin:** `DashboardNotificationBell` + `editor_notifications` DAL (`src/lib/api/editorNotifications.ts`).
+**Admin:** `DashboardNotificationBell` + unified `notifications` table via `src/lib/api/editorNotifications.ts` / `src/lib/api/notifications.ts`. Realtime on `notifications` filtered by `user_id`.
 
-**Portal:** `PortalNotificationBell` + `portalNotifications` feed DAL. Messages are markable; interviews/statements are workflow items (badge clears on status change). `PortalNotificationProvider` refreshes badge counts on realtime updates for messages, interviews, and statements.
+**Portal:** `PortalNotificationBell` + composite feed (`portalNotifications`): messages, interviews, statements, plus durable platform rows (`kind: platform`, e.g. fan-page decisions). Badge field `alerts` counts unread platform rows. `PortalNotificationProvider` refreshes on messages, interviews, statements, and `notifications`.
+
+**History + preferences:** Shared `NotificationCenter` and `NotificationPreferencesForm` under `src/components/notifications/`. Routes: `/admin/notifications` (+ `/preferences`), `/portal/notifications` (+ `/preferences`).

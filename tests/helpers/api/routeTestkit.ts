@@ -181,9 +181,11 @@ export function makeCookieSessionSupabase(options: {
           }),
         }
       }
-      if (table === 'editor_notifications') {
+      if (table === 'notifications' || table === 'editor_notifications') {
         return {
-          insert: async () => ({ error: null }),
+          insert: () => ({
+            select: async () => ({ data: [{ id: 'notif-1' }], error: null }),
+          }),
         }
       }
       return {
