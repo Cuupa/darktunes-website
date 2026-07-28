@@ -1974,6 +1974,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_user_dedupe
   WHERE dedupe_key IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
+-- TABLE: notification_preferences (per-user channel toggles)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.notification_preferences (
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  in_app BOOLEAN NOT NULL DEFAULT TRUE,
+  email BOOLEAN NOT NULL DEFAULT TRUE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, event_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_notification_preferences_user
+  ON public.notification_preferences(user_id);
+
+-- ---------------------------------------------------------------------------
 -- TABLE: interview_requests
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.interview_requests (
@@ -2881,6 +2896,7 @@ ALTER TABLE public.accreditation_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.editor_activity_log   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.editor_notifications  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interview_requests    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_logs              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.support_known_errors  ENABLE ROW LEVEL SECURITY;
@@ -3381,6 +3397,15 @@ CREATE POLICY "notifications: own update" ON public.notifications
 
 CREATE POLICY "notifications: admin read all" ON public.notifications
   FOR SELECT USING (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: notification_preferences
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "notification_preferences: own all" ON public.notification_preferences;
+
+CREATE POLICY "notification_preferences: own all" ON public.notification_preferences
+  FOR ALL USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
 
 -- ---------------------------------------------------------------------------
 -- RLS: interview_requests

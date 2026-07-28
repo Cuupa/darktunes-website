@@ -14,6 +14,7 @@ import {
 import { updateSalesStatementStatus } from '@/lib/api/salesStatements'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { emitNotification } from '@/lib/notifications'
 const paymentSchema = z.object({
   amountCents: z.number().int().positive(),
   paymentMethod: z.enum(['sepa', 'paypal', 'manual', 'other']),
@@ -109,6 +110,25 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
     })
 
     await updateIdempotencyKeyResourceId(serviceSupabase, parsed.data.idempotencyKey, invoice.id)
+
+    if (invoice.status === 'paid' || invoice.status === 'partially_paid') {
+      try {
+        await emitNotification(serviceSupabase, {
+          type: 'invoice_payment_received',
+          entityId: invoice.id,
+          entityName: `Payment on invoice ${invoice.invoiceNumber}`,
+          artistId: invoice.artistId,
+          senderId: userId,
+          payload: {
+            status: invoice.status,
+            amountCents: parsed.data.amountCents,
+          },
+          dedupeKey: `invoice_payment_received:${invoice.id}:${invoice.paidAmountCents ?? parsed.data.amountCents}`,
+        })
+      } catch (notifErr) {
+        console.error('[invoice payment] artist notify failed:', notifErr)
+      }
+    }
 
     return NextResponse.json({ invoice })
   } catch (err) {

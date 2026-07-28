@@ -21,7 +21,7 @@ export async function getEditorNotifications(
   userId: string,
   limit = 20,
 ): Promise<DashboardNotification[]> {
-  return getUserNotifications(db, userId, limit)
+  return getUserNotifications(db, userId, { limit })
 }
 
 export async function getEditorUnreadCount(db: DbClient, userId: string): Promise<number> {

@@ -26,14 +26,23 @@ function rowToDashboardNotification(row: NotificationRow): DashboardNotification
 export async function getUserNotifications(
   db: DbClient,
   userId: string,
-  limit = 20,
+  opts?: { limit?: number; unreadOnly?: boolean; offset?: number },
 ): Promise<DashboardNotification[]> {
-  const { data, error } = await db
+  const limit = opts?.limit ?? 20
+  const offset = opts?.offset ?? 0
+
+  let query = db
     .from('notifications')
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
-    .limit(limit)
+    .range(offset, offset + limit - 1)
+
+  if (opts?.unreadOnly) {
+    query = query.eq('read', false)
+  }
+
+  const { data, error } = await query
 
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToDashboardNotification)

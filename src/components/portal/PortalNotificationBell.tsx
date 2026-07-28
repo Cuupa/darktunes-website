@@ -102,6 +102,9 @@ export function PortalNotificationBell({ artistId }: PortalNotificationBellProps
   }, [artistId, badges.messages, badges.alerts, loadFeed, markingAll, setBadges, supabase])
 
   const messagesHref = artistId ? `/portal/messages?artistId=${artistId}` : '/portal/messages'
+  const centerHref = artistId
+    ? `/portal/notifications?artistId=${artistId}`
+    : '/portal/notifications'
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -118,17 +121,24 @@ export function PortalNotificationBell({ artistId }: PortalNotificationBellProps
           }
           isEmpty={items.length === 0}
           footer={
-            artistId ? (
-              <div className="border-t border-border px-1 pt-2">
+            <div className="space-y-1 border-t border-border px-1 pt-2">
+              <Link
+                href={centerHref}
+                onClick={() => setOpen(false)}
+                className="block text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {t('notifications_view_all')}
+              </Link>
+              {artistId ? (
                 <Link
                   href={messagesHref}
                   onClick={() => setOpen(false)}
-                  className="text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="block text-xs font-medium text-muted-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   {t('notifications_viewAllMessages')}
                 </Link>
-              </div>
-            ) : null
+              ) : null}
+            </div>
           }
         >
           {items.map((item) => {

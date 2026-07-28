@@ -3686,6 +3686,30 @@ export interface Database {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          user_id: string
+          event_type: string
+          in_app: boolean
+          email: boolean
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          event_type: string
+          in_app?: boolean
+          email?: boolean
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          event_type?: string
+          in_app?: boolean
+          email?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       interview_requests: {
         Row: {
           id: string

@@ -10,10 +10,13 @@ import {
 } from '@/lib/notifications'
 
 export function getDashboardNotificationHref(
-  notification: Pick<DashboardNotification, 'type'>,
+  notification: Pick<DashboardNotification, 'type'> &
+    Partial<Pick<DashboardNotification, 'entityId'>>,
   role: 'admin' | 'editor' | string | undefined,
 ): string | null {
-  return getNotificationHref(notification.type, role)
+  return getNotificationHref(notification.type, role, {
+    entityId: notification.entityId || undefined,
+  })
 }
 
 export function getDashboardNotificationSummary(

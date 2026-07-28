@@ -47,6 +47,43 @@ export const NOTIFICATION_CATALOG: Record<NotificationEventType, NotificationCat
     summaryKey: 'types.fan_page_decision',
     actionKey: 'actions.open_fan_page',
   },
+  release_submission_decision: {
+    audience: 'artist',
+    defaultEntityType: 'release_submission',
+    summaryKey: 'types.release_decision',
+    actionKey: 'actions.open_releases',
+  },
+  video_submission_decision: {
+    audience: 'artist',
+    defaultEntityType: 'video_submission',
+    summaryKey: 'types.video_decision',
+    actionKey: 'actions.open_videos',
+  },
+  statement_available: {
+    audience: 'artist',
+    defaultEntityType: 'sales_statement',
+    summaryKey: 'types.statement_available',
+    actionKey: 'actions.open_statements',
+  },
+  invoice_payment_received: {
+    audience: 'artist',
+    defaultEntityType: 'artist_invoice',
+    summaryKey: 'types.invoice_payment',
+    actionKey: 'actions.open_invoices',
+  },
+  journalist_application_submitted: {
+    audience: 'staff',
+    roles: ['admin'],
+    defaultEntityType: 'journalist_application',
+    summaryKey: 'types.journalist_application',
+    actionKey: 'actions.review_press',
+  },
+  journalist_application_decision: {
+    audience: 'user',
+    defaultEntityType: 'journalist_application',
+    summaryKey: 'types.journalist_decision',
+    actionKey: 'actions.open_press',
+  },
 }
 
 export function isNotificationEventType(value: string): value is NotificationEventType {

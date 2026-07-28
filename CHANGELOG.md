@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Notification platform (Phase 1):** Unified `notifications` table + `emitNotification()` catalog for staff and artist in-app alerts. Migrated release/video submit, fan-page review queue, press assets, portal messages-to-label. Fan-page approve/reject now notifies artist members. Admin/portal bells read the unified table; portal feed includes platform alerts.
+- **Notification platform (Phase 1–3):** Unified `notifications` table + `emitNotification()` catalog for staff and artist in-app alerts. Migrated release/video submit, fan-page review queue, press assets, portal messages-to-label. Fan-page approve/reject, release/video decisions, statement available, invoice payment, journalist applications. Admin/portal bells, history centers (`/admin|portal/notifications`), and per-event preferences (`notification_preferences`, in-app mute respected by emit).
 - **Invite link validity:** Admin → System → Invites configures how long invite links stay valid (24h–7 days, default 7 days). Invite emails show the exact UTC expiry. Durable tokens in `user_invites`; accept via `/auth/invite`.
 - **Resend invite (users + artists):** Admin users list/detail and roster artists (linked but never signed in) can resend a **new** invite link; previous open invites are revoked.
 - **Strong password policy:** SSOT `passwordPolicy` enforces 12+ chars with upper/lower/digit/special across invite accept, recovery, portal/press settings, register, and press apply.

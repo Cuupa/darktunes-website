@@ -6,6 +6,12 @@ export {
 } from './catalog'
 export { emitNotification } from './emit'
 export {
+  getUserNotificationPreferences,
+  getUsersWithInAppDisabled,
+  upsertNotificationPreferences,
+  type NotificationPreference,
+} from './preferences'
+export {
   resolveArtistMemberUserIds,
   resolveStaffUserIds,
 } from './recipients'

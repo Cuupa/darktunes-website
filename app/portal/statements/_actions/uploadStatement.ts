@@ -162,6 +162,19 @@ export async function uploadStatement(
           } else {
             console.warn('[uploadStatement] Email notification skipped:', emailResult.error)
           }
+          // In-app bell even when email fails — artist should still see the statement
+          try {
+            const { emitNotification } = await import('@/lib/notifications')
+            await emitNotification(serviceSupabase, {
+              type: 'statement_available',
+              entityId: statement.id,
+              entityName: statement.period || statement.filename || 'New statement',
+              artistId: statement.artistId,
+              dedupeKey: `statement_available:${statement.id}`,
+            })
+          } catch (notifErr) {
+            console.error('[uploadStatement] In-app notification failed:', notifErr)
+          }
         }
       } catch (emailErr) {
         console.error('[uploadStatement] Email notification failed:', emailErr)

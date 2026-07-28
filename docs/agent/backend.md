@@ -96,8 +96,18 @@ Client: `bronzeUpload.ts`. Multipart: `bronzeMultipartUpload.ts`. Limits: `bronz
 | `press_asset_suggestion` | staff | `POST /api/portal/upload-asset` |
 | `artist_portal_message` | staff | `POST /api/portal/messages/send` (toLabel) |
 | `fan_page_review_decision` | artist members | `POST /api/admin/fan-page/review/[artistId]` |
+| `release_submission_decision` | artist members | `PATCH /api/admin/release-submissions/[id]` |
+| `video_submission_decision` | artist members | `PATCH /api/admin/video-submissions/[id]` |
+| `statement_available` | artist members | `uploadStatement` (notify path) |
+| `invoice_payment_received` | artist members | `PATCH /api/admin/invoices/[id]/payment` |
+| `journalist_application_submitted` | staff (admin) | `POST /api/journalist-applications` |
+| `journalist_application_decision` | applicant user | `PATCH /api/journalist-applications/[id]` |
 
 Release/video submit also fires `sendSubmissionNotificationEmail()` (env `LABEL_NOTIFICATION_EMAIL`, fire-and-forget).
+
+**Preferences:** `notification_preferences` (user_id, event_type, in_app, email). Missing row = all channels on. `emitNotification` skips users with `in_app=false`. UI: `/admin/notifications/preferences`, `/portal/notifications/preferences`.
+
+**History:** `/admin/notifications`, `/portal/notifications` via `NotificationCenter`.
 
 **New feature checklist:** catalog entry → emit after successful write → i18n (admin/portal) → routing href → unit/route test.
 

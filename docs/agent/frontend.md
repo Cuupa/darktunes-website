@@ -105,3 +105,5 @@ Shared primitives in `src/components/notifications/` (`NotificationBellTrigger`,
 **Admin:** `DashboardNotificationBell` + unified `notifications` table via `src/lib/api/editorNotifications.ts` / `src/lib/api/notifications.ts`. Realtime on `notifications` filtered by `user_id`.
 
 **Portal:** `PortalNotificationBell` + composite feed (`portalNotifications`): messages, interviews, statements, plus durable platform rows (`kind: platform`, e.g. fan-page decisions). Badge field `alerts` counts unread platform rows. `PortalNotificationProvider` refreshes on messages, interviews, statements, and `notifications`.
+
+**History + preferences:** Shared `NotificationCenter` and `NotificationPreferencesForm` under `src/components/notifications/`. Routes: `/admin/notifications` (+ `/preferences`), `/portal/notifications` (+ `/preferences`).

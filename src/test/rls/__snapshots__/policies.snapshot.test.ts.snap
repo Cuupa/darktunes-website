@@ -147,6 +147,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "news_posts: can_edit_news update",
   "news_posts: can_publish_news insert",
   "news_posts: public read",
+  "notification_preferences: own all",
   "notifications: admin read all",
   "notifications: own read",
   "notifications: own update",
@@ -321,6 +322,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "message_templates",
   "news_post_artists",
   "news_posts",
+  "notification_preferences",
   "notifications",
   "page_events",
   "period_carry_forwards",
@@ -622,6 +624,9 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
     "news_posts: can_edit_news update",
     "news_posts: can_publish_news insert",
     "news_posts: public read",
+  ],
+  "notification_preferences": [
+    "notification_preferences: own all",
   ],
   "notifications": [
     "notifications: admin read all",

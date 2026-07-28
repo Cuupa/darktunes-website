@@ -2,7 +2,7 @@
  * Shared types for the unified notification platform.
  */
 
-export type NotificationAudience = 'staff' | 'artist'
+export type NotificationAudience = 'staff' | 'artist' | 'user'
 
 /** Catalog event types. Prefer these over free-text inserts. */
 export type NotificationEventType =
@@ -12,6 +12,12 @@ export type NotificationEventType =
   | 'press_asset_suggestion'
   | 'artist_portal_message'
   | 'fan_page_review_decision'
+  | 'release_submission_decision'
+  | 'video_submission_decision'
+  | 'statement_available'
+  | 'invoice_payment_received'
+  | 'journalist_application_submitted'
+  | 'journalist_application_decision'
 
 export type StaffRole = 'admin' | 'editor'
 
@@ -39,11 +45,15 @@ export interface EmitNotificationInput {
    * do not create a second row.
    */
   dedupeKey?: string | null
-  /** Override resolved recipients (e.g. single assignee). */
+  /**
+   * Override resolved recipients (assignee, single user).
+   * Required when catalog audience is `user`.
+   */
   userIds?: string[]
 }
 
 export interface EmitNotificationResult {
   inserted: number
   userIds: string[]
+  skippedByPreference: number
 }

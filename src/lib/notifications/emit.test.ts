@@ -33,6 +33,17 @@ function mockDb(opts?: {
           }),
         }
       }
+      if (table === 'notification_preferences') {
+        return {
+          select: () => ({
+            in: () => ({
+              eq: () => ({
+                eq: async () => ({ data: [], error: null }),
+              }),
+            }),
+          }),
+        }
+      }
       if (table === 'notifications') {
         return {
           insert(rows: unknown[]) {
@@ -63,7 +74,11 @@ describe('NOTIFICATION_CATALOG', () => {
   it('covers every event type with audience and keys', () => {
     for (const type of ALL_NOTIFICATION_EVENT_TYPES) {
       const entry = NOTIFICATION_CATALOG[type]
-      expect(entry.audience === 'staff' || entry.audience === 'artist').toBe(true)
+      expect(
+        entry.audience === 'staff' ||
+          entry.audience === 'artist' ||
+          entry.audience === 'user',
+      ).toBe(true)
       expect(entry.summaryKey.length).toBeGreaterThan(0)
       expect(entry.actionKey.length).toBeGreaterThan(0)
       expect(entry.defaultEntityType.length).toBeGreaterThan(0)
