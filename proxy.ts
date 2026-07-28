@@ -139,11 +139,16 @@ export async function proxy(request: NextRequest) {
     if (user && (hasRecoveryCode || !hasExchangedCode)) {
       await supabase.auth.signOut()
     }
+    // Must set x-pathname here too, or the request never reaches the shared
+    // header assignment below and next-intl falls back to the public "*"
+    // namespace bundle (no "portal" strings — raw "portal.xxx" keys render).
+    supabaseResponse.headers.set('x-pathname', pathname)
     return supabaseResponse
   }
 
   // Invite links must let the user set a password before role-based redirects.
   if (isLoginPage && request.nextUrl.searchParams.get('type') === 'invite') {
+    supabaseResponse.headers.set('x-pathname', pathname)
     return supabaseResponse
   }
 
@@ -165,6 +170,7 @@ export async function proxy(request: NextRequest) {
   // Central Login Redirection Logic for Authenticated Users
   if (isLoginPage && user && profileRole) {
     if (shouldStayOnLoginPage(request.nextUrl.searchParams)) {
+      supabaseResponse.headers.set('x-pathname', pathname)
       return supabaseResponse
     }
 
