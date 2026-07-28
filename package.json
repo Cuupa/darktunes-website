@@ -149,7 +149,7 @@
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.7.0",
     "jsdom": "^29.1.1",
-    "postcss": "^8.5.15",
+    "postcss": "^8.5.18",
     "tailwindcss": "^4.1.11",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.62.0",
@@ -166,8 +166,35 @@
     "@typescript-eslint/typescript-estree": {
       "minimatch": "9.0.7"
     },
+    "@eslint/config-array": {
+      "minimatch": "9.0.7"
+    },
+    "@eslint/eslintrc": {
+      "minimatch": "9.0.7"
+    },
+    "eslint": {
+      "minimatch": "9.0.7"
+    },
+    "eslint-config-next": {
+      "minimatch": "9.0.7"
+    },
+    "@ts-morph/common": {
+      "minimatch": "9.0.7"
+    },
+    "archiver-utils": {
+      "minimatch": "9.0.7"
+    },
+    "fstream": {
+      "minimatch": "9.0.7"
+    },
+    "rimraf": {
+      "minimatch": "9.0.7"
+    },
+    "zip-stream": {
+      "minimatch": "9.0.7"
+    },
     "smol-toml": "1.6.1",
-    "postcss": "^8.5.15",
+    "postcss": "^8.5.18",
     "@vercel/node": {
       "undici": "6.27.0"
     },
@@ -178,7 +205,7 @@
     "next": {
       "sharp": "0.35.3"
     },
-    "brace-expansion": "2.1.2"
+    "brace-expansion": "^5.0.8"
   },
   "license": "UNLICENSED"
 }
