@@ -9,9 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { submitPressApplication } from '../_actions/apply'
+import { PASSWORD_MIN_LENGTH, validatePassword } from '@/lib/auth/passwordPolicy'
+import { PasswordRequirements } from '@/components/auth/PasswordRequirements'
+import { translatePasswordPolicyCode } from '@/components/auth/passwordPolicyUi'
 
 export function ApplyForm() {
   const t = useTranslations('apply')
+  const tPortal = useTranslations('portal')
   const [isPending, startTransition] = useTransition()
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -27,13 +31,18 @@ export function ApplyForm() {
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
     setError(null)
+    const policy = validatePassword(form.password)
+    if (!policy.ok) {
+      setError(translatePasswordPolicyCode(policy.code, tPortal))
+      return
+    }
     startTransition(async () => {
       const result = await submitPressApplication(form)
       if (result.status === 'pending') {
         setSubmitted(true)
         return
       }
-      setError(result.message === 'emailInUse' ? t('errors.emailInUse') : t('errors.generic'))
+      setError(result.message === 'emailInUse' ? t('errors.emailInUse') : (result.message ?? t('errors.generic')))
     })
   }
 
@@ -80,7 +89,26 @@ export function ApplyForm() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="apply-password">{t('fields.password')}</Label>
-                  <Input id="apply-password" type="password" minLength={8} value={form.password} onChange={(e) => setForm((v) => ({ ...v, password: e.target.value }))} required />
+                  <Input
+                    id="apply-password"
+                    type="password"
+                    minLength={PASSWORD_MIN_LENGTH}
+                    autoComplete="new-password"
+                    value={form.password}
+                    onChange={(e) => setForm((v) => ({ ...v, password: e.target.value }))}
+                    required
+                  />
+                  <PasswordRequirements
+                    password={form.password}
+                    heading={tPortal('password_policy_heading')}
+                    labelFor={(id, fallback) => {
+                      try {
+                        return tPortal(`password_req_${id}` as 'password_req_length')
+                      } catch {
+                        return fallback
+                      }
+                    }}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="apply-publication">{t('fields.publication')}</Label>

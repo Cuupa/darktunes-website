@@ -1,18 +1,15 @@
 'use server'
 
-import { z } from 'zod'
+import { strongPasswordPairSchema } from '@/lib/auth/passwordPolicy'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
-const schema = z.object({
-  newPassword: z.string().min(8, 'Password must be at least 8 characters.'),
-  confirmPassword: z.string(),
-})
-
-export async function updatePortalPassword(input: { newPassword: string; confirmPassword: string }) {
-  const parsed = schema.parse(input)
-
-  if (parsed.newPassword !== parsed.confirmPassword) {
-    throw new Error('Passwords do not match.')
+export async function updatePortalPassword(input: {
+  newPassword: string
+  confirmPassword: string
+}) {
+  const parsed = strongPasswordPairSchema.safeParse(input)
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? 'Invalid password')
   }
 
   const supabase = await createServerSupabaseClient()
@@ -22,6 +19,6 @@ export async function updatePortalPassword(input: { newPassword: string; confirm
 
   if (!user) throw new Error('Unauthorized')
 
-  const { error } = await supabase.auth.updateUser({ password: parsed.newPassword })
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.newPassword })
   if (error) throw new Error(error.message)
 }

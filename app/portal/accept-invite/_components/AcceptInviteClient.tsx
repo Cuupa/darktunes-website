@@ -24,6 +24,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
+import { PASSWORD_MIN_LENGTH } from '@/lib/auth/passwordPolicy'
+import { PasswordRequirements } from '@/components/auth/PasswordRequirements'
+import { getLocalizedPasswordPairError } from '@/components/auth/passwordPolicyUi'
 
 export function AcceptInviteClient() {
   const t = useTranslations('portal')
@@ -35,6 +38,13 @@ export function AcceptInviteClient() {
   const [isLoading, setIsLoading] = useState(false)
   const [sessionReady, setSessionReady] = useState(false)
   const [sessionError, setSessionError] = useState<string | null>(null)
+  const labelFor = (id: string, fallback: string) => {
+    try {
+      return t(`password_req_${id}` as 'password_req_length')
+    } catch {
+      return fallback
+    }
+  }
 
   // Wait for Supabase to process the invite hash and establish a session.
   useEffect(() => {
@@ -68,13 +78,9 @@ export function AcceptInviteClient() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (password.length < 8) {
-      toast.error(t('register_password_too_short'))
-      return
-    }
-
-    if (password !== passwordConfirm) {
-      toast.error(t('acceptInvite_mismatch'))
+    const policyError = getLocalizedPasswordPairError(password, passwordConfirm, t)
+    if (policyError) {
+      toast.error(policyError)
       return
     }
 
@@ -140,8 +146,13 @@ export function AcceptInviteClient() {
                     onChange={(e) => setPassword(e.target.value)}
                     className="bg-muted border-border"
                     required
-                    minLength={8}
+                    minLength={PASSWORD_MIN_LENGTH}
                     disabled={isLoading || !sessionReady}
+                  />
+                  <PasswordRequirements
+                    password={password}
+                    heading={t('password_policy_heading')}
+                    labelFor={labelFor}
                   />
                 </div>
                 <div className="space-y-2">
@@ -154,7 +165,7 @@ export function AcceptInviteClient() {
                     onChange={(e) => setPasswordConfirm(e.target.value)}
                     className="bg-muted border-border"
                     required
-                    minLength={8}
+                    minLength={PASSWORD_MIN_LENGTH}
                     disabled={isLoading || !sessionReady}
                   />
                 </div>

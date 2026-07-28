@@ -1202,6 +1202,35 @@ CREATE TRIGGER trg_site_settings_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.set_site_settings_updated_at();
 
 -- ---------------------------------------------------------------------------
+-- TABLE: user_invites
+-- Durable admin invite tokens. Validity is controlled by
+-- site_settings.invite_link_expiry_hours (24–168h, default 168).
+-- Only the SHA-256 hash of the emailed token is stored.
+-- Access: service-role only (RLS on, no policies).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.user_invites (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  email        TEXT        NOT NULL,
+  role         TEXT        NOT NULL,
+  token_hash   TEXT        NOT NULL UNIQUE,
+  portal       BOOLEAN     NOT NULL DEFAULT FALSE,
+  artist_id    UUID        REFERENCES public.artists (id) ON DELETE SET NULL,
+  granted_by   UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  auth_user_id UUID        REFERENCES auth.users (id) ON DELETE CASCADE,
+  expires_at   TIMESTAMPTZ NOT NULL,
+  accepted_at  TIMESTAMPTZ,
+  revoked_at   TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_invites_email ON public.user_invites (email);
+CREATE INDEX IF NOT EXISTS idx_user_invites_auth_user_id ON public.user_invites (auth_user_id);
+CREATE INDEX IF NOT EXISTS idx_user_invites_expires_at ON public.user_invites (expires_at);
+
+ALTER TABLE public.user_invites ENABLE ROW LEVEL SECURITY;
+
+-- ---------------------------------------------------------------------------
 -- TABLE: api_credentials  (admin-managed external API keys, AES-256-GCM ciphertext)
 -- label_id 00000000-0000-0000-0000-000000000000 = default single-label tenant.
 -- ---------------------------------------------------------------------------

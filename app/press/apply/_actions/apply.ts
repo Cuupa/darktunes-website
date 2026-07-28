@@ -3,6 +3,7 @@
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { isPressApplicationsEnabled } from '@/lib/pressAccess'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
+import { validatePassword } from '@/lib/auth/passwordPolicy'
 
 async function sendPressApplicationNotification(data: {
   name: string
@@ -48,6 +49,11 @@ export async function submitPressApplication(data: {
   reason: string
 }): Promise<{ status: 'pending' | 'error'; message?: string }> {
   try {
+    const policy = validatePassword(data.password)
+    if (!policy.ok) {
+      return { status: 'error', message: policy.message }
+    }
+
     const supabase = await createServerSupabaseClient()
     const applicationsEnabled = await isPressApplicationsEnabled(supabase)
     if (!applicationsEnabled) return { status: 'error', message: 'disabled' }

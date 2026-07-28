@@ -83,6 +83,7 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     theme_gradient_accent_to: s.themeGradientAccentTo ?? '',
     theme_gradient_accent_dir: s.themeGradientAccentDir ?? '135deg',
     theme_config: s.themeConfig ? JSON.stringify(s.themeConfig) : '',
+    invite_link_expiry_hours: String(s.inviteLinkExpiryHours ?? 168),
   }
 }
 

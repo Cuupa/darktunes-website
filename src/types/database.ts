@@ -484,6 +484,62 @@ export interface Database {
           }
         ]
       }
+      user_invites: {
+        Row: {
+          id: string
+          email: string
+          role: string
+          token_hash: string
+          portal: boolean
+          artist_id: string | null
+          granted_by: string | null
+          auth_user_id: string | null
+          expires_at: string
+          accepted_at: string | null
+          revoked_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          email: string
+          role: string
+          token_hash: string
+          portal?: boolean
+          artist_id?: string | null
+          granted_by?: string | null
+          auth_user_id?: string | null
+          expires_at: string
+          accepted_at?: string | null
+          revoked_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          role?: string
+          token_hash?: string
+          portal?: boolean
+          artist_id?: string | null
+          granted_by?: string | null
+          auth_user_id?: string | null
+          expires_at?: string
+          accepted_at?: string | null
+          revoked_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'user_invites_artist_id_fkey'
+            columns: ['artist_id']
+            isOneToOne: false
+            referencedRelation: 'artists'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       users: {
         Row: {
           id: string

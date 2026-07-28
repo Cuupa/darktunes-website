@@ -21,6 +21,9 @@ import {
   isRecoverySessionEvent,
 } from '@/lib/auth/recoverySession'
 import { resolveRedirectPath } from '@/lib/auth/resolveRedirectPath'
+import { PASSWORD_MIN_LENGTH } from '@/lib/auth/passwordPolicy'
+import { PasswordRequirements } from '@/components/auth/PasswordRequirements'
+import { getLocalizedPasswordPairError } from '@/components/auth/passwordPolicyUi'
 import { useTranslations } from 'next-intl'
 import type { UserRole } from '@/types/users'
 
@@ -250,13 +253,9 @@ export function CentralLoginForm() {
   const handleRecovery = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (newPassword.length < 8) {
-      toast.error(t('settings_password_too_short'))
-      return
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast.error(t('settings_password_mismatch'))
+    const policyError = getLocalizedPasswordPairError(newPassword, confirmPassword, t)
+    if (policyError) {
+      toast.error(policyError)
       return
     }
 
@@ -441,10 +440,21 @@ export function CentralLoginForm() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     required
-                    minLength={8}
+                    minLength={PASSWORD_MIN_LENGTH}
                     disabled={isLoading || !sessionReady}
                     className="bg-muted border-border"
                     autoComplete="new-password"
+                  />
+                  <PasswordRequirements
+                    password={newPassword}
+                    heading={t('password_policy_heading')}
+                    labelFor={(id, fallback) => {
+                      try {
+                        return t(`password_req_${id}` as 'password_req_length')
+                      } catch {
+                        return fallback
+                      }
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
@@ -455,7 +465,7 @@ export function CentralLoginForm() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    minLength={8}
+                    minLength={PASSWORD_MIN_LENGTH}
                     disabled={isLoading || !sessionReady}
                     className="bg-muted border-border"
                     autoComplete="new-password"

@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Invite link validity:** Admin → System → Invites configures how long invite links stay valid (24h–7 days, default 7 days). Invite emails show the exact UTC expiry. Durable tokens in `user_invites`; accept via `/auth/invite`.
+- **Resend invite (users + artists):** Admin users list/detail and roster artists (linked but never signed in) can resend a **new** invite link; previous open invites are revoked.
+- **Strong password policy:** SSOT `passwordPolicy` enforces 12+ chars with upper/lower/digit/special across invite accept, recovery, portal/press settings, register, and press apply.
 - **Message compose pages:** Admin `/admin/messages/compose` and portal `/portal/messages/compose` replace dismissible compose overlays.
 - **Custom role assignment:** Admin user detail can assign custom roles (`GET/PUT /api/admin/users/:id/custom-roles`) with RBAC audit entries.
 - **Accounting guided setup:** Month picker component, structured label address fields, legal/bank optional section; clearer subtab/action styling.
@@ -24,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Portal profile hometown 500:** Idempotent `artists.hometown` (and related) `ADD COLUMN IF NOT EXISTS` so existing prod DBs get the column after epk→artists consolidation; roster-only profile saves no longer fail hard on EPK read errors.
 
 ### Changed
+- **Invite pipeline hardening:** Rate limits on admin invite/resend and public token exchange; email normalization; UUID checks; atomic invite consume; audit log on invite actions; `createUser` provisioning instead of discarded OTPs.
 - **API SOTA foundation (Phase A/B):** `npm run verify:schema-columns` blocks CREATE-only column drift on critical tables; `npm run verify:api-contracts` requires `withErrorHandler` + recognized portal/admin auth patterns; both wired into `npm run ci`. Golden route tests (401/403/200) for profile, billing-profile, and messages/send via `tests/helpers/api/routeTestkit.ts`.
 - **Portal write unification (Phase C complete):** Portal mutations (documents, EPK, fan-page, uploads, invoices, messages, concerts, checklist, submissions, interview requests, tour-planner) use membership helpers; dual auth Bearer+cookie; mailbox/compose send Bearer.
 - **Admin auth unification (Phase D):** `requireAdminFromRequest` / `requireAdminOrEditorFromRequest` / `requireAdminWithServiceClient` (Bearer + cookie dual auth); cookie-only admin routes (users, SOS, feature-flags, invites, analytics) migrated off ad-hoc role checks.

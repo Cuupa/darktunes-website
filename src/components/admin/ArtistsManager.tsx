@@ -258,9 +258,16 @@ export function ArtistsManager() {
     setInvitingId(artist.id)
     try {
       const res = await fetch(`/api/admin/artists/${artist.id}/invite`, { method: 'POST' })
-      const json = (await res.json()) as { ok: boolean; email?: string; error?: string }
+      const json = (await res.json()) as {
+        ok: boolean
+        email?: string
+        error?: string
+        mode?: 'invite' | 'resend'
+      }
       if (!res.ok || !json.ok) {
         toast.error(json.error ?? 'Failed to send invite')
+      } else if (json.mode === 'resend') {
+        toast.success(`New invite link sent to ${json.email ?? artist.email ?? 'artist'}`)
       } else {
         toast.success(`Invite sent to ${json.email ?? artist.email ?? 'artist'}`)
       }
@@ -345,14 +352,23 @@ export function ArtistsManager() {
           const artist = row.original
           return (
             <div className="flex justify-end gap-2">
-              {artist.email && !artist.userId && (
+              {/* Invite or resend (linked but never signed in handled by API) */}
+              {artist.email && (
                 <Button
                   size="icon"
                   variant="ghost"
                   onClick={() => void handleInvite(artist)}
                   disabled={invitingId === artist.id}
-                  title="Send Portal Invite"
-                  aria-label={`Invite ${artist.name} to the portal`}
+                  title={
+                    artist.userId
+                      ? 'Resend portal invite (new link)'
+                      : 'Send portal invite'
+                  }
+                  aria-label={
+                    artist.userId
+                      ? `Resend portal invite to ${artist.name}`
+                      : `Invite ${artist.name} to the portal`
+                  }
                   className="text-primary hover:text-primary"
                 >
                   <Envelope size={16} aria-hidden="true" />
