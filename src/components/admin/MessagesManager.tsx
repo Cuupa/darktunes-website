@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
@@ -155,6 +156,9 @@ async function loadReplies(
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function MessagesManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const { loading: authLoading, session } = useAuthContext()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const searchStateRef = useRef<SearchState>(DEFAULT_SEARCH)
@@ -259,7 +263,7 @@ export function MessagesManager() {
   const load = useCallback(async () => {
     if (authLoading) return
     if (!session?.access_token || !session.refresh_token) {
-      toast.error('Please sign in again to load messages.')
+      toast.error(tToast('sign_in_again_messages'))
       return
     }
     try {

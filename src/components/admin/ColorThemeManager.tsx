@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * src/components/admin/ColorThemeManager.tsx
  *
@@ -358,6 +359,9 @@ function saveCustomPresets(presets: CustomColorPreset[]) {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function ColorThemeManager({ value, onChange, isLoading = false }: ColorThemeManagerProps) {
+  const tToast = useTranslations('admin.toast')
+
+
   // ── Single atomic draft state (replaces 15+ useState/useRef pairs) ────────
   const [draft, dispatch] = useReducer(themeReducer, value, draftFromSettings)
   const [isSaving, setIsSaving] = useState(false)
@@ -456,7 +460,7 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
         themeConfig,
       })
       originalDraft.current = { ...draft }
-      toast.success('Color theme saved')
+      toast.success(tToast('color_theme_saved'))
       // Notify other open tabs to refresh their theme
       try {
         new BroadcastChannel('theme-updates').postMessage({ type: 'theme-updated' })
@@ -464,7 +468,7 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
         // BroadcastChannel not supported in this context — safe to ignore
       }
     } catch {
-      toast.error('Failed to save color theme')
+      toast.error(tToast('failed_save_color_theme'))
     } finally {
       setIsSaving(false)
     }
@@ -473,8 +477,9 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
   // ── Custom preset management ──────────────────────────────────────────────
 
   function handleSaveCustomPreset() {
+
     const name = newPresetName.trim()
-    if (!name) { toast.error('Enter a name for the preset'); return }
+    if (!name) { toast.error(tToast('enter_preset_name')); return }
     const updated = [...customPresets.filter((p) => p.name !== name), { name, colors: draft.colors }]
     setCustomPresets(updated)
     saveCustomPresets(updated)

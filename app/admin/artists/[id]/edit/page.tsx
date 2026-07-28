@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useMemo, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -105,6 +106,9 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
 }
 
 export default function ArtistEditPage() {
+  const tToast = useTranslations('admin.toast')
+
+
   const params = useParams()
   const router = useRouter()
   const cms = useCmsPaths()
@@ -121,12 +125,13 @@ export default function ArtistEditPage() {
   // Redirect to admin if artist not found once loading is complete
   useEffect(() => {
     if (!isLoading && artists.length > 0 && !artist) {
-      toast.error('Artist not found')
+      toast.error(tToast('artist_not_found'))
       router.push(cms.artists)
     }
   }, [isLoading, artists.length, artist, router, cms.artists])
 
   const handleInvite = async () => {
+
     if (!artist) return
     setIsInviting(true)
     try {
@@ -145,13 +150,14 @@ export default function ArtistEditPage() {
         toast.success(`Invite sent to ${json.email ?? artist.email ?? 'artist'}`)
       }
     } catch {
-      toast.error('Failed to send invite')
+      toast.error(tToast('failed_send_invite'))
     } finally {
       setIsInviting(false)
     }
   }
 
   const handleSave = async (data: ArtistFormData) => {
+
     if (!artist) return
     setIsSaving(true)
     try {
@@ -171,7 +177,7 @@ export default function ArtistEditPage() {
             body: JSON.stringify({ artistId: artist.id }),
           }).then(res => {
             if (!res.ok) throw new Error(`Sync failed (${res.status})`)
-            toast.success('Release sync triggered')
+            toast.success(tToast('release_sync_triggered'))
           }).catch(err => {
             toast.error(err instanceof Error ? err.message : 'Release sync failed')
           })

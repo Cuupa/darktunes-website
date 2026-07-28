@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * src/components/admin/GenresManager.tsx
  *
@@ -16,6 +17,9 @@ import { Input } from '@/components/ui/input'
 import { useGenres } from '@/hooks/useGenres'
 
 export function GenresManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const { genres, isLoading, addGenre, removeGenre } = useGenres()
   const [newName, setNewName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -28,7 +32,7 @@ export function GenresManager() {
     try {
       const genre = await addGenre(name)
       if (genre) {
-        toast.success('Genre "' + genre.name + '" added.')
+        toast.success(tToast('genre_added', { name: genre.name }))
         setNewName('')
       }
     } finally {
@@ -37,9 +41,9 @@ export function GenresManager() {
   }
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm('Delete genre "' + name + '"? Artists using this genre will keep it in their existing data.')) return
+    if (!window.confirm(tToast('confirm_delete_genre', { name }))) return
     const ok = await removeGenre(id)
-    if (ok) toast.success('Genre deleted.')
+    if (ok) toast.success(tToast('genre_deleted'))
   }
 
   return (

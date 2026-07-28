@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -42,6 +43,9 @@ async function getToken(): Promise<string> {
 }
 
 export function VideoSubmissionsManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const [submissions, setSubmissions] = useState<VideoSubmission[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<VideoSubmission | null>(null)
@@ -61,7 +65,7 @@ export function VideoSubmissionsManager() {
         setSubmissions(data)
       }
     } catch {
-      toast.error('Failed to load video submissions')
+      toast.error(tToast('failed_load_video_submissions'))
     } finally {
       setLoading(false)
     }
@@ -78,6 +82,7 @@ export function VideoSubmissionsManager() {
   }
 
   const saveStatus = async () => {
+
     if (!selected) return
     setSaving(true)
     try {
@@ -91,11 +96,11 @@ export function VideoSubmissionsManager() {
         body: JSON.stringify({ status: newStatus, adminReply: adminReply || undefined }),
       })
       if (!res.ok) throw new Error('Failed')
-      toast.success('Video submission updated')
+      toast.success(tToast('video_submission_updated'))
       setSelected(null)
       await fetchSubmissions()
     } catch {
-      toast.error('Failed to update video submission')
+      toast.error(tToast('failed_update_video_submission'))
     } finally {
       setSaving(false)
     }

@@ -39,6 +39,9 @@ function statusBadgeVariant(status: SubmissionStatus) {
 }
 
 export function ReleaseSubmissionsManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const t = useTranslations('adminSubmissions')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
 
@@ -69,7 +72,7 @@ export function ReleaseSubmissionsManager() {
         setSubmissions(data)
       }
     } catch {
-      toast.error('Failed to load submissions')
+      toast.error(tToast('failed_load_submissions'))
     } finally {
       setLoading(false)
     }
@@ -135,6 +138,7 @@ export function ReleaseSubmissionsManager() {
   }
 
   const saveStatus = async () => {
+
     if (!selected) return
     setSaving(true)
     try {
@@ -148,11 +152,11 @@ export function ReleaseSubmissionsManager() {
         body: JSON.stringify({ status: newStatus, adminReply: adminReply || undefined }),
       })
       if (!res.ok) throw new Error('Failed')
-      toast.success('Submission updated')
+      toast.success(tToast('submission_updated'))
       setSelected(null)
       await fetchSubmissions()
     } catch {
-      toast.error('Failed to update submission')
+      toast.error(tToast('failed_update_submission'))
     } finally {
       setSaving(false)
     }

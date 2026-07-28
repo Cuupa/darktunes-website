@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * Admin System → Invites: configure durable invite link validity (24h–7d).
  */
@@ -32,6 +33,9 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 
 export function InviteSettingsManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const { settings, isLoading, saveSettings } = useSiteSettings()
   const [hours, setHours] = useState(INVITE_LINK_EXPIRY_HOURS_DEFAULT)
   const [saving, setSaving] = useState(false)
@@ -53,7 +57,7 @@ export function InviteSettingsManager() {
         inviteLinkExpiryHours: next,
       })
       setHours(next)
-      toast.success('Invite link validity saved')
+      toast.success(tToast('invite_validity_saved'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save invite settings')
     } finally {

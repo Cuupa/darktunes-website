@@ -136,6 +136,9 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ contentOnly = false, standalone = true }: AdminDashboardProps) {
+  const tToast = useTranslations('admin.toast')
+
+
   const t = useTranslations('admin')
   const { user, profile, signOut, loading: authLoading } = useAuthContext()
   const router = useRouter()
@@ -191,11 +194,12 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
   }, [router, searchParams, contentOnly])
 
   const handleSignOut = async () => {
+
     const { error } = await signOut()
     if (error) {
-      toast.error('Failed to sign out')
+      toast.error(tToast('failed_sign_out'))
     } else {
-      toast.success('Signed out successfully')
+      toast.success(tToast('signed_out_success'))
       if (standalone && (contentOnly || isEditor)) {
         router.push('/login')
       }

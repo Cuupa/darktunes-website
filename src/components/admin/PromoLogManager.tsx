@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * src/components/admin/PromoLogManager.tsx
  *
@@ -75,6 +76,9 @@ function formatDate(dateStr: string): string {
 // ---------------------------------------------------------------------------
 
 export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) {
+  const tToast = useTranslations('admin.toast')
+
+
   const [entries, setEntries] = useState<PromoLogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -113,7 +117,7 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
       const json = (await res.json()) as { entries: PromoLogEntry[] }
       setEntries(json.entries)
     } catch {
-      toast.error('Failed to load promo log entries')
+      toast.error(tToast('failed_load_promo_log'))
     } finally {
       setLoading(false)
     }
@@ -157,7 +161,7 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
       setProofR2Key(r2Key)
       URL.revokeObjectURL(localPreview)
       setProofPreview(url)
-      toast.success('Screenshot uploaded.')
+      toast.success(tToast('screenshot_uploaded'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Proof upload failed')
       URL.revokeObjectURL(localPreview)
@@ -232,9 +236,10 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
   // Submit: create or update
   // ---------------------------------------------------------------------------
   async function handleSubmit(e: React.FormEvent) {
+
     e.preventDefault()
     if (!description.trim() || !actionDate) {
-      toast.error('Date and description are required.')
+      toast.error(tToast('date_description_required'))
       return
     }
 
@@ -276,7 +281,7 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
         const { entry } = (await res.json()) as { entry: PromoLogEntry }
         setEntries((prev) => prev.map((e) => (e.id === editingId ? entry : e)))
         setEditingId(null)
-        toast.success('Marketing activity updated.')
+        toast.success(tToast('marketing_activity_updated'))
       } else {
         // Create new entry via POST
         const res = await fetch('/api/admin/promo-log', {
@@ -303,7 +308,7 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
 
         const { entry } = (await res.json()) as { entry: PromoLogEntry }
         setEntries((prev) => [entry, ...prev])
-        toast.success('Marketing activity logged.')
+        toast.success(tToast('marketing_activity_logged'))
       }
 
       // Reset form
@@ -323,7 +328,8 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
   // Delete entry
   // ---------------------------------------------------------------------------
   async function handleDelete(id: string) {
-    if (!window.confirm('Delete this marketing activity?')) return
+
+    if (!window.confirm(tToast('confirm_delete_marketing'))) return
     setDeletingId(id)
     try {
       const supabase = createBrowserSupabaseClient()
@@ -345,7 +351,7 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
       }
 
       setEntries((prev) => prev.filter((e) => e.id !== id))
-      toast.success('Entry deleted.')
+      toast.success(tToast('entry_deleted'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Delete failed')
     } finally {

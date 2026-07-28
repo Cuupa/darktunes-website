@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { CloudArrowUp, Headphones, Images, Layout, Newspaper, TrendUp, Users } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -26,6 +27,9 @@ function PanelFallback() {
 }
 
 export function PressManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [applications, setApplications] = useState<JournalistApplication[]>([])
   const [tracks, setTracks] = useState<PromoTrack[]>([])
@@ -75,13 +79,14 @@ export function PressManager() {
   }, [loadAll])
 
   const approveApplication = async (id: string, status: 'approved' | 'rejected') => {
+
     const response = await fetch(`/api/journalist-applications/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     })
     if (!response.ok) {
-      toast.error('Failed to update application')
+      toast.error(tToast('failed_update_application'))
       return
     }
     toast.success(`Application ${status}`)
@@ -89,6 +94,7 @@ export function PressManager() {
   }
 
   const uploadTrack = async (event: React.FormEvent) => {
+
     event.preventDefault()
     if (!trackFile || !trackForm.title || !trackForm.artistName) return
     setTrackUploading(true)
@@ -121,7 +127,7 @@ export function PressManager() {
       })
       setTrackForm({ title: '', artistName: '', genre: '', bpm: '', key: '', releaseDate: '', embargoUntil: '', ndaRequired: false })
       setTrackFile(null)
-      toast.success('Promo track uploaded')
+      toast.success(tToast('promo_track_uploaded'))
       await loadAll()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Upload failed')
@@ -218,7 +224,7 @@ export function PressManager() {
                   <p className="font-medium">{track.title} — {track.artistName}</p>
                   <p className="text-sm text-muted-foreground">{[track.genre, track.bpm ? `${track.bpm} BPM` : null, track.key].filter(Boolean).join(' · ') || 'No metadata'}</p>
                 </div>
-                <Button size="sm" variant="destructive" onClick={() => deletePromoTrack(supabase, track.id).then(loadAll).catch(() => toast.error('Delete failed'))}>Delete</Button>
+                <Button size="sm" variant="destructive" onClick={() => deletePromoTrack(supabase, track.id).then(loadAll).catch(() => toast.error(tToast('delete_failed')))}>Delete</Button>
               </CardContent>
             </Card>
           ))}

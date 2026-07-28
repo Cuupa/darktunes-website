@@ -1,4 +1,6 @@
 'use client'
+
+import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { useRouter } from 'next/navigation'
@@ -127,6 +129,9 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
 }
 
 export function ArtistsManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const router = useRouter()
   const cms = useCmsPaths()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
@@ -255,6 +260,7 @@ export function ArtistsManager() {
   }
 
   const handleInvite = async (artist: Artist) => {
+
     setInvitingId(artist.id)
     try {
       const res = await fetch(`/api/admin/artists/${artist.id}/invite`, { method: 'POST' })
@@ -272,7 +278,7 @@ export function ArtistsManager() {
         toast.success(`Invite sent to ${json.email ?? artist.email ?? 'artist'}`)
       }
     } catch {
-      toast.error('Failed to send invite')
+      toast.error(tToast('failed_send_invite'))
     } finally {
       setInvitingId(null)
     }

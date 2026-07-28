@@ -30,6 +30,9 @@ jobs:
       - name: Scroll contract
         run: npm run check:scroll
 
+      - name: i18n contract
+        run: npm run check:i18n
+
       - name: Build
         # Secrets optional for CI build — placeholders allow prerender without a live DB.
         # See DEPLOYMENT.md for production secret configuration.

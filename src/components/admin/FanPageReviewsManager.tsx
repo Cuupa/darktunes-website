@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { ArrowSquareOut, Globe } from '@phosphor-icons/react'
@@ -46,6 +47,9 @@ async function getToken(): Promise<string> {
 }
 
 export function FanPageReviewsManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const [filter, setFilter] = useState<StatusFilter>('pending_review')
   const [reviews, setReviews] = useState<FanPageReviewListItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -70,7 +74,7 @@ export function FanPageReviewsManager() {
         return data.find((item) => item.artistId === current.artistId) ?? current
       })
     } catch {
-      toast.error('Failed to load fan page reviews')
+      toast.error(tToast('failed_load_fan_page_reviews'))
     } finally {
       setLoading(false)
     }
@@ -86,6 +90,7 @@ export function FanPageReviewsManager() {
   }
 
   const submitReview = async (approved: boolean) => {
+
     if (!selected) return
     setSaving(true)
     try {
@@ -107,13 +112,14 @@ export function FanPageReviewsManager() {
       setReviewComment('')
       await fetchReviews()
     } catch {
-      toast.error('Failed to update fan page review')
+      toast.error(tToast('failed_update_fan_page_review'))
     } finally {
       setSaving(false)
     }
   }
 
   const updateTrusted = async (trusted: boolean) => {
+
     if (!selected) return
     setTrustedSaving(true)
     try {
@@ -141,7 +147,7 @@ export function FanPageReviewsManager() {
           : 'Artist must submit fan pages for review',
       )
     } catch {
-      toast.error('Failed to update trusted publish setting')
+      toast.error(tToast('failed_update_trusted_publish'))
     } finally {
       setTrustedSaving(false)
     }

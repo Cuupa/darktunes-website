@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl'
 /**
  * app/portal/_components/PortalAccessGate.tsx — Client Component
  *
@@ -18,12 +19,16 @@ interface PortalAccessGateProps {
 }
 
 export function PortalAccessGate({ role }: PortalAccessGateProps) {
+  const tToast = useTranslations('portal')
+
+
   const router = useRouter()
 
   const handleSignOut = async () => {
+
     const supabase = createBrowserSupabaseClient()
     await supabase.auth.signOut()
-    toast.success('Signed out')
+    toast.success(tToast('toast_signed_out'))
     router.push('/login')
     router.refresh()
   }

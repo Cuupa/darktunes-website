@@ -144,6 +144,9 @@ const NAV_GROUPS: NavGroup[] = [
 ]
 
 export function AdminSidebarNav() {
+  const tToast = useTranslations('admin.toast')
+
+
   const pathname = usePathname()
   const router = useRouter()
   const tNav = useTranslations('admin.nav')
@@ -159,9 +162,9 @@ export function AdminSidebarNav() {
   const handleSignOut = useCallback(async () => {
     const { error } = await signOut()
     if (error) {
-      toast.error('Failed to sign out')
+      toast.error(tToast('failed_sign_out'))
     } else {
-      toast.success('Signed out successfully')
+      toast.success(tToast('signed_out_success'))
       router.push('/login')
     }
   }, [signOut, router])
