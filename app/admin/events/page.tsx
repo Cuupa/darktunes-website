@@ -1,21 +1,82 @@
 /**
  * app/admin/events/page.tsx — Events / Live Shows Management
+ *
+ * Prefetches artists, concerts, and news titles on the server (parallel).
+ * Artist switch uses ?artistId= (same pattern as promo-log).
+ * Tour Production remains at /admin/tour-planner — not this page.
  */
 
 export const dynamic = 'force-dynamic'
 
-import { Suspense, lazy } from 'react'
+import { Suspense } from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { getArtists } from '@/lib/api/artists'
+import { getConcertsByArtistId } from '@/lib/api/concerts'
+import { getNewsPosts } from '@/lib/api/news'
+import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { AdminConcertsManager } from '@/components/admin/AdminConcertsManager'
 import { AdminPageShell } from '../_components/AdminPageShell'
 
-const AdminConcertsManager = lazy(() =>
-  import('@/components/admin/AdminConcertsManager').then((m) => ({ default: m.AdminConcertsManager })),
-)
-
-export default function AdminEventsPage() {
+function EventsLoading() {
   return (
-    <AdminPageShell title="Events" description="Manage live shows and concert dates for all artists.">
-      <Suspense fallback={<div className="p-8 text-muted-foreground text-sm">Loading…</div>}>
-        <AdminConcertsManager />
+    <div className="space-y-3 p-2" aria-busy="true" aria-label="Loading events">
+      <Skeleton className="h-10 w-64" />
+      <Skeleton className="h-4 w-48" />
+      <Skeleton className="h-20 w-full" />
+      <Skeleton className="h-20 w-full" />
+    </div>
+  )
+}
+
+async function AdminEventsContent({
+  searchParams,
+}: {
+  searchParams: Promise<{ artistId?: string }>
+}) {
+  const { artistId: artistIdParam } = await searchParams
+  const supabase = await createServerSupabaseClient()
+
+  const artists = await getArtists(supabase).catch(() => [])
+  const selectedArtistId =
+    artistIdParam && artists.some((a) => a.id === artistIdParam) ? artistIdParam : null
+
+  const [concerts, newsPosts] = await Promise.all([
+    selectedArtistId
+      ? getConcertsByArtistId(supabase, selectedArtistId).catch(() => [])
+      : Promise.resolve([]),
+    getNewsPosts(supabase)
+      .then((posts) =>
+        posts
+          .filter((p) => p.status === 'published')
+          .slice(0, 50)
+          .map((p) => ({ id: p.id, title: p.title })),
+      )
+      .catch(() => []),
+  ])
+
+  return (
+    <AdminConcertsManager
+      artists={artists.map((a) => ({ id: a.id, name: a.name }))}
+      selectedArtistId={selectedArtistId}
+      concerts={concerts}
+      newsPosts={newsPosts}
+      syncSearchParams
+    />
+  )
+}
+
+export default function AdminEventsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ artistId?: string }>
+}) {
+  return (
+    <AdminPageShell
+      title="Events"
+      description="Manage live shows and concert dates for all artists."
+    >
+      <Suspense fallback={<EventsLoading />}>
+        <AdminEventsContent searchParams={searchParams} />
       </Suspense>
     </AdminPageShell>
   )
