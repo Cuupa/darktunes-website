@@ -896,6 +896,7 @@
   "notifications_viewMessage": "Nachricht öffnen",
   "notifications_viewInterview": "Interview-Anfrage ansehen",
   "notifications_viewStatement": "Abrechnung ansehen",
+  "notifications_viewAlert": "Öffnen",
   "profile_tab_riders": "Rider & Dokumente",
   "profile_riders_heading": "Technische Dokumente",
   "profile_riders_desc": "Lade Stage Plot, Technical Rider und Hospitality Rider als PDF hoch. Diese werden bei Buchungen mit Veranstaltern geteilt.",

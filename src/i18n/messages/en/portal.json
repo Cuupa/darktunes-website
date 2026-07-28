@@ -896,6 +896,7 @@
   "notifications_viewMessage": "Open message",
   "notifications_viewInterview": "View interview request",
   "notifications_viewStatement": "View statement",
+  "notifications_viewAlert": "Open",
   "profile_tab_riders": "Riders & Docs",
   "profile_riders_heading": "Technical Documents",
   "profile_riders_desc": "Upload your Stage Plot, Technical Rider and Hospitality Rider as PDF files. These are shared with promoters when booking shows.",

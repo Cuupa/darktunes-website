@@ -94,8 +94,12 @@ describe('POST /api/portal/upload-asset', () => {
             }),
           }
         }
-        if (table === 'editor_notifications') {
-          return { insert: editorNotificationsInsertMock.mockResolvedValue({ error: null }) }
+        if (table === 'notifications') {
+          return {
+            insert: editorNotificationsInsertMock.mockReturnValue({
+              select: async () => ({ data: [{ id: 'n1' }, { id: 'n2' }], error: null }),
+            }),
+          }
         }
         if (table === 'asset_folders') {
           return {

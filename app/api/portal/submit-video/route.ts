@@ -9,6 +9,7 @@ import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 import { withIdempotency } from '@/lib/api/idempotency'
 import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { getClientIp } from '@/lib/ipRateLimit'
+import { emitNotification } from '@/lib/notifications'
 
 const bodySchema = z.object({
   title: z.string().min(1),
@@ -88,24 +89,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const submission = idem.value
 
-  const { data: recipientProfiles } = await serviceRole
-    .from('users')
-    .select('id')
-    .in('role', ['admin', 'editor'])
-
-  const recipients = (recipientProfiles ?? []).map((profile) => ({
-    recipient_id: profile.id,
+  await emitNotification(serviceRole, {
     type: 'artist_video_submission',
-    entity_type: 'video_submission',
-    entity_id: submission.id,
-    entity_name: submission.title,
-    sender_id: user.id,
-    read: false,
-  }))
-
-  if (recipients.length > 0) {
-    await serviceRole.from('editor_notifications').insert(recipients)
-  }
+    entityId: submission.id,
+    entityName: submission.title,
+    senderId: user.id,
+    artistId: artist.id,
+    dedupeKey: `artist_video_submission:${submission.id}`,
+  })
 
   const { resendApiKey: storedResendKey, resendFromEmail: storedFromEmail } =
     await getEmailCredentials(serviceRole)

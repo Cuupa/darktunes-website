@@ -27,6 +27,17 @@ Update when applicable — skip doc-only sessions with no product change.
 
 **Minimal changes:** smallest diff that fully solves the requirement; no unrelated refactors; no new dependencies unless necessary.
 
+## Notifications (human-facing workflows)
+
+If a change creates work for staff or artists (queues, decisions, messages):
+
+1. Add or reuse a type in `src/lib/notifications/catalog.ts`
+2. Call `emitNotification(serviceDb, …)` after the successful write (never user JWT)
+3. Ensure admin/portal routing + i18n keys exist
+4. Cover emit with a unit or route test
+
+See [frontend.md](./frontend.md) and [backend.md](./backend.md).
+
 ## Multi-agent pattern (large tasks)
 
 For tasks with >3 distinct concerns:

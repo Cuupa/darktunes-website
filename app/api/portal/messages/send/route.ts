@@ -14,6 +14,7 @@ import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withP
 import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { getClientIp } from '@/lib/ipRateLimit'
 import { PORTAL_MESSAGE_SEND_RATE } from '@/lib/uploads/portalUploadLimits'
+import { emitNotification } from '@/lib/notifications'
 
 const sendSchema = z.object({
   fromArtistId: z.string().uuid(),
@@ -78,26 +79,21 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   )
 
   if (toLabel) {
-    // Staff notifications — always service role
-    const [{ data: artist }, { data: recipientProfiles }] = await Promise.all([
-      ctx.serviceDb.from('artists').select('name').eq('id', fromArtistId).maybeSingle(),
-      ctx.serviceDb.from('users').select('id').in('role', ['admin', 'editor']),
-    ])
+    const { data: artist } = await ctx.serviceDb
+      .from('artists')
+      .select('name')
+      .eq('id', fromArtistId)
+      .maybeSingle()
 
     const artistName = artist?.name ?? 'Artist'
-    const recipients = (recipientProfiles ?? []).map((profile) => ({
-      recipient_id: profile.id,
+    await emitNotification(ctx.serviceDb, {
       type: 'artist_portal_message',
-      entity_type: 'portal_message',
-      entity_id: message.id,
-      entity_name: `${artistName}: ${subject}`,
-      sender_id: ctx.user.id,
-      read: false,
-    }))
-
-    if (recipients.length > 0) {
-      await ctx.serviceDb.from('editor_notifications').insert(recipients)
-    }
+      entityId: message.id,
+      entityName: `${artistName}: ${subject}`,
+      senderId: ctx.user.id,
+      artistId: fromArtistId,
+      dedupeKey: `artist_portal_message:${message.id}`,
+    })
   }
 
   return NextResponse.json({ message }, { status: 201 })

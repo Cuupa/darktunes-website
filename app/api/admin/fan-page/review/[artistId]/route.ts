@@ -7,8 +7,9 @@ import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
 import { reviewFanPage } from '@/lib/api/fanPageDocument'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { revalidateTag } from 'next/cache'
+import { emitNotification } from '@/lib/notifications'
 
 const bodySchema = z.object({
   approved: z.boolean(),
@@ -26,7 +27,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const { data: artist } = await supabase
     .from('artists')
-    .select('slug')
+    .select('slug, name')
     .eq('id', artistId)
     .maybeSingle()
 
@@ -36,6 +37,30 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   if (result.publishStatus === 'published') {
     revalidateTag(`fan-page-${artist.slug}`, 'max')
+  }
+
+  // Notify artist members (service role — artists cannot self-insert)
+  try {
+    const serviceDb = await createServiceRoleSupabaseClient()
+    const decision = body.approved ? 'approved' : 'rejected'
+    await emitNotification(serviceDb, {
+      type: 'fan_page_review_decision',
+      entityId: artistId,
+      entityName: body.approved
+        ? `${artist.name}: Fan page approved`
+        : `${artist.name}: Fan page needs changes`,
+      senderId: userId,
+      artistId,
+      payload: {
+        approved: body.approved,
+        comment: body.comment ?? null,
+        publishStatus: result.publishStatus,
+      },
+      // Allow multiple review rounds: include status so re-review can notify again
+      dedupeKey: `fan_page_review_decision:${artistId}:${decision}:${result.publishStatus}`,
+    })
+  } catch (err) {
+    console.error('[fan-page/review] notification emit failed:', err)
   }
 
   return NextResponse.json(result)

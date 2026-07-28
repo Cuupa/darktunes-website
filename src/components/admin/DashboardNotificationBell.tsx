@@ -61,8 +61,8 @@ export function DashboardNotificationBell({ userId }: DashboardNotificationBellP
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'editor_notifications',
-          filter: `recipient_id=eq.${userId}`,
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
         },
         () => { void loadNotificationsRef.current() },
       )
@@ -71,8 +71,8 @@ export function DashboardNotificationBell({ userId }: DashboardNotificationBellP
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'editor_notifications',
-          filter: `recipient_id=eq.${userId}`,
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
         },
         () => { void loadNotificationsRef.current() },
       )

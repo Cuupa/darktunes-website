@@ -2,10 +2,17 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { markMessageRead } from '@/lib/api/labelMessages'
 import { markPortalMessageRead } from '@/lib/api/portalMessages'
+import { markNotificationRead } from '@/lib/api/notifications'
+import { getNotificationHref } from '@/lib/notifications'
 
 type DbClient = SupabaseClient<Database>
 
-export type PortalNotificationKind = 'label_message' | 'portal_message' | 'interview' | 'statement'
+export type PortalNotificationKind =
+  | 'label_message'
+  | 'portal_message'
+  | 'interview'
+  | 'statement'
+  | 'platform'
 
 export interface PortalNotificationItem {
   id: string
@@ -15,6 +22,8 @@ export interface PortalNotificationItem {
   createdAt: string
   isUnread: boolean
   canMarkRead: boolean
+  /** Present for kind === 'platform' */
+  platformType?: string
 }
 
 function buildPortalHref(path: string, artistId: string): string {
@@ -26,41 +35,50 @@ export async function getPortalNotificationFeed(
   artistId: string,
   limit = 20,
 ): Promise<PortalNotificationItem[]> {
-  const [labelResult, portalResult, interviewResult, statementResult] = await Promise.all([
-    db
-      .from('label_messages')
-      .select('id, subject, sent_at, read')
-      .eq('artist_id', artistId)
-      .is('deleted_at', null)
-      .order('sent_at', { ascending: false })
-      .limit(limit),
-    db
-      .from('portal_messages')
-      .select('id, subject, sent_at, read_at')
-      .eq('to_artist_id', artistId)
-      .is('deleted_at', null)
-      .order('sent_at', { ascending: false })
-      .limit(limit),
-    db
-      .from('interview_requests')
-      .select('id, subject, created_at, status')
-      .eq('artist_id', artistId)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-      .limit(limit),
-    db
-      .from('sales_statements')
-      .select('id, period, filename, created_at, status')
-      .eq('artist_id', artistId)
-      .eq('status', 'artist_notified')
-      .order('created_at', { ascending: false })
-      .limit(limit),
-  ])
+  const [labelResult, portalResult, interviewResult, statementResult, platformResult] =
+    await Promise.all([
+      db
+        .from('label_messages')
+        .select('id, subject, sent_at, read')
+        .eq('artist_id', artistId)
+        .is('deleted_at', null)
+        .order('sent_at', { ascending: false })
+        .limit(limit),
+      db
+        .from('portal_messages')
+        .select('id, subject, sent_at, read_at')
+        .eq('to_artist_id', artistId)
+        .is('deleted_at', null)
+        .order('sent_at', { ascending: false })
+        .limit(limit),
+      db
+        .from('interview_requests')
+        .select('id, subject, created_at, status')
+        .eq('artist_id', artistId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      db
+        .from('sales_statements')
+        .select('id, period, filename, created_at, status')
+        .eq('artist_id', artistId)
+        .eq('status', 'artist_notified')
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      // RLS scopes to auth.uid(); artist_id filters multi-roster users
+      db
+        .from('notifications')
+        .select('id, type, entity_name, entity_id, artist_id, read, created_at')
+        .eq('artist_id', artistId)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+    ])
 
   if (labelResult.error) throw new Error(labelResult.error.message)
   if (portalResult.error) throw new Error(portalResult.error.message)
   if (interviewResult.error) throw new Error(interviewResult.error.message)
   if (statementResult.error) throw new Error(statementResult.error.message)
+  if (platformResult.error) throw new Error(platformResult.error.message)
 
   const messagesHref = buildPortalHref('/portal/messages', artistId)
   const interviewsHref = buildPortalHref('/portal/interviews', artistId)
@@ -103,6 +121,23 @@ export async function getPortalNotificationFeed(
       isUnread: true,
       canMarkRead: false,
     })),
+    ...(platformResult.data ?? []).map((row) => {
+      const href =
+        getNotificationHref(row.type, 'artist', {
+          artistId: row.artist_id,
+          entityId: row.entity_id,
+        }) ?? buildPortalHref('/portal', artistId)
+      return {
+        id: row.id,
+        kind: 'platform' as const,
+        title: row.entity_name ?? row.type,
+        href,
+        createdAt: row.created_at,
+        isUnread: !row.read,
+        canMarkRead: true,
+        platformType: row.type,
+      }
+    }),
   ]
 
   return items
@@ -113,7 +148,7 @@ export async function getPortalNotificationFeed(
 export async function markAllPortalMessagesRead(db: DbClient, artistId: string): Promise<void> {
   const now = new Date().toISOString()
 
-  const [labelResult, portalResult] = await Promise.all([
+  const [labelResult, portalResult, platformResult] = await Promise.all([
     db
       .from('label_messages')
       .update({ read: true, read_at: now })
@@ -126,10 +161,16 @@ export async function markAllPortalMessagesRead(db: DbClient, artistId: string):
       .eq('to_artist_id', artistId)
       .is('read_at', null)
       .is('deleted_at', null),
+    db
+      .from('notifications')
+      .update({ read: true })
+      .eq('artist_id', artistId)
+      .eq('read', false),
   ])
 
   if (labelResult.error) throw new Error(labelResult.error.message)
   if (portalResult.error) throw new Error(portalResult.error.message)
+  if (platformResult.error) throw new Error(platformResult.error.message)
 }
 
 export async function markPortalNotificationItemRead(
@@ -143,5 +184,10 @@ export async function markPortalNotificationItemRead(
 
   if (item.kind === 'portal_message') {
     await markPortalMessageRead(db, item.id)
+    return
+  }
+
+  if (item.kind === 'platform') {
+    await markNotificationRead(db, item.id)
   }
 }

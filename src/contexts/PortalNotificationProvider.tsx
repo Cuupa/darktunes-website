@@ -19,6 +19,8 @@ export interface PortalBadgeCounts {
   messages: number
   interviews: number
   statements: number
+  /** Unread rows from unified `notifications` (e.g. fan-page decisions). */
+  alerts: number
 }
 
 interface PortalNotificationContextValue {
@@ -29,7 +31,7 @@ interface PortalNotificationContextValue {
 }
 
 export const PortalNotificationContext = createContext<PortalNotificationContextValue>({
-  badges: { messages: 0, interviews: 0, statements: 0 },
+  badges: { messages: 0, interviews: 0, statements: 0, alerts: 0 },
   unreadCount: 0,
   setUnreadCount: () => {},
   setBadges: () => {},
@@ -163,6 +165,16 @@ export function PortalNotificationProvider({
           event: '*',
           schema: 'public',
           table: 'sales_statements',
+          filter: `artist_id=eq.${artistId}`,
+        },
+        () => refreshBadges(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
           filter: `artist_id=eq.${artistId}`,
         },
         () => refreshBadges(),

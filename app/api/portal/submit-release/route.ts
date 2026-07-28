@@ -22,6 +22,7 @@ import { verifyCoverArtToken } from '@/lib/submissions/coverArtToken'
 import type { SubmissionFieldType } from '@/lib/submissions/fieldTypes'
 import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { getClientIp } from '@/lib/ipRateLimit'
+import { emitNotification } from '@/lib/notifications'
 
 const trackInputSchema = z.object({
   trackNumber: z.number().int().min(1),
@@ -185,24 +186,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       trackInserts,
     )
 
-    const { data: recipientProfiles } = await serviceRole
-      .from('users')
-      .select('id')
-      .in('role', ['admin', 'editor'])
-
-    const recipients = (recipientProfiles ?? []).map((profile) => ({
-      recipient_id: profile.id,
+    await emitNotification(serviceRole, {
       type: 'artist_release_submission',
-      entity_type: 'release_submission',
-      entity_id: submission.id,
-      entity_name: submission.title,
-      sender_id: user.id,
-      read: false,
-    }))
-
-    if (recipients.length > 0) {
-      await serviceRole.from('editor_notifications').insert(recipients)
-    }
+      entityId: submission.id,
+      entityName: submission.title,
+      senderId: user.id,
+      artistId: artist.id,
+      dedupeKey: `artist_release_submission:${submission.id}`,
+    })
 
     const { resendApiKey: storedResendKey, resendFromEmail: storedFromEmail } =
       await getEmailCredentials(serviceRole)

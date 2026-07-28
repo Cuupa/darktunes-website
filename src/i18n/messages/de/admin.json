@@ -801,7 +801,23 @@
     "markAll": "Alle gelesen",
     "markAllAria": "Alle Benachrichtigungen als gelesen markieren",
     "openAria": "Benachrichtigungen öffnen",
-    "unreadAria": "Benachrichtigungen öffnen, {count} ungelesen"
+    "unreadAria": "Benachrichtigungen öffnen, {count} ungelesen",
+    "types": {
+      "release_submission": "Release-Einreichung",
+      "video_submission": "Video-Einreichung",
+      "landing_page_review": "Fan-Page wartet auf Review",
+      "press_asset": "Press-Asset-Vorschlag",
+      "portal_message": "Neue Nachricht vom Artist",
+      "fan_page_decision": "Fan-Page-Review-Entscheidung"
+    },
+    "actions": {
+      "review_release": "Release prüfen",
+      "review_video": "Video prüfen",
+      "review_fan_page": "Fan-Page prüfen",
+      "review_asset": "Asset prüfen",
+      "open_messages": "Nachrichten öffnen",
+      "open_fan_page": "Fan-Page öffnen"
+    }
   },
   "toast": {
     "failed_send_invite": "Einladung konnte nicht gesendet werden",

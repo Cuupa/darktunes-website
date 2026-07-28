@@ -1943,6 +1943,37 @@ CREATE INDEX IF NOT EXISTS idx_editor_notifications_recipient
   ON public.editor_notifications(recipient_id, read);
 
 -- ---------------------------------------------------------------------------
+-- TABLE: notifications  (unified staff + artist in-app notifications)
+-- Prefer this over editor_notifications for all new emits.
+-- editor_notifications remains for legacy rows until fully migrated.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  artist_id UUID REFERENCES public.artists(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id UUID,
+  entity_name TEXT,
+  sender_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  dedupe_key TEXT,
+  read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read_created
+  ON public.notifications(user_id, read, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_artist
+  ON public.notifications(artist_id, created_at DESC)
+  WHERE artist_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_user_dedupe
+  ON public.notifications(user_id, dedupe_key)
+  WHERE dedupe_key IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
 -- TABLE: interview_requests
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.interview_requests (
@@ -2849,6 +2880,7 @@ ALTER TABLE public.journalist_downloads  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.accreditation_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.editor_activity_log   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.editor_notifications  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interview_requests    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_logs              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.support_known_errors  ENABLE ROW LEVEL SECURITY;
@@ -3332,6 +3364,23 @@ CREATE POLICY "editor_notifications: editor update own" ON public.editor_notific
 CREATE POLICY "editor_notifications: admin manage" ON public.editor_notifications
   FOR ALL USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: notifications (unified; INSERT via service role only)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "notifications: own read" ON public.notifications;
+DROP POLICY IF EXISTS "notifications: own update" ON public.notifications;
+DROP POLICY IF EXISTS "notifications: admin read all" ON public.notifications;
+
+CREATE POLICY "notifications: own read" ON public.notifications
+  FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "notifications: own update" ON public.notifications
+  FOR UPDATE USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "notifications: admin read all" ON public.notifications
+  FOR SELECT USING (public.get_my_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: interview_requests
