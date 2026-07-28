@@ -7,11 +7,13 @@
  * to artists via email (mailto links and optional email sending).
  */
 
-import { EnvelopeSimple, At, ArrowBendUpLeft } from '@phosphor-icons/react'
+import { EnvelopeSimple } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { EmailConfig } from '@/lib/sos/types'
+import { EmailField } from '@/components/admin/sos/fields/AccountingTextFields'
+import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 
 interface EmailConfigManagerProps {
   config: Partial<EmailConfig>
@@ -19,6 +21,7 @@ interface EmailConfigManagerProps {
 }
 
 export function EmailConfigManager({ config, onUpdate }: EmailConfigManagerProps) {
+  const t = useAccountingLabels()
   const patch = (partial: Partial<EmailConfig>) => onUpdate({ ...config, ...partial })
 
   return (
@@ -34,7 +37,6 @@ export function EmailConfigManager({ config, onUpdate }: EmailConfigManagerProps
       </p>
 
       <Card className="p-6 space-y-6">
-
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="email-from-name" className="flex items-center gap-1.5">
@@ -44,40 +46,33 @@ export function EmailConfigManager({ config, onUpdate }: EmailConfigManagerProps
               id="email-from-name"
               type="text"
               value={config.fromName ?? ''}
-              onChange={e => patch({ fromName: e.target.value })}
+              maxLength={120}
+              onChange={(e) => patch({ fromName: e.target.value.slice(0, 120) })}
               placeholder="e.g. darkTunes Music Group"
             />
             <p className="text-xs text-muted-foreground">Display name in the From field.</p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email-from-addr" className="flex items-center gap-1.5">
-              <At size={14} /> From Email
-            </Label>
-            <Input
-              id="email-from-addr"
-              type="email"
-              value={config.fromEmail ?? ''}
-              onChange={e => patch({ fromEmail: e.target.value })}
-              placeholder="e.g. finance@label.com"
-            />
-            <p className="text-xs text-muted-foreground">Sender address.</p>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="email-reply-to" className="flex items-center gap-1.5">
-            <ArrowBendUpLeft size={14} /> Reply-To (optional)
-          </Label>
-          <Input
-            id="email-reply-to"
-            type="email"
-            value={config.replyTo ?? ''}
-            onChange={e => patch({ replyTo: e.target.value })}
-            placeholder="Same as From Email if left empty"
-            className="max-w-sm"
+          <EmailField
+            id="email-from-addr"
+            label="From Email"
+            value={config.fromEmail ?? ''}
+            onChange={(v) => patch({ fromEmail: v })}
+            placeholder="e.g. finance@label.com"
+            description="Sender address."
+            errorMessage={t.validationInvalidEmail}
           />
         </div>
+
+        <EmailField
+          id="email-reply-to"
+          label="Reply-To (optional)"
+          value={config.replyTo ?? ''}
+          onChange={(v) => patch({ replyTo: v })}
+          placeholder="Same as From Email if left empty"
+          className="max-w-sm"
+          errorMessage={t.validationInvalidEmail}
+        />
 
         <div className="space-y-2">
           <Label htmlFor="email-subject">Subject Template</Label>
@@ -85,7 +80,8 @@ export function EmailConfigManager({ config, onUpdate }: EmailConfigManagerProps
             id="email-subject"
             type="text"
             value={config.subjectTemplate ?? ''}
-            onChange={e => patch({ subjectTemplate: e.target.value })}
+            maxLength={200}
+            onChange={(e) => patch({ subjectTemplate: e.target.value.slice(0, 200) })}
             placeholder="Statement of Sales – {period}"
           />
           <p className="text-xs text-muted-foreground">
@@ -93,7 +89,6 @@ export function EmailConfigManager({ config, onUpdate }: EmailConfigManagerProps
             <code className="text-primary">{'{period}'}</code>.
           </p>
         </div>
-
       </Card>
     </div>
   )

@@ -80,6 +80,13 @@ export async function getBillingProfile(
   return data ? rowToArtistBillingProfile(data as ArtistBillingProfileRow) : null
 }
 
+/** Loads all artist billing profiles (admin SOS roster / SEPA payouts). */
+export async function listBillingProfiles(db: DbClient): Promise<ArtistBillingProfile[]> {
+  const { data, error } = await db.from('artist_billing_profiles').select('*')
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((row) => rowToArtistBillingProfile(row as ArtistBillingProfileRow))
+}
+
 export async function upsertBillingProfile(
   db: DbClient,
   artistId: string,

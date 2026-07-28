@@ -38,10 +38,16 @@ export function guidedStepIndex(
 
 export function canAdvanceGuidedStep(
   step: GuidedWizardStep,
-  input: { hasData: boolean; isProcessing: boolean; hasBlockingValidation?: boolean },
+  input: {
+    hasData: boolean
+    isProcessing: boolean
+    hasBlockingValidation?: boolean
+    /** When false, Setup step cannot continue (invalid period / required fields). */
+    setupComplete?: boolean
+  },
   _stepIds: readonly GuidedWizardStep[] = QUICK_WIZARD_STEP_IDS,
 ): boolean {
-  if (step === 'setup') return true
+  if (step === 'setup') return input.setupComplete !== false
   if (step === 'upload') return input.hasData && !input.isProcessing
   if (step === 'validate') return input.hasData && !input.hasBlockingValidation
   if (step === 'review') return input.hasData

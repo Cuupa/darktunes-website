@@ -80,7 +80,7 @@ export function generateSepaXml(
   const ctrlSum       = formatAmount(payouts.reduce((acc, p) => acc + p.amount, 0))
   const pmtInfId      = `PMTINF-${msgId}`
   const labelName     = escapeXml(labelConfig.accountHolder)
-  const labelIban     = escapeXml(labelConfig.iban)
+  const labelIban     = escapeXml(labelConfig.iban.replace(/[\s-]/g, '').toUpperCase())
   const periodLabel   = escapeXml(labelConfig.periodLabel)
   const ustrdBase     = `Abrechnung ${periodLabel} ${escapeXml(labelConfig.accountHolder)}`
   const ustrdTruncated = ustrdBase.length > USTRD_MAX_LENGTH ? ustrdBase.slice(0, USTRD_MAX_LENGTH) : ustrdBase
@@ -102,7 +102,7 @@ export function generateSepaXml(
   const transactions = payouts.map((payout, index) => {
     const endToEndId = payout.endToEndId ?? `E2E-${String(index + 1).padStart(4, '0')}`
     const cdtrName = escapeXml(payout.accountHolder)
-    const cdtrIban = escapeXml(payout.iban)
+    const cdtrIban = escapeXml(payout.iban.replace(/[\s-]/g, '').toUpperCase())
     const instdAmt = formatAmount(payout.amount)
 
     const cdtrAgtBlock = payout.bic

@@ -86,6 +86,8 @@ export interface AccountingGuidedWizardProps {
   onImportReady?: () => void
   stepIds?: readonly GuidedWizardStep[]
   hasBlockingValidation?: boolean
+  /** When false, Continue is disabled on the Setup step. Default true. */
+  setupComplete?: boolean
   setupPanel?: React.ReactNode
   uploadPanel: React.ReactNode
   validatePanel?: React.ReactNode
@@ -103,6 +105,7 @@ export function AccountingGuidedWizard({
   onImportReady,
   stepIds = QUICK_WIZARD_STEP_IDS,
   hasBlockingValidation = false,
+  setupComplete = true,
   setupPanel,
   uploadPanel,
   validatePanel,
@@ -113,8 +116,8 @@ export function AccountingGuidedWizard({
   const t = useMemo(() => ({ ...GUIDED_FALLBACK, ...labels }), [labels])
   const settlePanelRef = useRef<HTMLDivElement>(null)
   const stepInput = useMemo(
-    () => ({ hasData, isProcessing, hasBlockingValidation }),
-    [hasData, isProcessing, hasBlockingValidation],
+    () => ({ hasData, isProcessing, hasBlockingValidation, setupComplete }),
+    [hasData, isProcessing, hasBlockingValidation, setupComplete],
   )
   const importReadyNotifiedRef = useRef(false)
 
