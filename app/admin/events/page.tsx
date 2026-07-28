@@ -9,6 +9,7 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
+import { getTranslations } from 'next-intl/server'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getArtists } from '@/lib/api/artists'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
@@ -17,9 +18,10 @@ import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { AdminConcertsManager } from '@/components/admin/AdminConcertsManager'
 import { AdminPageShell } from '../_components/AdminPageShell'
 
-function EventsLoading() {
+async function EventsLoading() {
+  const t = await getTranslations('admin.events')
   return (
-    <div className="space-y-3 p-2" aria-busy="true" aria-label="Loading events">
+    <div className="space-y-3 p-2" aria-busy="true" aria-label={t('loadingEvents')}>
       <Skeleton className="h-10 w-64" />
       <Skeleton className="h-4 w-48" />
       <Skeleton className="h-20 w-full" />
@@ -65,16 +67,14 @@ async function AdminEventsContent({
   )
 }
 
-export default function AdminEventsPage({
+export default async function AdminEventsPage({
   searchParams,
 }: {
   searchParams: Promise<{ artistId?: string }>
 }) {
+  const t = await getTranslations('admin.events')
   return (
-    <AdminPageShell
-      title="Events"
-      description="Manage live shows and concert dates for all artists."
-    >
+    <AdminPageShell title={t('pageTitle')} description={t('pageDescription')}>
       <Suspense fallback={<EventsLoading />}>
         <AdminEventsContent searchParams={searchParams} />
       </Suspense>

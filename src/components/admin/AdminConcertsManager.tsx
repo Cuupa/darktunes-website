@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { CalendarBlank } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { EventManager } from '../../../app/portal/events/_components/EventManager'
@@ -77,6 +78,7 @@ export function AdminConcertsManager({
   onArtistChange,
   showEvents = true,
 }: AdminConcertsManagerProps) {
+  const t = useTranslations('admin.events')
   const router = useRouter()
   const pathname = usePathname()
 
@@ -98,8 +100,8 @@ export function AdminConcertsManager({
     return (
       <PortalEmptyState
         icon={CalendarBlank}
-        heading="No artists found"
-        description="Add artists before managing their live shows."
+        heading={t('noArtistsHeading')}
+        description={t('noArtistsDescription')}
       />
     )
   }
@@ -108,14 +110,14 @@ export function AdminConcertsManager({
     <div className="space-y-6">
       <div className="space-y-2 max-w-sm">
         <label htmlFor="admin-concerts-artist" className="text-sm font-medium">
-          Select artist
+          {t('selectArtist')}
         </label>
         <Select value={selectedArtistId ?? NO_ARTIST} onValueChange={handleArtistChange}>
           <SelectTrigger id="admin-concerts-artist" className="min-h-[44px]">
-            <SelectValue placeholder="Choose an artist…" />
+            <SelectValue placeholder={t('chooseArtist')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={NO_ARTIST}>— Choose an artist —</SelectItem>
+            <SelectItem value={NO_ARTIST}>{t('chooseArtistNone')}</SelectItem>
             {artists.map((a) => (
               <SelectItem key={a.id} value={a.id}>
                 {a.name}
@@ -123,10 +125,7 @@ export function AdminConcertsManager({
             ))}
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground">
-          Select an artist to view and manage their upcoming live shows. Changes are applied
-          immediately.
-        </p>
+        <p className="text-xs text-muted-foreground">{t('selectArtistHint')}</p>
       </div>
 
       {selectedArtistId && showEvents ? (
@@ -149,6 +148,7 @@ export function AdminConcertsManager({
  * Artists + published news load in parallel; concerts load when an artist is chosen.
  */
 export function AdminConcertsManagerEmbedded() {
+  const t = useTranslations('admin.events')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [artists, setArtists] = useState<Pick<Artist, 'id' | 'name'>[]>([])
   const [artistsLoading, setArtistsLoading] = useState(true)
@@ -215,7 +215,7 @@ export function AdminConcertsManagerEmbedded() {
 
   if (artistsLoading) {
     return (
-      <div className="space-y-3" aria-busy="true" aria-label="Loading artists">
+      <div className="space-y-3" aria-busy="true" aria-label={t('loadingArtists')}>
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-4 w-48" />
       </div>
@@ -233,7 +233,7 @@ export function AdminConcertsManagerEmbedded() {
         showEvents={!concertsLoading}
       />
       {concertsLoading && selectedArtistId ? (
-        <div className="space-y-3" aria-busy="true" aria-label="Loading events">
+        <div className="space-y-3" aria-busy="true" aria-label={t('loadingEvents')}>
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-20 w-full" />

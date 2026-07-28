@@ -265,6 +265,8 @@
   "tour_share_unsupported": "Sharing not supported on this device.",
   "tour_export_ics": "Export calendar (.ics)",
   "tour_export_ics_error": "Failed to export calendar.",
+  "tour_map_preview": "Venue map preview",
+  "tour_map_preview_aria": "OpenStreetMap venue preview",
   "tour_address": "Street address",
   "tour_nav_link": "Navigate",
   "tour_osm_lookup": "Look up venue on map",

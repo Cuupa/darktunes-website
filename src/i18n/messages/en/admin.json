@@ -32,6 +32,18 @@
   "tour_planner_show_status_contract_sent": "Contract sent",
   "tour_planner_show_status_deposit_paid": "Deposit paid",
   "tour_planner_show_status_cancelled": "Cancelled",
+  "events": {
+    "pageTitle": "Events",
+    "pageDescription": "Manage live shows and concert dates for all artists.",
+    "selectArtist": "Select artist",
+    "chooseArtist": "Choose an artist…",
+    "chooseArtistNone": "— Choose an artist —",
+    "selectArtistHint": "Select an artist to view and manage their upcoming live shows. Changes are applied immediately.",
+    "noArtistsHeading": "No artists found",
+    "noArtistsDescription": "Add artists before managing their live shows.",
+    "loadingArtists": "Loading artists",
+    "loadingEvents": "Loading events"
+  },
   "labelIntelligence": {
     "pageTitle": "Analytics",
     "pageDescription": "Persisted label-wide revenue trends, roster health, press engagement, and financial audit trail.",

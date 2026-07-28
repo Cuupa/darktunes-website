@@ -32,6 +32,18 @@
   "tour_planner_show_status_contract_sent": "Vertrag gesendet",
   "tour_planner_show_status_deposit_paid": "Anzahlung bezahlt",
   "tour_planner_show_status_cancelled": "Abgesagt",
+  "events": {
+    "pageTitle": "Events",
+    "pageDescription": "Live-Shows und Konzertdaten für alle Künstler verwalten.",
+    "selectArtist": "Künstler auswählen",
+    "chooseArtist": "Künstler wählen…",
+    "chooseArtistNone": "— Künstler wählen —",
+    "selectArtistHint": "Wähle einen Künstler, um anstehende Live-Shows zu sehen und zu verwalten. Änderungen werden sofort übernommen.",
+    "noArtistsHeading": "Keine Künstler gefunden",
+    "noArtistsDescription": "Lege Künstler an, bevor du ihre Live-Shows verwaltest.",
+    "loadingArtists": "Künstler werden geladen",
+    "loadingEvents": "Events werden geladen"
+  },
   "labelIntelligence": {
     "pageTitle": "Analytics",
     "pageDescription": "Persistierte Label-weite Umsatztrends, Roster-Gesundheit, Press-Engagement und Finanz-Audit-Trail.",

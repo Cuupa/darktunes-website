@@ -265,6 +265,8 @@
   "tour_share_unsupported": "Teilen auf diesem Gerät nicht unterstützt.",
   "tour_export_ics": "Kalender exportieren (.ics)",
   "tour_export_ics_error": "Kalender-Export fehlgeschlagen.",
+  "tour_map_preview": "Venue-Kartenansicht",
+  "tour_map_preview_aria": "OpenStreetMap Venue-Vorschau",
   "tour_address": "Straße / Adresse",
   "tour_nav_link": "Navigation",
   "tour_osm_lookup": "Venue auf Karte suchen",
