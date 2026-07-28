@@ -85,6 +85,71 @@ describe('verifyCoverArtUrl', () => {
     expect(r.status).toBe('not_image')
   })
 
+  it('follows Drive redirect to drive.usercontent.google.com', async () => {
+    const buf = await jpegBuffer(3000, 3000)
+    const fetchFn = vi.fn().mockImplementation(async (url: string) => {
+      const href = String(url)
+      if (href.includes('drive.google.com/uc')) {
+        return {
+          ok: false,
+          status: 303,
+          headers: new Headers({
+            location:
+              'https://drive.usercontent.google.com/download?id=abc&export=download',
+          }),
+          arrayBuffer: async () => new ArrayBuffer(0),
+        }
+      }
+      if (href.includes('drive.usercontent.google.com')) {
+        return mockImageResponse(buf)
+      }
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/html' }),
+        arrayBuffer: async () => new TextEncoder().encode('<html></html>').buffer,
+      }
+    })
+
+    const r = await verifyCoverArtUrl('https://drive.google.com/file/d/abc/view', {
+      fetchFn: fetchFn as unknown as typeof fetch,
+    })
+    expect(r.verified).toBe(true)
+    expect(r.status).toBe('ok')
+    expect(r.width).toBe(3000)
+  })
+
+  it('tries later Drive candidates after HTML not_image on view URL', async () => {
+    const buf = await jpegBuffer(3000, 3000)
+    const fetchFn = vi.fn().mockImplementation(async (url: string) => {
+      const href = String(url)
+      if (href.includes('usercontent.google.com') || href.includes('lh3.googleusercontent.com')) {
+        return mockImageResponse(buf)
+      }
+      if (href.includes('/file/d/') || href.includes('uc?export')) {
+        return {
+          ok: true,
+          status: 200,
+          headers: new Headers({ 'content-type': 'text/html; charset=utf-8' }),
+          arrayBuffer: async () => new TextEncoder().encode('<html>viewer</html>').buffer,
+        }
+      }
+      return {
+        ok: false,
+        status: 404,
+        headers: new Headers(),
+        arrayBuffer: async () => new ArrayBuffer(0),
+      }
+    })
+
+    const r = await verifyCoverArtUrl(
+      'https://drive.google.com/file/d/abcXYZ/view?usp=sharing',
+      { fetchFn: fetchFn as unknown as typeof fetch },
+    )
+    expect(r.verified).toBe(true)
+    expect(r.status).toBe('ok')
+  })
+
   it('rejects redirect to a non-allowlisted host', async () => {
     const fetchFn = vi.fn().mockResolvedValue({
       ok: false,

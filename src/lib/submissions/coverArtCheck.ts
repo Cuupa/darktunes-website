@@ -91,13 +91,30 @@ export async function verifyCoverArtUrl(
 
   let lastError: CoverArtCheckStatus = 'fetch_failed'
   let lastMessage: string | undefined
+  /** Image was parsed but failed validation — prefer over generic download errors. */
+  let definitive: CoverArtCheckResult | null = null
+
   for (const candidate of candidates) {
     for (let attempt = 0; attempt < FETCH_RETRIES; attempt += 1) {
       try {
         const result = await fetchAndInspect(candidate, fetchFn, r2PublicUrl)
         if (result.verified) return withCode(result)
-        // Prefer informative failures over generic fetch_failed
-        if (result.status !== 'fetch_failed') return withCode(result)
+
+        // wrong_size / wrong_format / too_large mean we got real image bytes —
+        // keep as best diagnostic, but still try remaining candidates (e.g. Drive
+        // lh3 without size returns 1600px while usercontent has full 3000px).
+        if (
+          result.status === 'wrong_size' ||
+          result.status === 'wrong_format' ||
+          result.status === 'too_large'
+        ) {
+          definitive = withCode(result)
+          lastError = result.status
+          lastMessage = result.message
+          break // no point retrying same URL
+        }
+
+        // not_image / fetch_failed: try other candidates (Drive view HTML, etc.)
         lastError = result.status
         lastMessage = result.message
       } catch {
@@ -108,6 +125,8 @@ export async function verifyCoverArtUrl(
       }
     }
   }
+
+  if (definitive) return definitive
 
   return withCode({
     status: lastError,
@@ -127,16 +146,20 @@ function buildFetchCandidates(raw: string, r2PublicUrl?: string): string[] {
     if (!out.includes(u) && isAllowedCoverArtUrl(u, r2PublicUrl)) out.push(u)
   }
 
-  push(normalized)
-  push(raw)
-
-  // Drive often serves images more reliably via googleusercontent
+  // Drive: prefer full-file download paths before share/view HTML pages
   const driveId = extractGoogleDriveFileId(raw) ?? extractGoogleDriveFileId(normalized)
   if (driveId) {
+    // uc → redirects to drive.usercontent.google.com (full resolution)
     push(`https://drive.google.com/uc?export=download&id=${driveId}`)
-    push(`https://lh3.googleusercontent.com/d/${driveId}`)
+    push(`https://drive.usercontent.google.com/download?id=${driveId}&export=download`)
+    // Full-size via googleusercontent (=w3000); bare /d/{id} is often downscaled
+    push(`https://lh3.googleusercontent.com/d/${driveId}=w3000`)
     push(`https://drive.google.com/thumbnail?id=${driveId}&sz=w3000`)
+    push(`https://lh3.googleusercontent.com/d/${driveId}`)
   }
+
+  push(normalized)
+  push(raw)
 
   return out
 }
