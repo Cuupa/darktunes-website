@@ -39,9 +39,12 @@ export function validateStringField(fieldType: SubmissionFieldType, value: strin
   if (err) throw new ApiError(400, `${fieldKey}: ${err}`)
 }
 
+/**
+ * Normalize a release date string to ISO YYYY-MM-DD for DB storage.
+ * Accepts ISO and day-first forms (DD/MM/YYYY, DD.MM.YYYY).
+ */
 export function coerceReleaseDate(value: string | null | undefined): string | null {
   if (!value) return null
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
   return parseDateDmyToIso(value)
 }
 

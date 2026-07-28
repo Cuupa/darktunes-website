@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { Button } from '@/components/ui/button'
 import type { Database } from '@/types/database'
 import { createAccreditationRequest } from '../_actions/accreditation'
@@ -65,10 +66,13 @@ export function AccreditationClient({ initialRequests }: AccreditationClientProp
           <Label>{t('accreditationForm.eventName')}</Label>
           <Input value={form.eventName} onChange={(e) => setForm((v) => ({ ...v, eventName: e.target.value }))} required />
         </div>
-        <div className="space-y-1">
-          <Label>{t('accreditationForm.eventDate')}</Label>
-          <Input type="date" value={form.eventDate} onChange={(e) => setForm((v) => ({ ...v, eventDate: e.target.value }))} required />
-        </div>
+        <DateField
+          id="accreditation-event-date"
+          label={t('accreditationForm.eventDate')}
+          value={form.eventDate}
+          onChange={(v) => setForm((prev) => ({ ...prev, eventDate: v }))}
+          required
+        />
         <div className="space-y-1">
           <Label>{t('accreditationForm.publication')}</Label>
           <Input value={form.publication} onChange={(e) => setForm((v) => ({ ...v, publication: e.target.value }))} required />

@@ -25,6 +25,7 @@ import { MapPin, Share, CalendarBlank, YoutubeLogo, MusicNotes, Newspaper, Navig
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import {
   Select,
@@ -392,16 +393,13 @@ export function EventManager({ concerts, artistId, allArtists = [], newsPosts = 
           )}
 
           {/* Date */}
-          <div className="space-y-1">
-            <Label htmlFor="ev-date">{t('tour_date')}</Label>
-            <Input
-              id="ev-date"
-              type="date"
-              value={form.concertDate}
-              onChange={(e) => setForm((v) => ({ ...v, concertDate: e.target.value }))}
-              required
-            />
-          </div>
+          <DateField
+            id="ev-date"
+            label={t('tour_date')}
+            value={form.concertDate}
+            onChange={(v) => setForm((prev) => ({ ...prev, concertDate: v }))}
+            required
+          />
 
           {/* Time */}
           <div className="space-y-1">

@@ -90,10 +90,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       getReleaseTypeRules(supabase),
     ])
 
-    const standardBody: Record<string, unknown> = {
-      ...body,
-      releaseDate: coerceReleaseDate(body.releaseDate),
-    }
+    // Keep raw releaseDate for schema validation (date_dmy expects DD/MM/YYYY).
+    // Coerce to ISO only when writing to the DB below.
+    const standardBody: Record<string, unknown> = { ...body }
     const tracks = body.tracks ?? []
 
     validateReleaseSubmissionByType({

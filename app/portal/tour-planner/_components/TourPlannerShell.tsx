@@ -8,6 +8,7 @@ import { MapTrifold, Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import {
   Select,
   SelectContent,
@@ -262,15 +263,12 @@ export function TourPlannerShell({ artistId, artistName, initialTours, concerts 
           ) : (
             <>
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <Label htmlFor="new-stop-date">{t('tour_planner_stop_date')}</Label>
-                  <Input
-                    id="new-stop-date"
-                    type="date"
-                    value={newStopDate}
-                    onChange={(e) => setNewStopDate(e.target.value)}
-                  />
-                </div>
+                <DateField
+                  id="new-stop-date"
+                  label={t('tour_planner_stop_date')}
+                  value={newStopDate}
+                  onChange={setNewStopDate}
+                />
                 <div className="space-y-1">
                   <Label htmlFor="new-stop-venue">{t('tour_planner_stop_venue')}</Label>
                   <Input

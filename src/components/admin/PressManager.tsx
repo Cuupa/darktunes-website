@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
@@ -208,7 +209,12 @@ export function PressManager() {
               <div className="space-y-2"><Label htmlFor="promo-track-genre">Genre</Label><Input id="promo-track-genre" value={trackForm.genre} onChange={(e) => setTrackForm((v) => ({ ...v, genre: e.target.value }))} /></div>
               <div className="space-y-2"><Label htmlFor="promo-track-bpm">BPM</Label><Input id="promo-track-bpm" type="number" min="0" value={trackForm.bpm} onChange={(e) => setTrackForm((v) => ({ ...v, bpm: e.target.value }))} /></div>
               <div className="space-y-2"><Label htmlFor="promo-track-key">Key</Label><Input id="promo-track-key" value={trackForm.key} onChange={(e) => setTrackForm((v) => ({ ...v, key: e.target.value }))} /></div>
-              <div className="space-y-2"><Label htmlFor="promo-track-release-date">Release date</Label><Input id="promo-track-release-date" type="date" value={trackForm.releaseDate} onChange={(e) => setTrackForm((v) => ({ ...v, releaseDate: e.target.value }))} /></div>
+              <DateField
+                id="promo-track-release-date"
+                label="Release date"
+                value={trackForm.releaseDate}
+                onChange={(v) => setTrackForm((prev) => ({ ...prev, releaseDate: v }))}
+              />
               <div className="space-y-2"><Label htmlFor="promo-track-embargo">Embargo until</Label><Input id="promo-track-embargo" type="datetime-local" value={trackForm.embargoUntil} onChange={(e) => setTrackForm((v) => ({ ...v, embargoUntil: e.target.value }))} /></div>
               <div className="flex items-center gap-2 pt-8"><Checkbox id="promo-track-nda" checked={trackForm.ndaRequired} onCheckedChange={(value) => setTrackForm((v) => ({ ...v, ndaRequired: value === true }))} /><Label htmlFor="promo-track-nda">NDA required</Label></div>
               <div className="space-y-2 md:col-span-2"><Label htmlFor="promo-track-file">Audio file</Label><Input id="promo-track-file" type="file" accept="audio/*" onChange={(e) => setTrackFile(e.target.files?.[0] ?? null)} required /></div>
