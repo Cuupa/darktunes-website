@@ -94,6 +94,9 @@ function resolveTypeInfo(eventType: string): { preset: EventType; custom: string
 }
 
 export function EventManager({ concerts, artistId, allArtists = [], newsPosts = [], concertsApiPath = '/api/portal/concerts', hideIcsExport = false }: EventManagerProps) {
+  // Keys live in the portal dictionary. Admin/editor routes must load the
+  // `portal` namespace via ROUTE_BUNDLES (see src/i18n/loadMessages.ts) or
+  // next-intl will render raw keys like "portal.tour_heading".
   const t = useTranslations('portal')
 
   const [items, setItems] = useState(concerts)

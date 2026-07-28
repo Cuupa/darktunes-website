@@ -55,7 +55,10 @@ export const ROUTE_BUNDLES: Record<string, readonly Namespace[]> = {
   // plus the public shell (header, footer, consent, PWA prompt).
   '/login': ['portal', 'navigation', 'footer', 'consent', 'errors', 'pwa'],
   '/portal': ['portal', 'portalHelp', 'errors', 'pwa'],
-  '/admin': ['admin', 'adminSubmissions', 'errors', 'pwa'],
+  // Admin reuses portal components (e.g. EventManager) — include portal strings
+  // or keys render as raw "portal.tour_heading" in the admin UI.
+  '/admin': ['admin', 'adminSubmissions', 'portal', 'errors', 'pwa'],
+  '/editor': ['admin', 'adminSubmissions', 'portal', 'errors', 'pwa'],
   '/press': [
     'press',
     'pressLanding',
