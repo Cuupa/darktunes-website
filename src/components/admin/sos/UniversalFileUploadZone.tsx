@@ -8,13 +8,12 @@
  * inspecting the CSV header row:
  *  - Header contains "Sales Month" AND "ISRC"        → believe
  *  - Header contains "bandcamp transaction id"        → bandcamp
- *  - Header starts with "name" AND has ≥1 of          → artist roster CSV
- *    "email" | "vatnumber" | "iseunongerman" | "notes"
- *    (companion fields are compared after toLowerCase)
- *  - Otherwise                                        → opens a mapping dialog
+ *  - Shopify / Printful / Darkmerch headers           → ecommerce managers
+ *  - Otherwise                                       → opens a mapping dialog
  *    so the user can assign Artist, Revenue and Date columns manually.
  *
- * All detected files are routed to the correct internal file-manager callback.
+ * Artist roster is never imported from CSV — SOS uses the portal database roster.
+ * All detected financial files are routed to the correct file-manager callback.
  */
 
 import {
@@ -52,9 +51,9 @@ import { Label } from '@/components/ui/label'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { toast } from 'sonner'
-import type { UploadedFile, FileProcessingState, LabelArtist } from '@/lib/sos/types'
+import type { UploadedFile, FileProcessingState } from '@/lib/sos/types'
 import { parseCSVLine } from '@/lib/sos/ingest/csv-parser'
-import { matchProfile, parseMasterDataCSV } from '@/lib/sos/ingest/parser-facade'
+import { matchProfile } from '@/lib/sos/ingest/parser-facade'
 import {
   SYSTEM_SHOPIFY_PROFILE_ID,
   SYSTEM_PRINTFUL_PROFILE_ID,
@@ -101,14 +100,9 @@ interface UniversalFileUploadZoneProps {
   /** Called when an unknown CSV is confirmed with user-defined column aliases. */
   onAddAliases: (aliases: { fieldName: string; synonym: string }[]) => void
   /**
-   * Called when an artist roster CSV (header: name, email, vatNumber, …) is
-   * detected and successfully parsed. Allows the IngestView to import artist
-   * master data in the same upload step as revenue data.
-   */
-  onImportLabelArtistsCSV?: (artists: Omit<LabelArtist, 'id'>[]) => void
-  /**
    * Active CSV import profiles used for header-based auto-detection.
    * When provided, profile matching is attempted before the legacy heuristic.
+   * Master-data / artist-roster profiles are ignored (roster comes from the DB).
    */
   csvProfiles?: CsvImportProfile[]
 }
@@ -150,7 +144,7 @@ async function detectCSVSource(
   file: File,
   profiles: CsvImportProfile[]
 ): Promise<{
-  source: 'believe' | 'bandcamp' | 'artist' | 'shopify' | 'printful' | 'darkmerch' | 'profile-financial' | 'unknown'
+  source: 'believe' | 'bandcamp' | 'shopify' | 'printful' | 'darkmerch' | 'profile-financial' | 'unknown'
   headers: string[]
   matchedProfile?: CsvImportProfile
 }> {
@@ -171,13 +165,11 @@ async function detectCSVSource(
   const rawHeaders = parseCSVLine(firstLine, delimiter).map(h => h.trim())
   const normalizedHeaders = rawHeaders.map(h => h.toLowerCase())
 
-  // ── Phase 1: Profile-based matching ──────────────────────────────────────
+  // ── Phase 1: Profile-based matching (financial only) ─────────────────────
   if (profiles.length > 0) {
-    const matched = matchProfile(rawHeaders, profiles)
+    const financialProfiles = profiles.filter((p) => p.type !== 'master-data')
+    const matched = matchProfile(rawHeaders, financialProfiles)
     if (matched) {
-      if (matched.type === 'master-data') {
-        return { source: 'artist', headers: rawHeaders, matchedProfile: matched }
-      }
       if (matched.id === SYSTEM_SHOPIFY_PROFILE_ID) {
         return { source: 'shopify', headers: rawHeaders, matchedProfile: matched }
       }
@@ -209,11 +201,7 @@ async function detectCSVSource(
   if (normalizedHeaders.some(h => h === 'band') && normalizedHeaders.some(h => h === 'net revenue')) {
     return { source: 'darkmerch', headers: rawHeaders }
   }
-  // Artist roster CSV: first column is "name" and at least one known artist field is present.
-  const ARTIST_CSV_COMPANION_FIELDS = new Set(['email', 'vatnumber', 'iseunongerman', 'notes'])
-  if (normalizedHeaders[0] === 'name' && normalizedHeaders.some(h => ARTIST_CSV_COMPANION_FIELDS.has(h))) {
-    return { source: 'artist', headers: rawHeaders }
-  }
+  // Artist roster CSVs are intentionally not auto-detected — roster comes from the portal DB.
   return { source: 'unknown', headers: rawHeaders }
 }
 
@@ -668,7 +656,6 @@ export function UniversalFileUploadZone({
   printfulManager,
   darkmerchManager,
   onAddAliases,
-  onImportLabelArtistsCSV,
   csvProfiles = [],
 }: UniversalFileUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false)
@@ -728,56 +715,13 @@ export function UniversalFileUploadZone({
     } else if (source === 'darkmerch') {
       toast.info(`"${file.name}" detected as Darkmerch export`, { duration: 3000 })
       darkmerchManager.addFiles([file])
-    } else if (source === 'artist') {
-      if (!onImportLabelArtistsCSV) {
-        toast.error(`"${file.name}" looks like an artist roster CSV but no handler is configured.`)
-        return
-      }
-      try {
-        const text = await file.text()
-        let parsed: Omit<LabelArtist, 'id'>[]
-
-        if (matchedProfile && matchedProfile.type === 'master-data') {
-          // Profile-driven master-data parsing
-          parsed = parseMasterDataCSV(text, matchedProfile)
-        } else {
-          // Legacy column-index based parsing
-          const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
-          const dataLines = lines[0]?.toLowerCase().startsWith('name') ? lines.slice(1) : lines
-          parsed = dataLines.flatMap(l => {
-            const delimiter = l.includes(';') ? ';' : ','
-            const cols = parseCSVLine(l, delimiter)
-            const name = cols[0]?.trim()
-            if (!name) return []
-            return [{
-              name,
-              email: cols[1]?.trim() || undefined,
-              vatNumber: cols[2]?.trim() || undefined,
-              isEuNonGerman: cols[3]?.trim() === 'true',
-              notes: cols[4]?.trim() || undefined,
-              accountHolder: cols[5]?.trim() || undefined,
-              iban: cols[6]?.trim() || undefined,
-              bic: cols[7]?.trim() || undefined,
-            }]
-          })
-        }
-
-        if (parsed.length === 0) {
-          toast.error(`"${file.name}": no artist names found in CSV`)
-          return
-        }
-        onImportLabelArtistsCSV(parsed)
-        toast.success(`${parsed.length} artist${parsed.length !== 1 ? 's' : ''} imported from "${file.name}"`)
-      } catch {
-        toast.error(`Failed to parse artist CSV "${file.name}"`)
-      }
     } else {
       // Unknown format: open profile selection / mapping dialog
       setPendingFile(file)
       setPendingHeaders(headers)
-      setPendingHasProfiles(csvProfiles.filter(p => p.type === 'financial').length > 0)
+      setPendingHasProfiles(csvProfiles.filter((p) => p.type === 'financial').length > 0)
     }
-  }, [believeManager, bandcampManager, shopifyManager, printfulManager, darkmerchManager, onImportLabelArtistsCSV, csvProfiles])
+  }, [believeManager, bandcampManager, shopifyManager, printfulManager, darkmerchManager, csvProfiles])
 
   const processFiles = useCallback(async (rawFiles: File[]) => {
     const acceptedFiles = rawFiles.filter(f => {
@@ -974,7 +918,6 @@ export function UniversalFileUploadZone({
               <Badge variant="secondary" className="text-xs">Shopify</Badge>
               <Badge variant="secondary" className="text-xs">Printful</Badge>
               <Badge variant="secondary" className="text-xs">Darkmerch</Badge>
-              <Badge variant="secondary" className="text-xs">Artist Roster</Badge>
               <Badge variant="outline" className="text-xs">Multiple files</Badge>
             </div>
           )}

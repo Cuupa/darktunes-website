@@ -14,7 +14,7 @@ import type {
   ArtistMapping, CompilationFilter, SplitFee,
   ManualRevenue, ExpenseEntry, IgnoredEntry,
   CSVColumnAlias, AppDefaults, EmailConfig,
-  TrackRevenueAssignment,
+  TrackRevenueAssignment, LabelInfo,
 } from '@/lib/sos/types'
 import { ArtistMappingManager } from './ArtistMappingManager'
 import { CompilationFilterManager } from './CompilationFilterManager'
@@ -26,8 +26,11 @@ import { CsvAliasManager } from './CsvAliasManager'
 import { DefaultSettingsManager } from './DefaultSettingsManager'
 import { EmailConfigManager } from './EmailConfigManager'
 import { TrackRevenueAssignmentManager } from './TrackRevenueAssignmentManager'
+import { LabelIdentityManager } from './LabelIdentityManager'
+import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 
 type RulesTab =
+  | 'label'
   | 'mappings'
   | 'compilations'
   | 'splits'
@@ -51,6 +54,8 @@ export interface RulesPanelProps {
   trackRevenueAssignments: TrackRevenueAssignment[]
   appDefaults: AppDefaults
   emailConfig: Partial<EmailConfig>
+  labelInfo: LabelInfo | Partial<LabelInfo>
+  onUpdateLabelInfo: (next: LabelInfo) => void
 
   // Callbacks
   onAddArtistMapping: (m: Omit<ArtistMapping, 'id'>) => void
@@ -90,22 +95,10 @@ export interface RulesPanelProps {
   autoMappings?: ArtistMapping[]
 }
 
-const TABS: { id: RulesTab; label: string }[] = [
-  { id: 'mappings',     label: 'Artist Mappings' },
-  { id: 'compilations', label: 'Compilations' },
-  { id: 'splits',       label: 'Splits' },
-  { id: 'track-splits', label: 'Track Splits' },
-  { id: 'revenues',     label: 'Manual Revenue' },
-  { id: 'expenses',     label: 'Expenses' },
-  { id: 'ignored',      label: 'Ignored' },
-  { id: 'aliases',      label: 'CSV Columns' },
-  { id: 'defaults',     label: 'Defaults' },
-  { id: 'email',        label: 'Email' },
-]
-
 export function RulesPanel({
   artistMappings, compilationFilters, splitFees, manualRevenues, expenses,
   ignoredEntries, csvAliases, trackRevenueAssignments, appDefaults, emailConfig,
+  labelInfo, onUpdateLabelInfo,
   onAddArtistMapping, onRemoveArtistMapping, onUpdateArtistMapping,
   onAddCompilationFilter, onRemoveCompilationFilter,
   onAddSplitFee, onRemoveSplitFee, onUpdateSplitFee,
@@ -120,7 +113,22 @@ export function RulesPanel({
   availableReleases = [],
   autoMappings = [],
 }: RulesPanelProps) {
-  const [activeTab, setActiveTab] = useState<RulesTab>('mappings')
+  const t = useAccountingLabels()
+  const [activeTab, setActiveTab] = useState<RulesTab>('label')
+
+  const tabs: { id: RulesTab; label: string }[] = [
+    { id: 'label', label: t.rulesTabLabel },
+    { id: 'mappings', label: 'Artist Mappings' },
+    { id: 'compilations', label: 'Compilations' },
+    { id: 'splits', label: 'Splits' },
+    { id: 'track-splits', label: 'Track Splits' },
+    { id: 'revenues', label: 'Manual Revenue' },
+    { id: 'expenses', label: 'Expenses' },
+    { id: 'ignored', label: 'Ignored' },
+    { id: 'aliases', label: 'CSV Columns' },
+    { id: 'defaults', label: 'Defaults' },
+    { id: 'email', label: 'Email' },
+  ]
 
   const counts: Partial<Record<RulesTab, number>> = {
     mappings:     artistMappings.length + autoMappings.length,
@@ -137,7 +145,7 @@ export function RulesPanel({
     <div className="space-y-0">
       {/* Rules sub-navigation */}
       <div className={cn('flex items-center gap-0.5 border-b border-border px-2 pt-1', horizontalScrollClass)} data-lenis-prevent>
-        {TABS.map(({ id, label }) => (
+        {tabs.map(({ id, label }) => (
           <button
             key={id}
             onClick={() => setActiveTab(id)}
@@ -158,6 +166,13 @@ export function RulesPanel({
       </div>
 
       <div className="p-6">
+        {activeTab === 'label' && (
+          <LabelIdentityManager
+            labelInfo={labelInfo}
+            onUpdate={onUpdateLabelInfo}
+            embedded
+          />
+        )}
         {activeTab === 'mappings' && (
           <ArtistMappingManager
             mappings={artistMappings}

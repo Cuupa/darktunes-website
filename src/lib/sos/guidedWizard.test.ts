@@ -41,6 +41,31 @@ describe('guidedWizard', () => {
     ).toBe(true)
   })
 
+  it('gates setup advance on setupComplete', () => {
+    expect(
+      canAdvanceGuidedStep(
+        'setup',
+        { hasData: false, isProcessing: false, setupComplete: false },
+        ASSISTANT_WIZARD_STEP_IDS,
+      ),
+    ).toBe(false)
+    expect(
+      canAdvanceGuidedStep(
+        'setup',
+        { hasData: false, isProcessing: false, setupComplete: true },
+        ASSISTANT_WIZARD_STEP_IDS,
+      ),
+    ).toBe(true)
+    // Undefined setupComplete remains allowed (quick mode / default).
+    expect(
+      canAdvanceGuidedStep(
+        'setup',
+        { hasData: false, isProcessing: false },
+        ASSISTANT_WIZARD_STEP_IDS,
+      ),
+    ).toBe(true)
+  })
+
   it('orders quick steps upload → review → settle', () => {
     expect(guidedStepIndex('upload', QUICK_WIZARD_STEP_IDS)).toBe(0)
     expect(guidedStepIndex('review', QUICK_WIZARD_STEP_IDS)).toBe(1)

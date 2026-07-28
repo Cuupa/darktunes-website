@@ -22,6 +22,9 @@ import {
 } from '@/components/ui/select'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SplitFee } from '@/lib/sos/types'
+import { PercentField } from '@/components/admin/sos/fields/AccountingNumberFields'
+import { clampPercent, parseOptionalPercent, parseRequiredPercent } from '@/lib/sos/accountingInputValidation'
+import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 
 export interface SplitFeeManagerProps {
   splitFees: SplitFee[]
@@ -30,8 +33,6 @@ export interface SplitFeeManagerProps {
   onUpdateSplitFee?: (artist: string, update: Omit<SplitFee, 'artist'>) => void
   artists?: string[]
 }
-
-function clamp(v: number) { return Math.max(0, Math.min(100, v)) }
 
 interface FeeFormProps {
   initialArtist?: string
@@ -45,22 +46,45 @@ interface FeeFormProps {
   onCancel: () => void
 }
 
-function FeeForm({ initialArtist = '', initialPercentage = 50, initialDigital = '', initialPhysical = '', artists, existingArtists, isEdit, onSave, onCancel }: FeeFormProps) {
+function FeeForm({
+  initialArtist = '',
+  initialPercentage = 50,
+  initialDigital = '',
+  initialPhysical = '',
+  artists,
+  existingArtists,
+  isEdit,
+  onSave,
+  onCancel,
+}: FeeFormProps) {
+  const t = useAccountingLabels()
   const [artist, setArtist] = useState(initialArtist)
-  const [percentage, setPercentage] = useState(String(initialPercentage))
-  const [digital, setDigital] = useState(initialDigital)
-  const [physical, setPhysical] = useState(initialPhysical)
+  const [percentage, setPercentage] = useState<number>(initialPercentage)
+  const [digital, setDigital] = useState<number | undefined>(
+    initialDigital !== '' ? clampPercent(Number(initialDigital)) : undefined,
+  )
+  const [physical, setPhysical] = useState<number | undefined>(
+    initialPhysical !== '' ? clampPercent(Number(initialPhysical)) : undefined,
+  )
 
-  const pct = clamp(parseFloat(percentage) || 0)
+  const pct = clampPercent(percentage)
   const duplicateArtist = !isEdit && existingArtists.includes(artist.trim())
+  const percentMessages = {
+    out_of_range: t.validationPercentRange,
+    invalid: t.validationFieldInvalidNumber,
+    required: t.validationFieldRequired,
+  }
 
   const handleSave = () => {
-    if (!artist.trim() || isNaN(parseFloat(percentage))) return
+    if (!artist.trim()) return
+    if (!parseRequiredPercent(String(percentage)).ok) return
+    if (digital != null && !parseOptionalPercent(String(digital)).ok) return
+    if (physical != null && !parseOptionalPercent(String(physical)).ok) return
     onSave({
       artist: artist.trim(),
       percentage: pct,
-      digitalPercentage: digital !== '' ? clamp(parseFloat(digital) || 0) : undefined,
-      physicalPercentage: physical !== '' ? clamp(parseFloat(physical) || 0) : undefined,
+      digitalPercentage: digital,
+      physicalPercentage: physical,
     })
   }
 
@@ -76,8 +100,10 @@ function FeeForm({ initialArtist = '', initialPercentage = 50, initialDigital = 
               <SelectValue placeholder="Select artist…" />
             </SelectTrigger>
             <SelectContent>
-              {artists.filter(a => !existingArtists.includes(a) || a === initialArtist).map(a => (
-                <SelectItem key={a} value={a}>{a}</SelectItem>
+              {artists.filter((a) => !existingArtists.includes(a) || a === initialArtist).map((a) => (
+                <SelectItem key={a} value={a}>
+                  {a}
+                </SelectItem>
               ))}
               {artists.length === 0 && (
                 <SelectItem value={artist || '_manual'} disabled={false}>
@@ -88,39 +114,75 @@ function FeeForm({ initialArtist = '', initialPercentage = 50, initialDigital = 
           </Select>
         )}
         {!artists.includes(artist) && !isEdit && artist.trim() && (
-          <Input value={artist} onChange={e => setArtist(e.target.value)} placeholder="Or type artist name" className="mt-1" />
+          <Input
+            value={artist}
+            onChange={(e) => setArtist(e.target.value.slice(0, 120))}
+            placeholder="Or type artist name"
+            className="mt-1"
+            maxLength={120}
+          />
         )}
         {!isEdit && artist && artists.length === 0 && (
-          <Input value={artist} onChange={e => setArtist(e.target.value)} placeholder="Artist name" autoFocus />
+          <Input
+            value={artist}
+            onChange={(e) => setArtist(e.target.value.slice(0, 120))}
+            placeholder="Artist name"
+            autoFocus
+            maxLength={120}
+          />
         )}
         {artists.length === 0 && !isEdit && !artist && (
-          <Input value={artist} onChange={e => setArtist(e.target.value)} placeholder="Artist name" autoFocus />
+          <Input
+            value={artist}
+            onChange={(e) => setArtist(e.target.value.slice(0, 120))}
+            placeholder="Artist name"
+            autoFocus
+            maxLength={120}
+          />
         )}
-        {duplicateArtist && <p className="text-xs text-destructive">A split fee for this artist already exists.</p>}
+        {duplicateArtist && (
+          <p className="text-xs text-destructive">A split fee for this artist already exists.</p>
+        )}
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="split-pct">Default Split (%)</Label>
-        <div className="flex items-center gap-2">
-          <Input id="split-pct" type="number" min={0} max={100} value={percentage} onChange={e => setPercentage(e.target.value)} className="w-28" />
-          <span className="text-sm text-muted-foreground">= label keeps {100 - pct}%</span>
-        </div>
+        <PercentField
+          id="split-pct"
+          label="Default Split (%)"
+          value={percentage}
+          onChange={(v) => setPercentage(v ?? 0)}
+          inputClassName="w-28"
+          messages={percentMessages}
+        />
+        <p className="text-sm text-muted-foreground">= label keeps {100 - pct}%</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="split-digital" className="text-xs">Digital override (%)</Label>
-          <Input id="split-digital" type="number" min={0} max={100} value={digital} onChange={e => setDigital(e.target.value)} placeholder={`${pct}`} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="split-physical" className="text-xs">Physical override (%)</Label>
-          <Input id="split-physical" type="number" min={0} max={100} value={physical} onChange={e => setPhysical(e.target.value)} placeholder={`${pct}`} />
-        </div>
+        <PercentField
+          id="split-digital"
+          label="Digital override (%)"
+          value={digital}
+          onChange={setDigital}
+          optional
+          placeholder={String(pct)}
+          messages={percentMessages}
+        />
+        <PercentField
+          id="split-physical"
+          label="Physical override (%)"
+          value={physical}
+          onChange={setPhysical}
+          optional
+          placeholder={String(pct)}
+          messages={percentMessages}
+        />
       </div>
 
       <DialogFooter>
-        <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button onClick={handleSave} disabled={!artist.trim() || isNaN(parseFloat(percentage)) || duplicateArtist}>
+        <Button variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button onClick={handleSave} disabled={!artist.trim() || duplicateArtist}>
           {isEdit ? 'Save' : 'Add Split'}
         </Button>
       </DialogFooter>
