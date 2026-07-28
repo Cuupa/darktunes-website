@@ -2911,8 +2911,6 @@ ALTER TABLE public.message_folders       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_rules         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_attachments   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_receipts      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.message_internal_notes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.message_events        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.journalist_downloads  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.accreditation_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.editor_activity_log   ENABLE ROW LEVEL SECURITY;
@@ -5818,6 +5816,9 @@ CREATE INDEX IF NOT EXISTS idx_message_events_msg
 CREATE INDEX IF NOT EXISTS idx_message_events_actor
   ON public.message_events (actor_user_id, created_at DESC)
   WHERE actor_user_id IS NOT NULL;
+
+ALTER TABLE public.message_internal_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_events        ENABLE ROW LEVEL SECURITY;
 
 CREATE INDEX IF NOT EXISTS idx_portal_msg_from    ON public.portal_messages (from_artist_id, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_portal_msg_to      ON public.portal_messages (to_artist_id,   sent_at DESC);
