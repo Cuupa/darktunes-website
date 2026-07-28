@@ -472,7 +472,7 @@ export function ColorThemeManager({ value, onChange, isLoading = false }: ColorT
     } finally {
       setIsSaving(false)
     }
-  }, [onChange, value, draft])
+  }, [onChange, value, draft, tToast])
 
   // ── Custom preset management ──────────────────────────────────────────────
 

@@ -121,7 +121,7 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
     } finally {
       setLoading(false)
     }
-  }, [artistId])
+  }, [artistId, tToast])
 
   useEffect(() => {
     void loadEntries()
@@ -171,7 +171,7 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
     } finally {
       setUploadingProof(false)
     }
-  }, [artistId])
+  }, [artistId, tToast])
 
   // ---------------------------------------------------------------------------
   // Clipboard paste — extract image and upload to R2

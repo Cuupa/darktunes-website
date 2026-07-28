@@ -78,7 +78,7 @@ export function FanPageReviewsManager() {
     } finally {
       setLoading(false)
     }
-  }, [filter])
+  }, [filter, tToast])
 
   useEffect(() => {
     void fetchReviews()

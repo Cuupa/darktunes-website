@@ -167,7 +167,7 @@ export function AdminSidebarNav() {
       toast.success(tToast('signed_out_success'))
       router.push('/login')
     }
-  }, [signOut, router])
+  }, [signOut, router, tToast])
 
   const canSee = (item: NavItem) => {
     if (isAdmin) return true

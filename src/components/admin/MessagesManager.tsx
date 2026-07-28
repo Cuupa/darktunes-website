@@ -288,7 +288,7 @@ export function MessagesManager() {
       const msg = e instanceof Error ? e.message : 'Failed to load messages'
       toast.error(msg)
     }
-  }, [authLoading, refreshMessages, session?.access_token, session?.refresh_token, supabase])
+  }, [authLoading, refreshMessages, session?.access_token, session?.refresh_token, supabase, tToast])
 
   useEffect(() => {
     if (!authLoading) void load()

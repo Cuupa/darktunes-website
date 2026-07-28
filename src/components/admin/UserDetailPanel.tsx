@@ -197,7 +197,7 @@ export function UserDetailPanel() {
     } finally {
       setIsLoading(false)
     }
-  }, [authHeaders, userId, router])
+  }, [authHeaders, userId, router, tToast])
 
   useEffect(() => { void load() }, [load])
 

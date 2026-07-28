@@ -114,7 +114,7 @@ export function FileExplorer({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Bulk action failed')
     }
-  }, [explorer])
+  }, [explorer, tToast])
 
   const handleSavePress = useCallback(async (assetId: string, draft: AssetPressDraft) => {
     await explorer.updateAsset(assetId, {
@@ -177,7 +177,7 @@ export function FileExplorer({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to rename folder')
     }
-  }, [explorer])
+  }, [explorer, tToast])
 
   const renameAsset = useCallback(async (assetId: string, name: string) => {
     const nextName = name.trim()
@@ -189,7 +189,7 @@ export function FileExplorer({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to rename file')
     }
-  }, [explorer])
+  }, [explorer, tToast])
 
   const deleteSelected = useCallback(async () => {
     const fileIds = [...explorer.selectedIds].filter((id) => !id.startsWith('folder:'))
@@ -211,7 +211,7 @@ export function FileExplorer({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Delete failed')
     }
-  }, [bumpStorageStats, explorer])
+  }, [bumpStorageStats, explorer, tToast])
 
   const handleAssetTags = useCallback((asset: Asset) => {
     setTagsAsset(asset)
@@ -225,7 +225,7 @@ export function FileExplorer({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to update tags')
     }
-  }, [explorer, tagsAsset])
+  }, [explorer, tagsAsset, tToast])
 
   const handleAssignArtists = useCallback(async (assetId: string, artistIds: string[]) => {
     try {
@@ -234,7 +234,7 @@ export function FileExplorer({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Assign failed')
     }
-  }, [explorer])
+  }, [explorer, tToast])
 
   const handleAssignRelease = useCallback(async (assetId: string, releaseId: string | null) => {
     try {

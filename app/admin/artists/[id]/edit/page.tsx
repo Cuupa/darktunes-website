@@ -128,7 +128,7 @@ export default function ArtistEditPage() {
       toast.error(tToast('artist_not_found'))
       router.push(cms.artists)
     }
-  }, [isLoading, artists.length, artist, router, cms.artists])
+  }, [isLoading, artists.length, artist, router, cms.artists, tToast])
 
   const handleInvite = async () => {
 

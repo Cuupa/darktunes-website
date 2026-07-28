@@ -76,7 +76,7 @@ export function ReleaseSubmissionsManager() {
     } finally {
       setLoading(false)
     }
-  }, [getToken])
+  }, [getToken, tToast])
 
   useEffect(() => {
     void fetchSubmissions()

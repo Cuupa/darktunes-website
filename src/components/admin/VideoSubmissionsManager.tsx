@@ -69,7 +69,7 @@ export function VideoSubmissionsManager() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [tToast])
 
   useEffect(() => {
     void fetchSubmissions()

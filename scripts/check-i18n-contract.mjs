@@ -19,12 +19,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createRequire } from 'node:module'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.join(__dirname, '..')
 const writeBaseline = process.argv.includes('--write-baseline')
-const require = createRequire(import.meta.url)
 
 const UI_GLOBS = [
   'app/portal',
@@ -122,7 +120,6 @@ for (const f of files) {
     if (key.includes('${')) continue
     // Determine dictionary from namespaces used in file
     const hasPortal = namespaces.some((n) => n === 'portal' || n.startsWith('portal.'))
-    const hasAdmin = namespaces.some((n) => n === 'admin' || n.startsWith('admin.'))
 
     if (namespaces.includes('admin.toast') || namespaces.includes('portal.toast')) {
       // tToast keys under toast ns

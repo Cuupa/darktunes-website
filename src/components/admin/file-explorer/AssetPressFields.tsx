@@ -92,7 +92,7 @@ export function AssetPressFields({
       await onSave(draft)
       toast.success(tToast('press_metadata_saved'))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Save failed')
+      toast.error(error instanceof Error ? error.message : tToast('save_failed'))
     } finally {
       setSaving(false)
     }
@@ -109,9 +109,9 @@ export function AssetPressFields({
     try {
       await onSave(nextDraft)
       onAssetChange({ ...asset, isPressApproved: approved, pressSuggested: approved ? false : asset.pressSuggested })
-      toast.success(approved ? 'Marked as press photo' : 'Removed from press downloads')
+      toast.success(approved ? tToast('marked_as_press_photo') : tToast('removed_from_press_downloads'))
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Update failed')
+      toast.error(error instanceof Error ? error.message : tToast('update_failed'))
       setDraft(draftFromAsset(asset))
     } finally {
       setSaving(false)

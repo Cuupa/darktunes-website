@@ -53,7 +53,7 @@ export function AssetPreviewModal({
   const copyUrl = useCallback(() => {
     if (!asset) return
     void navigator.clipboard.writeText(asset.publicUrl).then(() => toast.success(tToast('url_copied')))
-  }, [asset])
+  }, [asset, tToast])
 
   const download = useCallback(() => {
     if (!asset) return
@@ -98,7 +98,7 @@ export function AssetPreviewModal({
 
     setIsCropping(false)
     setCropRect(null)
-  }, [asset, cropRect])
+  }, [asset, cropRect, tToast])
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isCropping) return

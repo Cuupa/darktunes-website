@@ -63,7 +63,7 @@ export function InviteSettingsManager() {
     } finally {
       setSaving(false)
     }
-  }, [hours, saveSettings, settings])
+  }, [hours, saveSettings, settings, tToast])
 
   if (isLoading) {
     return (

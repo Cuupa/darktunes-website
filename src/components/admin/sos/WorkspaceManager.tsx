@@ -71,11 +71,9 @@ export function WorkspaceManager({
     a.click()
     URL.revokeObjectURL(url)
     toast.success(tToast('workspace_exported'))
-  }, [
-    appDefaults, emailConfig, artistMappings, compilationFilters, splitFees,
+  }, [appDefaults, emailConfig, artistMappings, compilationFilters, splitFees,
     manualRevenues, expenses, ignoredEntries, csvAliases, trackRevenueAssignments,
-    labelInfo, pdfSettings, csvImportProfiles,
-  ])
+    labelInfo, pdfSettings, csvImportProfiles, tToast])
 
   const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -108,7 +106,7 @@ export function WorkspaceManager({
       if (fileRef.current) fileRef.current.value = ''
     }
     reader.readAsText(file)
-  }, [onImport])
+  }, [onImport, tToast])
 
   const totalRules =
     artistMappings.length + compilationFilters.length + splitFees.length +

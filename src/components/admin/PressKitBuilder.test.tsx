@@ -165,7 +165,7 @@ describe('PressKitBuilder', () => {
         }),
       )
     })
-    expect(mockToastSuccess).toHaveBeenCalledWith('Removed from press kit')
+    expect(mockToastSuccess).toHaveBeenCalledWith('removed_from_press_kit')
     await waitFor(() => {
       expect(screen.queryByText('Band Live 1')).not.toBeInTheDocument()
     })
@@ -207,7 +207,7 @@ describe('PressKitBuilder', () => {
         }),
       )
     })
-    expect(mockToastSuccess).toHaveBeenCalledWith('Order updated')
+    expect(mockToastSuccess).toHaveBeenCalledWith('order_updated')
   })
 
   it('opens the asset picker when Add asset is clicked', async () => {

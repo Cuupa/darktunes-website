@@ -752,7 +752,7 @@ export function UniversalFileUploadZone({
     for (const file of acceptedFiles) {
       await routeFile(file)
     }
-  }, [routeFile])
+  }, [routeFile, tToast])
 
   // ── Drag & drop ────────────────────────────────────────────────────────────
 
@@ -825,7 +825,7 @@ export function UniversalFileUploadZone({
     toast.info(tToast('import_cancelled'))
     setPendingFile(null)
     setPendingHeaders([])
-  }, [])
+  }, [tToast])
 
   // ── Combined file list (all sources) ─────────────────────────────────────
 
