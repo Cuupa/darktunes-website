@@ -38,7 +38,7 @@ export function PortalLoginForm() {
     setIsLoading(true)
 
     if (mode === 'register') {
-      const policyError = getLocalizedPasswordPairError(password, passwordConfirm, t)
+      const policyError = getLocalizedPasswordPairError(password, passwordConfirm, (key) => t(key))
       if (policyError) {
         toast.error(policyError)
         setIsLoading(false)

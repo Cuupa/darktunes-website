@@ -33,7 +33,7 @@ export function ApplyForm() {
     setError(null)
     const policy = validatePassword(form.password)
     if (!policy.ok) {
-      setError(translatePasswordPolicyCode(policy.code, tPortal))
+      setError(translatePasswordPolicyCode(policy.code, (key) => tPortal(key)))
       return
     }
     startTransition(async () => {

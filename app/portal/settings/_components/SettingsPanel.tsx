@@ -54,7 +54,7 @@ export function SettingsPanel({ email, displayName: initialDisplayName }: Settin
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const policyError = getLocalizedPasswordPairError(newPassword, confirmPassword, t)
+    const policyError = getLocalizedPasswordPairError(newPassword, confirmPassword, (key) => t(key))
     if (policyError) {
       toast.error(policyError)
       return

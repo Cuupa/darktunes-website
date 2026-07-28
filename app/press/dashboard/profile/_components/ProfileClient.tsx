@@ -28,7 +28,9 @@ export function ProfileClient({ user, downloadCount, application }: ProfileClien
 
   const savePassword = async (event: React.FormEvent) => {
     event.preventDefault()
-    const policyError = getLocalizedPasswordPairError(newPassword, confirmPassword, tPortal)
+    const policyError = getLocalizedPasswordPairError(newPassword, confirmPassword, (key) =>
+      tPortal(key),
+    )
     if (policyError) {
       toast.error(policyError)
       return

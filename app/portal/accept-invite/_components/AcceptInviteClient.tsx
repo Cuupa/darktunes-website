@@ -84,7 +84,7 @@ export function AcceptInviteClient() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const policyError = getLocalizedPasswordPairError(password, passwordConfirm, t)
+    const policyError = getLocalizedPasswordPairError(password, passwordConfirm, (key) => t(key))
     if (policyError) {
       toast.error(policyError)
       return
