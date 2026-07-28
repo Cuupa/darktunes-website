@@ -14,7 +14,7 @@ import {
 } from '@/lib/auth/inviteAdmin'
 import { requireAdminWithServiceClient } from '@/lib/adminAuth'
 import { logAdminAction } from '@/lib/adminAuditLog'
-import { ApiError, withErrorHandler } from '@/lib/errors'
+import { withErrorHandler } from '@/lib/errors'
 import { getClientIp } from '@/lib/ipRateLimit'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 
