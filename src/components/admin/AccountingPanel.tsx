@@ -52,12 +52,13 @@ import { isValidPeriodRange } from '@/lib/sos/accountingInputValidation'
 import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUploadZone'
 import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
 import { AccountingGuidedWizard } from '@/components/admin/sos/AccountingGuidedWizard'
+import { CurrencyRatesBanner } from '@/components/admin/sos/CurrencyRatesBanner'
 import { SettlementCenterPanel } from '@/components/admin/sos/SettlementCenterPanel'
+import { OperatorPlaybook } from '@/components/admin/sos/OperatorPlaybook'
 import { PayoutManager } from '@/components/admin/sos/PayoutManager'
 import { PdfExportSettingsPanel } from '@/components/admin/sos/PdfExportSettingsPanel'
 import { RulesPanel } from '@/components/admin/sos/RulesPanel'
 import { SosAnalyticsPersistPanel } from '@/components/admin/sos/SosAnalyticsPersistPanel'
-import { OperatorPlaybook } from '@/components/admin/sos/OperatorPlaybook'
 import { ImportBatchesPanel } from '@/components/admin/sos/ImportBatchesPanel'
 import { SosConfirmDialog } from '@/components/admin/sos/SosConfirmDialog'
 import { ExternalMetricsSyncPanel } from '@/components/admin/sos/ExternalMetricsSyncPanel'
@@ -425,6 +426,10 @@ function SosGeneratorPanel() {
     releaseTitlesByArtistIncFeaturing,
     territoryMetrics,
     merchOrderRows,
+    exchangeRatesLoading,
+    exchangeRatesReady,
+    exchangeRatesSource,
+    refreshExchangeRates,
   } = useCSVProcessor(
     believeManager.files,
     bandcampManager.files,
@@ -800,6 +805,10 @@ function SosGeneratorPanel() {
           {t.resetSessionLabel}
         </Button>
       </div>
+      <div className="rounded-md border border-border bg-muted/10 p-3 space-y-1">
+        <p className="text-xs font-semibold text-foreground">{t.uploadHelpTitle}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">{t.uploadHelpBody}</p>
+      </div>
       <p className="text-xs text-muted-foreground">
         {interpolate(t.rosterFromDbHint, { count: labelArtists.length })}
       </p>
@@ -840,23 +849,50 @@ function SosGeneratorPanel() {
   )
 
   const settlePanel = hasData ? (
-    <SettlementCenterPanel
-      revenues={revenues}
-      labelArtists={labelArtists}
-      periodStart={detectedPeriodStart}
-      periodEnd={detectedPeriodEnd}
-      territoryMetrics={territoryMetrics}
-      merchOrderRows={merchOrderRows}
-      bronzeBatchIds={bronzeBatchIds}
-      persistDisabled={isProcessing}
-      onCreateDraft={handlePublishToPortal}
-      onBuildCorrectionPdf={buildCorrectionPdfBase64}
-    />
+    <div className="space-y-4">
+      <div className="px-6 pt-4 space-y-3">
+        <p className="text-sm text-muted-foreground leading-relaxed">{t.settlementDauIntro}</p>
+        <OperatorPlaybook
+          title={t.playbookTitle}
+          step1={t.coachCheckDrafts}
+          step2={t.coachCheckApprove}
+          step3={t.coachCheckPay}
+        />
+        {wizardMode === 'quick' && hasBlockingValidation && (
+          <Alert className="border-amber-500/40 bg-amber-500/10">
+            <AlertDescription className="text-xs space-y-1">
+              <p className="font-medium text-foreground">{t.quickSettleWarningTitle}</p>
+              <p className="text-muted-foreground">{t.quickSettleWarningBody}</p>
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+      <SettlementCenterPanel
+        revenues={revenues}
+        labelArtists={labelArtists}
+        periodStart={detectedPeriodStart}
+        periodEnd={detectedPeriodEnd}
+        territoryMetrics={territoryMetrics}
+        merchOrderRows={merchOrderRows}
+        bronzeBatchIds={bronzeBatchIds}
+        persistDisabled={isProcessing}
+        onCreateDraft={handlePublishToPortal}
+        onBuildCorrectionPdf={buildCorrectionPdfBase64}
+      />
+    </div>
   ) : (
     <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
       <SealCheck size={32} className="opacity-30" />
       <p className="text-sm">{t.emptySettlements}</p>
     </div>
+  )
+
+  const currencyBanner = (
+    <CurrencyRatesBanner
+      loading={exchangeRatesLoading}
+      source={exchangeRatesSource}
+      onRefresh={refreshExchangeRates}
+    />
   )
 
   const rulesStatusBanner = settingsReady ? (
@@ -889,6 +925,7 @@ function SosGeneratorPanel() {
       return (
         <div className="space-y-0">
           {rulesStatusBanner}
+          {currencyBanner}
           <SosWizardModeChooser
             onSelect={(mode) => {
               setWizardMode(mode)
@@ -922,6 +959,11 @@ function SosGeneratorPanel() {
           stepIds={stepIds}
           hasBlockingValidation={hasBlockingValidation}
           setupComplete={setupComplete}
+          ratesReady={exchangeRatesReady}
+          exchangeRatesLoading={exchangeRatesLoading}
+          revenueCount={revenues.length}
+          issueCount={wizardValidationIssues.length}
+          statusBanner={currencyBanner}
           setupPanel={wizardMode === 'assistant' ? setupPanel : undefined}
           validatePanel={wizardMode === 'assistant' ? validatePanel : undefined}
           uploadPanel={uploadPanel}
@@ -947,6 +989,13 @@ function SosGeneratorPanel() {
             guidedReviewHint: t.guidedReviewHint,
             guidedSettleHint: t.guidedSettleHint,
             guidedStepperAria: t.guidedStepperAria,
+            guidedStepOf: t.guidedStepOf,
+            blockedSetupPeriod: t.blockedSetupPeriod,
+            blockedUploadNoData: t.blockedUploadNoData,
+            blockedUploadProcessing: t.blockedUploadProcessing,
+            blockedUploadRates: t.blockedUploadRates,
+            blockedValidateErrors: t.blockedValidateErrors,
+            blockedReviewNoData: t.blockedReviewNoData,
           }}
         />
       </div>
@@ -955,6 +1004,7 @@ function SosGeneratorPanel() {
 
   return (
     <div className="space-y-0">
+      {currencyBanner}
       {/* Sub-tab navigation */}
       <div
         className={cn('flex items-center gap-1 px-6 pt-4 border-b border-border', horizontalScrollClass)}

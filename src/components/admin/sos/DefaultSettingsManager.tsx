@@ -188,6 +188,7 @@ export function DefaultSettingsManager({ defaults, onUpdate, onApplyDefaultSplit
             />
 
             <div className="space-y-2">
+              {/* Free text on purpose: used as email template placeholder (e.g. "20 December"), not ISO date. */}
               <Label htmlFor="deadline-date">Specific due date (optional)</Label>
               <Input
                 id="deadline-date"

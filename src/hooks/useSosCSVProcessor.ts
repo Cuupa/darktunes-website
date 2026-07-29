@@ -5,8 +5,16 @@ import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { computeAutoMappings } from '@/lib/sos/auto-mapping'
 import { logClientAppEvent } from '@/lib/sos/clientAppLog'
-import { fetchExchangeRates, fetchHistoricalExchangeRates } from '@/lib/sos/currency'
-import type { ExchangeRates, HistoricalRates } from '@/lib/sos/currency'
+import {
+  FALLBACK_EXCHANGE_RATES,
+  fetchExchangeRates,
+  fetchHistoricalExchangeRates,
+  parseMissingExchangeRateCurrency,
+  type ExchangeRateSource,
+  type ExchangeRates,
+  type HistoricalRates,
+} from '@/lib/sos/currency'
+import { interpolate } from '@/lib/i18n/interpolate'
 import type {
   UploadedFile,
   CompilationFilter,
@@ -128,8 +136,23 @@ export function useCSVProcessor(
   const [isProcessing, setIsProcessing] = useState(false)
   const [exchangeRates, setExchangeRates] = useState<ExchangeRates>({})
   const [exchangeRatesLoading, setExchangeRatesLoading] = useState(true)
+  const [exchangeRatesSource, setExchangeRatesSource] = useState<ExchangeRateSource | 'unknown'>('unknown')
   const [historicalRates, setHistoricalRates] = useState<HistoricalRates | null>(null)
   const t = useTranslations('admin.accounting')
+  const tRef = useRef(t)
+  tRef.current = t
+
+  /** Latest rates for process gate (worker lifecycle effect must not rebind). */
+  const exchangeRatesRef = useRef(exchangeRates)
+  exchangeRatesRef.current = exchangeRates
+
+  const applyRateSource = useCallback((source: ExchangeRateSource) => {
+    setExchangeRatesSource((prev) => {
+      if (source === 'fallback') return 'fallback'
+      if (prev === 'fallback') return 'fallback'
+      return source
+    })
+  }, [])
 
   const notifyCurrencyFallback = useCallback(
     (period?: string) => {
@@ -147,10 +170,13 @@ export function useCSVProcessor(
     fetchExchangeRates()
       .then((result) => {
         setExchangeRates(result.rates)
+        setExchangeRatesSource(result.source)
         if (result.source === 'fallback') notifyCurrencyFallback()
       })
       .catch((err) => {
         console.warn('[useCSVProcessor] Exchange rate fetch failed unexpectedly:', err)
+        setExchangeRates(FALLBACK_EXCHANGE_RATES)
+        setExchangeRatesSource('fallback')
         notifyCurrencyFallback()
       })
       .finally(() => {
@@ -171,18 +197,20 @@ export function useCSVProcessor(
     fetchHistoricalExchangeRates(detectedStart, detectedEnd)
       .then((result) => {
         setHistoricalRates(result.rates)
+        applyRateSource(result.source)
         if (result.source === 'fallback') {
           notifyCurrencyFallback(`${detectedStart}–${detectedEnd}`)
         }
       })
       .catch((err) => {
         console.warn('[useCSVProcessor] Historical exchange rate fetch failed:', err)
+        applyRateSource('fallback')
         notifyCurrencyFallback(`${detectedStart}–${detectedEnd}`)
       })
       .finally(() => {
         setExchangeRatesLoading(false)
       })
-  }, [detectedStart, detectedEnd, notifyCurrencyFallback])
+  }, [detectedStart, detectedEnd, notifyCurrencyFallback, applyRateSource])
 
   // ── Manual refresh of exchange rates ─────────────────────────────────────────
 
@@ -197,7 +225,10 @@ export function useCSVProcessor(
       ])
       setExchangeRates(spot.rates)
       if (historical !== null) setHistoricalRates(historical.rates)
-      if (spot.source === 'fallback' || historical?.source === 'fallback') {
+      const nextSource: ExchangeRateSource =
+        spot.source === 'fallback' || historical?.source === 'fallback' ? 'fallback' : 'ecb'
+      setExchangeRatesSource(nextSource)
+      if (nextSource === 'fallback') {
         notifyCurrencyFallback(
           detectedStart && detectedEnd ? `${detectedStart}–${detectedEnd}` : undefined,
         )
@@ -206,6 +237,8 @@ export function useCSVProcessor(
       }
     } catch (err) {
       console.warn('[useCSVProcessor] Exchange rate refresh failed:', err)
+      setExchangeRates(FALLBACK_EXCHANGE_RATES)
+      setExchangeRatesSource('fallback')
       notifyCurrencyFallback(
         detectedStart && detectedEnd ? `${detectedStart}–${detectedEnd}` : undefined,
       )
@@ -280,6 +313,11 @@ export function useCSVProcessor(
   }), [config.compilationFilters, config.artistMappings, config.splitFees, config.manualRevenues, config.expenses, config.excludePhysical, exchangeRates, historicalRates, config.labelArtists, config.ignoredEntries, config.distributionFeePercentage, config.distributionFeeDigital, config.distributionFeePhysical, config.defaultSplitPercentage, config.defaultSplitPercentageDigital, config.defaultSplitPercentagePhysical, config.sourceSplits, config.trackRevenueAssignments, config.carryForwardByArtist])
 
   const sendProcess = useCallback(() => {
+    // Never process with empty rates — avoids race toast for missing USD/etc.
+    if (Object.keys(exchangeRatesRef.current).length === 0) {
+      setIsProcessing(false)
+      return
+    }
     const cfg = latestConfigRef.current ?? buildConfig()
     workerRef.current?.postMessage({ type: 'process', config: cfg } satisfies WorkerRequest)
     setIsProcessing(true)
@@ -319,17 +357,31 @@ export function useCSVProcessor(
           setIsProcessing(false)
           break
 
-        case 'error':
+        case 'error': {
           console.error('CSV Worker error:', msg.message)
-          toast.error('CSV processing error', { description: msg.message })
+          const labels = tRef.current
+          const missingCurrency = parseMissingExchangeRateCurrency(msg.message)
+          if (missingCurrency) {
+            toast.error(labels('currencyMissingRateTitle'), {
+              description: interpolate(labels('currencyMissingRateDesc'), {
+                currency: missingCurrency,
+              }),
+            })
+          } else {
+            toast.error(labels('csvProcessingError'), { description: msg.message })
+          }
           setIsProcessing(false)
           break
+        }
       }
     }
 
     worker.onerror = (err) => {
       console.error('CSV Worker uncaught error:', err)
-      toast.error('Worker crashed', { description: err.message ?? 'Unknown error' })
+      const labels = tRef.current
+      toast.error(labels('workerCrashed'), {
+        description: err.message || labels('workerCrashedUnknown'),
+      })
       setIsProcessing(false)
     }
 
@@ -457,9 +509,13 @@ export function useCSVProcessor(
     [workerResult.uniqueArtists, config.artistMappings]
   )
 
+  const exchangeRatesReady = Object.keys(exchangeRates).length > 0
+
   return {
     isProcessing,
     exchangeRatesLoading,
+    exchangeRatesReady,
+    exchangeRatesSource,
     refreshExchangeRates,
     uniqueArtists: workerResult.uniqueArtists,
     processedData: workerResult.processedData as SafeProcessedArtistData[],

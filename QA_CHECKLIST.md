@@ -36,6 +36,15 @@
 - [ ] Invoice with 19% USt: payment can record gross PDF total
 - [ ] Portal invoice against locked settlement period returns 422
 
+## Accounting wizard (DAU path)
+- [ ] `/admin/accounting` shows Assistant as recommended; 5-step “what happens next” list
+- [ ] Assistant: empty period → Continue disabled with plain reason; set months → Continue works
+- [ ] Upload one CSV → coach checklist updates; Continue enabled only after numbers appear
+- [ ] Block/throttle `/api/exchange-rates` → sticky fallback banner + Refresh; no crash on first process
+- [ ] Validate step: blocking errors prevent Continue; warnings allow continue
+- [ ] DE labels: Setup / Dateien / Automatik-Check / Auszahlungen / Veröffentlichen (no double “Prüfen”)
+- [ ] Expense date = calendar picker; period = month picker; track owner % = percent field
+
 ## Corporate Identity
 - [ ] Validate only approved CI colors are hardcoded in components
 - [ ] Validate primary/secondary/background colors in rendered UI

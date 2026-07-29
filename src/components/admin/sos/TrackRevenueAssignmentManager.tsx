@@ -16,6 +16,8 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { TrackRevenueAssignment, RevenueOwner } from '@/lib/sos/types'
+import { PercentField } from '@/components/admin/sos/fields/AccountingNumberFields'
+import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { v4 as uuidv4 } from 'uuid'
 
 interface TrackRevenueAssignmentManagerProps {
@@ -37,39 +39,50 @@ function OwnerRow({
   onChange,
   onRemove,
   artists,
+  artistPlaceholder,
+  percentLabel,
+  removeLabel,
 }: {
   owner: OwnerDraft
   onChange: (o: OwnerDraft) => void
   onRemove: () => void
   artists: string[]
+  artistPlaceholder: string
+  percentLabel: string
+  removeLabel: string
 }) {
+  const pctNum = owner.percentage.trim() === '' ? undefined : Number(owner.percentage.replace(',', '.'))
+  const pctValue = pctNum != null && Number.isFinite(pctNum) ? pctNum : undefined
+
   return (
-    <div className="flex gap-2 items-center">
-      <Input
-        list="track-artists"
-        value={owner.artist}
-        onChange={e => onChange({ ...owner, artist: e.target.value })}
-        placeholder="Artist name"
-        className="flex-1 h-8 text-sm"
-      />
-      <datalist id="track-artists">
-        {artists.map(a => <option key={a} value={a} />)}
-      </datalist>
-      <Input
-        type="number"
-        min={0}
-        max={100}
-        step={0.1}
-        value={owner.percentage}
-        onChange={e => onChange({ ...owner, percentage: e.target.value })}
-        placeholder="%"
-        className="w-20 h-8 text-sm"
+    <div className="flex gap-2 items-end">
+      <div className="flex-1 space-y-1">
+        <Input
+          list="track-artists"
+          value={owner.artist}
+          onChange={e => onChange({ ...owner, artist: e.target.value })}
+          placeholder={artistPlaceholder}
+          className="h-8 text-sm"
+          aria-label={artistPlaceholder}
+        />
+        <datalist id="track-artists">
+          {artists.map(a => <option key={a} value={a} />)}
+        </datalist>
+      </div>
+      <PercentField
+        label={percentLabel}
+        value={pctValue}
+        onChange={(v) => onChange({ ...owner, percentage: v == null ? '' : String(v) })}
+        optional
+        className="w-28 shrink-0"
+        inputClassName="h-8 text-sm"
       />
       <Button
         size="sm"
         variant="ghost"
         onClick={onRemove}
-        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive mb-0.5"
+        aria-label={removeLabel}
       >
         <Trash size={14} />
       </Button>
@@ -83,12 +96,13 @@ export function TrackRevenueAssignmentManager({
   onRemoveAssignment,
   availableArtists = [],
 }: TrackRevenueAssignmentManagerProps) {
+  const t = useAccountingLabels()
   const [trackTitle, setTrackTitle] = useState('')
   const [owners, setOwners] = useState<OwnerDraft[]>([EMPTY_DRAFT])
   const [error, setError] = useState('')
 
   const ownerSum = owners.reduce((s, o) => {
-    const n = parseFloat(o.percentage)
+    const n = parseFloat(o.percentage.replace(',', '.'))
     return s + (Number.isNaN(n) ? 0 : n)
   }, 0)
   const sumOk = Math.abs(ownerSum - 100) < 0.01
@@ -108,26 +122,29 @@ export function TrackRevenueAssignmentManager({
   const handleAdd = useCallback(() => {
     const title = trackTitle.trim()
     if (!title) {
-      setError('Enter a track or release title substring to match.')
+      setError(t.trackTitleRequired)
       return
     }
     if (owners.length === 0 || owners.every(o => !o.artist.trim())) {
-      setError('Add at least one owner artist.')
+      setError(t.trackOwnerRequired)
       return
     }
     const parsed: RevenueOwner[] = owners
       .filter(o => o.artist.trim())
-      .map(o => ({ artist: o.artist.trim(), percentage: parseFloat(o.percentage) || 0 }))
+      .map(o => ({
+        artist: o.artist.trim(),
+        percentage: parseFloat(o.percentage.replace(',', '.')) || 0,
+      }))
     const sum = parsed.reduce((s, o) => s + o.percentage, 0)
     if (Math.abs(sum - 100) >= 0.01) {
-      setError(`Owner percentages must sum to 100% (currently ${sum.toFixed(1)}%).`)
+      setError(`${t.validationPercentRange} (${sum.toFixed(1)}%)`)
       return
     }
     onAddAssignment({ id: uuidv4(), trackTitle: title, owners: parsed })
     setTrackTitle('')
     setOwners([EMPTY_DRAFT])
     setError('')
-  }, [trackTitle, owners, onAddAssignment])
+  }, [trackTitle, owners, onAddAssignment, t])
 
   return (
     <div className="space-y-5">
@@ -176,6 +193,9 @@ export function TrackRevenueAssignmentManager({
                 onChange={o => handleChangeOwner(idx, o)}
                 onRemove={() => handleRemoveOwner(idx)}
                 artists={availableArtists}
+                artistPlaceholder={t.artistNamePlaceholder}
+                percentLabel={t.trackPercentLabel}
+                removeLabel={t.trackRemoveOwner}
               />
             ))}
           </div>

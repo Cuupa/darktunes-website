@@ -12,6 +12,9 @@ vi.mock('@phosphor-icons/react', () => ({
   SealCheck: () => <span data-testid="icon-seal" />,
   Gear: () => <span data-testid="icon-gear" />,
   ShieldCheck: () => <span data-testid="icon-shield" />,
+  CheckCircle: () => <span data-testid="icon-check" />,
+  Circle: () => <span data-testid="icon-circle" />,
+  Warning: () => <span data-testid="icon-warning" />,
 }))
 
 vi.mock('@/components/ui/button', () => ({
@@ -32,6 +35,34 @@ vi.mock('@/components/ui/alert', () => ({
   AlertDescription: ({ children, ...props }: React.HTMLAttributes<HTMLParagraphElement>) => (
     <p {...props}>{children}</p>
   ),
+}))
+
+vi.mock('@/lib/i18n/accountingFallbacks', () => ({
+  useAccountingLabels: () => ({
+    coachSetupTitle: 'Step: Set up the period',
+    coachSetupBody: 'Pick months',
+    coachUploadTitle: 'Step: Upload sales files',
+    coachUploadBody: 'Drop files',
+    coachValidateTitle: 'Step: Automatic checks',
+    coachValidateBody: 'Fix errors',
+    coachReviewTitle: 'Step: Check payouts',
+    coachReviewBody: 'Look at euros',
+    coachSettleTitle: 'Step: Publish & pay',
+    coachSettleBody: 'Create drafts',
+    coachCheckPeriod: 'Period set',
+    coachCheckFees: 'Fees ok',
+    coachCheckLabel: 'Label ok',
+    coachCheckRates: 'Rates loaded',
+    coachCheckFiles: 'Files uploaded',
+    coachCheckProcessed: 'Numbers ready',
+    coachCheckNoBlocking: 'No blocking',
+    coachCheckNoIssues: 'No issues',
+    coachCheckIssuesCount: '{count} issues',
+    coachCheckPayouts: '{count} payouts',
+    coachCheckDrafts: 'Drafts',
+    coachCheckApprove: 'Approve',
+    coachCheckPay: 'Pay',
+  }),
 }))
 
 describe('AccountingGuidedWizard navigation', () => {
@@ -71,27 +102,33 @@ describe('AccountingGuidedWizard navigation', () => {
     expect(screen.getByText('upload-panel')).toBeInTheDocument()
     expect(screen.queryByText('review-panel')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    expect(screen.getAllByText(/Upload at least one sales file/i).length).toBeGreaterThanOrEqual(1)
   })
 
-  it('uses Open settlement label on the review step', () => {
+  it('uses Continue to publish label on the review step', () => {
     renderWizard({ hasData: true, activeStep: 'review' })
 
     expect(screen.getByText('review-panel')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Open settlement' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Continue to publish' })).toBeEnabled()
   })
 
   it('advances to settle when continue is clicked on review', () => {
     renderWizard({ hasData: true, activeStep: 'review' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open settlement' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to publish' }))
     expect(onActiveStepChange).toHaveBeenCalledWith('settle')
   })
 
   it('jumps to settle when the settle stepper control is clicked', () => {
     renderWizard({ hasData: true, activeStep: 'review' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save analytics, create drafts, and approve' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create drafts, approve, and pay' }))
     expect(onActiveStepChange).toHaveBeenCalledWith('settle')
+  })
+
+  it('shows step progress in the footer', () => {
+    renderWizard({ hasData: true, activeStep: 'review' })
+    expect(screen.getByText(/Step 2 of 3/)).toBeInTheDocument()
   })
 
   it('notifies import ready without auto-advancing from upload', () => {

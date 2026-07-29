@@ -17,9 +17,12 @@ import {
   QUICK_WIZARD_STEP_IDS,
   canAdvanceGuidedStep,
   canNavigateToGuidedStep,
+  guidedContinueBlockedReason,
   guidedStepIndex,
+  type GuidedBlockedReasonLabels,
   type GuidedWizardStep,
 } from '@/lib/sos/guidedWizard'
+import { SosWizardStepCoach } from '@/components/admin/sos/SosWizardStepCoach'
 import { cn } from '@/lib/utils'
 
 const GUIDED_FALLBACK = {
@@ -29,21 +32,28 @@ const GUIDED_FALLBACK = {
   guidedStepSetup: 'Setup',
   guidedStepSetupDesc: 'Period and accounting parameters',
   guidedStepUpload: 'Upload',
-  guidedStepUploadDesc: 'Import distributor CSV files',
-  guidedStepValidate: 'Validate',
-  guidedStepValidateDesc: 'Automatic checks before review',
-  guidedStepReview: 'Review',
-  guidedStepReviewDesc: 'Validate payouts before publishing',
+  guidedStepUploadDesc: 'Import sales CSV files',
+  guidedStepValidate: 'Checks',
+  guidedStepValidateDesc: 'Automatic checks before payout review',
+  guidedStepReview: 'Payouts',
+  guidedStepReviewDesc: 'Check amounts before publishing',
   guidedStepSettle: 'Publish',
-  guidedStepSettleDesc: 'Save analytics, create drafts, and approve',
+  guidedStepSettleDesc: 'Create drafts, approve, and pay',
   guidedBack: 'Back',
   guidedNext: 'Continue',
-  guidedOpenSettle: 'Open settlement',
+  guidedOpenSettle: 'Continue to publish',
   guidedProcessingHint: 'Processing CSV data…',
-  guidedUploadHint: 'Upload at least one distributor CSV to continue.',
+  guidedUploadHint: 'Upload at least one sales CSV to continue.',
   guidedReviewHint: 'Check artist payouts, then continue to publish statements.',
-  guidedSettleHint: 'Save portal analytics and run the settlement workflow below.',
+  guidedSettleHint: 'Create drafts, approve them, then record payments below.',
   guidedStepperAria: 'Accounting guided workflow',
+  guidedStepOf: 'Step {current} of {total}',
+  blockedSetupPeriod: 'Select a valid billing period (start and end month) to continue.',
+  blockedUploadNoData: 'Upload at least one sales file and wait until numbers appear.',
+  blockedUploadProcessing: 'Please wait — files are still being processed.',
+  blockedUploadRates: 'Please wait — exchange rates are still loading.',
+  blockedValidateErrors: 'Fix the blocking errors in the checklist before continuing.',
+  blockedReviewNoData: 'Upload and process sales files before publishing.',
 } as const
 
 const STEP_META: Record<
@@ -88,6 +98,12 @@ export interface AccountingGuidedWizardProps {
   hasBlockingValidation?: boolean
   /** When false, Continue is disabled on the Setup step. Default true. */
   setupComplete?: boolean
+  ratesReady?: boolean
+  exchangeRatesLoading?: boolean
+  revenueCount?: number
+  issueCount?: number
+  /** Extra content under the coach (e.g. FX banner). */
+  statusBanner?: React.ReactNode
   setupPanel?: React.ReactNode
   uploadPanel: React.ReactNode
   validatePanel?: React.ReactNode
@@ -106,6 +122,11 @@ export function AccountingGuidedWizard({
   stepIds = QUICK_WIZARD_STEP_IDS,
   hasBlockingValidation = false,
   setupComplete = true,
+  ratesReady = true,
+  exchangeRatesLoading = false,
+  revenueCount = 0,
+  issueCount = 0,
+  statusBanner,
   setupPanel,
   uploadPanel,
   validatePanel,
@@ -116,8 +137,14 @@ export function AccountingGuidedWizard({
   const t = useMemo(() => ({ ...GUIDED_FALLBACK, ...labels }), [labels])
   const settlePanelRef = useRef<HTMLDivElement>(null)
   const stepInput = useMemo(
-    () => ({ hasData, isProcessing, hasBlockingValidation, setupComplete }),
-    [hasData, isProcessing, hasBlockingValidation, setupComplete],
+    () => ({
+      hasData,
+      isProcessing,
+      hasBlockingValidation,
+      setupComplete,
+      ratesReady,
+    }),
+    [hasData, isProcessing, hasBlockingValidation, setupComplete, ratesReady],
   )
   const importReadyNotifiedRef = useRef(false)
 
@@ -137,6 +164,20 @@ export function AccountingGuidedWizard({
     if (activeStep !== 'settle') return
     settlePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [activeStep])
+
+  const blockedReasonLabels = useMemo((): GuidedBlockedReasonLabels => ({
+    blockedSetupPeriod: t.blockedSetupPeriod,
+    blockedUploadNoData: t.blockedUploadNoData,
+    blockedUploadProcessing: t.blockedUploadProcessing,
+    blockedUploadRates: t.blockedUploadRates,
+    blockedValidateErrors: t.blockedValidateErrors,
+    blockedReviewNoData: t.blockedReviewNoData,
+  }), [t])
+
+  const blockedReason = useMemo(
+    () => guidedContinueBlockedReason(activeStep, stepInput, blockedReasonLabels),
+    [activeStep, stepInput, blockedReasonLabels],
+  )
 
   const stepHint = useMemo(() => {
     if (activeStep === 'setup') {
@@ -169,6 +210,11 @@ export function AccountingGuidedWizard({
   const canGoNext = canAdvanceGuidedStep(activeStep, stepInput, stepIds)
   const canGoBack = guidedStepIndex(activeStep, stepIds) > 0
   const nextLabel = activeStep === 'review' ? t.guidedOpenSettle : t.guidedNext
+  const stepNumber = guidedStepIndex(activeStep, stepIds) + 1
+  const stepProgress = t.guidedStepOf
+    .replace('{current}', String(stepNumber))
+    .replace('{total}', String(stepIds.length))
+  const activeStepLabel = t[STEP_META[activeStep].labelKey]
 
   return (
     <div className="flex flex-col min-h-[500px]">
@@ -226,7 +272,22 @@ export function AccountingGuidedWizard({
         </Button>
       </div>
 
-      <Alert className="mx-6 mt-4 border-border bg-card/40">
+      {statusBanner}
+
+      <SosWizardStepCoach
+        step={activeStep}
+        hasData={hasData}
+        isProcessing={isProcessing}
+        setupComplete={setupComplete}
+        hasBlockingValidation={hasBlockingValidation}
+        ratesReady={ratesReady}
+        exchangeRatesLoading={exchangeRatesLoading}
+        revenueCount={revenueCount}
+        issueCount={issueCount}
+        blockedReason={activeStep === 'settle' ? null : blockedReason}
+      />
+
+      <Alert className="mx-6 mt-3 border-border bg-card/40">
         <AlertDescription className="text-xs">{stepHint}</AlertDescription>
       </Alert>
 
@@ -242,16 +303,28 @@ export function AccountingGuidedWizard({
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-border px-6 py-4 bg-card/40">
-        <Button type="button" variant="outline" disabled={!canGoBack} onClick={goBack} className="min-h-11">
-          <ArrowLeft size={16} className="mr-1.5" aria-hidden="true" />
-          {t.guidedBack}
-        </Button>
-        {activeStep !== 'settle' ? (
-          <Button type="button" disabled={!canGoNext} onClick={goNext} className="min-h-11">
-            {nextLabel}
-            <ArrowRight size={16} className="ml-1.5" aria-hidden="true" />
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4 bg-card/40">
+        <div className="flex flex-col gap-1 min-w-0">
+          <Button type="button" variant="outline" disabled={!canGoBack} onClick={goBack} className="min-h-11 w-fit">
+            <ArrowLeft size={16} className="mr-1.5" aria-hidden="true" />
+            {t.guidedBack}
           </Button>
+          <span className="text-[11px] text-muted-foreground tabular-nums">
+            {stepProgress} · {activeStepLabel}
+          </span>
+        </div>
+        {activeStep !== 'settle' ? (
+          <div className="flex flex-col items-end gap-1 max-w-sm">
+            <Button type="button" disabled={!canGoNext} onClick={goNext} className="min-h-11">
+              {nextLabel}
+              <ArrowRight size={16} className="ml-1.5" aria-hidden="true" />
+            </Button>
+            {!canGoNext && blockedReason && (
+              <p className="text-[11px] text-muted-foreground text-right leading-snug" role="status">
+                {blockedReason}
+              </p>
+            )}
+          </div>
         ) : (
           <span className="text-xs text-muted-foreground">{t.guidedSettleHint}</span>
         )}

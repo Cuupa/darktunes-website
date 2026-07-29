@@ -103,7 +103,7 @@ function ExpenseForm({
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select artist…" />
+                <SelectValue placeholder={t.selectArtistPlaceholder} />
               </SelectTrigger>
               <SelectContent>
                 {artists.map((a) => (
@@ -111,14 +111,14 @@ function ExpenseForm({
                     {a}
                   </SelectItem>
                 ))}
-                <SelectItem value="__manual__">Enter manually…</SelectItem>
+                <SelectItem value="__manual__">{t.enterArtistManually}</SelectItem>
               </SelectContent>
             </Select>
             {artist === '__manual__' && (
               <Input
                 value={artistInput}
                 onChange={(e) => setArtistInput(e.target.value.slice(0, 120))}
-                placeholder="Artist name"
+                placeholder={t.artistNamePlaceholder}
                 className="mt-1"
                 maxLength={120}
               />
@@ -128,7 +128,7 @@ function ExpenseForm({
           <Input
             value={artistInput}
             onChange={(e) => setArtistInput(e.target.value.slice(0, 120))}
-            placeholder="Artist name"
+            placeholder={t.artistNamePlaceholder}
             maxLength={120}
           />
         )}

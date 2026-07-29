@@ -4,8 +4,9 @@ import { FilePdf, type Icon as PhosphorIcon } from '@phosphor-icons/react'
 import { Card } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import type { PdfExportSettings } from '@/lib/sos/types'
+import { IntegerField } from '@/components/admin/sos/fields/AccountingNumberFields'
+import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 
 interface PdfExportSettingsProps {
   settings: PdfExportSettings
@@ -42,6 +43,7 @@ function SectionHeading({ icon: Icon, title }: { icon: PhosphorIcon; title: stri
 }
 
 export function PdfExportSettingsPanel({ settings, onUpdate }: PdfExportSettingsProps) {
+  const t = useAccountingLabels()
   const patch = (partial: Partial<PdfExportSettings>) => onUpdate({ ...settings, ...partial })
 
   return (
@@ -89,24 +91,17 @@ export function PdfExportSettingsPanel({ settings, onUpdate }: PdfExportSettings
               onCheckedChange={v => patch({ includeCountryBreakdown: v })}
             />
             {settings.includeCountryBreakdown && (
-              <div className="ml-4 flex items-center gap-3 py-2 px-4 rounded-xl bg-muted/10 border border-border/30">
-                <Label htmlFor="pdf-top-countries" className="text-xs text-muted-foreground whitespace-nowrap">
-                  Max countries shown
-                </Label>
-                <Input
+              <div className="ml-4 py-2 px-4 rounded-xl bg-muted/10 border border-border/30 max-w-xs">
+                <IntegerField
                   id="pdf-top-countries"
-                  type="number"
+                  label={t.pdfTopCountriesLabel}
+                  value={settings.topCountriesCount ?? 15}
+                  onChange={(val) => patch({ topCountriesCount: val })}
                   min={1}
                   max={200}
-                  step={1}
-                  value={settings.topCountriesCount ?? 15}
-                  onChange={e => {
-                    const val = parseInt(e.target.value, 10)
-                    if (!Number.isNaN(val) && val >= 1 && val <= 200) patch({ topCountriesCount: val })
-                  }}
-                  className="w-20 h-7 text-xs"
+                  description="(default: 15)"
+                  inputClassName="h-8 text-xs w-24"
                 />
-                <span className="text-xs text-muted-foreground">(default: 15)</span>
               </div>
             )}
             <ToggleRow
