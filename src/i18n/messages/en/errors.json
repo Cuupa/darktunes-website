@@ -18,6 +18,11 @@
   "EMAIL_SEND_FAILED": "Your message could not be sent. Please try again later.",
   "EMAIL_NOT_CONFIGURED": "The email service is not available at this time.",
   "EXTERNAL_API_ERROR": "An external service is currently unavailable. Please try again later.",
+  "APIFY_NOT_CONFIGURED": "Apify is not configured. Add your Apify API token under Admin → API Keys.",
+  "APIFY_NO_TARGETS": "No visible artists or releases with a Spotify link were found to sync.",
+  "APIFY_BUDGET_EXCEEDED": "Monthly Apify free budget exhausted. Try again next month or reduce the sync scope.",
+  "APIFY_RUN_FAILED": "Spotify play-count scrape failed on Apify. Check the Apify Console for run details.",
+  "APIFY_TIMEOUT": "The Apify scrape timed out before finishing. Partial progress may be saved; re-run to continue.",
   "SERVER_ERROR": "Something went wrong on our end. Please try again later.",
   "CONFIG_ERROR": "Something went wrong on our end. Please try again later.",
   "DB_ERROR": "Something went wrong on our end. Please try again later."

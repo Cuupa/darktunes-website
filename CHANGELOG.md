@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Apify Spotify public play counts:** Admin → API Keys (`apify_token`) + Accounting panel dry-run/sync. Scrapes visible artists/releases with Spotify IDs via `beatanalytics/spotify-play-count-scraper` (monthly listeners, followers, track play snapshots). Hard cap 1200 URLs/month (`apify_usage_months`). Portal Listeners chart shows Spotify (public) series. Never writes SOS `streaming_stats`.
+
 ### Changed
 - **GitHub Actions speed (phases A–C):** Deduplicated PR checks (QA is E2E-only; security/perf live in their own workflows). Parallel CI jobs (lint+contracts+tsc · unit · build). Concurrency cancel-in-progress on all workflows. Next.js + ESLint + Playwright browser caches. PR E2E runs Desktop Chrome only (full matrix on `main`); Playwright CI workers default to 2. Path filters for Lighthouse/budget/security; Playwright performance suite no longer on every PR (main paths + weekly + manual).
 

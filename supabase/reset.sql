@@ -2442,13 +2442,13 @@ CREATE INDEX IF NOT EXISTS idx_merch_orders_artist_period
 
 -- ---------------------------------------------------------------------------
 -- TABLE: artist_listener_metrics  (Gold — external listener/play trends)
--- Sources: Last.fm (free), Soundcharts (optional paid API key)
+-- Sources: Last.fm (free), Soundcharts (optional), Apify Spotify public scrapes
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.artist_listener_metrics (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   artist_id   UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
-  source      TEXT        NOT NULL CHECK (source IN ('lastfm', 'soundcharts')),
-  metric_type TEXT        NOT NULL CHECK (metric_type IN ('listeners', 'plays')),
+  source      TEXT        NOT NULL CHECK (source IN ('lastfm', 'soundcharts', 'apify')),
+  metric_type TEXT        NOT NULL CHECK (metric_type IN ('listeners', 'plays', 'followers')),
   period      TEXT        NOT NULL,
   value       BIGINT      NOT NULL DEFAULT 0,
   country     TEXT        NOT NULL DEFAULT '',
@@ -2458,6 +2458,51 @@ CREATE TABLE IF NOT EXISTS public.artist_listener_metrics (
 
 CREATE INDEX IF NOT EXISTS idx_artist_listener_metrics_artist_period
   ON public.artist_listener_metrics (artist_id, period DESC);
+
+-- Idempotent CHECK expansion for existing databases created with older CHECKs
+ALTER TABLE public.artist_listener_metrics
+  DROP CONSTRAINT IF EXISTS artist_listener_metrics_source_check;
+ALTER TABLE public.artist_listener_metrics
+  ADD CONSTRAINT artist_listener_metrics_source_check
+  CHECK (source IN ('lastfm', 'soundcharts', 'apify'));
+ALTER TABLE public.artist_listener_metrics
+  DROP CONSTRAINT IF EXISTS artist_listener_metrics_metric_type_check;
+ALTER TABLE public.artist_listener_metrics
+  ADD CONSTRAINT artist_listener_metrics_metric_type_check
+  CHECK (metric_type IN ('listeners', 'plays', 'followers'));
+
+-- ---------------------------------------------------------------------------
+-- TABLE: spotify_track_play_snapshots  (Apify public track play counts)
+-- Lifetime play_count per track per calendar month snapshot (not SOS settlement)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.spotify_track_play_snapshots (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id         UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  release_id        UUID        REFERENCES public.releases (id) ON DELETE SET NULL,
+  spotify_track_id  TEXT        NOT NULL,
+  spotify_album_id  TEXT,
+  track_name        TEXT,
+  play_count        BIGINT      NOT NULL DEFAULT 0,
+  period            TEXT        NOT NULL,
+  scraped_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (spotify_track_id, period)
+);
+
+CREATE INDEX IF NOT EXISTS idx_spotify_track_play_snapshots_artist_period
+  ON public.spotify_track_play_snapshots (artist_id, period DESC);
+CREATE INDEX IF NOT EXISTS idx_spotify_track_play_snapshots_release_period
+  ON public.spotify_track_play_snapshots (release_id, period DESC)
+  WHERE release_id IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- TABLE: apify_usage_months  (monthly URL budget for Apify free tier)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.apify_usage_months (
+  year_month   TEXT        PRIMARY KEY,
+  urls_charged INTEGER     NOT NULL DEFAULT 0,
+  budget       INTEGER     NOT NULL DEFAULT 1200,
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 -- ---------------------------------------------------------------------------
 -- TABLE: release_checklists  (per-artist release task tracking)
@@ -2957,6 +3002,8 @@ ALTER TABLE public.sales_statements             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.distributor_import_batches     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.artist_territory_metrics     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.artist_listener_metrics      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.spotify_track_play_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.apify_usage_months           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_statement_line_items     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.event_impact                   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tours                          ENABLE ROW LEVEL SECURITY;
@@ -3811,6 +3858,32 @@ CREATE POLICY "artist_listener_metrics: artist read own" ON public.artist_listen
   );
 
 CREATE POLICY "artist_listener_metrics: admin all" ON public.artist_listener_metrics
+  FOR ALL
+  USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- RLS: spotify_track_play_snapshots
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "spotify_track_play_snapshots: artist read own" ON public.spotify_track_play_snapshots;
+DROP POLICY IF EXISTS "spotify_track_play_snapshots: admin all"       ON public.spotify_track_play_snapshots;
+
+CREATE POLICY "spotify_track_play_snapshots: artist read own" ON public.spotify_track_play_snapshots
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "spotify_track_play_snapshots: admin all" ON public.spotify_track_play_snapshots
+  FOR ALL
+  USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- RLS: apify_usage_months (admin/editor only — budget is label infrastructure)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "apify_usage_months: admin all" ON public.apify_usage_months;
+
+CREATE POLICY "apify_usage_months: admin all" ON public.apify_usage_months
   FOR ALL
   USING (public.get_my_role() IN ('admin', 'editor'))
   WITH CHECK (public.get_my_role() IN ('admin', 'editor'));

@@ -18,6 +18,11 @@
   "EMAIL_SEND_FAILED": "Deine Nachricht konnte nicht gesendet werden. Bitte versuche es später erneut.",
   "EMAIL_NOT_CONFIGURED": "Der E-Mail-Dienst ist derzeit nicht verfügbar.",
   "EXTERNAL_API_ERROR": "Ein externer Dienst ist momentan nicht verfügbar. Bitte versuche es später erneut.",
+  "APIFY_NOT_CONFIGURED": "Apify ist nicht konfiguriert. Lege deinen Apify-API-Token unter Admin → API Keys an.",
+  "APIFY_NO_TARGETS": "Keine sichtbaren Artists oder Releases mit Spotify-Link zum Sync gefunden.",
+  "APIFY_BUDGET_EXCEEDED": "Monatliches Apify-Free-Kontingent erschöpft. Nächsten Monat erneut versuchen oder Scope verkleinern.",
+  "APIFY_RUN_FAILED": "Spotify-Play-Count-Scrape auf Apify fehlgeschlagen. Details in der Apify Console prüfen.",
+  "APIFY_TIMEOUT": "Der Apify-Scrape ist abgelaufen. Teilfortschritt kann gespeichert sein — erneut starten.",
   "SERVER_ERROR": "Auf unserer Seite ist ein Fehler aufgetreten. Bitte versuche es später erneut.",
   "CONFIG_ERROR": "Auf unserer Seite ist ein Fehler aufgetreten. Bitte versuche es später erneut.",
   "DB_ERROR": "Auf unserer Seite ist ein Fehler aufgetreten. Bitte versuche es später erneut."

@@ -132,6 +132,8 @@
 - [ ] Feature-flagged modules hidden when flag is disabled
 - [ ] `/portal/calendar` blocked when `artist.calendar` is disabled (direct URL shows disabled message)
 - [ ] `/portal/analytics` tabs load (streaming, website, merch) when `artist.analytics` is enabled
+- [ ] Admin → API Keys can store Apify token; Accounting dry-run lists only **visible** artists/releases with Spotify links; live sync respects 1200 URL/month budget and shows clear errors if token missing/budget exhausted
+- [ ] Portal Listeners tab shows Spotify (public) series after Apify sync (disclaimer: not settlement data)
 - [ ] Overview intelligence panel shows insights with working deep links
 
 ## Fan Page
