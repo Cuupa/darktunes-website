@@ -23,6 +23,12 @@ import type { ArtistProfile } from '@/lib/api/artistProfiles'
 import type { Artist, ArtistAsset } from '@/types'
 import type { EpkPickerAsset } from '@/lib/epk/pickerAssets'
 import { toast } from 'sonner'
+import { GuidedModeChooser } from '@/components/guided/GuidedModeChooser'
+import type { GuidedMode } from '@/lib/guided/guidedSteps'
+import { hydrateTemplateWithArtistData } from '@/lib/epk/templates/hydrateArtistData'
+import { EpkFirstPublishAssistant } from './EpkFirstPublishAssistant'
+
+const STORAGE_KEY = 'portal-epk-mode'
 
 const EpkBuilderShell = dynamic(
   () => import('@/components/epk-builder/EpkBuilderShell').then((m) => m.EpkBuilderShell),
@@ -61,9 +67,28 @@ function EpkBuilderWorkspace({
   const document = useEpkEditorStore((s) => s.document)
   const isDirty = useEpkEditorStore((s) => s.isDirty)
   const markClean = useEpkEditorStore((s) => s.markClean)
+  const setDocument = useEpkEditorStore((s) => s.setDocument)
   const [documentVersion, setDocumentVersion] = useState(initialVersion)
   const [exporting, setExporting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [mode, setMode] = useState<GuidedMode | null>(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY) as GuidedMode | null
+      return stored === 'assistant' || stored === 'advanced' ? stored : null
+    } catch {
+      return null
+    }
+  })
+
+  const selectMode = (next: GuidedMode) => {
+    setMode(next)
+    try {
+      localStorage.setItem(STORAGE_KEY, next)
+    } catch {
+      /* ignore */
+    }
+  }
 
   const { saveNow } = useEpkAutosave({
     artistId,
@@ -140,6 +165,60 @@ function EpkBuilderWorkspace({
     }
   }, [artistId, artistName, document, isDirty, saveNow, t])
 
+  if (mode === null) {
+    return (
+      <GuidedModeChooser
+        title={t('epk_assistant_mode_title')}
+        subtitle={t('epk_assistant_mode_subtitle')}
+        recommendedLabel={t('guided_recommended')}
+        assistantTitle={t('epk_assistant_mode_assistant_title')}
+        assistantDesc={t('epk_assistant_mode_assistant_desc')}
+        assistantButton={t('epk_assistant_mode_assistant_btn')}
+        advancedTitle={t('epk_assistant_mode_advanced_title')}
+        advancedDesc={t('epk_assistant_mode_advanced_desc')}
+        advancedButton={t('epk_assistant_mode_advanced_btn')}
+        whatNextTitle={t('epk_assistant_what_next_title')}
+        whatNextSteps={[
+          t('epk_assistant_what_next_1'),
+          t('epk_assistant_what_next_2'),
+          t('epk_assistant_what_next_3'),
+        ]}
+        onSelect={selectMode}
+      />
+    )
+  }
+
+  if (mode === 'assistant') {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-4 py-3">
+          <Button variant="ghost" size="sm" asChild className="-ml-2 h-8 px-2">
+            <Link href={`/portal/profile?artistId=${artistId}`}>
+              <ArrowLeft className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              {t('epk_builder_back_profile')}
+            </Link>
+          </Button>
+          <h1 className="text-lg font-semibold">{t('epk_builder_title')}</h1>
+        </div>
+        <EpkFirstPublishAssistant
+          artistId={artistId}
+          exporting={exporting}
+          onApplyTemplate={(doc) => {
+            const next = hydrateTemplateWithArtistData(
+              structuredClone(doc),
+              artist,
+              artistProfile,
+              initialAssets,
+            )
+            setDocument(next)
+          }}
+          onExportPdf={handleServerPdfExport}
+          onOpenAdvanced={() => selectMode('advanced')}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3">
@@ -156,14 +235,19 @@ function EpkBuilderWorkspace({
             {isDirty ? ` · ${t('epk_editor_unsaved')}` : ''}
           </p>
         </div>
-        <Button
-          onClick={() => void handleServerPdfExport()}
-          disabled={exporting}
-          className="min-h-[44px] shrink-0"
-        >
-          <FilePdf className="mr-2 h-4 w-4" aria-hidden="true" />
-          {exporting ? t('epk_builder_exporting') : t('epk_builder_download_pdf')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => selectMode('assistant')}>
+            {t('guided_open_assistant')}
+          </Button>
+          <Button
+            onClick={() => void handleServerPdfExport()}
+            disabled={exporting}
+            className="min-h-[44px] shrink-0"
+          >
+            <FilePdf className="mr-2 h-4 w-4" aria-hidden="true" />
+            {exporting ? t('epk_builder_exporting') : t('epk_builder_download_pdf')}
+          </Button>
+        </div>
       </div>
 
       <EpkBuilderShell

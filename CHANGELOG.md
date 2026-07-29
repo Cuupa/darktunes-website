@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Portal/Admin DAU assistants (1–5):** Shared guided kit; billing SEPA assistant; invoice-from-statement assistant (default CTA; quick-send with confirm); EPK first share/PDF; fan-page first publish with templates; admin release-submission review assistant.
 - **Accounting DAU wizard:** Assistant-first mode chooser, per-step coach checklist, plain-language Continue-blocked reasons, step X of Y footer; sticky ECB/FX banner with refresh; CSV processing waits for exchange rates (no empty-rate race).
 - **Admin release submissions (Eingang):** Artist name left of title; desired release date column; inline status select (saves immediately); per-submission CSV/Excel download plus bulk export; team-wide export column order in `site_settings` (`release_submissions_export_columns`); detail preview shows composer/author and fixes submitted vs. desired release date.
 - **Messaging M0–M2:** Paginated lists, per-user receipts, server rules, attachment allowlist, domain send + client idempotency, unified search helper. Shared inbox for artist→label: claim/unclaim, priority/tags, staff internal notes, audit events, JSON export (`/api/admin/messages/[id]/*`, `SharedInboxPanel`).

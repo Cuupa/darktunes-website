@@ -45,6 +45,14 @@
 - [ ] DE labels: Setup / Dateien / Automatik-Check / Auszahlungen / Veröffentlichen (no double “Prüfen”)
 - [ ] Expense date = calendar picker; period = month picker; track owner % = percent field
 
+## Portal / admin DAU assistants (1–5)
+- [ ] `/portal/billing` assistant: legal → tax → optional IBAN → invoice-ready / SEPA status
+- [ ] Statement CTA opens `/portal/invoices?statement=` assistant; quick-send shows confirm dialog
+- [ ] Analytics + Statements invoice status parity (`label_approved` \| `artist_notified` \| `viewed`)
+- [ ] `/portal/epk-builder` mode chooser → template → PDF/share → advanced editor
+- [ ] `/portal/fan-page` mode chooser → template picker → checks → publish/review
+- [ ] `/admin/release-submissions` assistant: queue → checklist → decision → optional draft
+
 ## Corporate Identity
 - [ ] Validate only approved CI colors are hardcoded in components
 - [ ] Validate primary/secondary/background colors in rendered UI

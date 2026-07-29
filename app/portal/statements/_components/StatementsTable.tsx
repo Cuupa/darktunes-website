@@ -80,7 +80,7 @@ function statusVariant(status: SalesStatement['status']): 'outline' | 'secondary
 
 function StatementActions({
   artistId,
-  billingProfileComplete,
+  billingProfileComplete: _billingProfileComplete,
   hasInvoice,
   loadingId,
   onDownload,
@@ -93,6 +93,7 @@ function StatementActions({
   onDownload: (id: string) => void
   statement: SalesStatement
 }) {
+  void _billingProfileComplete
   const t = useTranslations('portal')
   const canInvoice = ['label_approved', 'artist_notified', 'viewed'].includes(statement.status) && !hasInvoice
 
@@ -112,7 +113,7 @@ function StatementActions({
         )}
         {t('statements_download')}
       </Button>
-      {canInvoice && artistId && billingProfileComplete && (
+      {canInvoice && artistId && (
         <QuickInvoiceButton
           artistId={artistId}
           statement={statement}
