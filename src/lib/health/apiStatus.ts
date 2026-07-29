@@ -14,6 +14,7 @@ export const API_SOURCE_ORDER = [
   'odesli',
   'lastfm',
   'soundcharts',
+  'apify',
   'youtube',
   'all',
 ] as const
@@ -29,7 +30,14 @@ export const API_CONFIG_HINTS: Record<string, string> = {
   odesli: 'No API key required — free song.link smart-link resolution.',
   lastfm: 'Add a Last.fm API key in Admin → API Keys. Artists need a Last.fm name.',
   soundcharts: 'Optional — add a Soundcharts API key in Admin → API Keys.',
+  apify: 'Add an Apify API token in Admin → API Keys (Spotify public play counts).',
   youtube: 'Add YouTube API key and Channel ID in Admin → API Keys.',
+}
+
+/** Map historical/alias sync_logs.api_source values onto health card keys. */
+export function normalizeHealthApiSource(apiSource: string): string {
+  if (apiSource === 'apify_spotify') return 'apify'
+  return apiSource
 }
 
 /** Sync crons run daily; flag as stale after 36 hours without a successful run. */
@@ -103,7 +111,11 @@ function formatSyncMetrics(
 
   if (snapshot.releasesSynced > 0) {
     const unit =
-      api === 'youtube' ? 'video' : api === 'lastfm' || api === 'soundcharts' ? 'metric row' : 'release'
+      api === 'youtube'
+        ? 'video'
+        : api === 'lastfm' || api === 'soundcharts' || api === 'apify'
+          ? 'metric row'
+          : 'release'
     parts.push(
       `${snapshot.releasesSynced} ${unit}${snapshot.releasesSynced === 1 ? '' : 's'}`,
     )

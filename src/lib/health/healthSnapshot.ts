@@ -19,6 +19,7 @@ import {
   deriveApiHealth,
   deriveOverallHealth,
   deriveSyncQueueHealth,
+  normalizeHealthApiSource,
   parseSyncLogSnapshot,
   sortApiSources,
   type ApiOperationalState,
@@ -161,12 +162,13 @@ export async function buildHealthSnapshot(
         const statsAccumulator = new Map<string, ApiRunStats24h>()
 
         for (const row of (logs ?? []) as SyncLogRow[]) {
-          if (!latestPerApi.has(row.api_source)) {
-            latestPerApi.set(row.api_source, parseSyncLogSnapshot(row))
+          const apiSource = normalizeHealthApiSource(row.api_source)
+          if (!latestPerApi.has(apiSource)) {
+            latestPerApi.set(apiSource, parseSyncLogSnapshot(row))
           }
           accumulateStats24h(
             statsAccumulator,
-            row.api_source,
+            apiSource,
             row.status,
             cutoff24hMs,
             new Date(row.created_at).getTime(),

@@ -109,7 +109,8 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     errors: result.errors.map((e) =>
       e.spotifyId ? `${e.spotifyId}: ${e.message}` : e.message,
     ),
-    api_source: 'apify_spotify',
+    // Health dashboard keys this as `apify` (see getKnownApiConfiguration / normalizeHealthApiSource).
+    api_source: 'apify',
     rate_limited: false,
     duration_ms: result.durationMs,
     metadata: {
