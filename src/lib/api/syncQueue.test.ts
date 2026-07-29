@@ -12,6 +12,8 @@ import {
   getSyncQueueStats,
   tryAcquireSyncExecutorLease,
   releaseSyncExecutorLease,
+  cancelSyncJob,
+  retrySyncJob,
   SYNC_EXECUTOR_LEASE_KEY,
   MAX_ATTEMPTS,
 } from './syncQueue'
@@ -143,6 +145,46 @@ describe('enqueueArtistSyncJobs', () => {
     const db = makeSequentialMockDb([])
     const count = await enqueueArtistSyncJobs(db, [])
     expect(count).toBe(0)
+  })
+})
+
+describe('cancelSyncJob', () => {
+  it('cancels pending jobs immediately', async () => {
+    const db = makeSequentialMockDb([
+      { data: { id: 'job-1', status: 'pending', cancel_requested_at: null } },
+      { data: null },
+    ])
+    await expect(cancelSyncJob(db, 'job-1')).resolves.toBe('cancelled')
+  })
+
+  it('requests cancel for running jobs', async () => {
+    const db = makeSequentialMockDb([
+      { data: { id: 'job-1', status: 'running', cancel_requested_at: null } },
+      { data: null },
+    ])
+    await expect(cancelSyncJob(db, 'job-1')).resolves.toBe('cancel_requested')
+  })
+
+  it('noops for done jobs', async () => {
+    const db = makeSequentialMockDb([
+      { data: { id: 'job-1', status: 'done', cancel_requested_at: null } },
+    ])
+    await expect(cancelSyncJob(db, 'job-1')).resolves.toBe('noop')
+  })
+})
+
+describe('retrySyncJob', () => {
+  it('re-queues failed jobs', async () => {
+    const db = makeSequentialMockDb([
+      { data: { id: 'job-1', status: 'failed' } },
+      { data: null },
+    ])
+    await expect(retrySyncJob(db, 'job-1')).resolves.toBe(true)
+  })
+
+  it('returns false for pending jobs', async () => {
+    const db = makeSequentialMockDb([{ data: { id: 'job-1', status: 'pending' } }])
+    await expect(retrySyncJob(db, 'job-1')).resolves.toBe(false)
   })
 })
 

@@ -45,9 +45,9 @@ External API calls: `withApiRetry()` + per-API profiles in `src/lib/sync/retryPo
 
 Logic in `src/lib/sync/` with injected `SyncDeps`. `syncSingleArtist` / `syncAll` never throw — errors in `SyncResult.errors`. Each run → `sync_logs`.
 
-**Scheduling (no Vercel Cron):** Supabase Cron → `supabase/functions/trigger-sync` → Next.js routes. Auth: `CRON_SECRET` Bearer. Typical schedules: `all` daily 03:00 UTC, `process-queue` every 5 min, `youtube` daily 06:00 UTC.
+**Scheduling (no Vercel Cron — Hobby-safe):** Supabase Cron → Edge `trigger-sync` → Next.js. Auth: `CRON_SECRET` Bearer. Required: `process-queue` every 5 min (`POST /api/sync`), `all` daily (`/api/sync/queue` + kick), `youtube` daily. Edge secrets: `SITE_URL` + `CRON_SECRET` (must match Vercel).
 
-**Queue:** `sync_queue` DAL in `syncQueue.ts` — job types: `full`, `spotify`, `discogs`, `youtube` (legacy; prefer channel route), `odesli`. Spotify/Odesli force-sync enqueues only; executor in `/api/sync` (~280s budget, `maxDuration` 300, `verifySyncTrigger`). **Single-flight lease** (`site_settings.sync_executor_lease`) prevents overlapping `waitUntil` workers from admin poll kicks. Odesli batches (`ODESLI_BATCH_SIZE`) for releases **and** artist `platform_links`; reschedule on rate limit (15 min cooldown) or remaining work.
+**Queue:** `sync_queue` DAL in `syncQueue.ts` — statuses: `pending` | `running` | `done` | `failed` | `cancelled`. Job types: `full`, `spotify`, `discogs`, `youtube` (legacy), `odesli`. Executor `/api/sync` (~280s, single-flight lease). **Admin control (Advanced only):** `GET/POST /api/admin/sync/jobs` — list, cancel (pending immediate; running = cooperative `cancel_requested_at` between jobs), retry failed/cancelled. Guided UI: setup checklist + speaking errors; Advanced: live job table. Odesli: never retry 429 in-request — reschedule with cooldown.
 
 **Cover art / R2:** `uploadUrlToR2` retries transient DNS errors and caps process-wide upload concurrency at 2. iTunes release processing concurrency is 2. iTunes lookup is capped at 200 collections (logged when truncated).
 

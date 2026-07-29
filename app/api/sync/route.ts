@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import {
   claimNextSyncJob,
+  isSyncJobCancelRequested,
+  markSyncJobCancelled,
   markSyncJobDone,
   markSyncJobFailed,
   releaseSyncExecutorLease,
@@ -145,11 +147,24 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
           const job = await claimNextSyncJob(db)
           if (!job) break
 
+          // Cooperative cancel: admin sets cancel_requested_at on running jobs
+          // (pending jobs are cancelled before claim). Checked between jobs only.
+          if (await isSyncJobCancelRequested(db, job.id)) {
+            await markSyncJobCancelled(db, job.id)
+            jobsProcessed += 1
+            continue
+          }
+
           try {
             const tags = await processSyncJob(db, job, uploadFn, syncCredentials)
             for (const tag of tags) tagsToRevalidate.add(tag)
             jobsProcessed += 1
           } catch (err) {
+            if (await isSyncJobCancelRequested(db, job.id)) {
+              await markSyncJobCancelled(db, job.id)
+              jobsProcessed += 1
+              continue
+            }
             const message = err instanceof Error ? err.message : String(err)
             await markSyncJobFailed(db, job.id, message, job.attemptCount, {
               rateLimited: isRateLimitedSyncError(err),

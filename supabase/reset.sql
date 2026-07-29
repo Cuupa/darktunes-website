@@ -2915,21 +2915,26 @@ CREATE TABLE IF NOT EXISTS public.sync_queue (
   id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   artist_id     UUID        REFERENCES public.artists (id) ON DELETE CASCADE,
   job_type      TEXT        NOT NULL DEFAULT 'full',  -- 'full' | 'spotify' | 'discogs' | 'youtube' | 'odesli'
-  status        TEXT        NOT NULL DEFAULT 'pending', -- 'pending' | 'running' | 'done' | 'failed'
+  status        TEXT        NOT NULL DEFAULT 'pending', -- 'pending' | 'running' | 'done' | 'failed' | 'cancelled'
   scheduled_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   started_at    TIMESTAMPTZ,
   finished_at   TIMESTAMPTZ,
   locked_until  TIMESTAMPTZ,
+  cancel_requested_at TIMESTAMPTZ,
+  cancelled_at  TIMESTAMPTZ,
   error_message TEXT,
   attempt_count INTEGER     NOT NULL DEFAULT 0,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE public.sync_queue ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
+ALTER TABLE public.sync_queue ADD COLUMN IF NOT EXISTS cancel_requested_at TIMESTAMPTZ;
+ALTER TABLE public.sync_queue ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_sync_queue_status       ON public.sync_queue (status, scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_sync_queue_artist        ON public.sync_queue (artist_id);
 CREATE INDEX IF NOT EXISTS idx_sync_queue_created_at   ON public.sync_queue (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_status_finished ON public.sync_queue (status, finished_at DESC);
 
 ALTER TABLE public.sync_queue ENABLE ROW LEVEL SECURITY;
 

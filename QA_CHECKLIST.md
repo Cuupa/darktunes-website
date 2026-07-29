@@ -87,6 +87,9 @@
 - [ ] Admin → Videos → "Sync YouTube Channel": admin list updates; public `/videos` updates after revalidation
 - [ ] Full artist sync does **not** claim to update videos (YouTube is a separate action)
 - [ ] `GET /api/sync/queue` with admin Bearer returns `{ pending, running, done, failed }` and does **not** enqueue jobs
+- [ ] Admin → System → **Advanced**: job table lists pending/running; cancel pending removes work; cancel running sets cancel-requested then job ends cancelled; retry failed re-queues
+- [ ] Admin → System → **Guided**: setup checklist shows Supabase Cron paths (no Vercel Cron); speaking issues when executor offline with backlog
+- [ ] `vercel.json` has no `crons` key
 
 ## Documentation
 - [ ] README reflects current setup and QA commands
