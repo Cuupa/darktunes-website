@@ -43,10 +43,15 @@ import {
   type QueueOperationalState,
 } from '@/lib/health/apiStatus'
 import type { AlertSeverity, HealthResponse } from '@/lib/health/types'
+import { describeSyncQueueIssue } from '@/lib/sync/userFacingErrors'
+import { SyncAdvancedJobsPanel } from '@/components/admin/sync/SyncAdvancedJobsPanel'
+import { SyncSetupChecklist } from '@/components/admin/sync/SyncSetupChecklist'
 
 interface SystemHealthWidgetProps {
   bearerToken: string
 }
+
+type SystemViewMode = 'guided' | 'advanced'
 
 /** Reads response text first so Vercel/plain-text error pages never crash res.json(). */
 async function parseAdminFetchJson(res: Response): Promise<Record<string, unknown>> {
@@ -165,6 +170,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   const [syncingYoutube, setSyncingYoutube] = useState(false)
   const [syncingApi, setSyncingApi] = useState<string | null>(null)
   const [expandedErrors, setExpandedErrors] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<SystemViewMode>('guided')
 
   const fetchHealth = useCallback(async (showRefreshSpinner = false) => {
     if (showRefreshSpinner) setRefreshing(true)
@@ -385,6 +391,34 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   const criticalAlerts = health.alerts.filter((a) => a.severity === 'critical')
   const warningAlerts = health.alerts.filter((a) => a.severity === 'warning')
 
+  const queueBacklog =
+    (health.syncQueue?.pending ?? 0) +
+    (health.syncQueue?.running ?? 0) +
+    (health.syncQueue?.stuckRunning ?? 0)
+  const executeJob = health.cronHealth?.jobs.find((j) => j.key === 'sync_execute')
+  const youtubeJob = health.cronHealth?.jobs.find((j) => j.key === 'sync_youtube')
+  const speakingIssues = describeSyncQueueIssue({
+    executorNeverRan: executeJob?.statusLabel === 'Executor never ran',
+    executorOffline:
+      executeJob?.statusLabel === 'Executor offline' ||
+      executeJob?.statusLabel === 'Executor overdue',
+    backlog: queueBacklog,
+    youtubeUnconfigured:
+      youtubeJob?.operationalState === 'unconfigured' ||
+      !(health.apis.youtube?.configured ?? false),
+    youtubeIdle:
+      Boolean(health.apis.youtube?.configured) &&
+      (youtubeJob?.statusLabel === 'Awaiting first run' ||
+        youtubeJob?.lastHeartbeatAt == null),
+    cronSecretMissing: executeJob?.statusLabel === 'Cron auth not configured',
+  })
+
+  const activeWork = queueBacklog > 0
+  const executorOk =
+    executeJob?.operationalState === 'operational' ||
+    (executeJob?.lastHeartbeatAt != null && executeJob.operationalState !== 'failing')
+  const youtubeOk = Boolean(youtubeJob?.lastHeartbeatAt)
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -409,6 +443,30 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
           <p className="text-sm text-muted-foreground">{health.statusDetail}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <div
+            className="flex rounded-md border border-border p-0.5"
+            role="group"
+            aria-label="System view mode"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === 'guided' ? 'secondary' : 'ghost'}
+              className="h-8"
+              onClick={() => setViewMode('guided')}
+            >
+              Guided
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === 'advanced' ? 'secondary' : 'ghost'}
+              className="h-8"
+              onClick={() => setViewMode('advanced')}
+            >
+              Advanced
+            </Button>
+          </div>
           <Button
             onClick={() => { void fetchHealth(true) }}
             disabled={refreshing}
@@ -511,6 +569,44 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
           </p>
         </Card>
       </div>
+
+      {speakingIssues.length > 0 && (
+        <Card className="border-yellow-500/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">What needs attention</CardTitle>
+            <CardDescription>Plain-language sync/scheduler issues and how to fix them.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {speakingIssues.map((issue) => (
+                <li key={issue.title} className="rounded-md border border-border px-3 py-2 text-sm">
+                  <p className="font-medium">{issue.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{issue.message}</p>
+                  {issue.fixHint && (
+                    <p className="text-xs text-foreground mt-1">
+                      <span className="font-medium">Fix: </span>
+                      {issue.fixHint}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {viewMode === 'guided' && (
+        <SyncSetupChecklist
+          cronSecretConfigured={executeJob?.statusLabel !== 'Cron auth not configured'}
+          executorOk={executorOk}
+          youtubeConfigured={health.apis.youtube?.configured ?? false}
+          youtubeOk={youtubeOk}
+        />
+      )}
+
+      {viewMode === 'advanced' && (
+        <SyncAdvancedJobsPanel bearerToken={bearerToken} activeWork={activeWork} />
+      )}
 
       {health.alerts.length > 0 && (
         <Card>

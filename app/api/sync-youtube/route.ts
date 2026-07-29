@@ -76,6 +76,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   }
 
   if (videos.length === 0) {
+    await recordHealthHeartbeat(db, 'sync_youtube')
     return NextResponse.json({ synced: 0, message: 'No videos returned from YouTube' })
   }
 

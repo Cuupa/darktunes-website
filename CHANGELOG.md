@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Sync control plane (Guided / Advanced):** Admin → System Health — Guided setup checklist (Supabase Cron only, no Vercel Cron), plain-language scheduler issues, Advanced live `sync_queue` table with cancel (pending immediate; running cooperative) and retry. APIs: `GET/POST /api/admin/sync/jobs`. Schema: `cancel_requested_at`, `cancelled_at`, status `cancelled`.
 - **Apify Spotify public play counts:** Admin → API Keys (`apify_token`) + Accounting panel dry-run/sync. Scrapes visible artists/releases with Spotify IDs via `beatanalytics/spotify-play-count-scraper` (monthly listeners, followers, track play snapshots). Hard cap 1200 URLs/month (`apify_usage_months`). Portal Listeners chart shows Spotify (public) series. Never writes SOS `streaming_stats`.
 
 ### Changed

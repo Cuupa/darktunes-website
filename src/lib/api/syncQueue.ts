@@ -5,11 +5,12 @@
  *
  * The sync queue decouples triggering a sync (POST /api/sync/queue) from the actual
  * processing, so syncing many artists never exceeds Vercel's timeout limits.
- * Each job processes one artist via POST /api/sync (cron: every 5 minutes).
+ * Each job processes one artist via POST /api/sync (Supabase Cron: every 5 minutes).
  *
  * Job lifecycle:
  *   pending → running → done
  *                     → failed (attempt_count incremented, re-queued up to 3×)
+ *                     → cancelled (admin cancel; running uses cancel_requested_at)
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -20,17 +21,20 @@ type DbClient = SupabaseClient<Database>
 type SyncQueueRow = Database['public']['Tables']['sync_queue']['Row']
 
 export type SyncJobType = 'full' | 'spotify' | 'discogs' | 'youtube' | 'odesli'
-export type SyncJobStatus = 'pending' | 'running' | 'done' | 'failed'
+export type SyncJobStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled'
 
 export interface SyncJob {
   id: string
   artistId: string | null
+  artistName: string | null
   jobType: SyncJobType
   status: SyncJobStatus
   scheduledAt: string
   startedAt: string | null
   finishedAt: string | null
   lockedUntil: string | null
+  cancelRequestedAt: string | null
+  cancelledAt: string | null
   errorMessage: string | null
   attemptCount: number
   createdAt: string
@@ -63,16 +67,22 @@ export function conflictingArtistJobTypes(jobType: SyncJobType): SyncJobType[] {
   }
 }
 
-function rowToSyncJob(row: SyncQueueRow): SyncJob {
+function rowToSyncJob(
+  row: SyncQueueRow,
+  artistName: string | null = null,
+): SyncJob {
   return {
     id: row.id,
     artistId: row.artist_id ?? null,
+    artistName,
     jobType: (row.job_type as SyncJobType) ?? 'full',
     status: row.status as SyncJobStatus,
     scheduledAt: row.scheduled_at,
     startedAt: row.started_at ?? null,
     finishedAt: row.finished_at ?? null,
     lockedUntil: row.locked_until ?? null,
+    cancelRequestedAt: row.cancel_requested_at ?? null,
+    cancelledAt: row.cancelled_at ?? null,
     errorMessage: row.error_message ?? null,
     attemptCount: row.attempt_count,
     createdAt: row.created_at,
@@ -350,7 +360,183 @@ export async function claimNextSyncJob(db: DbClient): Promise<SyncJob | null> {
     .update({ attempt_count: (data.attempt_count ?? 0) + 1 })
     .eq('id', jobId)
 
-  return rowToSyncJob({ ...data, attempt_count: (data.attempt_count ?? 0) + 1, locked_until: lockedUntil })
+  return rowToSyncJob({
+    ...data,
+    attempt_count: (data.attempt_count ?? 0) + 1,
+    locked_until: lockedUntil,
+  })
+}
+
+/**
+ * True when the job was cancelled or an admin requested cancel while running.
+ */
+export async function isSyncJobCancelRequested(
+  db: DbClient,
+  jobId: string,
+): Promise<boolean> {
+  const { data, error } = await db
+    .from('sync_queue')
+    .select('status, cancel_requested_at')
+    .eq('id', jobId)
+    .maybeSingle()
+
+  if (error) throw new Error(`Failed to read cancel state: ${error.message}`)
+  if (!data) return true
+  return data.status === 'cancelled' || data.cancel_requested_at != null
+}
+
+/**
+ * Cancel a pending job immediately, or request cancel for a running job.
+ * Returns the resulting status label for UI feedback.
+ */
+export async function cancelSyncJob(
+  db: DbClient,
+  jobId: string,
+): Promise<'cancelled' | 'cancel_requested' | 'noop'> {
+  const { data: existing, error: readError } = await db
+    .from('sync_queue')
+    .select('id, status, cancel_requested_at')
+    .eq('id', jobId)
+    .maybeSingle()
+
+  if (readError) throw new Error(`Failed to load sync job: ${readError.message}`)
+  if (!existing) throw new Error('Sync job not found')
+
+  if (existing.status === 'cancelled') return 'noop'
+  if (existing.status === 'done' || existing.status === 'failed') return 'noop'
+
+  const now = new Date().toISOString()
+
+  if (existing.status === 'pending') {
+    const { error } = await db
+      .from('sync_queue')
+      .update({
+        status: 'cancelled',
+        cancelled_at: now,
+        finished_at: now,
+        locked_until: null,
+        started_at: null,
+        cancel_requested_at: now,
+        error_message: 'Cancelled by admin',
+      })
+      .eq('id', jobId)
+      .eq('status', 'pending')
+
+    if (error) throw new Error(`Failed to cancel sync job: ${error.message}`)
+    return 'cancelled'
+  }
+
+  // running — cooperative cancel; executor checks between jobs
+  if (existing.cancel_requested_at) return 'cancel_requested'
+
+  const { error } = await db
+    .from('sync_queue')
+    .update({
+      cancel_requested_at: now,
+      error_message: 'Cancel requested by admin',
+    })
+    .eq('id', jobId)
+    .eq('status', 'running')
+
+  if (error) throw new Error(`Failed to request cancel: ${error.message}`)
+  return 'cancel_requested'
+}
+
+/** Finalize a running job that observed cancel_requested_at. */
+export async function markSyncJobCancelled(db: DbClient, jobId: string): Promise<void> {
+  const now = new Date().toISOString()
+  const { error } = await db
+    .from('sync_queue')
+    .update({
+      status: 'cancelled',
+      cancelled_at: now,
+      finished_at: now,
+      locked_until: null,
+      error_message: 'Cancelled by admin',
+    })
+    .eq('id', jobId)
+
+  if (error) throw new Error(`Failed to mark job cancelled: ${error.message}`)
+}
+
+/**
+ * Re-queue a failed or cancelled job for another attempt.
+ */
+export async function retrySyncJob(db: DbClient, jobId: string): Promise<boolean> {
+  const { data: existing, error: readError } = await db
+    .from('sync_queue')
+    .select('id, status')
+    .eq('id', jobId)
+    .maybeSingle()
+
+  if (readError) throw new Error(`Failed to load sync job: ${readError.message}`)
+  if (!existing) throw new Error('Sync job not found')
+  if (existing.status !== 'failed' && existing.status !== 'cancelled') return false
+
+  const { error } = await db
+    .from('sync_queue')
+    .update({
+      status: 'pending',
+      scheduled_at: new Date().toISOString(),
+      finished_at: null,
+      locked_until: null,
+      started_at: null,
+      cancel_requested_at: null,
+      cancelled_at: null,
+      error_message: null,
+      attempt_count: 0,
+    })
+    .eq('id', jobId)
+    .in('status', ['failed', 'cancelled'])
+
+  if (error) throw new Error(`Failed to retry sync job: ${error.message}`)
+  return true
+}
+
+export interface ListSyncJobsOptions {
+  status?: SyncJobStatus | SyncJobStatus[]
+  jobType?: SyncJobType
+  limit?: number
+}
+
+/**
+ * Recent queue jobs for the Advanced admin console (with artist name when set).
+ */
+export async function listSyncJobs(
+  db: DbClient,
+  options: ListSyncJobsOptions = {},
+): Promise<SyncJob[]> {
+  const limit = Math.min(Math.max(options.limit ?? 50, 1), 100)
+
+  let query = db
+    .from('sync_queue')
+    .select(
+      'id, artist_id, job_type, status, scheduled_at, started_at, finished_at, locked_until, cancel_requested_at, cancelled_at, error_message, attempt_count, created_at, artists(name)',
+    )
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (options.status) {
+    const statuses = Array.isArray(options.status) ? options.status : [options.status]
+    query = query.in('status', statuses)
+  }
+  if (options.jobType) {
+    query = query.eq('job_type', options.jobType)
+  }
+
+  const { data, error } = await query
+  if (error) throw new Error(`Failed to list sync jobs: ${error.message}`)
+
+  return (data ?? []).map((row) => {
+    const artistJoin = row.artists as { name: string } | { name: string }[] | null
+    const artistName = Array.isArray(artistJoin)
+      ? (artistJoin[0]?.name ?? null)
+      : (artistJoin?.name ?? null)
+    const { artists: _artists, ...queueRow } = row as typeof row & {
+      artists: unknown
+    }
+    return rowToSyncJob(queueRow as SyncQueueRow, artistName)
+  })
 }
 
 /**
@@ -479,5 +665,5 @@ export async function getRecentSyncJobs(db: DbClient, limit = 20): Promise<SyncJ
     .limit(limit)
 
   if (error) throw new Error(`Failed to get sync jobs: ${error.message}`)
-  return (data ?? []).map(rowToSyncJob)
+  return (data ?? []).map((row) => rowToSyncJob(row))
 }

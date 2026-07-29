@@ -444,6 +444,8 @@ export interface Database {
           started_at: string | null
           finished_at: string | null
           locked_until: string | null
+          cancel_requested_at: string | null
+          cancelled_at: string | null
           error_message: string | null
           attempt_count: number
           created_at: string
@@ -457,6 +459,8 @@ export interface Database {
           started_at?: string | null
           finished_at?: string | null
           locked_until?: string | null
+          cancel_requested_at?: string | null
+          cancelled_at?: string | null
           error_message?: string | null
           attempt_count?: number
           created_at?: string
@@ -470,6 +474,8 @@ export interface Database {
           started_at?: string | null
           finished_at?: string | null
           locked_until?: string | null
+          cancel_requested_at?: string | null
+          cancelled_at?: string | null
           error_message?: string | null
           attempt_count?: number
           created_at?: string

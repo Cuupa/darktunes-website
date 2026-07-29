@@ -218,12 +218,13 @@ The **SOS Generator** tab in the same Accounting page lets admins upload royalty
 
 ## Monitoring Sync Schedules
 
-Sync runs via **Supabase Cron** → `trigger-sync` Edge Function (not Vercel Cron). To verify:
+Sync runs via **Supabase Cron** → `trigger-sync` Edge Function (**not** Vercel Cron). To verify:
 1. Supabase Dashboard → Cron Jobs → last execution time and status
-2. Admin → System → Health widget (queue stats, last sync per API)
-3. Admin → System → Audit Log → filter by `api_source`
+2. Admin → **System** → Health (**Guided**): setup checklist, plain-language issues, queue KPIs
+3. Admin → System → Health → **Advanced**: live `sync_queue` jobs — cancel pending/running (cooperative), retry failed/cancelled
+4. Admin → System → Log Manager → filter by `api_source`
 
-If sync fails: check Error Log for failed `sync_logs` entries; re-queue via System health or `POST /api/sync/requeue`.
+If sync fails: check logs; re-queue bulk via Maintenance or per-job **Retry** in Advanced.
 
 ## Creating a Journalist Account
 
