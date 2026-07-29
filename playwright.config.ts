@@ -4,13 +4,19 @@
  * Runs against a locally built Next.js production server (npm run build &&
  * npm run start) for production-parity results.
  *
- * Three browser projects cover all critical viewport combinations:
- *  - Desktop Chrome  (1920 × 1080)
- *  - Mobile Safari   (iPhone 13 — 390 × 844)
- *  - Mobile Chrome   (Pixel 5   — 393 × 851)
+ * Projects:
+ *  - Desktop Chrome  (1920 × 1080) — PR default in QA workflow
+ *  - Mobile Safari   (iPhone 13 — 390 × 844) — main / full matrix
+ *  - Mobile Chrome   (Pixel 5   — 393 × 851) — main / full matrix
+ *  - Performance Chrome — `npm run perf:test` / performance-tests workflow
+ *
+ * CI selects projects via `npx playwright test --project=...` (see qa.yml).
+ * Workers: CI defaults to 2 (override with PLAYWRIGHT_WORKERS).
  */
 
 import { defineConfig, devices } from '@playwright/test'
+
+const ciWorkers = Number(process.env.PLAYWRIGHT_WORKERS || '2')
 
 export default defineConfig({
   testDir: './tests',
@@ -30,8 +36,8 @@ export default defineConfig({
   /* Retry once on CI to reduce flakiness caused by resource contention. */
   retries: process.env.CI ? 1 : 0,
 
-  /* Parallelism: 1 worker in CI to keep resource usage predictable. */
-  workers: process.env.CI ? 1 : undefined,
+  /* CI: 2 workers by default (GHA free runners are dual-core); override via PLAYWRIGHT_WORKERS. */
+  workers: process.env.CI ? (Number.isFinite(ciWorkers) && ciWorkers > 0 ? ciWorkers : 2) : undefined,
 
   /* Reporter: 'list' for concise terminal output; HTML report always generated. */
   reporter: [['list'], ['html', { open: 'never' }]],

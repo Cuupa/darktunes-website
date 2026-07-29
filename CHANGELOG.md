@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **GitHub Actions speed (phases A–C):** Deduplicated PR checks (QA is E2E-only; security/perf live in their own workflows). Parallel CI jobs (lint+contracts+tsc · unit · build). Concurrency cancel-in-progress on all workflows. Next.js + ESLint + Playwright browser caches. PR E2E runs Desktop Chrome only (full matrix on `main`); Playwright CI workers default to 2. Path filters for Lighthouse/budget/security; Playwright performance suite no longer on every PR (main paths + weekly + manual).
+
 ### Added
 - **Portal/Admin DAU assistants (1–5):** Shared guided kit; billing SEPA assistant; invoice-from-statement assistant (default CTA; quick-send with confirm); EPK first share/PDF; fan-page first publish with templates; admin release-submission review assistant.
 - **Accounting DAU wizard:** Assistant-first mode chooser, per-step coach checklist, plain-language Continue-blocked reasons, step X of Y footer; sticky ECB/FX banner with refresh; CSV processing waits for exchange rates (no empty-rate race).

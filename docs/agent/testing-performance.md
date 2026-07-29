@@ -11,10 +11,22 @@
 ## E2E (Playwright)
 
 - `npm run test:e2e` — specs in `tests/e2e/`
-- Projects: Desktop Chrome, Mobile Safari, Mobile Chrome
+- Projects: Desktop Chrome, Mobile Safari, Mobile Chrome, Performance Chrome
 - Hide CRT/noise overlays before screenshots (`page.addStyleTag`)
 - `SKIP_BUILD=1` to reuse existing build
 - Skip gracefully when Supabase unconfigured
+- CI workers: 2 by default (`PLAYWRIGHT_WORKERS` override)
+
+### GitHub Actions CI layout (speed)
+
+| Workflow | PR | main / other | Notes |
+|----------|----|--------------|--------|
+| `ci.yml` | always | always | Parallel jobs: lint+contracts+tsc · unit · build. Concurrency cancel-in-progress. Next + ESLint caches. |
+| `qa.yml` | E2E **Desktop Chrome only** (docs paths ignored) | Full E2E matrix (Chrome + Mobile Safari + Mobile Chrome) | No duplicate lint/unit/security. |
+| `security.yml` | only lockfile/package changes | same + weekly schedule | Sole npm audit owner |
+| `lighthouse-ci.yml` | path-filtered (`app`/`src`/…) | same | Next cache |
+| `performance-budget.yml` | path-filtered | same | Next cache |
+| `performance-tests.yml` | **not on PR** | path-filtered push + weekly + `workflow_dispatch` | Avoids double Playwright perf on every PR |
 
 ## Performance
 

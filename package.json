@@ -7,7 +7,7 @@
     "dev": "next dev",
     "kill": "fuser -k 3000/tcp",
     "build": "next build --webpack",
-    "lint": "eslint app src tests scripts lib supabase proxy.ts playwright.config.ts next.config.ts vitest.config.ts global.d.ts",
+    "lint": "eslint --cache --cache-location .eslintcache app src tests scripts lib supabase proxy.ts playwright.config.ts next.config.ts vitest.config.ts global.d.ts",
     "check:scroll": "node scripts/check-scroll-contract.mjs",
     "check:brand": "node scripts/check-brand-contract.mjs",
     "check:i18n": "node scripts/check-i18n-contract.mjs",
