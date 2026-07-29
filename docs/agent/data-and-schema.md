@@ -82,5 +82,10 @@ Apply: paste `reset.sql` into Supabase SQL Editor (idempotent on live DB).
 | `merch_orders` | Worker → persist |
 | `page_events` | `POST /api/page-events` |
 | `epk_download_events` | Export routes |
+| `artist_listener_metrics` (`source`: lastfm \| soundcharts \| **apify**) | Admin listener sync / Apify Spotify plays |
+| `spotify_track_play_snapshots` | Apify album scrapes — public lifetime play counts per track/period (**not** SOS) |
+| `apify_usage_months` | Monthly Apify URL budget counter (default 1200) |
+
+**Apify vs SOS:** Public Spotify scrapes must never write `streaming_stats` / territory revenue gold. Portal copy labels Apify as non-settlement.
 
 Portal analytics uses authenticated primary client (RLS), not replica.

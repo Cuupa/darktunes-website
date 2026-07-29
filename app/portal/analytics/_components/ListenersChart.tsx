@@ -7,9 +7,10 @@ import type { ArtistListenerMetric } from '@/lib/api/artistListenerMetrics'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export interface ListenersChartInnerProps {
-  chartData: Array<{ period: string; lastfm: number; soundcharts: number }>
+  chartData: Array<{ period: string; lastfm: number; soundcharts: number; apify: number }>
   latestLastfm: number
   latestSoundcharts: number
+  latestApify: number
 }
 
 interface ListenersChartProps {
@@ -27,16 +28,18 @@ const ListenersChartInner = dynamic(
 export function ListenersChart({ metrics }: ListenersChartProps) {
   const t = useTranslations('portal')
 
-  const { chartData, latestLastfm, latestSoundcharts } = useMemo(() => {
+  const { chartData, latestLastfm, latestSoundcharts, latestApify } = useMemo(() => {
     const periods = new Set<string>()
     const lastfmByPeriod = new Map<string, number>()
     const soundchartsByPeriod = new Map<string, number>()
+    const apifyByPeriod = new Map<string, number>()
 
     for (const m of metrics) {
       if (m.metricType !== 'listeners') continue
       periods.add(m.period)
       if (m.source === 'lastfm') lastfmByPeriod.set(m.period, m.value)
       if (m.source === 'soundcharts') soundchartsByPeriod.set(m.period, m.value)
+      if (m.source === 'apify') apifyByPeriod.set(m.period, m.value)
     }
 
     const sortedPeriods = Array.from(periods).sort()
@@ -44,6 +47,7 @@ export function ListenersChart({ metrics }: ListenersChartProps) {
       period,
       lastfm: lastfmByPeriod.get(period) ?? 0,
       soundcharts: soundchartsByPeriod.get(period) ?? 0,
+      apify: apifyByPeriod.get(period) ?? 0,
     }))
 
     const lastPeriod = sortedPeriods.at(-1)
@@ -51,6 +55,7 @@ export function ListenersChart({ metrics }: ListenersChartProps) {
       chartData: data,
       latestLastfm: lastPeriod ? (lastfmByPeriod.get(lastPeriod) ?? 0) : 0,
       latestSoundcharts: lastPeriod ? (soundchartsByPeriod.get(lastPeriod) ?? 0) : 0,
+      latestApify: lastPeriod ? (apifyByPeriod.get(lastPeriod) ?? 0) : 0,
     }
   }, [metrics])
 
@@ -68,6 +73,7 @@ export function ListenersChart({ metrics }: ListenersChartProps) {
       chartData={chartData}
       latestLastfm={latestLastfm}
       latestSoundcharts={latestSoundcharts}
+      latestApify={latestApify}
     />
   )
 }

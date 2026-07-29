@@ -45,6 +45,7 @@ export function getKnownApisFallback(): Record<string, boolean> {
     odesli: true,
     lastfm: false,
     soundcharts: false,
+    apify: false,
     youtube: false,
   }
 }

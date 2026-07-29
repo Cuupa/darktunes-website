@@ -134,6 +134,7 @@ describe('buildHealthSnapshot', () => {
         odesli: true,
         lastfm: false,
         soundcharts: false,
+        apify: false,
         youtube: false,
       },
       nowMs: NOW_MS,

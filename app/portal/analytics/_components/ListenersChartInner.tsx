@@ -27,14 +27,17 @@ function fmtListeners(n: number): string {
   return n.toLocaleString()
 }
 
-export function ListenersChartInner({ chartData,
+export function ListenersChartInner({
+  chartData,
   latestLastfm,
   latestSoundcharts,
+  latestApify,
 }: ListenersChartInnerProps) {
   const t = useTranslations('portal')
 
   const hasLastfm = chartData.some((d) => d.lastfm > 0)
   const hasSoundcharts = chartData.some((d) => d.soundcharts > 0)
+  const hasApify = chartData.some((d) => d.apify > 0)
 
   return (
     <div className="space-y-6">
@@ -43,7 +46,7 @@ export function ListenersChartInner({ chartData,
         <p className="text-sm text-muted-foreground mt-1">{t('analytics_listeners_hint')}</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {hasLastfm && (
           <Card className="bg-card border-border">
             <CardHeader className="pb-2">
@@ -65,6 +68,18 @@ export function ListenersChartInner({ chartData,
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold tabular-nums">{fmtListeners(latestSoundcharts)}</p>
+            </CardContent>
+          </Card>
+        )}
+        {hasApify && (
+          <Card className="bg-card border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {t('analytics_listeners_apify')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold tabular-nums">{fmtListeners(latestApify)}</p>
             </CardContent>
           </Card>
         )}
@@ -97,6 +112,16 @@ export function ListenersChartInner({ chartData,
                 dataKey="soundcharts"
                 name={t('analytics_listeners_soundcharts')}
                 stroke="oklch(0.60 0.25 300)"
+                strokeWidth={2}
+                dot={false}
+              />
+            )}
+            {hasApify && (
+              <Line
+                type="monotone"
+                dataKey="apify"
+                name={t('analytics_listeners_apify')}
+                stroke="oklch(0.72 0.19 145)"
                 strokeWidth={2}
                 dot={false}
               />

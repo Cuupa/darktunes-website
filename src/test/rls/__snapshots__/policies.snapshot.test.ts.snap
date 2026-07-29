@@ -11,6 +11,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "admin_audit_log: admin insert",
   "admin_audit_log: admin read",
   "api_credentials_admin_only",
+  "apify_usage_months: admin all",
   "app_logs: admin read",
   "app_logs: authenticated insert",
   "artist_assets_admin_all",
@@ -220,6 +221,8 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "sos_accounting_workspaces: admin/editor all",
   "sos_period_summaries: admin all",
   "sos_rules_presets: admin all",
+  "spotify_track_play_snapshots: admin all",
+  "spotify_track_play_snapshots: artist read own",
   "streaming_stats: admin all",
   "streaming_stats: artist read own",
   "submission_form_drafts: member all own",
@@ -281,6 +284,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "accreditation_requests",
   "admin_audit_log",
   "api_credentials",
+  "apify_usage_months",
   "app_logs",
   "artist_assets",
   "artist_billing_profiles",
@@ -361,6 +365,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "sos_accounting_workspaces",
   "sos_period_summaries",
   "sos_rules_presets",
+  "spotify_track_play_snapshots",
   "streaming_stats",
   "submission_form_drafts",
   "submission_form_schema",
@@ -402,6 +407,9 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   ],
   "api_credentials": [
     "api_credentials_admin_only",
+  ],
+  "apify_usage_months": [
+    "apify_usage_months: admin all",
   ],
   "app_logs": [
     "app_logs: admin read",
@@ -772,6 +780,10 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   ],
   "sos_rules_presets": [
     "sos_rules_presets: admin all",
+  ],
+  "spotify_track_play_snapshots": [
+    "spotify_track_play_snapshots: admin all",
+    "spotify_track_play_snapshots: artist read own",
   ],
   "streaming_stats": [
     "streaming_stats: admin all",

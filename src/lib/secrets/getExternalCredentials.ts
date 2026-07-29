@@ -150,6 +150,15 @@ export async function getListenerAnalyticsCredentials(
   return { lastfmApiKey, soundchartsApiKey }
 }
 
+export interface ApifyCredentials {
+  apifyToken: string | null
+}
+
+export async function getApifyCredentials(db: DbClient): Promise<ApifyCredentials> {
+  const apifyToken = await getApiCredential(db, 'apify_token')
+  return { apifyToken }
+}
+
 export async function getKnownApiConfiguration(
   db: DbClient,
 ): Promise<Record<string, boolean>> {
@@ -161,6 +170,7 @@ export async function getKnownApiConfiguration(
     bandsintownApiKey,
     lastfmApiKey,
     soundchartsApiKey,
+    apifyToken,
     youtubeApiKey,
     youtubeChannelId,
     artistsWithBandsintownKey,
@@ -172,6 +182,7 @@ export async function getKnownApiConfiguration(
     getApiCredential(db, 'bandsintown_api_key'),
     getApiCredential(db, 'lastfm_api_key'),
     getApiCredential(db, 'soundcharts_api_key'),
+    getApiCredential(db, 'apify_token'),
     getApiCredential(db, 'youtube_api_key'),
     getApiCredential(db, 'youtube_channel_id'),
     db
@@ -193,6 +204,7 @@ export async function getKnownApiConfiguration(
     odesli: true,
     lastfm: Boolean(lastfmApiKey),
     soundcharts: Boolean(soundchartsApiKey),
+    apify: Boolean(apifyToken),
     youtube: Boolean(youtubeApiKey && youtubeChannelId),
   }
 }

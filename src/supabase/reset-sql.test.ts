@@ -327,6 +327,26 @@ describe('supabase/reset.sql — static analysis', () => {
     )
   })
 
+  it('defines Apify Spotify play snapshot + usage tables with RLS enable', () => {
+    const sql = readFileSync(SQL_PATH, 'utf-8')
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS public\.spotify_track_play_snapshots/,
+    )
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS public\.apify_usage_months/)
+    expect(sql).toMatch(
+      /source IN \('lastfm', 'soundcharts', 'apify'\)/,
+    )
+    expect(sql).toMatch(
+      /metric_type IN \('listeners', 'plays', 'followers'\)/,
+    )
+    expect(sql).toMatch(
+      /ALTER TABLE public\.spotify_track_play_snapshots ENABLE ROW LEVEL SECURITY/,
+    )
+    expect(sql).toMatch(
+      /ALTER TABLE public\.apify_usage_months\s+ENABLE ROW LEVEL SECURITY/,
+    )
+  })
+
   it('guards artists CREATE columns with ADD COLUMN IF NOT EXISTS (prod CREATE is a no-op)', () => {
     // CREATE TABLE IF NOT EXISTS does not add new columns on live DBs.
     // SSOT: every non-structural artists column must appear in the idempotent

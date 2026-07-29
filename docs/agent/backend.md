@@ -63,6 +63,16 @@ Logic in `src/lib/sync/` with injected `SyncDeps`. `syncSingleArtist` / `syncAll
 
 Encrypted in `api_credentials` (AES-256-GCM). Admin: `/admin/api-keys`. Resolver: `getExternalCredentials.ts`. Bootstrap secrets stay in env.
 
+### Apify Spotify play counts
+
+- Credential: `apify_token` (group Apify) — **not** a Vercel env var.
+- Actor: `beatanalytics/spotify-play-count-scraper` via official `apify-client`.
+- Route: `POST /api/admin/analytics/sync-spotify-plays` (`scope`: artists \| releases \| all, `dryRun`).
+- Auth: admin session **or** `CRON_SECRET` / Vercel cron (same pattern as YouTube sync).
+- Eligibility: `is_visible = true` and resolvable Spotify id/url; releases also require visible parent artist. Never uses `followAlbums`/`followSingles` (catalog via explicit release album URLs only).
+- Budget: `apify_usage_months`, default **1200 URLs/month**; **429** when exhausted; **503** if token missing (live runs); dry-run works without token.
+- Persist: `artist_listener_metrics` source `apify`; `spotify_track_play_snapshots`. Logs: `sync_logs.api_source = apify_spotify`.
+
 ## Admin assets
 
 SSOT: `assets` table + `asset_folders`. Upload: `POST /api/upload`. Explorer APIs: `/api/admin/assets/*`. Press curation: `press_kit_items` + `PressKitBuilder`. Deletes: R2 first, then DB.

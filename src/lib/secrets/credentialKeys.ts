@@ -11,6 +11,7 @@ export type CredentialGroup =
   | 'bandsintown'
   | 'lastfm'
   | 'soundcharts'
+  | 'apify'
   | 'youtube'
   | 'resend'
   | 'mailerlite'
@@ -90,6 +91,16 @@ export const CREDENTIAL_KEY_DEFINITIONS: readonly CredentialKeyDefinition[] = [
     group: 'soundcharts',
     isSecret: true,
     docsUrl: 'https://soundcharts.com',
+  },
+  {
+    key: 'apify_token',
+    label: 'API Token',
+    description:
+      'Apify API token for Spotify public play-count scrapes (Admin → monthly artist/release stats).',
+    category: 'sync',
+    group: 'apify',
+    isSecret: true,
+    docsUrl: 'https://console.apify.com/account/integrations',
   },
   {
     key: 'youtube_api_key',
@@ -187,6 +198,7 @@ export const GROUP_LABELS: Record<CredentialGroup, string> = {
   bandsintown: 'Bandsintown',
   lastfm: 'Last.fm',
   soundcharts: 'Soundcharts',
+  apify: 'Apify',
   youtube: 'YouTube',
   resend: 'Resend',
   mailerlite: 'MailerLite',
@@ -195,7 +207,16 @@ export const GROUP_LABELS: Record<CredentialGroup, string> = {
 
 /** Display order of provider groups within each category. */
 export const GROUP_ORDER_BY_CATEGORY: Record<CredentialCategory, readonly CredentialGroup[]> = {
-  sync: ['spotify', 'discogs', 'songkick', 'bandsintown', 'lastfm', 'soundcharts', 'youtube'],
+  sync: [
+    'spotify',
+    'discogs',
+    'songkick',
+    'bandsintown',
+    'lastfm',
+    'soundcharts',
+    'apify',
+    'youtube',
+  ],
   email: ['resend'],
   newsletter: ['mailerlite'],
   monitoring: ['health_alerts'],

@@ -1494,6 +1494,63 @@ export interface Database {
         }
         Relationships: []
       }
+      spotify_track_play_snapshots: {
+        Row: {
+          id: string
+          artist_id: string
+          release_id: string | null
+          spotify_track_id: string
+          spotify_album_id: string | null
+          track_name: string | null
+          play_count: number
+          period: string
+          scraped_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          release_id?: string | null
+          spotify_track_id: string
+          spotify_album_id?: string | null
+          track_name?: string | null
+          play_count?: number
+          period: string
+          scraped_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          release_id?: string | null
+          spotify_track_id?: string
+          spotify_album_id?: string | null
+          track_name?: string | null
+          play_count?: number
+          period?: string
+          scraped_at?: string
+        }
+        Relationships: []
+      }
+      apify_usage_months: {
+        Row: {
+          year_month: string
+          urls_charged: number
+          budget: number
+          updated_at: string
+        }
+        Insert: {
+          year_month: string
+          urls_charged?: number
+          budget?: number
+          updated_at?: string
+        }
+        Update: {
+          year_month?: string
+          urls_charged?: number
+          budget?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       artist_territory_metrics: {
         Row: {
           id: string

@@ -62,6 +62,7 @@ import { SosAnalyticsPersistPanel } from '@/components/admin/sos/SosAnalyticsPer
 import { ImportBatchesPanel } from '@/components/admin/sos/ImportBatchesPanel'
 import { SosConfirmDialog } from '@/components/admin/sos/SosConfirmDialog'
 import { ExternalMetricsSyncPanel } from '@/components/admin/sos/ExternalMetricsSyncPanel'
+import { ApifySpotifySyncPanel } from '@/components/admin/sos/ApifySpotifySyncPanel'
 import dynamic from 'next/dynamic'
 const TrendsDashboard = dynamic(() => import('@/components/admin/sos/TrendsDashboard').then(mod => mod.TrendsDashboard), { ssr: false, loading: () => <Skeleton className="h-96 w-full" /> })
 import { CsvProfileManager } from '@/components/admin/sos/CsvProfileManager'
@@ -1312,6 +1313,7 @@ function SosGeneratorPanel() {
               />
               <ImportBatchesPanel labelArtists={labelArtists} onLoadBatch={loadBronzeBatch} />
               <ExternalMetricsSyncPanel />
+              <ApifySpotifySyncPanel />
               {hasData ? (
                 <SosAnalyticsPersistPanel
                   periodStart={detectedPeriodStart}
