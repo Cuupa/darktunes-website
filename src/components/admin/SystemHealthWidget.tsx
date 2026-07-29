@@ -80,10 +80,11 @@ const API_META: Record<string, { label: string; icon: React.ReactNode }> = {
   odesli: { label: 'Odesli', icon: <Link size={16} weight="bold" aria-hidden="true" /> },
   lastfm: { label: 'Last.fm', icon: <Headphones size={16} weight="bold" aria-hidden="true" /> },
   soundcharts: { label: 'Soundcharts', icon: <Waveform size={16} weight="bold" aria-hidden="true" /> },
+  apify: { label: 'Apify (Spotify public)', icon: <ChartLine size={16} weight="bold" aria-hidden="true" /> },
   all: { label: 'Full pipeline', icon: <ArrowsClockwise size={16} weight="bold" aria-hidden="true" /> },
 }
 
-const LISTENER_SYNC_APIS = new Set(['lastfm', 'soundcharts'])
+const LISTENER_SYNC_APIS = new Set(['lastfm', 'soundcharts', 'apify'])
 
 function getApiMeta(api: string): { label: string; icon: React.ReactNode } {
   return (

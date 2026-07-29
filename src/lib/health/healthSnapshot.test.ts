@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { buildHealthSnapshot } from './healthSnapshot'
+import { invalidateCredentialCache } from '@/lib/secrets/getExternalCredentials'
 import type { Database } from '@/types/database'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -28,6 +29,7 @@ function makeThenableBuilder(data: unknown, error: unknown = null) {
     order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     gte: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
     then: p.then.bind(p),
     catch: p.catch.bind(p),
     finally: p.finally.bind(p),
@@ -84,6 +86,7 @@ function createMockDb(): SupabaseClient<Database> {
 
 describe('buildHealthSnapshot', () => {
   beforeEach(() => {
+    invalidateCredentialCache()
     vi.stubEnv('API_CREDENTIALS_ENCRYPTION_KEY', '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')
   })
 

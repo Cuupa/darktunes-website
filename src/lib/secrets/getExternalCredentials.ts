@@ -56,10 +56,13 @@ export async function getApiCredential(
   key: CredentialKey,
 ): Promise<string | null> {
   const cache = await loadCredentialCache(db)
-  if (!cache.configured.has(key)) return null
+  // Prefer cache hits, but never treat a stale "configured" set as authoritative:
+  // a key may have been saved on another instance or after this cache was filled.
   if (cache.values.has(key)) return cache.values.get(key) ?? null
+
   const value = await getDecryptedCredential(db, key, DEFAULT_LABEL_ID)
   cache.values.set(key, value)
+  if (value) cache.configured.add(key)
   return value
 }
 

@@ -3,6 +3,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
@@ -27,6 +28,7 @@ export const DELETE = withErrorHandler(async (req: NextRequest): Promise<NextRes
   const db = await createServiceRoleSupabaseClient()
   await deleteCredential(db, key as CredentialKey)
   invalidateCredentialCache()
+  revalidateTag('health-snapshot', 'max')
 
   return NextResponse.json({ success: true })
 })
