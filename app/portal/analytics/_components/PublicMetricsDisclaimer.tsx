@@ -32,47 +32,48 @@ export function PublicMetricsDisclaimer({
 }: PublicMetricsDisclaimerProps) {
   const t = useTranslations('portal')
 
+  // Site is dark-by-default via :root tokens (no .dark class), so never rely on
+  // dark: light-mode amber-9xx text — it washes out on bg-amber-*/15.
   return (
     <Alert
       role="alert"
       className={cn(
-        'border-2 border-amber-500/70 bg-amber-500/15 text-foreground shadow-sm',
-        'dark:bg-amber-500/10 dark:border-amber-400/60',
-        '[&>svg]:text-amber-700 dark:[&>svg]:text-amber-300',
+        'border-2 border-amber-400/55 bg-amber-950 text-amber-50 shadow-sm',
+        '[&>svg]:text-amber-400',
         'items-start',
         className,
       )}
     >
       <WarningCircle className="size-5 shrink-0" weight="fill" aria-hidden="true" />
-      <AlertTitle className="line-clamp-none text-base font-semibold text-amber-950 dark:text-amber-100">
+      <AlertTitle className="line-clamp-none text-base font-semibold text-amber-50">
         {t('analytics_public_metrics_disclaimer_title')}
       </AlertTitle>
-      <AlertDescription className="col-start-2 space-y-3 text-sm text-foreground/95">
-        <p className="font-medium leading-relaxed">
+      <AlertDescription className="col-start-2 space-y-3 text-sm text-amber-50/95">
+        <p className="font-medium leading-relaxed text-amber-50">
           {t('analytics_public_metrics_disclaimer_lead')}
         </p>
-        <p className="leading-relaxed border-l-2 border-amber-600/50 pl-3 text-foreground/90">
+        <p className="leading-relaxed border-l-2 border-amber-400/60 pl-3 text-amber-100">
           {t('analytics_public_metrics_disclaimer_truth')}
         </p>
 
         {variant === 'full' && (
           <>
-            <details className="rounded-md border border-amber-600/30 bg-background/40 open:bg-background/60">
-              <summary className="cursor-pointer select-none px-3 py-2.5 min-h-[44px] flex items-center text-sm font-semibold text-amber-950 dark:text-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md">
+            <details className="rounded-md border border-amber-400/35 bg-black/35 open:bg-black/50">
+              <summary className="cursor-pointer select-none px-3 py-2.5 min-h-[44px] flex items-center text-sm font-semibold text-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md">
                 {t('analytics_public_metrics_disclaimer_why_title')}
               </summary>
-              <ul className="list-disc space-y-2 px-3 pb-3 pl-8 text-sm leading-relaxed text-foreground/90">
+              <ul className="list-disc space-y-2 px-3 pb-3 pl-8 text-sm leading-relaxed text-amber-100">
                 {WHY_KEYS.map((key) => (
                   <li key={key}>{t(key)}</li>
                 ))}
               </ul>
             </details>
 
-            <details className="rounded-md border border-amber-600/30 bg-background/40 open:bg-background/60">
-              <summary className="cursor-pointer select-none px-3 py-2.5 min-h-[44px] flex items-center text-sm font-semibold text-amber-950 dark:text-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md">
+            <details className="rounded-md border border-amber-400/35 bg-black/35 open:bg-black/50">
+              <summary className="cursor-pointer select-none px-3 py-2.5 min-h-[44px] flex items-center text-sm font-semibold text-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md">
                 {t('analytics_public_metrics_disclaimer_legal_title')}
               </summary>
-              <div className="space-y-2 px-3 pb-3 text-sm leading-relaxed text-foreground/90">
+              <div className="space-y-2 px-3 pb-3 text-sm leading-relaxed text-amber-100">
                 <p>{t('analytics_public_metrics_disclaimer_legal_1')}</p>
                 <p>{t('analytics_public_metrics_disclaimer_legal_2')}</p>
                 <p>{t('analytics_public_metrics_disclaimer_legal_3')}</p>

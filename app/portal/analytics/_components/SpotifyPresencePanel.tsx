@@ -115,7 +115,7 @@ export function SpotifyPresencePanel({
         </div>
         <Badge
           variant="outline"
-          className="text-xs font-normal shrink-0 border-amber-500/50 text-amber-900 dark:text-amber-100 bg-amber-500/10"
+          className="text-xs font-normal shrink-0 border-amber-400/50 text-amber-100 bg-amber-950"
         >
           {t('analytics_presence_source_badge')}
         </Badge>
