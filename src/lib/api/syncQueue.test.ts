@@ -14,6 +14,7 @@ import {
   releaseSyncExecutorLease,
   cancelSyncJob,
   retrySyncJob,
+  listSyncJobs,
   SYNC_EXECUTOR_LEASE_KEY,
   MAX_ATTEMPTS,
 } from './syncQueue'
@@ -170,6 +171,62 @@ describe('cancelSyncJob', () => {
       { data: { id: 'job-1', status: 'done', cancel_requested_at: null } },
     ])
     await expect(cancelSyncJob(db, 'job-1')).resolves.toBe('noop')
+  })
+})
+
+describe('listSyncJobs', () => {
+  it('lists jobs and attaches artist names from a separate lookup', async () => {
+    const queueRow = {
+      id: 'job-1',
+      artist_id: 'artist-1',
+      job_type: 'spotify',
+      status: 'pending',
+      scheduled_at: '2026-07-29T00:00:00.000Z',
+      started_at: null,
+      finished_at: null,
+      locked_until: null,
+      cancel_requested_at: null,
+      cancelled_at: null,
+      error_message: null,
+      attempt_count: 0,
+      created_at: '2026-07-29T00:00:00.000Z',
+    }
+    const db = makeSequentialMockDb([
+      { data: [queueRow] },
+      { data: [{ id: 'artist-1', name: 'Nightfall' }] },
+    ])
+
+    const jobs = await listSyncJobs(db, { status: 'pending', limit: 10 })
+    expect(jobs).toHaveLength(1)
+    expect(jobs[0]?.id).toBe('job-1')
+    expect(jobs[0]?.artistName).toBe('Nightfall')
+    expect(jobs[0]?.status).toBe('pending')
+    expect(db.from).toHaveBeenNthCalledWith(1, 'sync_queue')
+    expect(db.from).toHaveBeenNthCalledWith(2, 'artists')
+  })
+
+  it('returns jobs without names when no artist_ids are present', async () => {
+    const queueRow = {
+      id: 'job-odesli',
+      artist_id: null,
+      job_type: 'odesli',
+      status: 'running',
+      scheduled_at: '2026-07-29T00:00:00.000Z',
+      started_at: '2026-07-29T00:01:00.000Z',
+      finished_at: null,
+      locked_until: null,
+      cancel_requested_at: null,
+      cancelled_at: null,
+      error_message: null,
+      attempt_count: 1,
+      created_at: '2026-07-29T00:00:00.000Z',
+    }
+    const db = makeSequentialMockDb([{ data: [queueRow] }])
+
+    const jobs = await listSyncJobs(db, { status: ['pending', 'running'] })
+    expect(jobs).toHaveLength(1)
+    expect(jobs[0]?.artistName).toBeNull()
+    expect(db.from).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -501,6 +501,10 @@ export interface ListSyncJobsOptions {
 
 /**
  * Recent queue jobs for the Advanced admin console (with artist name when set).
+ *
+ * Uses `select('*')` + a separate artists lookup so listing still works when:
+ * - cancel columns are not yet applied on an older production DB
+ * - PostgREST embed `artists(name)` fails (relationship / schema-cache issues)
  */
 export async function listSyncJobs(
   db: DbClient,
@@ -510,9 +514,7 @@ export async function listSyncJobs(
 
   let query = db
     .from('sync_queue')
-    .select(
-      'id, artist_id, job_type, status, scheduled_at, started_at, finished_at, locked_until, cancel_requested_at, cancelled_at, error_message, attempt_count, created_at, artists(name)',
-    )
+    .select('*')
     .order('created_at', { ascending: false })
     .limit(limit)
 
@@ -527,16 +529,31 @@ export async function listSyncJobs(
   const { data, error } = await query
   if (error) throw new Error(`Failed to list sync jobs: ${error.message}`)
 
-  return (data ?? []).map((row) => {
-    const artistJoin = row.artists as { name: string } | { name: string }[] | null
-    const artistName = Array.isArray(artistJoin)
-      ? (artistJoin[0]?.name ?? null)
-      : (artistJoin?.name ?? null)
-    const { artists: _artists, ...queueRow } = row as typeof row & {
-      artists: unknown
+  const rows = (data ?? []) as SyncQueueRow[]
+  const artistIds = [
+    ...new Set(rows.map((r) => r.artist_id).filter((id): id is string => Boolean(id))),
+  ]
+
+  const nameById = new Map<string, string>()
+  if (artistIds.length > 0) {
+    const { data: artists, error: artistsError } = await db
+      .from('artists')
+      .select('id, name')
+      .in('id', artistIds)
+
+    if (artistsError) {
+      // Non-fatal: jobs still list without names
+      console.warn('[listSyncJobs] artist name lookup failed:', artistsError.message)
+    } else {
+      for (const artist of artists ?? []) {
+        nameById.set(artist.id, artist.name)
+      }
     }
-    return rowToSyncJob(queueRow as SyncQueueRow, artistName)
-  })
+  }
+
+  return rows.map((row) =>
+    rowToSyncJob(row, row.artist_id ? (nameById.get(row.artist_id) ?? null) : null),
+  )
 }
 
 /**

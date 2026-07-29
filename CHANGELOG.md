@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Admin wizard groups:** submission form manager can set each field’s wizard group (`metadata`, `distribution`, `rights`, `track`, custom).
 
 ### Fixed
+- **Apify Force Sync in System Health:** Health card Force Sync for Apify now calls `/api/admin/analytics/sync-spotify-plays` instead of the Last.fm/Soundcharts `sync-listeners` route.
+- **Advanced sync jobs 500:** `GET /api/admin/sync/jobs` no longer depends on PostgREST embed `artists(name)` or requiring cancel columns in the SELECT; lists via `select('*')` + separate artist name lookup and surfaces DB errors to admins.
 - **Accounting FX race:** Worker no longer processes CSVs before rates load (avoids false “missing exchange rate” toasts).
 - **Accounting field UX:** Track split % uses `PercentField`; PDF top-countries uses `IntegerField`; clearer DE step labels (no double “Prüfen”); i18n for worker/currency errors and common form placeholders.
 - **Portal profile hometown 500:** Idempotent `artists.hometown` (and related) `ADD COLUMN IF NOT EXISTS` so existing prod DBs get the column after epk→artists consolidation; roster-only profile saves no longer fail hard on EPK read errors.

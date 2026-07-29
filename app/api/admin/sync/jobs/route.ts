@@ -48,11 +48,18 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
   const jobType = jobTypeParam && isJobType(jobTypeParam) ? jobTypeParam : undefined
   const limit = limitParam ? Number.parseInt(limitParam, 10) : 50
 
-  const jobs = await listSyncJobs(db, {
-    status,
-    jobType,
-    limit: Number.isFinite(limit) ? limit : 50,
-  })
+  let jobs
+  try {
+    jobs = await listSyncJobs(db, {
+      status,
+      jobType,
+      limit: Number.isFinite(limit) ? limit : 50,
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    // Surface schema/query failures to admins (withErrorHandler hides plain Error).
+    throw new ApiError(500, message, 'SERVER_ERROR')
+  }
 
   return NextResponse.json({
     jobs: jobs.map((j) => ({

@@ -89,7 +89,8 @@ const API_META: Record<string, { label: string; icon: React.ReactNode }> = {
   all: { label: 'Full pipeline', icon: <ArrowsClockwise size={16} weight="bold" aria-hidden="true" /> },
 }
 
-const LISTENER_SYNC_APIS = new Set(['lastfm', 'soundcharts', 'apify'])
+/** Last.fm + Soundcharts share POST /api/admin/analytics/sync-listeners. */
+const LISTENER_SYNC_APIS = new Set(['lastfm', 'soundcharts'])
 
 function getApiMeta(api: string): { label: string; icon: React.ReactNode } {
   return (
@@ -98,6 +99,18 @@ function getApiMeta(api: string): { label: string; icon: React.ReactNode } {
       icon: <MusicNote size={16} weight="bold" aria-hidden="true" />,
     }
   )
+}
+
+function apifySyncToastMessage(data: Record<string, unknown>): string {
+  const urls = typeof data.urlsCharged === 'number' ? data.urlsCharged : 0
+  const upserted =
+    data.upserted && typeof data.upserted === 'object'
+      ? (data.upserted as { listenerRows?: unknown; trackRows?: unknown })
+      : null
+  const listeners = typeof upserted?.listenerRows === 'number' ? upserted.listenerRows : 0
+  const tracks = typeof upserted?.trackRows === 'number' ? upserted.trackRows : 0
+  const partial = data.partial === true ? ' Partial run — re-run to continue.' : ''
+  return `Apify (Spotify public) sync completed (${urls} URL${urls === 1 ? '' : 's'}, ${listeners} listener row${listeners === 1 ? '' : 's'}, ${tracks} track row${tracks === 1 ? '' : 's'}).${partial}`
 }
 
 function operationalBadgeClass(
@@ -312,19 +325,30 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   const handleSyncApi = async (api: string) => {
     setSyncingApi(api)
     try {
-      const res = LISTENER_SYNC_APIS.has(api)
-        ? await fetch('/api/admin/analytics/sync-listeners', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${bearerToken}` },
-          })
-        : await fetch('/api/sync-api', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${bearerToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ apiSource: api }),
-          })
+      // Apify is a separate analytics route (not Last.fm/Soundcharts sync-listeners).
+      const res =
+        api === 'apify'
+          ? await fetch('/api/admin/analytics/sync-spotify-plays', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${bearerToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ scope: 'all' }),
+            })
+          : LISTENER_SYNC_APIS.has(api)
+            ? await fetch('/api/admin/analytics/sync-listeners', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${bearerToken}` },
+              })
+            : await fetch('/api/sync-api', {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${bearerToken}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ apiSource: api }),
+              })
 
       const data = await parseAdminFetchJson(res)
       if (!res.ok) {
@@ -333,7 +357,9 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
         )
       }
 
-      if (LISTENER_SYNC_APIS.has(api)) {
+      if (api === 'apify') {
+        toast.success(apifySyncToastMessage(data))
+      } else if (LISTENER_SYNC_APIS.has(api)) {
         const rows =
           api === 'soundcharts'
             ? (data.soundchartsRows as number | undefined)
@@ -853,6 +879,9 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
                   {api === 'soundcharts' && status.configured && (
                     <p>Optional paid listener analytics — requires Soundcharts UUID per artist.</p>
                   )}
+                  {api === 'apify' && status.configured && (
+                    <p>Scrapes public Spotify monthly listeners and track plays (budget-capped).</p>
+                  )}
                 </div>
 
                 {(status.releasesSynced !== null ||
@@ -864,7 +893,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
                         {status.releasesSynced}{' '}
                         {api === 'youtube'
                           ? 'video'
-                          : api === 'lastfm' || api === 'soundcharts'
+                          : api === 'lastfm' || api === 'soundcharts' || api === 'apify'
                             ? 'metric row'
                             : 'release'}
                         {status.releasesSynced === 1 ? '' : 's'} on last run
