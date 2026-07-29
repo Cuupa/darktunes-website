@@ -97,7 +97,7 @@ function FeeForm({
         ) : (
           <Select value={artist} onValueChange={setArtist}>
             <SelectTrigger id="split-artist">
-              <SelectValue placeholder="Select artist…" />
+              <SelectValue placeholder={t.selectArtistPlaceholder} />
             </SelectTrigger>
             <SelectContent>
               {artists.filter((a) => !existingArtists.includes(a) || a === initialArtist).map((a) => (
@@ -117,7 +117,7 @@ function FeeForm({
           <Input
             value={artist}
             onChange={(e) => setArtist(e.target.value.slice(0, 120))}
-            placeholder="Or type artist name"
+            placeholder={t.artistNamePlaceholder}
             className="mt-1"
             maxLength={120}
           />
@@ -126,7 +126,7 @@ function FeeForm({
           <Input
             value={artist}
             onChange={(e) => setArtist(e.target.value.slice(0, 120))}
-            placeholder="Artist name"
+            placeholder={t.artistNamePlaceholder}
             autoFocus
             maxLength={120}
           />
@@ -135,7 +135,7 @@ function FeeForm({
           <Input
             value={artist}
             onChange={(e) => setArtist(e.target.value.slice(0, 120))}
-            placeholder="Artist name"
+            placeholder={t.artistNamePlaceholder}
             autoFocus
             maxLength={120}
           />

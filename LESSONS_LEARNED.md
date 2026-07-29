@@ -62,6 +62,7 @@ Distilled anti-patterns from project history. **Append session findings before o
 | PII in `app_logs` | UUIDs only; no emails/names |
 | Vulnerable deps without audit | `npm audit` before adding packages |
 | Browser `fetch()` to bronze CSV presigned R2 URLs | Same-origin `/api/admin/sos/import-batches/*` only |
+| Process SOS CSVs while `exchangeRates` is still `{}` | Gate worker `process` until rates non-empty; sticky FX banner on ECB fallback |
 
 ## Accessibility & i18n
 

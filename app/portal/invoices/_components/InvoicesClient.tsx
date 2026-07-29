@@ -23,6 +23,7 @@ import type { ArtistInvoice } from '@/lib/api/artistInvoices'
 import type { SalesStatement } from '@/lib/api/salesStatements'
 import { FreeInvoiceGenerator } from './FreeInvoiceGenerator'
 import { InvoiceForm } from './InvoiceForm'
+import { InvoiceFromStatementAssistant } from './InvoiceFromStatementAssistant'
 
 interface InvoicesClientProps {
   artistId: string
@@ -170,16 +171,25 @@ export function InvoicesClient({
       >
         {activeTab === 'my-invoices' && (
           <div className="space-y-6">
-            {showForm && (
+            {showForm && statement ? (
+              <InvoiceFromStatementAssistant
+                artistId={artistId}
+                statement={statement}
+                billingProfile={billingProfile}
+                billingProfileComplete={billingProfileComplete}
+                onCancel={handleCancel}
+                onSuccess={handleNewInvoice}
+              />
+            ) : null}
+            {showForm && !statement ? (
               <InvoiceForm
                 artistId={artistId}
                 billingProfile={billingProfile}
                 billingProfileComplete={billingProfileComplete}
                 onCancel={handleCancel}
                 onSuccess={handleNewInvoice}
-                statement={statement ?? undefined}
               />
-            )}
+            ) : null}
 
             {invoices.length === 0 ? (
               <PortalEmptyState

@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { IgnoredEntry } from '@/lib/sos/types'
+import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 
 export interface IgnoredEntriesManagerProps {
   entries: IgnoredEntry[]
@@ -33,6 +34,7 @@ export interface IgnoredEntriesManagerProps {
 }
 
 export function IgnoredEntriesManager({ entries, onAddEntry, onRemoveEntry, artists = [], releaseTitles = [] }: IgnoredEntriesManagerProps) {
+  const t = useAccountingLabels()
   const [open, setOpen] = useState(false)
   const [artist, setArtist] = useState('')
   const [artistInput, setArtistInput] = useState('')
@@ -90,19 +92,19 @@ export function IgnoredEntriesManager({ entries, onAddEntry, onRemoveEntry, arti
                   <>
                     <Select value={artist} onValueChange={v => { setArtist(v); if (v !== '__manual__') setArtistInput('') }}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select artist…" />
+                        <SelectValue placeholder={t.selectArtistPlaceholder} />
                       </SelectTrigger>
                       <SelectContent>
                         {artists.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                        <SelectItem value="__manual__">Enter manually…</SelectItem>
+                        <SelectItem value="__manual__">{t.enterArtistManually}</SelectItem>
                       </SelectContent>
                     </Select>
                     {artist === '__manual__' && (
-                      <Input value={artistInput} onChange={e => setArtistInput(e.target.value)} placeholder="Artist name" className="mt-1" />
+                      <Input value={artistInput} onChange={e => setArtistInput(e.target.value)} placeholder={t.artistNamePlaceholder} className="mt-1" />
                     )}
                   </>
                 ) : (
-                  <Input value={artistInput} onChange={e => setArtistInput(e.target.value)} placeholder="Artist name" autoFocus />
+                  <Input value={artistInput} onChange={e => setArtistInput(e.target.value)} placeholder={t.artistNamePlaceholder} autoFocus />
                 )}
               </div>
               <div className="space-y-1.5">

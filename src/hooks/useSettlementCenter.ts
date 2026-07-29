@@ -100,7 +100,7 @@ export function useSettlementCenter({
     })
 
     if (!result.success) {
-      toast.error(result.error ?? 'Failed to persist portal analytics')
+      toast.error(result.error ?? t.analyticsPersistFailed)
       return false
     }
 
@@ -114,6 +114,7 @@ export function useSettlementCenter({
     periodStart,
     revenues,
     territoryMetrics,
+    t.analyticsPersistFailed,
   ])
 
   const periodStartDate = monthToPeriodDate(periodStart, false)

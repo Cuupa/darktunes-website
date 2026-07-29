@@ -27,8 +27,12 @@ import { toast } from 'sonner'
 import { formatSecondsToDuration } from '@/lib/submissions/fieldValidation'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { ReleaseSubmission, ReleaseSubmissionTrack, SubmissionStatus } from '@/types'
+import { GuidedModeChooser } from '@/components/guided/GuidedModeChooser'
+import type { GuidedMode } from '@/lib/guided/guidedSteps'
+import { ReleaseReviewAssistant } from '@/components/admin/ReleaseReviewAssistant'
 
 const STATUS_OPTIONS: SubmissionStatus[] = ['received', 'reviewed', 'accepted', 'rejected']
+const MODE_KEY = 'admin-release-review-mode'
 
 const STATUS_LABELS: Record<SubmissionStatus, string> = {
   received: 'Received',
@@ -40,7 +44,26 @@ const STATUS_LABELS: Record<SubmissionStatus, string> = {
 export function ReleaseSubmissionsManager() {
   const tToast = useTranslations('admin.toast')
   const t = useTranslations('adminSubmissions')
+  const tAdmin = useTranslations('admin')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
+
+  const [mode, setMode] = useState<GuidedMode | null>(() => {
+    if (typeof window === 'undefined') return null
+    try {
+      const stored = localStorage.getItem(MODE_KEY) as GuidedMode | null
+      return stored === 'assistant' || stored === 'advanced' ? stored : null
+    } catch {
+      return null
+    }
+  })
+  const selectMode = (next: GuidedMode) => {
+    setMode(next)
+    try {
+      localStorage.setItem(MODE_KEY, next)
+    } catch {
+      /* ignore */
+    }
+  }
 
   const [submissions, setSubmissions] = useState<ReleaseSubmission[]>([])
   const [loading, setLoading] = useState(true)
@@ -308,10 +331,78 @@ export function ReleaseSubmissionsManager() {
 
   if (loading) return <p className="text-muted-foreground">{t('loading')}</p>
 
+  if (mode === null) {
+    return (
+      <GuidedModeChooser
+        title={tAdmin('review_assistant_mode_title')}
+        subtitle={tAdmin('review_assistant_mode_subtitle')}
+        recommendedLabel={tAdmin('guided_recommended')}
+        assistantTitle={tAdmin('review_assistant_mode_assistant_title')}
+        assistantDesc={tAdmin('review_assistant_mode_assistant_desc')}
+        assistantButton={tAdmin('review_assistant_mode_assistant_btn')}
+        advancedTitle={tAdmin('review_assistant_mode_advanced_title')}
+        advancedDesc={tAdmin('review_assistant_mode_advanced_desc')}
+        advancedButton={tAdmin('review_assistant_mode_advanced_btn')}
+        whatNextTitle={tAdmin('review_assistant_what_next_title')}
+        whatNextSteps={[
+          tAdmin('review_assistant_what_next_1'),
+          tAdmin('review_assistant_what_next_2'),
+          tAdmin('review_assistant_what_next_3'),
+        ]}
+        onSelect={selectMode}
+      />
+    )
+  }
+
+  if (mode === 'assistant') {
+    return (
+      <div className="space-y-4">
+        <ReleaseReviewAssistant
+          submissions={submissions}
+          onPatchStatus={async (id, status, reply) => {
+            const updated = await patchStatus(id, status, reply)
+            setSubmissions((list) => list.map((s) => (s.id === id ? updated : s)))
+            return updated
+          }}
+          onCreateDraft={async (sub) => {
+            setSelected(sub)
+            const token = await getToken()
+            const res = await fetch('/api/admin/release-submissions/' + sub.id, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ action: 'create_draft_release' }),
+            })
+            if (!res.ok) {
+              const errBody = (await res.json().catch(() => ({}))) as { error?: string }
+              throw new Error(errBody.error ?? 'Failed')
+            }
+            const data = (await res.json()) as {
+              submission: ReleaseSubmission
+              release: { id: string; title: string }
+              created: boolean
+            }
+            setSubmissions((list) =>
+              list.map((s) => (s.id === sub.id ? data.submission : s)),
+            )
+            return { releaseId: data.release.id, created: data.created }
+          }}
+          onOpenAdvanced={() => selectMode('advanced')}
+          onSelectSubmission={setSelected}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       {!selected && (
         <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => selectMode('assistant')}>
+            {tAdmin('guided_open_assistant')}
+          </Button>
           <Button
             variant="outline"
             size="sm"

@@ -48,7 +48,9 @@ export function EarningsStatementsPanel({
   )
 
   const hasInvoiceableStatement = statements.some(
-    (statement) => statement.status === 'label_approved' && !linkedIds.has(statement.id),
+    (statement) =>
+      ['label_approved', 'artist_notified', 'viewed'].includes(statement.status) &&
+      !linkedIds.has(statement.id),
   )
 
   const handleDownload = async (statementId: string) => {
@@ -95,7 +97,9 @@ export function EarningsStatementsPanel({
         ) : (
           filtered.map((statement) => {
             const hasInvoice = linkedIds.has(statement.id)
-            const canInvoice = statement.status === 'label_approved' && !hasInvoice
+            const canInvoice =
+              ['label_approved', 'artist_notified', 'viewed'].includes(statement.status) &&
+              !hasInvoice
 
             return (
               <div
@@ -124,7 +128,7 @@ export function EarningsStatementsPanel({
                     )}
                     {t('statements_download')}
                   </Button>
-                  {canInvoice && billingProfileComplete && (
+                  {canInvoice && (
                     <QuickInvoiceButton
                       artistId={artistId}
                       statement={statement}

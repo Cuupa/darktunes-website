@@ -134,3 +134,16 @@ export function isBillingProfileComplete(profile: ArtistBillingProfile | null): 
 
   return hasRequiredAddress && hasTaxIdentity
 }
+
+/**
+ * SEPA payout readiness (display / admin SOS). Does not change invoice completeness.
+ * Callers should validate IBAN checksum separately when accepting user input.
+ */
+export function isBillingProfileSepaReady(
+  profile: ArtistBillingProfile | null,
+  options?: { ibanValid?: boolean },
+): boolean {
+  if (!profile?.legalName?.trim() || !profile.iban?.trim()) return false
+  if (options?.ibanValid === false) return false
+  return true
+}

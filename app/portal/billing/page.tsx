@@ -4,7 +4,7 @@ import type { Metadata } from 'next'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getBillingProfile, isBillingProfileComplete } from '@/lib/api/artistBillingProfiles'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
-import { BillingProfileForm } from './_components/BillingProfileForm'
+import { BillingProfileAssistant } from './_components/BillingProfileAssistant'
 import { getMetadataBrand, portalPageTitle } from '@/lib/seo/metadata'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -18,10 +18,10 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function BillingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ artistId?: string }>
+  searchParams: Promise<{ artistId?: string; mode?: string; focus?: string }>
 }) {
 
-  const { artistId } = await searchParams
+  const { artistId, mode, focus } = await searchParams
 
   const supabase = await createServerSupabaseClient()
   const {
@@ -32,12 +32,14 @@ export default async function BillingPage({
 
   const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
   const billingProfile = artist ? await getBillingProfile(supabase, artist.id).catch(() => null) : null
+  const complete = isBillingProfileComplete(billingProfile)
 
   return (
-    <BillingProfileForm
+    <BillingProfileAssistant
       artistId={artist?.id ?? ''}
       billingProfile={billingProfile}
-      isComplete={isBillingProfileComplete(billingProfile)}
+      isComplete={complete}
+      forceAssistant={mode === 'assistant' || focus === 'payout' || !complete}
     />
   )
 }

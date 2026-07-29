@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Portal/Admin DAU assistants (1–5):** Shared guided kit; billing SEPA assistant; invoice-from-statement assistant (default CTA; quick-send with confirm); EPK first share/PDF; fan-page first publish with templates; admin release-submission review assistant.
+- **Accounting DAU wizard:** Assistant-first mode chooser, per-step coach checklist, plain-language Continue-blocked reasons, step X of Y footer; sticky ECB/FX banner with refresh; CSV processing waits for exchange rates (no empty-rate race).
 - **Admin release submissions (Eingang):** Artist name left of title; desired release date column; inline status select (saves immediately); per-submission CSV/Excel download plus bulk export; team-wide export column order in `site_settings` (`release_submissions_export_columns`); detail preview shows composer/author and fixes submitted vs. desired release date.
 - **Messaging M0–M2:** Paginated lists, per-user receipts, server rules, attachment allowlist, domain send + client idempotency, unified search helper. Shared inbox for artist→label: claim/unclaim, priority/tags, staff internal notes, audit events, JSON export (`/api/admin/messages/[id]/*`, `SharedInboxPanel`).
 - **Notification platform (Phase 1–3):** Unified `notifications` table + `emitNotification()` catalog for staff and artist in-app alerts. Migrated release/video submit, fan-page review queue, press assets, portal messages-to-label. Fan-page approve/reject, release/video decisions, statement available, invoice payment, journalist applications. Admin/portal bells, history centers (`/admin|portal/notifications`), and per-event preferences (`notification_preferences`, in-app mute respected by emit).
@@ -27,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Admin wizard groups:** submission form manager can set each field’s wizard group (`metadata`, `distribution`, `rights`, `track`, custom).
 
 ### Fixed
+- **Accounting FX race:** Worker no longer processes CSVs before rates load (avoids false “missing exchange rate” toasts).
+- **Accounting field UX:** Track split % uses `PercentField`; PDF top-countries uses `IntegerField`; clearer DE step labels (no double “Prüfen”); i18n for worker/currency errors and common form placeholders.
 - **Portal profile hometown 500:** Idempotent `artists.hometown` (and related) `ADD COLUMN IF NOT EXISTS` so existing prod DBs get the column after epk→artists consolidation; roster-only profile saves no longer fail hard on EPK read errors.
 
 ### Changed

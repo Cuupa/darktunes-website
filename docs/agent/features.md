@@ -67,10 +67,26 @@ Enterprise tour production module (ported from artist-tour-planner). **Distinct 
 
 Enterprise SOS + invoice lifecycle. Workflow helpers: `src/lib/sos/statementWorkflow.ts`, UI: `statementWorkflowUi.tsx`.
 
-**Admin accounting (`/admin/accounting`):** Default **Guided** mode (`AccountingGuidedWizard` in `AccountingPanel.tsx`) — Upload → Review → Publish (settlement). **Advanced** mode: all sub-tabs. Guided stepper is controlled (`activeStep` / `onActiveStepChange`); Review CTA opens settle step and scrolls to `#accounting-guided-settle-panel`.
+**Shared guided kit:** `src/components/guided/` (`GuidedModeChooser`, `GuidedStepShell`, `GuidedStepCoach`) + `src/lib/guided/guidedSteps.ts`. Used by portal billing/invoice/EPK/fan-page assistants and admin release review.
+
+**Portal DAU assistants:**
+| Flow | Entry | Steps |
+|------|--------|--------|
+| Billing | `/portal/billing` | Legal → Tax → Payout (SEPA) → Done |
+| Invoice from Statement | `/portal/invoices?statement=` (CTA from Statements/Analytics) | Confirm → Billing if needed → Send |
+| EPK first share | `/portal/epk-builder` mode chooser | Template → PDF/Share → Done |
+| Fan page first publish | `/portal/fan-page` mode chooser | Layout template → Checks → Publish |
+
+**Admin release review assistant:** `/admin/release-submissions` mode chooser → Queue → Checklist → Decision → optional draft.
+
+**Admin accounting (`/admin/accounting`):** Default **Guided** mode with **Assistant-first** chooser (`SosWizardModeChooser`). Assistant: Setup → Upload → Checks → Payouts → Publish. Quick: Upload → Payouts → Publish (experts). Step coach (`SosWizardStepCoach`) + `guidedContinueBlockedReason` explain why Continue is disabled. **Advanced** mode: all sub-tabs.
+
+**FX / ECB:** Spot + historical rates via `/api/exchange-rates` (Frankfurter). Processing is gated until rates are non-empty (`useSosCSVProcessor`). Sticky `CurrencyRatesBanner` for loading / live ECB / fallback + refresh. Missing currency throws (no silent €0).
 
 | Module | Role |
 |--------|------|
+| `AccountingGuidedWizard` + `SosWizardStepCoach` | DAU step UI, progress, blocked reasons |
+| `CurrencyRatesBanner` | Sticky FX status + refresh |
 | `SettlementCenterPanel` | Shell: overview, toolbar, register, dialogs |
 | `useSettlementCenter` | Register fetch, bulk actions, correction/payment/lock/archive |
 | `SettlementWorkflowOverview` | Workflow + ledger mismatch warning (`settlementReconciliation`) |
