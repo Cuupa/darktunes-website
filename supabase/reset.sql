@@ -2262,6 +2262,22 @@ CREATE INDEX IF NOT EXISTS idx_sales_statements_artist_id  ON public.sales_state
 CREATE INDEX IF NOT EXISTS idx_sales_statements_created_at ON public.sales_statements (created_at DESC);
 
 -- ---------------------------------------------------------------------------
+-- TABLE: sos_rules_presets  — named rule-set presets for SOS accounting
+-- Must exist before distributor_import_batches (FK rules_preset_id).
+-- RLS/policies are applied later in the SOS section.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.sos_rules_presets (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       TEXT        NOT NULL,
+  config     JSONB       NOT NULL DEFAULT '{}'::JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_sos_rules_presets_name_ci
+  ON public.sos_rules_presets (lower(btrim(name)));
+
+-- ---------------------------------------------------------------------------
 -- TABLE: distributor_import_batches  (Bronze metadata — raw CSV in R2)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.distributor_import_batches (
@@ -2341,6 +2357,26 @@ CREATE TABLE IF NOT EXISTS public.event_impact (
 
 CREATE INDEX IF NOT EXISTS idx_event_impact_artist
   ON public.event_impact (artist_id);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: promo_log_entries
+-- Label-documented marketing activities (timeline for linked artists).
+-- Must exist before promo_impact (FK promo_log_id). RLS applied later.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.promo_log_entries (
+  id               UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id        UUID           NOT NULL REFERENCES public.artists(id) ON DELETE CASCADE,
+  action_date      DATE           NOT NULL,
+  description      TEXT           NOT NULL,
+  budget_amount    NUMERIC(12, 2),
+  budget_currency  TEXT           NOT NULL DEFAULT 'EUR',
+  proof_url        TEXT,
+  proof_r2_key     TEXT,
+  created_by       UUID           REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at       TIMESTAMPTZ    NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_promo_log_artist_id ON public.promo_log_entries (artist_id, action_date DESC);
 
 -- ---------------------------------------------------------------------------
 -- TABLE: promo_impact  (Gold — precomputed promo log ↔ stream correlation)
@@ -2664,6 +2700,38 @@ CREATE INDEX IF NOT EXISTS idx_message_receipts_user
   ON public.message_receipts (user_id, message_source, read_at DESC);
 
 -- ---------------------------------------------------------------------------
+-- TABLE: message_internal_notes (staff-only notes on label/portal messages)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.message_internal_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_source TEXT NOT NULL CHECK (message_source IN ('label', 'portal')),
+  message_id UUID NOT NULL,
+  author_user_id UUID NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_message_internal_notes_msg
+  ON public.message_internal_notes (message_source, message_id, created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: message_events (audit trail for message ops)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.message_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_source TEXT NOT NULL CHECK (message_source IN ('label', 'portal')),
+  message_id UUID NOT NULL,
+  actor_user_id UUID REFERENCES auth.users (id) ON DELETE SET NULL,
+  event_type TEXT NOT NULL,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_message_events_msg
+  ON public.message_events (message_source, message_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_message_events_actor
+  ON public.message_events (actor_user_id, created_at DESC)
+  WHERE actor_user_id IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
 -- TABLE: journalist_downloads
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.journalist_downloads (
@@ -2911,6 +2979,8 @@ ALTER TABLE public.message_folders       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_rules         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_attachments   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_receipts      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_internal_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_events        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.journalist_downloads  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.accreditation_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.editor_activity_log   ENABLE ROW LEVEL SECURITY;
@@ -5789,37 +5859,6 @@ CREATE INDEX IF NOT EXISTS idx_portal_messages_assignee
   ON public.portal_messages (assignee_user_id)
   WHERE assignee_user_id IS NOT NULL;
 
--- Staff-only internal notes on a message (label or portal source)
-CREATE TABLE IF NOT EXISTS public.message_internal_notes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  message_source TEXT NOT NULL CHECK (message_source IN ('label', 'portal')),
-  message_id UUID NOT NULL,
-  author_user_id UUID NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
-  body TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS idx_message_internal_notes_msg
-  ON public.message_internal_notes (message_source, message_id, created_at DESC);
-
--- Audit trail for message ops (claim, read, delete, export, …)
-CREATE TABLE IF NOT EXISTS public.message_events (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  message_source TEXT NOT NULL CHECK (message_source IN ('label', 'portal')),
-  message_id UUID NOT NULL,
-  actor_user_id UUID REFERENCES auth.users (id) ON DELETE SET NULL,
-  event_type TEXT NOT NULL,
-  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS idx_message_events_msg
-  ON public.message_events (message_source, message_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_message_events_actor
-  ON public.message_events (actor_user_id, created_at DESC)
-  WHERE actor_user_id IS NOT NULL;
-
-ALTER TABLE public.message_internal_notes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.message_events        ENABLE ROW LEVEL SECURITY;
-
 CREATE INDEX IF NOT EXISTS idx_portal_msg_from    ON public.portal_messages (from_artist_id, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_portal_msg_to      ON public.portal_messages (to_artist_id,   sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_portal_msg_search  ON public.portal_messages USING GIN(search_vector);
@@ -5895,17 +5934,8 @@ CREATE POLICY "portal_attach: admin all" ON public.portal_message_attachments
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
--- TABLE: sos_rules_presets  — named rule-set presets for SOS accounting
--- Each row bundles all rule types into a single JSONB config blob.
+-- RLS: sos_rules_presets (table created earlier — before distributor_import_batches)
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.sos_rules_presets (
-  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  name       TEXT        NOT NULL,
-  config     JSONB       NOT NULL DEFAULT '{}'::JSONB,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 ALTER TABLE public.sos_rules_presets ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "sos_rules_presets: admin all" ON public.sos_rules_presets;
@@ -5917,9 +5947,6 @@ DROP TRIGGER IF EXISTS sos_rules_presets_updated_at ON public.sos_rules_presets;
 CREATE TRIGGER sos_rules_presets_updated_at
   BEFORE UPDATE ON public.sos_rules_presets
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_sos_rules_presets_name_ci
-  ON public.sos_rules_presets (lower(btrim(name)));
 
 -- ---------------------------------------------------------------------------
 -- TABLE: sos_accounting_workspaces  — server-persisted live workspace for a period
@@ -6230,25 +6257,9 @@ ALTER TABLE public.sales_statement_line_items
   ADD COLUMN IF NOT EXISTS fx_rate_date DATE;
 
 -- =============================================================================
--- TABLE: promo_log_entries
--- Label-documented marketing activities shown to the linked artist as a
--- chronological read-only timeline.  Admins/editors write; artists read.
+-- RLS: promo_log_entries (table created earlier — before promo_impact)
+-- Admins/editors write; artists read their own timeline.
 -- =============================================================================
-
-CREATE TABLE IF NOT EXISTS public.promo_log_entries (
-  id               UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
-  artist_id        UUID           NOT NULL REFERENCES public.artists(id) ON DELETE CASCADE,
-  action_date      DATE           NOT NULL,
-  description      TEXT           NOT NULL,
-  budget_amount    NUMERIC(12, 2),
-  budget_currency  TEXT           NOT NULL DEFAULT 'EUR',
-  proof_url        TEXT,
-  proof_r2_key     TEXT,
-  created_by       UUID           REFERENCES auth.users(id) ON DELETE SET NULL,
-  created_at       TIMESTAMPTZ    NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_promo_log_artist_id ON public.promo_log_entries (artist_id, action_date DESC);
 
 ALTER TABLE public.promo_log_entries ENABLE ROW LEVEL SECURITY;
 
