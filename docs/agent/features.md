@@ -40,7 +40,10 @@ Enterprise tour production module (ported from artist-tour-planner). **Distinct 
 | DAL | `src/lib/api/tours.ts`, `tourStops.ts`, `tourContacts.ts`, `tourTasks.ts`, `tourCrew.ts`, `tourMerch.ts`, `tourConcertBridge.ts` |
 | APIs | `app/api/portal/tour-planner/*` — bearer + `?artistId=` via `authenticatePortalBearerWithArtist` |
 | Offline | Dexie sync queue (`src/lib/tour-planner/offline/`) + TanStack Query persist (tour-planner keys only) |
-| PDF | Day sheet, show settlement, merch settlement — `src/lib/tour-planner/pdf.ts` (jsPDF) |
+| PDF | Day sheet, show settlement, merch settlement, **tour itinerary** — `src/lib/tour-planner/pdf.ts` (jsPDF) |
+| Guided | Mode chooser + `TourProductionWizard` (basics → import concerts → defaults → readiness → share/export). Readiness: `tourReadiness.ts`. |
+| Tour mode | Show-day fullscreen UI (`TourModeView`, `?mode=tour`) — next stop, schedule, maps, day sheet, checks; offline via cached queries. No push. |
+| Public share | `tour_share_links` + `/tour/share/[token]` — logistics + deal framework only (`publicTourShare.ts`) |
 | Admin | Read-only `/admin/tour-planner` — `AdminTourPlannerView`, RLS `"*: admin all"` |
 
 **Concert bridge:** import event → stop (`stops/import-concert`); publish stop → concert (`publishConcert`); sync linked concert (`syncConcert` when `concertId` set). Logic in `tourConcertBridge.ts`.
