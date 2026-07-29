@@ -39,6 +39,9 @@ function makeThenableBuilder(data: unknown, error: unknown = null) {
     order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     gte: vi.fn().mockReturnThis(),
+    // Credential lookup chains: .select().eq().eq().maybeSingle()
+    maybeSingle: vi.fn().mockResolvedValue(result),
+    single: vi.fn().mockResolvedValue(result),
     then: p.then.bind(p),
     catch: p.catch.bind(p),
     finally: p.finally.bind(p),
