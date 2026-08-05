@@ -27,7 +27,7 @@ Roster cards, tiles, and list items **must** link to `/artists/[slug]` via Next.
 
 ## Web workers
 
-CPU-intensive image ops use `src/workers/imageProcessor.worker.ts` via `createImageProcessorWorker()`. Terminate workers in effect cleanup; transfer `ImageBitmap` via Transferable API.
+SOS CSV processing uses `src/workers/sos-csv-processor.worker.ts` (spawned from `useSosCSVProcessor`). Instantiate with `new Worker(new URL(…, import.meta.url))`, terminate on unmount.
 
 ## Error handling
 

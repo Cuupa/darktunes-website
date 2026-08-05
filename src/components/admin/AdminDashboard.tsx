@@ -127,8 +127,7 @@ interface AdminDashboardProps {
   contentOnly?: boolean
   /**
    * When true (default) the component renders its own full-page wrapper,
-   * sticky header, and sign-out button — used on the /editor standalone page
-   * and via AdminApp.
+   * sticky header, and sign-out button — used on the /editor standalone page.
    * When false the component renders only the tabs section, relying on the
    * surrounding AdminClientLayout to supply the page shell (sidebar, header).
    */
