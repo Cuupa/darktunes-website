@@ -73,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Refactored
 - Centralized `createPublicSupabaseClient` (removed page-local duplicates).
 - Press detail routes: `React.cache()` for shared slug fetches across metadata + page.
+- **Dead code cleanup:** removed unused legacy UI (AdminApp/login wrappers, SpotifyPlayer, Tactical*, MessagesInbox, ListenersChart, PromoLogAdmin, fixtures), unused image-processor worker, unused server actions, and orphaned `publicContentMaintenance` chain (maintenance remains on Supabase Cron path per `publicQueries` comment).
 
 ## [1.1.0] — 2026-06-06
 

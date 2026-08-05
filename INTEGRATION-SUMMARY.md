@@ -81,53 +81,11 @@ Living product-status snapshot. Architecture and agent rules: `AGENTS.md` + `doc
 | `src/types/database.ts` | TypeScript DB types (sync with reset.sql) |
 | `.env.example` | Env var template |
 
-## Dead code candidates (audit 2026-08-05)
+## Dead code cleanup
 
-Verified with knip + manual import search. **Do not delete without a second pass** (dynamic import, Serwist, Supabase Edge Functions, CLI scripts, and shadcn primitives are often false positives).
+**2026-08-05:** High-confidence orphans removed in `chore/dead-code-cleanup` (legacy login shells, unused mailbox/charts, fixtures, unused image worker, orphaned `publicContentMaintenance` chain — scheduled news/hero/emoji maintenance is documented as Supabase Cron / Edge, not the Next read path).
 
-### High confidence — no runtime importers found
-
-| Path | Why likely dead | Risk if deleted |
-|------|-----------------|-----------------|
-| `src/components/SpotifyPlayer.tsx` | Home uses `SpotifyMultiPlayer` | Low |
-| `src/components/TacticalModal.tsx` | No imports | Low |
-| `src/components/ReleasePreviewModal.tsx` | No imports | Low |
-| `src/components/LoadingSpinner.tsx` | No imports (skeletons used instead) | Low |
-| `src/components/Artists.tsx` | Roster uses page-level grid, not this component | Medium — confirm no dynamic import |
-| `src/components/admin/AdminApp.tsx` | Superseded by `app/admin` layout + routes | Medium — historical SPA shell |
-| `src/components/admin/LoginForm.tsx` | Only wired via unused wrappers; login is `/login` | Medium |
-| `app/admin/_components/LoginPageWrapper.tsx` | Not referenced by any page | Low |
-| `app/portal/_components/PortalLoginForm.tsx` | Superseded by central `/login` | Low |
-| `app/portal/messages/_components/MessagesInbox.tsx` | Replaced by `PortalMailbox` | Medium — check `_actions` together |
-| `app/portal/messages/_actions/*` | Knip unused; mailbox uses API routes | Medium |
-| `app/portal/analytics/_components/ListenersChart.tsx` (+ `ListenersChartInner`) | Analytics hub uses `SpotifyPresencePanel` | Medium — may be intentional spare |
-| `app/admin/promo-log/_components/PromoLogAdmin.tsx` | Page uses `PromoLogManager` instead | Low |
-| `app/admin/accounting/_actions/persistSosAnalytics.ts` | Thin re-export; callers import `@/lib/sos/persistSosAnalyticsAction` directly | Low |
-| `src/lib/mockData.ts`, `src/lib/artistsData.ts` | Static fixtures, no imports | Low |
-| `src/lib/supabase/performance.ts` + `lib/supabase/performance.ts` | Re-export loop; no consumers | Low |
-| `src/workers/imageProcessor.worker.ts` (+ `createImageProcessorWorker`) | Documented only; never imported in app | Low–medium |
-| `src/actions/admin/users.ts`, `src/actions/epkUpload.ts` | No callers found | Medium |
-| `src/lib/publicContentMaintenance.ts` | Never called — orphan maintenance entry | **High product risk** if intended to run on public reads |
-| `src/lib/emojiCleanup.ts`, `src/lib/heroFeaturedEnforcement.ts` | Only used by unused `publicContentMaintenance` | Same chain |
-| `src/config/effectDescriptors.ts` | No imports found | Low |
-| `src/lib/api/index.ts` barrel | Nothing imports `@/lib/api` root | Low (keep for DX if desired) |
-
-### False positives / keep
-
-| Path | Why keep |
-|------|----------|
-| `app/sw.ts` | Serwist service worker entry |
-| `scripts/*` | Manual / CI maintenance scripts |
-| `supabase/functions/*` | Deployed separately from Next imports |
-| Most `src/components/ui/*` unused exports | shadcn primitives for future composition |
-| `src/lib/supabase/replica.ts` | Optional env-gated reads |
-| Knip “unused exports” on DAL helpers | Used via named imports; knip under-detects |
-
-### Follow-up recommendation
-
-1. Decide whether `runPublicContentMaintenance` should be wired into public RSC paths (if yes → not dead).  
-2. Delete high-confidence UI leftovers in a dedicated cleanup PR after CI green.  
-3. Do **not** bulk-delete knip “unused files” without human review.
+Still keep without bulk-delete: `app/sw.ts`, `scripts/*`, `supabase/functions/*`, unused shadcn primitive exports, env-gated `replica.ts`.
 
 ## Quick start
 
