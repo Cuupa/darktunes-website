@@ -21,7 +21,7 @@ Review and update stale sections in:
 |------|-------|
 | Agent spec | `AGENTS.md`, `docs/agent/*.md` |
 | Onboarding | `README.md`, `DEPLOYMENT.md`, `.env.example`, `scripts/vercel-install.sh` |
-| Product state | `INTEGRATION-SUMMARY.md`, `ADMIN.md`, `SECURITY.md` |
+| Product state | `PRD.md`, `INTEGRATION-SUMMARY.md`, `ADMIN.md`, `SECURITY.md` |
 | Living docs | `CHANGELOG.md`, `LESSONS_LEARNED.md`, `QA_CHECKLIST.md` (see below) |
 
 Mandatory even when the task did not start as a docs task. New public APIs, components, or utilities → update the relevant `docs/agent/*.md` topic file (or JSDoc).
