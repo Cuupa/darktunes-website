@@ -108,11 +108,11 @@ export function HomePageContent({
         return (
           <motion.div
             key="releases"
-            id="releases"
             initial={prefersReducedMotion ? { opacity: 1 } : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
           >
+            {/* Anchor id is on Releases root <section id="releases"> */}
             <Releases
               releases={releases}
               heading={siteSettings.releasesSectionHeading}
@@ -147,7 +147,8 @@ export function HomePageContent({
         )
       case 'videos':
         return (
-          <div key="videos" id="videos">
+          <div key="videos">
+            {/* Anchor id lives on Videos root <section id="videos"> — avoid duplicate ids. */}
             <Videos
               videos={videos}
               placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
@@ -172,7 +173,8 @@ export function HomePageContent({
         )
       case 'news':
         return (
-          <div key="news" id="news">
+          <div key="news">
+            {/* Anchor id is on News root <section id="news"> */}
             <News
               news={news}
               heading={siteSettings.newsSectionHeading}
