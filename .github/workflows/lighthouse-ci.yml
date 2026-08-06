@@ -24,7 +24,6 @@ on:
       - 'lighthouserc.*'
       - '.github/workflows/lighthouse-ci.yml'
   workflow_dispatch:
-  workflow_dispatch:
 
 concurrency:
   group: lighthouse-${{ github.workflow }}-${{ github.ref }}
