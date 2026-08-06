@@ -2,6 +2,7 @@ name: Performance Budget
 
 on:
   pull_request:
+    branches: [main]
     paths:
       - 'src/**'
       - 'app/**'
