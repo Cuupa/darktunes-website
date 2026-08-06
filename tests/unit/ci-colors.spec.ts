@@ -6,6 +6,11 @@ import { globSync } from 'glob'
 // #1db954 is Spotify's official brand color — required for Spotify logo icons
 const ALLOWED_COLORS = new Set(['#493687', '#7e1e37', '#101010', '#292929', '#383838', '#ffffff', '#1db954'])
 
+/** National flag SVG fills — not product CI palette (see LocaleFlagIcon). */
+const EXCLUDED_FILES = new Set([
+  path.normalize('src/components/LocaleFlagIcon.tsx'),
+])
+
 type Violation = {
   file: string
   line: number
@@ -21,6 +26,9 @@ function findViolations(): Violation[] {
   const violations: Violation[] = []
 
   for (const filePath of files) {
+    const rel = path.relative(process.cwd(), filePath)
+    if (EXCLUDED_FILES.has(path.normalize(rel))) continue
+
     const content = readFileSync(filePath, 'utf8')
     const lines = content.split(/\r?\n/)
 
@@ -30,7 +38,7 @@ function findViolations(): Violation[] {
         const color = match[0].toLowerCase()
         if (!ALLOWED_COLORS.has(color)) {
           violations.push({
-            file: path.relative(process.cwd(), filePath),
+            file: rel,
             line: index + 1,
             color,
           })

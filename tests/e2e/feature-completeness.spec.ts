@@ -21,13 +21,13 @@ const ADMIN_DASHBOARD_TABS = [
   'Maintenance',
 ]
 
-/** Sidebar-only routes (AdminSidebarNav) — not dashboard tabs. */
+/** Sidebar-only routes (AdminSidebarNav) — not dashboard tabs. Labels = admin.nav (en). */
 const ADMIN_SIDEBAR_LINKS = [
   'Dashboard',
   'Submission Form',
-  'Tour Planner',
+  'Tour Production',
   'Accounting',
-  'Label Intelligence',
+  'Analytics',
   'Messages',
   'Users',
   'Feature Flags',
@@ -90,6 +90,12 @@ test.describe('Feature completeness', () => {
     }
 
     await loginAsAdmin(page)
+    // Force English so assertions match admin.nav en strings (default locale is de).
+    const origin = new URL(page.url()).origin
+    await page.context().addCookies([
+      { name: 'NEXT_LOCALE', value: 'en', url: origin },
+    ])
+    await page.reload({ waitUntil: 'domcontentloaded' })
 
     const nav = page.getByRole('navigation', { name: 'Admin sections' })
     for (const linkLabel of ADMIN_SIDEBAR_LINKS) {

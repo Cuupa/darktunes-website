@@ -42,7 +42,12 @@ export function AdminClientLayout({ children }: AdminClientLayoutProps) {
           AdminSidebarNav handles both breakpoints internally. */}
       <ScrollableAppShell
         lockScroll={lockScroll}
-        sidebar={<AdminSidebarNav />}
+        sidebar={
+          // useSearchParams in AdminSidebarNav requires a Suspense boundary
+          <Suspense fallback={<div className="hidden h-full w-56 shrink-0 border-r border-border bg-card md:block" aria-hidden="true" />}>
+            <AdminSidebarNav />
+          </Suspense>
+        }
         footer={(
           <div className="py-4 text-center">
             <p className="text-xs text-muted-foreground/30 select-none">

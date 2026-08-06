@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dependabot batch (#518–#522):** `@radix-ui/react-avatar` 1.2.6, `@radix-ui/react-context-menu` 2.3.7, `@hookform/resolvers` 5.5.7, `typescript-eslint` 8.65.0, `@vitejs/plugin-react` 6.0.4.
 
 ### Fixed
+- **Admin/editor chrome language:** Sidebar + editor dashboard tab labels, Sign Out, roles, and switcher aria-labels resolve via `admin.nav` / `pwa` (en/de/fr). Locale switch updates the menu; editor standalone header gets a flag switcher; active nav uses exact path/tab matching (no false “Releases” highlight on release-submissions; editor tabs highlight correctly).
 - **A11y (public):** 44px touch targets on Consent/PWA dismiss/Videos pagination/Contact submit; contact form `aria-invalid`/`aria-describedby`; header menu icons `aria-hidden`; Related Artists meta contrast.
 - **Scroll:** Notification preferences table uses horizontal scroll contract + `data-lenis-prevent`.
 - **Locale switcher UX:** SVG flags (no emoji letter fallbacks on Windows); single switcher in portal/admin chrome (not footer duplicate); hard navigation for reliable language change; portal sidebar PWA install entry restored.

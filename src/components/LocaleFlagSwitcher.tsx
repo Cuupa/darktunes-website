@@ -9,7 +9,7 @@
  * cookie (router.refresh() is slow/unreliable on force-dynamic dashboards).
  */
 
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { Check } from '@phosphor-icons/react'
 import {
   DropdownMenu,
@@ -53,6 +53,7 @@ export function LocaleFlagSwitcher({
   align = 'end',
 }: LocaleFlagSwitcherProps) {
   const locale = useLocale() as Locale
+  const tPwa = useTranslations('pwa')
   const currentCode = ((LOCALES as readonly string[]).includes(locale)
     ? locale
     : 'de') as AppLocale
@@ -76,7 +77,7 @@ export function LocaleFlagSwitcher({
             size === 'md' && 'px-2.5',
             className,
           )}
-          aria-label={`Language: ${currentMeta.label}. Open language menu`}
+          aria-label={tPwa('language_switcher_aria', { label: currentMeta.label })}
         >
           <LocaleFlagIcon locale={currentCode} className="h-4 w-6" />
           <span className="sr-only">{currentMeta.label}</span>

@@ -6,5 +6,6 @@
   "install_ios_hint_prefix": "Tap",
   "install_ios_hint_suffix": "and then \"Add to Home Screen\".",
   "install_manual_fallback": "Open your browser menu and choose “Install app” or “Add to Home Screen”.",
-  "dismiss_aria_label": "Close install banner"
+  "dismiss_aria_label": "Close install banner",
+  "language_switcher_aria": "Language: {label}. Open language menu"
 }

@@ -62,6 +62,8 @@ Public images via `getOptimizedImageUrl` / `getSquareThumbnail` (`imageUtils.ts`
 
 **Locale UI:** `LocaleFlagSwitcher` — SVG flags (not emoji; Windows otherwise shows DE/GB/FR letters) + DE/EN/FR menu; sets `NEXT_LOCALE` and **reloads** (not `router.refresh()` — unreliable/slow on force-dynamic admin/portal). Locales: `en` | `de` | `fr` (`src/i18n/locales.ts`). One switcher per shell chrome (header), not also in sidebar footers. Date formatting: `toBcp47(locale)`. Legal CMS fields are DE/EN only — FR falls back to English body text; Impressum labels use `next-intl`.
 
+**Admin/editor chrome:** Every label in `AdminSidebarNav` and `AdminDashboard` tab strip must go through `admin.nav` keys (`labelKey`). Hardcoded English makes language switches look broken even when the cookie + reload work. Active state: `isAdminNavActive` (`adminNavActive.ts`) — exact path or `path/` prefix, editor tabs via `?tab=`. Wrap `AdminSidebarNav` in `<Suspense>` (uses `useSearchParams`).
+
 **Enterprise contract (mandatory):** `npm run check:i18n` — en/de parity, static key existence, zero hardcoded `toast.*`/`confirm` in portal/admin, admin/editor must load `portal` bundle, residual UI hardcodes only via shrinkable baseline (`scripts/i18n-hardcode-baseline.json`). See [i18n-audit-notes.md](./i18n-audit-notes.md).
 
 ## Responsive layout

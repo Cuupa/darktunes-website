@@ -157,6 +157,8 @@
 ## Internationalisation (i18n)
 - [ ] Flag language switcher in public header shows current language; choosing DE/EN/FR persists via NEXT_LOCALE cookie
 - [ ] Same flag switcher works in admin sidebar, portal sidebar, and press dashboard
+- [ ] **Admin sidebar labels update on language switch:** e.g. EN “Artists” / “Sign Out” → DE “Künstler” / “Abmelden” → FR “Artistes” / “Déconnexion” after reload (no leftover English menu)
+- [ ] **Editor `/editor` chrome:** flag switcher present; tab labels + Sign Out follow locale after switch
 - [ ] French UI: public shell + portal/admin strings load from `messages/fr`
 - [ ] All UI strings use dictionary keys (no hard-coded EN strings visible in DE/FR mode)
 - [ ] Locale-specific legal pages (/impressum, /datenschutz, /agb) reflect correct language (Impressum labels DE/EN/FR; CMS body DE/EN with FR→EN fallback)

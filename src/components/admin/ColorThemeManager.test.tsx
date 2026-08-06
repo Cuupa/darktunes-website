@@ -193,7 +193,7 @@ describe('ColorThemeManager', () => {
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: /save theme/i }))
-    await waitFor(() => expect(mockToastSuccess).toHaveBeenCalledWith('color_theme_saved'))
+    await waitFor(() => expect(mockToastSuccess).toHaveBeenCalledWith('Color theme saved'))
   })
 
   it('shows toast error when save fails', async () => {
@@ -205,7 +205,7 @@ describe('ColorThemeManager', () => {
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: /save theme/i }))
-    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('failed_save_color_theme'))
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('Failed to save color theme'))
   })
 
   it('reset button clears a single field back to empty string', async () => {
@@ -270,7 +270,7 @@ describe('ColorThemeManager', () => {
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: /save theme/i }))
-    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('failed_save_color_theme'))
+    await waitFor(() => expect(mockToastError).toHaveBeenCalledWith('Failed to save color theme'))
   })
 
   it('renders preset buttons', () => {
