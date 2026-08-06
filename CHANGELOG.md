@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Health “Never” / buried last-runs:** Full health snapshot loads latest `sync_logs` per API (`limit(1)` per source) instead of a global recent-N window, so a chatty source no longer hides other APIs.
+- **Cron heartbeats reliability:** `sync_execute` awaits heartbeats (incl. mid-drain + finally); YouTube path records `sync_youtube` at start; concurrent heartbeat upserts retry once.
+- **YouTube sync ops:** Cap 500 newest videos/run, structured `sync_logs` on success/error/empty, shared artist attribution + `is_short`, preserve admin-hidden `is_visible` on upsert via `sync-api`.
+- **Hero promo vs site description:** Featured release/news promo/excerpt always wins (teaser + ellipsis); global `heroDescription` only when the item has no own text.
+
 ### Added
 
 #### Product & compliance
