@@ -185,8 +185,8 @@ export function SettingsPanel({ email, displayName: initialDisplayName }: Settin
             {isInstalled ? t('settings_pwa_installed') : t('settings_pwa_hint')}
           </p>
         </CardHeader>
-        <CardContent>
-          {!isInstalled && (
+        {!isInstalled ? (
+          <CardContent>
             <Button
               type="button"
               variant="outline"
@@ -197,8 +197,8 @@ export function SettingsPanel({ email, displayName: initialDisplayName }: Settin
             >
               {t('settings_pwa_show')}
             </Button>
-          )}
-        </CardContent>
+          </CardContent>
+        ) : null}
       </Card>
     </div>
   )

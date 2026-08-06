@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -29,6 +29,7 @@ import {
 } from '@phosphor-icons/react'
 import { useBrand } from '@/components/brand/BrandProvider'
 import { LocaleFlagSwitcher } from '@/components/LocaleFlagSwitcher'
+import { isStandaloneDisplayMode, requestPwaInstallPrompt } from '@/lib/pwa/installPrompt'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -149,8 +150,13 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [pwaInstalled, setPwaInstalled] = useState(false)
   const { badges } = useUnreadMessages()
   const { offline, canNavigateTo } = usePortalOffline()
+
+  useEffect(() => {
+    setPwaInstalled(isStandaloneDisplayMode())
+  }, [])
 
   // Derive active artist directly from URL — no stale local state
   const activeArtistId = searchParams.get('artistId')
@@ -301,11 +307,17 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
       {artistBlock}
       {renderNav(onNavigate)}
       <Separator className="bg-border" />
-      <div className="p-4 space-y-2">
-        <div className="flex items-center justify-between gap-2 px-1">
-          <span className="text-xs text-muted-foreground">{t('settings_language')}</span>
-          <LocaleFlagSwitcher align="end" />
-        </div>
+      <div className="p-4 space-y-1">
+        {/* Language switcher lives only in the portal header — avoid duplicates. */}
+        {!pwaInstalled ? (
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+            onClick={() => requestPwaInstallPrompt()}
+          >
+            {t('settings_pwa_show')}
+          </Button>
+        ) : null}
         <Button
           variant="ghost"
           className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
