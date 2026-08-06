@@ -49,6 +49,8 @@ test.describe('Route completeness', () => {
   })
 
   test('crawler visits internal links and verifies HTTP 200 responses', async ({ page, baseURL }) => {
+    // Cold SSR + many public links can exceed Playwright's default 30s in CI.
+    test.setTimeout(180_000)
     const appBaseURL = baseURL ?? 'http://localhost:3000'
     const queue = ['/']
     const visited = new Set<string>()

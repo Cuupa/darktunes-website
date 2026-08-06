@@ -20,6 +20,7 @@ on:
       - 'CHANGELOG.md'
       - 'LESSONS_LEARNED.md'
       - 'QA_CHECKLIST.md'
+  workflow_dispatch:
 
 concurrency:
   group: qa-${{ github.workflow }}-${{ github.ref }}
@@ -78,10 +79,11 @@ jobs:
 
       - name: Install Playwright browsers
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            npx playwright install --with-deps chromium
-          else
+          # PR + manual branch runs: Chromium only. Full matrix on main pushes only.
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
             npx playwright install --with-deps
+          else
+            npx playwright install --with-deps chromium
           fi
 
       - name: Build
@@ -89,13 +91,13 @@ jobs:
 
       - name: Run E2E
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            SKIP_BUILD=1 npx playwright test --project="Desktop Chrome"
-          else
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
             SKIP_BUILD=1 npx playwright test \
               --project="Desktop Chrome" \
               --project="Mobile Safari" \
               --project="Mobile Chrome"
+          else
+            SKIP_BUILD=1 npx playwright test --project="Desktop Chrome"
           fi
 
       - name: Upload Playwright report

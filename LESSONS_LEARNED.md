@@ -32,6 +32,7 @@ Distilled anti-patterns from project history. **Append session findings before o
 | `router.refresh()` for locale cookie change | Force-dynamic portal/admin often lag or ignore; use cookie + full navigation |
 | Locale switcher in header *and* sidebar footer | One chrome control per surface; dedicated Settings card may still host one |
 | SW NetworkFirst cache for dashboard HTML | Locale/cookie-dependent shells (`/admin`, `/portal`, …) must be NetworkOnly or language switches serve stale HTML |
+| Locale switch works but admin menu stays English | Hard reload only helps if labels use `useTranslations` — never hardcode sidebar strings; full `admin.nav` tree in en/de/fr |
 
 ## CI & TypeScript
 

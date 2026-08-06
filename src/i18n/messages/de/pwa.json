@@ -6,5 +6,6 @@
   "install_ios_hint_prefix": "Tippe auf",
   "install_ios_hint_suffix": "und dann „Zum Home-Bildschirm“.",
   "install_manual_fallback": "Öffne das Browser-Menü und wähle „App installieren“ oder „Zum Home-Bildschirm“.",
-  "dismiss_aria_label": "Install-Banner schließen"
+  "dismiss_aria_label": "Install-Banner schließen",
+  "language_switcher_aria": "Sprache: {label}. Sprachmenü öffnen"
 }
