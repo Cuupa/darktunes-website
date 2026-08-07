@@ -48,6 +48,15 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
       }
 
       if (folder === 'inbox') {
+        // Include sent so client can build full conversations (Re: threads)
+        // without listing every reply as its own inbox row.
+        const sent = await getSentMessages(db, artistId)
+        const byId = new Map(messages.map((m) => [m.id, m]))
+        for (const m of sent) byId.set(m.id, m)
+        messages = Array.from(byId.values()).sort(
+          (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime(),
+        )
+
         const labelMessages = await getLabelMessages(db, artistId)
         const repliesEntries = await Promise.allSettled(
           labelMessages.map(

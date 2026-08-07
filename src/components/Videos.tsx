@@ -190,15 +190,15 @@ export function Videos({ videos, placeholderUrl, heading, subheading, videosPerP
             </p>
           )}
 
-          {/* data-lenis-prevent is required on mobile where this is overflow-x-auto snap-x.
-              On md+ it becomes a grid (overflow-x-visible) — the attribute is a no-op there. */}
+          {/* Mobile: max-md:overflow-x-auto snap strip. Desktop: grid with no overflow-x.
+              Lenis prevent uses real scroll metrics (not class substrings) so the grid
+              does not create a vertical dead-zone on md+. */}
           {/* key={currentPage} forces remount on page change so the whileInView
               IntersectionObserver fires fresh and new items animate in properly. */}
           <motion.ul
             key={currentPage}
             ref={listRef}
-            data-lenis-prevent
-            className="list-none flex overflow-x-auto snap-x snap-mandatory scrollbar-hide gap-4 pb-4 md:grid md:grid-cols-2 md:items-stretch md:overflow-x-visible md:gap-8 md:pb-0 lg:grid-cols-3"
+            className="list-none flex max-md:overflow-x-auto max-md:snap-x max-md:snap-mandatory scrollbar-hide gap-4 pb-4 md:grid md:grid-cols-2 md:items-stretch md:gap-8 md:pb-0 lg:grid-cols-3"
             variants={prefersReducedMotion ? undefined : listVariants}
             initial={prefersReducedMotion ? { opacity: 1 } : 'hidden'}
             animate={prefersReducedMotion ? { opacity: 1 } : isListInView ? 'visible' : 'hidden'}

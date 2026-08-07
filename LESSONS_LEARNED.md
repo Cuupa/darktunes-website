@@ -15,6 +15,21 @@ Distilled anti-patterns from project history. **Append session findings before o
 | `has_permission(auth.uid(), …)` | ✅ `has_permission('can_manage_releases')` — one arg only |
 | `CREATE TYPE IF NOT EXISTS` in Supabase SQL Editor | Use `DO $$ … IF NOT EXISTS (pg_type) …` blocks |
 
+## UI stacking & overlays
+
+| Anti-pattern | Rule |
+|--------------|------|
+| Dialog at `z-[9999]` but Popover/Dropdown at default `z-50` | Portaled pickers/menus must use `z-[10000]` (same as Select) or calendars/menus open *behind* the modal and look dead |
+| Raising only Select after a modal z-index bump | Audit **all** portaled overlays (Popover, DropdownMenu, HoverCard, …) in the same change |
+| Replacing `type="date"` with Popover DateField without checking modal hosts | Forms in Dialog (Releases, Videos, Expenses, …) depend on Popover stacking |
+
+## Lenis / public scroll
+
+| Anti-pattern | Rule |
+|--------------|------|
+| Permanent `data-lenis-prevent` on a desktop grid that is only a mobile horizontal strip | Prevent only real nested scrollports; desktop page scroll must keep Lenis |
+| Matching `[class*="overflow-x-auto"]` for Lenis prevent | Tailwind keeps the token in the class string under responsive overrides — check **computed overflow + scroll metrics** |
+
 ## Next.js & RSC
 
 | Anti-pattern | Rule |
@@ -221,6 +236,14 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 **Item promo must not mix with site hero copy:** Release `promoText` / news `excerpt` always wins for the homepage hero teaser; global `heroDescription` is fallback only when the featured item has no body text.
 
+### 2026-08-07 — Modal pickers, Lenis dead zones, mailbox threads
+
+**Raising Dialog z-index without portaled menus:** After Dialog/Sheet moved to `z-[9999]`, Select was patched to `z-[10000]` but Popover stayed at `z-50` → DateField calendars “do nothing” inside modals. Any portaled overlay that must work in dialogs belongs on the same stack as Select.
+
+**Lenis prevent via class substring:** `[class*="overflow-x-auto"]` matches Tailwind tokens even when `md:overflow-x-visible` wins in CSS. Homepage Videos put permanent `data-lenis-prevent` + `overflow-x-auto` on a desktop grid → vertical scroll dead zone. Prefer real scroll metrics or mobile-only overflow classes; never treat a non-overflowing grid as a nested scrollport.
+
+**Mailbox replies without thread_id:** Sending `Re: subject` as a new row floods the inbox. Group client-side by normalized subject + participants (`src/lib/messaging/threads.ts`); load sent+received for the open conversation so the chat is complete. Thread-level star/delete/move/DnD must touch every message id in the group, not only the root.
+
 ---
 
-*Last updated: 2026-08-04*
+*Last updated: 2026-08-07*

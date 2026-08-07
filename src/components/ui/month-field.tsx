@@ -72,6 +72,7 @@ export function MonthField({
   max,
   placeholder = 'Select month…',
 }: MonthFieldProps) {
+  const [open, setOpen] = useState(false)
   const parsed = parseYm(value)
   const viewYear = parsed?.year ?? new Date().getFullYear()
 
@@ -81,7 +82,7 @@ export function MonthField({
         {label}
         {required ? <span className="text-destructive"> *</span> : null}
       </Label>
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             id={id}
@@ -108,7 +109,10 @@ export function MonthField({
             selected={parsed}
             min={min}
             max={max}
-            onSelect={(year, month) => onChange(formatYearMonth(year, month))}
+            onSelect={(year, month) => {
+              onChange(formatYearMonth(year, month))
+              setOpen(false)
+            }}
           />
         </PopoverContent>
       </Popover>

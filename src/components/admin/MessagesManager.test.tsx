@@ -68,6 +68,11 @@ vi.mock('@phosphor-icons/react', () => ({
   FileDoc: () => null,
   FileArrowDown: () => null,
   File: () => null,
+  SpeakerHigh: () => null,
+  SpeakerSlash: () => null,
+  ChatsCircle: () => null,
+  CaretDown: () => null,
+  CaretUp: () => null,
 }))
 
 vi.mock('sonner', () => ({

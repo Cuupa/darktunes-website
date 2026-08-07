@@ -43,7 +43,7 @@ WHERE slug = 'artist-slug';
 - **Releases Management**: Manage music releases with iTunes API integration, Odesli smart-link resolution, and promo-flag control.
 - **News Management**: Create and publish news posts and announcements. Optionally associate a news post with a specific artist (`news_posts.artist_id`). Toggle **Press-only** visibility (`is_press_only`).
 - **Feature Flags** *(admin-only)*: Toggle Artist + Journalist dashboard modules (`portal_feature_flags` table, API: `PATCH /api/admin/feature-flags/[id]`). Also toggle global `site_settings` feature flags via **FeatureTogglesManager**.
-- **Messages** *(admin-only)*: Rich-text label inbox (`label_messages`) at `/admin/messages`; supports templates, search, per-artist thread view, starring, realtime updates, multi-select, and soft-delete bulk actions.
+- **Messages** *(admin-only)*: Rich-text label inbox (`label_messages`) at `/admin/messages`. Conversations group `Re:`/`Aw:` rows into one list entry (chat detail, sort, drag-to-folder, optional arrival sound). Also: templates, search, starring, realtime, soft-delete.
 - **Promo Log**: `/admin/promo-log` — admins and editors create, review, and delete artist-specific marketing activity entries. Artists see these read-only in `/portal/marketing`.
 - **Accreditations** *(admin-only)*: `/admin/accreditations` — review and approve/reject journalist accreditation requests (`accreditation_requests`).
 - **Release Submissions**: `/admin/release-submissions` — review/approve/reject submissions; **Create draft release** builds a hidden catalog entry from submission data (optional, not automatic on accept).
