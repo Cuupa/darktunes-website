@@ -225,13 +225,15 @@ Route handlers must import size limits from `portalUploadLimits` — no local `M
 
 ## API contract CI (SOTA foundation)
 
-Wired into `npm run ci`:
+Wired into `npm run ci` → phase `ci:contracts`:
 
 | Script | Purpose |
 |--------|---------|
 | `verify:portal-rls` | Expected portal RLS policy names ⊆ `reset.sql` |
-| `verify:schema-columns` | Critical tables: CREATE columns have matching `ADD COLUMN IF NOT EXISTS` (prevents hometown-class drift) |
+| `verify:schema-columns` | No `supabase/migrations/*.sql`; critical tables: CREATE columns have matching `ADD COLUMN IF NOT EXISTS` (prevents hometown-class drift) |
 | `verify:api-contracts` | Every route uses `withErrorHandler`; portal mutations / admin routes have recognized auth helpers |
+
+Local phases: `ci:contracts` → `ci:typecheck` → `ci:tests` (see [workflow.md](./workflow.md)).
 
 Inventory dump: `npm run api:inventory` (`scripts/extract-api-routes.mjs`).
 

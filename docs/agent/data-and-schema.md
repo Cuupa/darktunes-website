@@ -60,6 +60,8 @@ Bronze limits: SSOT `src/lib/sos/bronzeUploadLimits.ts` only.
 
 ⛔ **No** `supabase/migrations/`. Only `supabase/reset.sql` + `src/types/database.ts`.
 
+CI: `npm run verify:schema-columns` (part of `ci:contracts` / `npm run ci`) **fails** if any `supabase/migrations/*.sql` file exists. Empty dir / README-only is fine. Fold all schema into idempotent `reset.sql` + update `src/types/database.ts`.
+
 Schema change checklist:
 
 1. `supabase/reset.sql` — CREATE + idempotent `ADD COLUMN IF NOT EXISTS`

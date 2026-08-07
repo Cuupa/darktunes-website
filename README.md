@@ -67,7 +67,10 @@ npm run dev
 | `npm run build` | Production build (`next build`) |
 | `npm run preview` | Preview the production build locally (`next start`) |
 | `npm run lint` | Run ESLint |
-| `npm run ci` | Full CI check: lint → tsc → test → build |
+| `npm run ci` | Full CI: `ci:contracts` → `ci:typecheck` → `ci:tests` |
+| `npm run ci:contracts` | Lint + scroll/overlay/brand/i18n + portal-rls + schema-columns + api-contracts |
+| `npm run ci:typecheck` | `tsc --noEmit` |
+| `npm run ci:tests` | Unit tests + production build |
 | `npm test` | Run unit tests (Vitest) |
 | `npm run test:watch` | Run tests in watch mode |
 | `npm run test:e2e` | Run Playwright E2E & visual regression tests |
@@ -97,14 +100,15 @@ npm run dev
 ### Local QA commands
 
 ```bash
-npm run ci          # full atomic check: lint → tsc → test → build
-npm run lint
-npx tsc --noEmit
-npm run test
+npm run ci              # contracts → typecheck → tests+build
+npm run ci:contracts    # lint + structural contracts only
+npm run ci:typecheck
+npm run ci:tests
 npm run test:e2e
 npm run perf:test
-npm run test -- tests/unit/ci-colors.spec.ts
 ```
+
+PRs use `.github/pull_request_template.md` (docs checklist is conditional — see `docs/agent/workflow.md`).
 
 ### QA CI pipeline
 
