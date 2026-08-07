@@ -16,7 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Dependabot batch (#518–#522):** `@radix-ui/react-avatar` 1.2.6, `@radix-ui/react-context-menu` 2.3.7, `@hookform/resolvers` 5.5.7, `typescript-eslint` 8.65.0, `@vitejs/plugin-react` 6.0.4.
 
+### Added
+- **Mailbox as conversations:** Portal + admin inbox groups `Re:`/`Aw:`/`Fwd:` correspondence into one thread (no duplicate list rows). Detail is a chat timeline (`MessageChatThread`). Sort (newest/oldest/unread/subject/most replies). Drag threads onto folders or Trash. Optional live chime (`MessageSoundToggle`, `localStorage`). Thread actions (star/delete/move/restore) apply to the whole conversation.
+
 ### Fixed
+- **Homepage scroll over Videos:** Lenis no longer treats the video grid as a nested scrollport on desktop; `shouldPreventLenis` uses real overflow metrics (not class substrings / permanent `data-lenis-prevent` on grids).
+- **Date/month pickers in modals:** Popover + DropdownMenu `z-[10000]` so calendars open above Dialog/Sheet (`z-[9999]`). Fixes Admin → Releases → Release Date (and other DateField/MonthField-in-dialog cases).
 - **Admin/editor chrome language:** Sidebar + editor dashboard tab labels, Sign Out, roles, and switcher aria-labels resolve via `admin.nav` / `pwa` (en/de/fr). Locale switch updates the menu; editor standalone header gets a flag switcher; active nav uses exact path/tab matching (no false “Releases” highlight on release-submissions; editor tabs highlight correctly).
 - **Bundle budget:** Artist detail route-specific JS ceiling raised to 580 KB (was 530; ~570 KB after public-artist DTO/security work on main).
 - **Homepage anchors:** Remove duplicate `id="videos|releases|news"` wrappers (section components already own the anchors) so e2e/`#videos` is unique.

@@ -77,9 +77,31 @@ Mobile-first; fluid widths (`w-full`, `max-w-*`); no hardcoded structural pixels
 | Width | `max-w-[calc(100%-2rem)] sm:max-w-lg md:max-w-xl lg:max-w-2xl` |
 | Height | Body `overflow-y-auto max-h-[70vh]` (forms); `max-h-[92vh]` (media) |
 | Spacing | 8px grid: `p-2`–`p-12`; default body `p-6` |
-| z-index | Radix default `z-50`; never above `z-[9900]` (effects at 9996+) |
+| z-index | Stacking contract below (do not invent ad-hoc layers) |
 | Dismiss | Close button (44px), ESC, backdrop click via `onOpenChange` |
 | Motion | Spring `{ stiffness: 400, damping: 40 }`; duration 0 when reduced motion |
+
+### Overlay stacking contract
+
+Portaled pickers/menus must sit **above** Dialog/Sheet or they open “invisibly” behind the modal backdrop (user sees “click does nothing”).
+
+| Layer | z-index | Components |
+|-------|---------|------------|
+| Dialog/Sheet overlay | `z-[9998]` | `dialog.tsx`, `alert-dialog.tsx`, `sheet.tsx` |
+| Dialog/Sheet content | `z-[9999]` | same |
+| Portaled pickers & menus | `z-[10000]` | `select.tsx`, `popover.tsx` (DateField/MonthField), `dropdown-menu.tsx` |
+
+**Date pickers:** Always use `DateField` / `MonthField` — never raw `type="date"` for shared UX. They rely on Popover; the Popover z-index is what keeps calendars usable inside admin modals (e.g. New Release → Release Date).
+
+### Lenis `prevent` contract
+
+`shouldPreventLenis` (`src/lib/scroll/lenisPrevent.ts`):
+
+1. Explicit `data-lenis-prevent` / scroll-area viewport → yield to native.
+2. Else: ancestors that **actually** overflow (computed `overflow` + `scrollWidth/Height` vs client size).
+3. Never gate only on class substrings (`overflow-x-auto` in a Tailwind string) — homepage Videos used that pattern and dead-zoned vertical scroll on desktop.
+
+**Mailbox UX:** Thread detail uses `MessageChatThread` (chat bubbles). Live arrivals can play `playNewMessageSound()`; users toggle via `MessageSoundToggle` (`localStorage` key `dt-message-sound-enabled`).
 
 ## Visual effects
 

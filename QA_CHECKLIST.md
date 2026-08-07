@@ -7,6 +7,14 @@
 - [ ] Homepage hero: featured release with long `promoText` shows teaser + ellipsis (not site-wide hero description); full promo on release detail; empty promo uses site `heroDescription` only
 - [ ] Validate newsletter submission flow and confirmation message
 - [ ] Validate media and upload features from admin/portal areas
+- [ ] Admin → Releases → New Release: **Release Date** calendar opens above the modal, day selectable, form can save with today’s date
+- [ ] Spot-check other modal date/month fields: Videos publish date, Expense date, Settlement period MonthField
+- [ ] Homepage: wheel/trackpad scroll over **Videos** section continues page scroll (no dead zone on desktop)
+- [ ] Admin/Portal messages: open a label thread → original + replies show as chat bubbles (own on the right)
+- [ ] New message while mailbox open → toast + optional chime; toggle Sound off/on persists after reload
+- [ ] Inbox: multiple Re:/Aw: messages on same subject appear as **one** conversation (count badge); opening shows full chat
+- [ ] Inbox sort: Newest / Unread first / Subject A–Z change list order
+- [ ] Drag conversation onto a custom folder (or Trash) files/deletes the whole thread
 
 ## Security
 - [ ] Verify unauthenticated users are blocked or redirected from protected routes (`/admin/*`, `/portal/*`, `/press/dashboard/*`, `/promo-pool/*`)

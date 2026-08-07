@@ -5,10 +5,12 @@
  *
  * Left-panel folder tree for the email-client messaging UI.
  * Shows system folders (Inbox, Starred, Sent, Trash) plus
- * admin-created custom folders.
+ * admin-created custom folders. Custom folders (and Inbox) are
+ * drop targets when `enableDrop` is true (DnD from conversation list).
  */
 
 import { useCallback, useState } from 'react'
+import { useDroppable } from '@dnd-kit/core'
 import {
   Tray,
   Star,
@@ -37,6 +39,58 @@ interface FolderTreeProps {
   onCreateFolder: (name: string) => Promise<void>
   onDeleteFolder: (id: string) => Promise<void>
   onRenameFolder: (id: string, newName: string) => Promise<void>
+  /** Accept conversation drops onto Inbox + custom folders */
+  enableDrop?: boolean
+  /** Hide From Artists system folder (portal has no staff queue) */
+  hideFromArtists?: boolean
+}
+
+function DroppableFolderRow({
+  id,
+  active,
+  count,
+  label,
+  Icon,
+  enableDrop,
+  onSelect,
+}: {
+  id: string
+  active: boolean
+  count: number
+  label: string
+  Icon: React.ElementType
+  enableDrop: boolean
+  onSelect: () => void
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `folder-drop:${id}`,
+    disabled: !enableDrop,
+    data: { folderId: id === 'inbox' ? null : id },
+  })
+
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors text-left',
+        active
+          ? 'bg-primary/10 text-primary'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        isOver && enableDrop && 'ring-2 ring-primary bg-primary/15',
+      )}
+      aria-current={active ? 'page' : undefined}
+    >
+      <Icon size={16} weight={active ? 'fill' : 'regular'} aria-hidden="true" />
+      <span className="flex-1">{label}</span>
+      {count > 0 && (
+        <span className="rounded-full bg-primary/20 px-1.5 text-xs font-semibold text-primary">
+          {count}
+        </span>
+      )}
+    </button>
+  )
 }
 
 const SYSTEM_FOLDERS: Array<{ id: SystemFolder; label: string; Icon: React.ElementType }> = [
@@ -55,6 +109,8 @@ export function FolderTree({
   onCreateFolder,
   onDeleteFolder,
   onRenameFolder,
+  enableDrop = false,
+  hideFromArtists = false,
 }: FolderTreeProps) {
   const [creatingFolder, setCreatingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
@@ -74,12 +130,31 @@ export function FolderTree({
     setEditingId(null)
   }, [editName, onRenameFolder])
 
+  const systemFolders = hideFromArtists
+    ? SYSTEM_FOLDERS.filter((f) => f.id !== 'from-artists')
+    : SYSTEM_FOLDERS
+
   return (
     <div className="flex flex-col gap-0.5 py-2">
       {/* System folders */}
-      {SYSTEM_FOLDERS.map(({ id, label, Icon }) => {
+      {systemFolders.map(({ id, label, Icon }) => {
         const count = unreadCounts[id] ?? 0
         const active = selected === id
+        const droppable = enableDrop && (id === 'inbox' || id === 'trash')
+        if (droppable) {
+          return (
+            <DroppableFolderRow
+              key={id}
+              id={id}
+              active={active}
+              count={count}
+              label={label}
+              Icon={Icon}
+              enableDrop={enableDrop}
+              onSelect={() => onSelect(id)}
+            />
+          )
+        }
         return (
           <button
             key={id}
@@ -105,7 +180,7 @@ export function FolderTree({
       })}
 
       {/* Divider + Custom folders header */}
-      {customFolders.length > 0 && (
+      {(customFolders.length > 0 || enableDrop) && (
         <div className="mt-2 mb-1 px-3">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground/60">
             Folders
@@ -140,29 +215,17 @@ export function FolderTree({
         }
         return (
           <div key={folder.id} className="group flex items-center gap-0.5 pr-1">
-            <button
-              type="button"
-              onClick={() => onSelect(folder.id)}
-              className={cn(
-                'flex flex-1 items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors text-left min-w-0',
-                active
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-              )}
-            >
-              <Folder
-                size={16}
-                weight={active ? 'fill' : 'regular'}
-                aria-hidden="true"
-                style={folder.color ? { color: folder.color } : undefined}
+            <div className="flex-1 min-w-0">
+              <DroppableFolderRow
+                id={folder.id}
+                active={active}
+                count={unreadCounts[folder.id] ?? 0}
+                label={folder.name}
+                Icon={Folder}
+                enableDrop={enableDrop}
+                onSelect={() => onSelect(folder.id)}
               />
-              <span className="flex-1 truncate">{folder.name}</span>
-              {(unreadCounts[folder.id] ?? 0) > 0 && (
-                <span className="rounded-full bg-primary/20 px-1.5 text-xs font-semibold text-primary shrink-0">
-                  {unreadCounts[folder.id]}
-                </span>
-              )}
-            </button>
+            </div>
             {/* Edit / Delete controls */}
             <button
               type="button"
