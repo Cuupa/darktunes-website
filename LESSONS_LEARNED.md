@@ -53,10 +53,13 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 | Anti-pattern | Rule |
 |--------------|------|
-| PR without full check sequence | `lint` → `tsc` → `test` → `build` — all green in one run |
+| PR without full check sequence | `npm run ci` (or `ci:contracts` → `ci:typecheck` → `ci:tests`) — all green |
 | Lockfile not updated after dep change | Run `npm install`; commit `package-lock.json` |
 | `as any` / `@ts-ignore` / `eslint-disable` to silence CI | Fix root cause |
 | Code shipped without docs/markdown refresh | Agents **always** update docs at session end (`AGENTS.md` + `docs/agent/workflow.md`); stale README/agent/living docs = incomplete work |
+| Prose-only bans with no CI | Prefer contract scripts (`verify:*`, `check:*`) so agents cannot ignore rules |
+| Naive “any code change → any docs file” CI | Causes no-op doc edits; use PR template + `workflow.md` living-doc rules instead |
+| `supabase/migrations/*.sql` | Forbidden — `verify:schema-columns` fails CI |
 
 ## Lenis & scroll
 
@@ -138,6 +141,11 @@ Distilled anti-patterns from project history. **Append session findings before o
 | `authenticated read` on shared media tables | Staff permission or press-approved flags — not every logged-in user |
 
 ## Session additions
+
+### 2026-08-07 — Bad-practice “enforcement” drafts need reality checks
+
+- **Finding:** A full agent task dump (emoji START HERE, naive docs-freshness CI, CommonJS in ESM scripts, wholesale `package.json` rewrite, generators with wrong `SectionProps` / raw `fetch` tests) would fight progressive disclosure and existing `routeTestkit` / contract scripts.
+- **Rule:** Prefer structural gates that match the stack (`verify:*` ESM, `ci:*` phase aliases, PR template with *conditional* docs). Do not add “any code → any docs file” CI (no-op docs); do not teach generators that invent APIs (`SectionProps` is not `isLoading`/`onError`).
 
 ### 2026-08-07 — Sync executor hang / constant re-kick
 

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Agent / CI process (phase-1 bad-practice enforcement):** Session-start section in `AGENTS.md`; `npm run ci` split into `ci:contracts` → `ci:typecheck` → `ci:tests`; PR template (`.github/pull_request_template.md`) with conditional docs checklist; `verify:schema-columns` fails if `supabase/migrations/*.sql` appears. Docs enforcement stays PR/process-based (no naive “any code → any docs” CI gate).
+
 ### Fixed
 - **Admin messages chat:** Inline reply field under the conversation (like the artist portal), not only a link to Compose.
 - **Message reply notifications:** Label→artist sends emit `label_message` to artist members; artist replies to label messages emit staff `artist_portal_message` notifications (bell + history), not only realtime toasts when the mailbox is open.

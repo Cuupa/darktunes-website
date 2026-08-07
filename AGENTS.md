@@ -5,14 +5,28 @@ Stack: React 19, Supabase (PostgreSQL), Cloudflare R2, Vercel.
 
 **Package manager:** npm only (`npm ci` in CI).
 
+## Session start (read before coding)
+
+1. **This file** — critical rules, checks, and docs closeout.
+2. **Topic file** — open the matching `docs/agent/{topic}.md` from the table below for the area you touch.
+3. **PRD.md** — only when the task is product/feature-shaped (not pure refactors/CI).
+4. **End of session** — docs refresh is mandatory; follow [workflow.md](docs/agent/workflow.md).
+
+Skipping specs and fixing CI later costs more than reading first.
+
 ## Mandatory checks (every code change)
 
-Run in order until all pass:
+Prefer the full local pipeline (same gates as GitHub CI):
 
-1. `npm run lint`
-2. `npx tsc --noEmit`
-3. `npm test`
-4. `npm run build`
+```bash
+npm run ci
+```
+
+Or by phase when debugging a failure:
+
+1. `npm run ci:contracts` — lint + scroll/overlay/brand/i18n + portal-rls + schema-columns + api-contracts
+2. `npm run ci:typecheck` — `tsc --noEmit`
+3. `npm run ci:tests` — unit tests + production build
 
 No PR with failing checks. No `as any`, `@ts-ignore`, or `eslint-disable` to silence errors.
 

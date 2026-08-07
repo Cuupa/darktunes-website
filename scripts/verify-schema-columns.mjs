@@ -14,13 +14,57 @@
  * Exit 0 = ok; 1 = drift.
  */
 
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = join(__dirname, '..')
 const resetPath = join(root, 'supabase', 'reset.sql')
+const migrationsDir = join(root, 'supabase', 'migrations')
+
+/**
+ * This repo forbids supabase/migrations/*.sql — SSOT is reset.sql + database.ts.
+ * Fail CI early with an actionable message if migration SQL appears.
+ */
+function assertNoMigrationSqlFiles() {
+  if (!existsSync(migrationsDir)) {
+    console.log('[verify-schema-columns] OK — no supabase/migrations/ directory')
+    return
+  }
+
+  const sqlFiles = readdirSync(migrationsDir).filter(
+    (f) => !f.startsWith('.') && f !== 'README.md' && f.endsWith('.sql'),
+  )
+
+  if (sqlFiles.length === 0) {
+    console.log(
+      '[verify-schema-columns] OK — supabase/migrations/ has no .sql files',
+    )
+    return
+  }
+
+  console.error('')
+  console.error('[verify-schema-columns] FAIL — SCHEMA MIGRATIONS DETECTED')
+  console.error('')
+  console.error('This project uses ONLY supabase/reset.sql (idempotent).')
+  console.error('No supabase/migrations/*.sql files are allowed.')
+  console.error('')
+  console.error('Found files:')
+  for (const f of sqlFiles) {
+    console.error(`  - supabase/migrations/${f}`)
+  }
+  console.error('')
+  console.error('ACTION REQUIRED:')
+  console.error('  1. Delete these migration files')
+  console.error('  2. Fold schema changes into supabase/reset.sql')
+  console.error('  3. Use idempotent SQL: ADD COLUMN IF NOT EXISTS, etc.')
+  console.error('  4. Update src/types/database.ts to match')
+  console.error('')
+  console.error('Reference: docs/agent/data-and-schema.md')
+  console.error('')
+  process.exit(1)
+}
 
 /** Always skip — table identity / timestamps / generated vectors. */
 const STRUCTURAL_COLUMNS = new Set([
@@ -124,6 +168,8 @@ function structuralFor(table, cfg) {
 }
 
 function main() {
+  assertNoMigrationSqlFiles()
+
   if (!existsSync(resetPath)) {
     console.error('[verify-schema-columns] Missing supabase/reset.sql')
     process.exit(1)
