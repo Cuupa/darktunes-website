@@ -16,8 +16,8 @@ import {
   type ApifyDatasetItem,
   type ApifyPlayCountClient,
   createApifyPlayCountClient,
-  utcPeriodMonth,
 } from '@/lib/analytics/apifySpotifyPlayCountClient'
+import { utcPeriodMonth } from '@/lib/analytics/periodMonth'
 
 type ServiceClient = SupabaseClient<Database>
 

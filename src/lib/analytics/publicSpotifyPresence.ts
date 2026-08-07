@@ -11,7 +11,7 @@ import {
   GROWTH_SIGNIFICANT_PCT,
   TREND_MIN_PERIODS,
 } from '@/lib/analytics/constants'
-import { utcPeriodMonth } from '@/lib/analytics/apifySpotifyPlayCountClient'
+import { utcPeriodMonth } from '@/lib/analytics/periodMonth'
 
 /** Internal DB source for public Spotify scrape — map to UI as spotifyPublic only. */
 export const PUBLIC_SPOTIFY_SOURCE = 'apify' as const
