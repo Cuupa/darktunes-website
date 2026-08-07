@@ -40,11 +40,16 @@
 - [ ] Unauthenticated `POST /api/portal/feedback` rejected; non-member artistId → 403
 - [ ] Apply `portal_feedback` from `supabase/reset.sql` on live DB
 
+## Portal interviews
+- [ ] `/portal/interviews`: accept/reject + reply save works with `?artistId=`
+- [ ] Delete interview request → confirm → removed from list; badge/count drops when it was pending
+- [ ] Non-member / missing `artistId` cannot DELETE another artist's request
+
 ## Portal analytics split + Bandsintown
-- [ ] Sidebar Dashboard shows **Spotify Trends** and **SOS Analytics** (flag `artist.analytics`)
+- [ ] Sidebar Dashboard shows **Spotify Trends** and **Sales Analytics** (flag `artist.analytics`)
 - [ ] `/portal/spotify-trends` shows empty state when no presence data (not a wall of zeros)
 - [ ] `/portal/sos-analytics` shows empty state when no SOS statements; tabs exclude Spotify presence
-- [ ] `/portal/analytics` redirects to SOS Analytics; `?tab=listeners` → Spotify Trends
+- [ ] `/portal/analytics` redirects to Sales Analytics (`/portal/sos-analytics`); `?tab=listeners` → Spotify Trends
 - [ ] Profile → Integrations: save Bandsintown ID + API key; key masked after save (`hasApiKey`)
 - [ ] Sync concerts from Integrations updates tour list when credentials valid
 
@@ -76,6 +81,7 @@
 
 ## Portal / admin DAU assistants (1–5)
 - [ ] `/portal/billing` assistant: legal → tax (3 statuses) → optional IBAN → invoice-ready / SEPA status
+- [ ] `/portal/billing` with a **complete** profile opens the form directly (no mode chooser / setup guide); incomplete still starts assistant; `?mode=assistant` re-opens guide
 - [ ] Statement CTA opens `/portal/invoices?statement=` assistant; quick-send shows confirm dialog
 - [ ] Analytics + Statements invoice status parity (`label_approved` \| `artist_notified` \| `viewed`)
 - [ ] `/portal/epk-builder` mode chooser → template → PDF/share → advanced editor
@@ -203,6 +209,7 @@
 - [ ] `/portal/sos-analytics` tabs load (streaming, website, merch) when `artist.analytics` is enabled
 - [ ] Admin → API Keys can store Apify token; Accounting dry-run lists only **visible** artists/releases with Spotify links; live sync respects 1200 URL/month budget and shows clear errors if token missing/budget exhausted
 - [ ] Portal Listeners tab shows Spotify (public) series after Apify sync (disclaimer: not settlement data)
+- [ ] Spotify Trends: before this month’s public scrape, current calendar month is **not** shown as zeros (hint about pending refresh); after scrape, current month KPIs/trend include the new period
 - [ ] Overview intelligence panel shows insights with working deep links
 
 ## Messaging (chat + notifications)
@@ -216,7 +223,9 @@
 - [ ] Publish flow: draft → pending_review (or direct publish when `landing_publish_trusted` is set)
 - [ ] Public URL `/@{slug}` renders the page; returns 404 for unpublished pages
 - [ ] Admin review queue labels say Personal Artist Page Reviews
-- [ ] Admin → Assets storage bar shows catalog total (Σ `assets.size_bytes`); refreshes after upload/delete
+- [ ] Admin → Assets **Catalog storage** bar shows DB catalog total (Σ `assets.size_bytes`); refreshes after upload/delete
+- [ ] Storage bar still loads after access token expiry (cookie fallback / retry without Bearer)
+- [ ] If some assets have `size_bytes = 0`, bar shows “size unknown” warning (not silent undercount only)
 
 ## TRACK Tour Planner
 - [ ] `/portal/tour-planner` accessible when `artist.tour_planner` flag is enabled; shows disabled message otherwise

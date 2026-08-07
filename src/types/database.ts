@@ -5078,7 +5078,12 @@ export interface Database {
     Functions: {
       get_assets_storage_stats: {
         Args: Record<string, never>
-        Returns: { used_bytes: number; asset_count: number }[]
+        /** JSON object: used_bytes, asset_count, zero_size_count */
+        Returns: {
+          used_bytes: number
+          asset_count: number
+          zero_size_count: number
+        }
       }
     }
     Enums: {

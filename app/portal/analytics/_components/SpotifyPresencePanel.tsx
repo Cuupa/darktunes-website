@@ -123,6 +123,12 @@ export function SpotifyPresencePanel({
 
       <PublicMetricsDisclaimer />
 
+      {!model.currentPeriodHasPublicData && (
+        <p className="text-xs text-muted-foreground" role="status">
+          {t('analytics_presence_current_month_pending', { period: model.currentPeriod })}
+        </p>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <Card className="bg-card border-border min-w-0">
           <CardHeader className="pb-1 px-4 pt-4">

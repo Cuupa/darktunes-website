@@ -39,7 +39,9 @@ export default async function BillingPage({
       artistId={artist?.id ?? ''}
       billingProfile={billingProfile}
       isComplete={complete}
-      forceAssistant={mode === 'assistant' || focus === 'payout' || !complete}
+      // First-time setup: force assistant. Complete profiles open the form;
+      // re-open guide only via ?mode=assistant or ?focus=payout.
+      forceAssistant={!complete || mode === 'assistant' || focus === 'payout'}
     />
   )
 }

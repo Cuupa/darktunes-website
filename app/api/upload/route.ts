@@ -113,7 +113,8 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     filename,
     original_filename: file.name,
     mime_type: mimeType,
-    size_bytes: file.size,
+    // Prefer actual buffer length (matches R2 ContentLength); file.size can disagree for some browsers.
+    size_bytes: fileBuffer.length,
     r2_key: r2Key,
     public_url: publicUrl,
     uploaded_by: userId,
@@ -130,6 +131,6 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     r2Key,
     filename,
     mimeType,
-    sizeBytes: file.size,
+    sizeBytes: fileBuffer.length,
   })
 })

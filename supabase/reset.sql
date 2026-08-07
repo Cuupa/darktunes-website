@@ -1222,23 +1222,25 @@ CREATE INDEX IF NOT EXISTS idx_assets_folder_id   ON public.assets (folder_id);
 CREATE INDEX IF NOT EXISTS idx_assets_artist_id   ON public.assets (artist_id);
 CREATE INDEX IF NOT EXISTS idx_assets_sha256_hash ON public.assets (sha256_hash);
 
--- Aggregate catalog storage (avoids PostgREST row-limit undercount on SELECT size_bytes)
+-- Aggregate catalog storage (avoids PostgREST row-limit undercount on SELECT size_bytes).
+-- Returns JSON object so PostgREST/supabase-js always yields a single object (not empty set edge cases).
 CREATE OR REPLACE FUNCTION public.get_assets_storage_stats()
-RETURNS TABLE(used_bytes bigint, asset_count bigint)
+RETURNS json
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT
-    COALESCE(SUM(a.size_bytes), 0)::bigint AS used_bytes,
-    COUNT(*)::bigint AS asset_count
+  SELECT json_build_object(
+    'used_bytes', COALESCE(SUM(a.size_bytes), 0),
+    'asset_count', COUNT(*)::bigint,
+    'zero_size_count', COUNT(*) FILTER (WHERE a.size_bytes = 0)::bigint
+  )
   FROM public.assets a;
 $$;
 
--- Ensure live DBs pick up the function even when table already existed
 COMMENT ON FUNCTION public.get_assets_storage_stats() IS
-  'SUM(size_bytes)+COUNT(*) over public.assets for admin storage bar';
+  'JSON: used_bytes, asset_count, zero_size_count over public.assets for admin storage bar';
 
 REVOKE ALL ON FUNCTION public.get_assets_storage_stats() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_assets_storage_stats() TO service_role;
@@ -3807,6 +3809,7 @@ CREATE POLICY "notification_preferences: own all" ON public.notification_prefere
 DROP POLICY IF EXISTS "interview_requests: journalist manage own" ON public.interview_requests;
 DROP POLICY IF EXISTS "interview_requests: artist read own" ON public.interview_requests;
 DROP POLICY IF EXISTS "interview_requests: artist update own" ON public.interview_requests;
+DROP POLICY IF EXISTS "interview_requests: artist delete own" ON public.interview_requests;
 
 CREATE POLICY "interview_requests: journalist manage own" ON public.interview_requests
   FOR ALL USING (journalist_id = auth.uid())
@@ -3818,6 +3821,10 @@ CREATE POLICY "interview_requests: artist read own" ON public.interview_requests
 CREATE POLICY "interview_requests: artist update own" ON public.interview_requests
   FOR UPDATE USING (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()))
   WITH CHECK (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()));
+
+-- Portal artists may remove requests from their inbox (status reply remains optional).
+CREATE POLICY "interview_requests: artist delete own" ON public.interview_requests
+  FOR DELETE USING (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()));
 
 
 

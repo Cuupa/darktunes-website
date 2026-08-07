@@ -44,8 +44,10 @@ export function BillingProfileAssistant({
   forceAssistant = false,
 }: BillingProfileAssistantProps) {
   const t = useTranslations('portal')
+  // Incomplete (or ?mode=assistant / ?focus=payout) → guided assistant.
+  // Already complete → advanced form only (no mode chooser / guide again).
   const [mode, setMode] = useState<GuidedMode | null>(
-    forceAssistant || !initialComplete ? 'assistant' : null,
+    forceAssistant || !initialComplete ? 'assistant' : 'advanced',
   )
   const [stepId, setStepId] = useState('legal')
   const [maxReachable, setMaxReachable] = useState(0)

@@ -1,5 +1,5 @@
 /**
- * Legacy /portal/analytics → SOS analytics (bookmarks & old nav links).
+ * Legacy /portal/analytics → Sales Analytics (bookmarks & old nav links).
  * Spotify presence lives at /portal/spotify-trends.
  */
 

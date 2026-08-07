@@ -1,5 +1,5 @@
 /**
- * app/portal/sos-analytics/page.tsx — SOS / statement analytics (Server Component)
+ * app/portal/sos-analytics/page.tsx — Sales Analytics (statement streams; Server Component)
  *
  * Label royalty & business metrics (streams from statements, territories,
  * earnings, settlement). Public Spotify trends live under /portal/spotify-trends.

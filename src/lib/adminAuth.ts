@@ -160,6 +160,11 @@ export interface AdminRequestAuth {
 
 /**
  * Resolve the caller from Bearer JWT or cookie session, then enforce role.
+ *
+ * Important: a **stale/expired Bearer must not block cookie fallback**.
+ * Admin UI often sends an in-memory access token that expires while the
+ * refresh cookie session is still valid — storage-stats and other dual-auth
+ * routes were 401ing with a wrong/empty storage bar when only Bearer failed.
  */
 export async function verifyAdminRequest(
   req: NextRequest,
@@ -169,15 +174,20 @@ export async function verifyAdminRequest(
   const authHeader = req.headers.get('authorization')
 
   if (authHeader?.startsWith('Bearer ')) {
-    const token = extractBearerToken(authHeader)
-    const userId = adminOnly ? await verifyAdmin(token) : await verifyAdminOrEditor(token)
-    const client = createServiceRoleClient()
-    const role = await getUserRoleWithClient(client, userId)
-    if (!role) throw new ApiError(403, 'Forbidden')
-    return { userId, role }
+    try {
+      const token = extractBearerToken(authHeader)
+      const userId = adminOnly ? await verifyAdmin(token) : await verifyAdminOrEditor(token)
+      const client = createServiceRoleClient()
+      const role = await getUserRoleWithClient(client, userId)
+      if (!role) throw new ApiError(403, 'Forbidden')
+      return { userId, role }
+    } catch (err) {
+      // Only fall through for auth failures (401). 403 stays hard (wrong role).
+      if (!(err instanceof ApiError) || err.status !== 401) throw err
+    }
   }
 
-  // Cookie session fallback (admin UI often omits Bearer on fetch)
+  // Cookie session fallback (admin UI often omits Bearer, or Bearer is stale)
   const supabase = await createServerSupabaseClient()
   const {
     data: { user },

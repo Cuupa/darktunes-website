@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import {
   createInterviewRequest,
+  deleteInterviewRequest,
   getInterviewRequestsByArtistId,
   getInterviewRequestsByJournalistId,
   updateInterviewRequest,
@@ -18,6 +19,7 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     select: vi.fn().mockReturnThis(),
     insert: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
@@ -80,5 +82,22 @@ describe('updateInterviewRequest', () => {
     const result = await updateInterviewRequest(db, row.id, { status: 'accepted', artist_reply: 'Yes' })
     expect(result.status).toBe('accepted')
     expect(result.artistReply).toBe('Yes')
+  })
+})
+
+describe('deleteInterviewRequest', () => {
+  it('deletes request scoped to artist', async () => {
+    const builder = makeBuilder(null, null)
+    const db = { from: vi.fn().mockReturnValue(builder) } as unknown as DbClient
+    await deleteInterviewRequest(db, row.id, 'artist-1')
+    expect(db.from).toHaveBeenCalledWith('interview_requests')
+    expect(builder.delete).toHaveBeenCalled()
+    expect(builder.eq).toHaveBeenCalledWith('id', row.id)
+    expect(builder.eq).toHaveBeenCalledWith('artist_id', 'artist-1')
+  })
+
+  it('throws on delete error', async () => {
+    const db = makeMockDb(null, { message: 'delete failed' })
+    await expect(deleteInterviewRequest(db, row.id, 'artist-1')).rejects.toThrow('delete failed')
   })
 })

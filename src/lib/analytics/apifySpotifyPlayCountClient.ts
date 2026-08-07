@@ -8,6 +8,8 @@
 import { ApifyClient } from 'apify-client'
 import { ApiError } from '@/lib/errors'
 
+export { utcPeriodMonth } from '@/lib/analytics/periodMonth'
+
 export const APIFY_SPOTIFY_PLAY_COUNT_ACTOR = 'beatanalytics/spotify-play-count-scraper'
 
 /** Free-tier monthly URL budget (billable input URLs). */
@@ -200,9 +202,4 @@ export function createApifyPlayCountClient(token: string): ApifyPlayCountClient 
   }
 }
 
-/** Calendar period key YYYY-MM in UTC. */
-export function utcPeriodMonth(date: Date = new Date()): string {
-  const y = date.getUTCFullYear()
-  const m = String(date.getUTCMonth() + 1).padStart(2, '0')
-  return `${y}-${m}`
-}
+
