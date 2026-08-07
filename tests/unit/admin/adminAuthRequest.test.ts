@@ -73,6 +73,14 @@ describe('requireAdminFromRequest', () => {
     const result = await requireAdminFromRequest(makeReq('Bearer tok'))
     expect(result.userId).toBe('admin-2')
   })
+
+  it('stale Bearer 401 falls through to cookie admin session', async () => {
+    authGetUser.mockResolvedValue({ data: { user: null }, error: { message: 'jwt expired' } })
+    getUser.mockResolvedValue({ data: { user: { id: 'admin-cookie' } }, error: null })
+    getUserRoleWithClient.mockResolvedValue('admin')
+    const result = await requireAdminFromRequest(makeReq('Bearer expired'))
+    expect(result.userId).toBe('admin-cookie')
+  })
 })
 
 describe('requireAdminOrEditorFromRequest', () => {

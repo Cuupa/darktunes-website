@@ -182,6 +182,18 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-08-07 — Admin dual-auth must not let stale Bearer block cookies
+
+**Admin UI often sends an in-memory access token that expires while the refresh cookie is still valid.** If `verifyAdminRequest` only tries Bearer and never falls through on 401, dual-auth routes (e.g. Assets storage-stats) return 401 and the storage bar stays empty/wrong. Rule: Bearer 401 → cookie session fallback; only hard-stop on 403. Prefer `credentials: 'include'` and optional retry without Authorization.
+
+### 2026-08-07 — Billing guide when profile already complete
+
+**Do not show the guided mode chooser on every `/portal/billing` visit once the profile is complete:** Default complete profiles to advanced form; reserve the assistant for incomplete setup or explicit `?mode=assistant` / `?focus=payout`. Users can still open the assistant from advanced mode.
+
+### 2026-08-07 — Spotify Trends current month without scrape
+
+**Do not materialize the open calendar month as Spotify zeros:** Public presence series only exist after the label scrape writes `apify` listener metrics / track snapshots for `YYYY-MM`. Chart joins that fill missing Spotify series with `0` (e.g. Last.fm-only periods) make the current month look empty/null. Gate the in-progress UTC month until public Spotify data exists; show the last completed snapshot and a pending hint instead.
+
 ### 2026-08-04 — Legal billing / VIES / IBAN / FX
 
 **Reverse charge without a hard VIES gate is a tax risk:** Do not allow `tax_status = reverse_charge` without a VAT ID, and do not store VIES downtime as `valid: false` (keep the last good snapshot). Re-check VIES at invoice create. **IBAN stays local-only** (ISO 7064) — never third-party bank APIs (DSGVO). Label recipient party and invoice email brand must come from `site_settings`. SOS-linked invoices should 422 if label contact email/address is missing in CMS.

@@ -76,3 +76,17 @@ export async function updateInterviewRequest(
   if (!row) throw new Error('No data returned from updateInterviewRequest')
   return rowToInterviewRequest(row)
 }
+
+/** Hard-delete a request. Caller must pin artist_id / membership authorization. */
+export async function deleteInterviewRequest(
+  db: DbClient,
+  id: string,
+  artistId: string,
+): Promise<void> {
+  const { error } = await db
+    .from('interview_requests')
+    .delete()
+    .eq('id', id)
+    .eq('artist_id', artistId)
+  if (error) throw new Error(error.message)
+}

@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Agent / CI process (phase-1 bad-practice enforcement):** Session-start section in `AGENTS.md`; `npm run ci` split into `ci:contracts` → `ci:typecheck` → `ci:tests`; PR template (`.github/pull_request_template.md`) with conditional docs checklist; `verify:schema-columns` fails if `supabase/migrations/*.sql` appears. Docs enforcement stays PR/process-based (no naive “any code → any docs” CI gate).
 
 ### Fixed
+- **Admin Assets storage bar:** Stale Bearer tokens no longer block cookie auth (401 → cookie fallback). Catalog totals use multi-strategy aggregation (RPC JSON → PostgREST `sum()` → paginated); no-store cache; clearer “Catalog storage” UI with zero-size warning and retry.
+
+### Added
+- **Portal interviews:** Artists can permanently delete interview requests from `/portal/interviews` (`DELETE /api/portal/interview-requests/[id]?artistId=`). RLS: `interview_requests: artist delete own`.
+
+### Changed
+- **Portal billing:** Complete billing profiles open the full form directly — no guided mode chooser / setup wizard on every visit. Incomplete profiles and `?mode=assistant` / `?focus=payout` still use the assistant.
+- **Portal nav label:** Statement dashboard renamed **SOS Analytics** → **Sales Analytics** (en/de/fr UI + help). Route `/portal/sos-analytics` and i18n keys unchanged.
+
+### Fixed
+- **Portal Spotify Trends — current month:** Figures for the in-progress calendar month appear only after public presence data exists for that period (post label scrape). Until then the UI keeps the last completed snapshot and does not invent Spotify zeros for the open month.
 - **Admin messages chat:** Inline reply field under the conversation (like the artist portal), not only a link to Compose.
 - **Message reply notifications:** Label→artist sends emit `label_message` to artist members; artist replies to label messages emit staff `artist_portal_message` notifications (bell + history), not only realtime toasts when the mailbox is open.
 

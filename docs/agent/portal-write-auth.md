@@ -61,7 +61,7 @@ Membership verified with bearer client, then **service role** for writes on
 - Concerts + ICS export
 - Checklist toggle
 - Submit release / video + submission drafts + list submissions
-- Interview request PATCH
+- Interview request PATCH / DELETE
 - Portal feedback `GET/POST /api/portal/feedback`
 - Tour Planner (all routes via `authenticateTourPlannerRequest` → membership write)
 

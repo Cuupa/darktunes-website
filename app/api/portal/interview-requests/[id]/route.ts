@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { updateInterviewRequest } from '@/lib/api/interviewRequests'
+import {
+  deleteInterviewRequest,
+  updateInterviewRequest,
+} from '@/lib/api/interviewRequests'
 import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 
 const bodySchema = z.object({
@@ -9,19 +12,24 @@ const bodySchema = z.object({
   artistReply: z.string().nullable().optional(),
 })
 
-const ROUTE = 'PATCH /api/portal/interview-requests/[id]'
+const ROUTE_PATCH = 'PATCH /api/portal/interview-requests/[id]'
+const ROUTE_DELETE = 'DELETE /api/portal/interview-requests/[id]'
+
+function requestIdFromUrl(url: string): string {
+  return new URL(url).pathname.split('/').at(-1) ?? ''
+}
 
 export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const artistId =
     req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
   const ctx = await withPortalMembershipWrite(req, artistId)
 
-  const id = new URL(req.url).pathname.split('/').at(-1) ?? ''
+  const id = requestIdFromUrl(req.url)
   if (!id) throw new ApiError(400, 'Missing interview request id')
 
   const { value: existing } = await portalMemberWrite(
     ctx,
-    { route: ROUTE, table: 'interview_requests', operation: 'select' },
+    { route: ROUTE_PATCH, table: 'interview_requests', operation: 'select' },
     async (db) => {
       const { data, error } = await db
         .from('interview_requests')
@@ -38,7 +46,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const body = bodySchema.parse(await req.json())
   const { value: updated } = await portalMemberWrite(
     ctx,
-    { route: ROUTE, table: 'interview_requests', operation: 'update' },
+    { route: ROUTE_PATCH, table: 'interview_requests', operation: 'update' },
     (db) =>
       updateInterviewRequest(db, id, {
         status: body.status,
@@ -47,4 +55,37 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   )
 
   return NextResponse.json(updated)
+})
+
+export const DELETE = withErrorHandler(async (req: NextRequest) => {
+  const artistId =
+    req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
+  const ctx = await withPortalMembershipWrite(req, artistId)
+
+  const id = requestIdFromUrl(req.url)
+  if (!id) throw new ApiError(400, 'Missing interview request id')
+
+  const { value: existing } = await portalMemberWrite(
+    ctx,
+    { route: ROUTE_DELETE, table: 'interview_requests', operation: 'select' },
+    async (db) => {
+      const { data, error } = await db
+        .from('interview_requests')
+        .select('id')
+        .eq('id', id)
+        .eq('artist_id', ctx.artist.id)
+        .maybeSingle()
+      if (error) throw new Error(error.message)
+      return data
+    },
+  )
+  if (!existing) throw new ApiError(404, 'Interview request not found')
+
+  await portalMemberWrite(
+    ctx,
+    { route: ROUTE_DELETE, table: 'interview_requests', operation: 'delete' },
+    (db) => deleteInterviewRequest(db, id, ctx.artist.id),
+  )
+
+  return NextResponse.json({ ok: true })
 })

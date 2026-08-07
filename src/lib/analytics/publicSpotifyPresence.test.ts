@@ -167,6 +167,7 @@ describe('buildPublicSpotifyPresenceModel', () => {
         snap({ spotifyTrackId: 't2', playCount: 500, period: '2026-07' }),
       ],
       releaseTitles: { 'rel-1': 'Debut' },
+      now: new Date('2026-08-15T12:00:00.000Z'),
     })
 
     expect(model.kpis.hasAnyData).toBe(true)
@@ -177,6 +178,51 @@ describe('buildPublicSpotifyPresenceModel', () => {
     expect(model.topTracks[0]?.playCount).toBe(1000)
     expect(model.secondaryListeners.lastfm).toHaveLength(1)
     expect(model.trend.at(-1)?.listeners).toBe(1200)
+    expect(model.currentPeriod).toBe('2026-08')
+    expect(model.currentPeriodHasPublicData).toBe(false)
+  })
+
+  it('hides the current month until public Spotify scrape data exists', () => {
+    const model = buildPublicSpotifyPresenceModel({
+      listenerMetrics: [
+        metric({ metricType: 'listeners', period: '2026-07', value: 1000 }),
+        metric({ metricType: 'followers', period: '2026-07', value: 400 }),
+        // Secondary-only current month must not invent Spotify zeros
+        metric({ source: 'lastfm', metricType: 'listeners', period: '2026-08', value: 99 }),
+      ],
+      trackSnapshots: [
+        snap({ spotifyTrackId: 't1', playCount: 500, period: '2026-07' }),
+      ],
+      now: new Date('2026-08-07T10:00:00.000Z'),
+    })
+
+    expect(model.currentPeriod).toBe('2026-08')
+    expect(model.currentPeriodHasPublicData).toBe(false)
+    expect(model.kpis.latestPeriod).toBe('2026-07')
+    expect(model.kpis.latestListeners).toBe(1000)
+    expect(model.trend.map((p) => p.period)).toEqual(['2026-07'])
+    expect(model.secondaryListeners.lastfm.map((p) => p.period)).toEqual([])
+    expect(model.trend.some((p) => p.period === '2026-08')).toBe(false)
+  })
+
+  it('includes the current month after public Spotify data is present', () => {
+    const model = buildPublicSpotifyPresenceModel({
+      listenerMetrics: [
+        metric({ metricType: 'listeners', period: '2026-07', value: 1000 }),
+        metric({ metricType: 'listeners', period: '2026-08', value: 1100 }),
+        metric({ metricType: 'followers', period: '2026-08', value: 450 }),
+      ],
+      trackSnapshots: [
+        snap({ spotifyTrackId: 't1', playCount: 600, period: '2026-08' }),
+      ],
+      now: new Date('2026-08-20T10:00:00.000Z'),
+    })
+
+    expect(model.currentPeriodHasPublicData).toBe(true)
+    expect(model.kpis.latestPeriod).toBe('2026-08')
+    expect(model.kpis.latestListeners).toBe(1100)
+    expect(model.trend.at(-1)?.period).toBe('2026-08')
+    expect(model.trend.at(-1)?.listeners).toBe(1100)
   })
 
   it('returns empty-ish model when no public data', () => {

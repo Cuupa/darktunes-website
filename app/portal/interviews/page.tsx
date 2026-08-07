@@ -15,5 +15,10 @@ export default async function PortalInterviewsPage({ searchParams }: { searchPar
   const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
   const requests = artist ? await getInterviewRequestsByArtistId(supabase, artist.id).catch(() => []) : []
 
-  return <PortalInterviewsClient initialRequests={requests} />
+  return (
+    <PortalInterviewsClient
+      artistId={artist?.id ?? ''}
+      initialRequests={requests}
+    />
+  )
 }

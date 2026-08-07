@@ -16,13 +16,14 @@ vi.mock('@/lib/supabase/server', () => ({
 describe('GET /api/admin/assets/storage-stats', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.resetModules()
     requireAdminOrEditorFromRequest.mockResolvedValue({ userId: 'u1', role: 'admin' })
   })
 
   it('returns RPC totals with coerced bigint strings', async () => {
     createServiceRoleSupabaseClient.mockResolvedValue({
       rpc: vi.fn().mockResolvedValue({
-        data: [{ used_bytes: '2048000', asset_count: '12' }],
+        data: { used_bytes: '2048000', asset_count: '12', zero_size_count: '2' },
         error: null,
       }),
     })
@@ -36,6 +37,7 @@ describe('GET /api/admin/assets/storage-stats', () => {
     const body = (await res.json()) as {
       usedBytes: number
       assetCount: number
+      zeroSizeCount: number
       limitBytes: number
       source: string
     }
@@ -43,22 +45,30 @@ describe('GET /api/admin/assets/storage-stats', () => {
     expect(res.status).toBe(200)
     expect(body.usedBytes).toBe(2048000)
     expect(body.assetCount).toBe(12)
+    expect(body.zeroSizeCount).toBe(2)
     expect(body.source).toBe('rpc')
     expect(body.limitBytes).toBeGreaterThan(0)
+    expect(res.headers.get('Cache-Control')).toContain('no-store')
   })
 
-  it('falls back to paginated sum when RPC fails', async () => {
+  it('falls back to paginated sum when RPC and aggregate fail', async () => {
     const range = vi.fn().mockResolvedValue({
       data: [{ size_bytes: 100 }, { size_bytes: 50 }],
       error: null,
     })
-    createServiceRoleSupabaseClient.mockResolvedValue({
-      rpc: vi.fn().mockResolvedValue({ data: null, error: { message: 'missing fn' } }),
-      from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnThis(),
+    const select = vi.fn().mockImplementation((sel: string) => {
+      if (typeof sel === 'string' && sel.includes('sum')) {
+        return Promise.resolve({ data: null, error: { message: 'no agg' } })
+      }
+      return {
         order: vi.fn().mockReturnThis(),
         range,
-      }),
+        eq: vi.fn().mockReturnThis(),
+      }
+    })
+    createServiceRoleSupabaseClient.mockResolvedValue({
+      rpc: vi.fn().mockResolvedValue({ data: null, error: { message: 'missing fn' } }),
+      from: vi.fn().mockReturnValue({ select }),
     })
 
     const { GET } = await import('../../../app/api/admin/assets/storage-stats/route')

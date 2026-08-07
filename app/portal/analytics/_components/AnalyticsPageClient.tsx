@@ -272,6 +272,8 @@ export function AnalyticsPageClient({
         byRelease: [],
         insights: [],
         secondaryListeners: { lastfm: [], soundcharts: [] },
+        currentPeriod: '',
+        currentPeriodHasPublicData: false,
       }
       const blob = await buildAnalyticsReportPdf({
         artistName: artistName || 'Artist',

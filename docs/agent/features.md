@@ -39,10 +39,10 @@
 
 | Topic | Rule |
 |-------|------|
-| Nav | Two dashboard items under `artist.analytics`: **Spotify Trends** (`/portal/spotify-trends`) and **SOS Analytics** (`/portal/sos-analytics`). Legacy `/portal/analytics` redirects (listeners tab → Spotify Trends). |
-| Sources | SOS **statement streams** vs public **Spotify presence** never mixed into one total or one menu |
-| Spotify Trends | Presence only (listeners, followers, track plays, dual-axis trends, disclaimer). Empty state when no presence data — avoid zero KPI grids. |
-| SOS Analytics | Statement streams, territories, earnings, releases, revenue-mix, settlement, events, press, engagement, merch. Empty state when no statement data. |
+| Nav | Two dashboard items under `artist.analytics`: **Spotify Trends** (`/portal/spotify-trends`) and **Sales Analytics** (UI label; route `/portal/sos-analytics`). Legacy `/portal/analytics` redirects (listeners tab → Spotify Trends). |
+| Sources | Statement **sales streams** (SOS backend) vs public **Spotify presence** never mixed into one total or one menu |
+| Spotify Trends | Presence only (listeners, followers, track plays, dual-axis trends, disclaimer). Empty state when no presence data — avoid zero KPI grids. **Current UTC month** only appears after public scrape rows exist for that period (otherwise secondary sources / chart joins would show Spotify as 0). |
+| Sales Analytics | User-facing name for statement streams, territories, earnings, releases, revenue-mix, settlement, events, press, engagement, merch. Empty state when no statement data. Internal keys/routes may still say `sos_*`. |
 | Disclaimer | Spotify page: high-visibility non-binding / liability notice (`PublicMetricsDisclaimer`) — public/third-party figures approximate & unreconciled; statements + settlement only for payouts. PDF includes same disclaimer. Never name scrape vendors in UI. |
 | Waterfall | Top tracks / album play totals dedupe by normalized track name (`publicSpotifyPresence.ts`) — max plays, no double-count |
 | Prefs | Separate localStorage keys: `portal-spotify-trends-view-v1`, `portal-sos-analytics-view-v1` |
@@ -66,7 +66,7 @@
 | Mark one | `markPortalNotificationItemRead` → legacy flag + receipt |
 | Mark all | `markAllPortalMessagesRead(db, artistId, userId)` must write **receipts** for label+portal ids (otherwise badge stays high after “seen”) |
 | Feed | `getPortalNotificationFeed(..., userId)` — same receipt rules as badges |
-| Non-dismissible | Pending interviews + `artist_notified` statements stay in feed/badge until workflow advances (not clearable via mark-all) |
+| Non-dismissible | Pending interviews + `artist_notified` statements stay in feed/badge until workflow advances (not clearable via mark-all). Artists may **delete** interview requests (`DELETE /api/portal/interview-requests/[id]?artistId=`) which removes them from inbox + badge. |
 | Platform alerts | Unified `notifications` table (`read` flag); artist-scoped by `artist_id` + RLS |
 | Admin bell | Separate: `DashboardNotificationBell` + `editor`/`notifications` APIs with realtime |
 
@@ -134,7 +134,7 @@ Enterprise SOS + invoice lifecycle. Workflow helpers: `src/lib/sos/statementWork
 **Portal DAU assistants:**
 | Flow | Entry | Steps |
 |------|--------|--------|
-| Billing | `/portal/billing` | Legal → Tax → Payout (SEPA) → Done |
+| Billing | `/portal/billing` | Legal → Tax → Payout (SEPA) → Done. **Skip chooser/assistant when `isBillingProfileComplete`** — open advanced form; `?mode=assistant` or incomplete profile still forces guide. |
 | Invoice from Statement | `/portal/invoices?statement=` (CTA from Statements/Analytics) | Confirm → Billing if needed → Send |
 | EPK first share | `/portal/epk-builder` mode chooser | Template → PDF/Share → Done |
 | Fan page first publish | `/portal/fan-page` mode chooser | Layout template → Checks → Publish |

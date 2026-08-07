@@ -11,6 +11,7 @@ import {
   GROWTH_SIGNIFICANT_PCT,
   TREND_MIN_PERIODS,
 } from '@/lib/analytics/constants'
+import { utcPeriodMonth } from '@/lib/analytics/apifySpotifyPlayCountClient'
 
 /** Internal DB source for public Spotify scrape — map to UI as spotifyPublic only. */
 export const PUBLIC_SPOTIFY_SOURCE = 'apify' as const
@@ -74,6 +75,68 @@ export interface PublicSpotifyPresenceModel {
   secondaryListeners: {
     lastfm: PeriodPoint[]
     soundcharts: PeriodPoint[]
+  }
+  /**
+   * Current UTC calendar month (YYYY-MM). Portal UI must not invent Spotify
+   * zeros for this period until public presence data exists for it.
+   */
+  currentPeriod: string
+  /** True when at least one public Spotify (scrape) row exists for `currentPeriod`. */
+  currentPeriodHasPublicData: boolean
+}
+
+/**
+ * Whether this artist has any public Spotify presence rows for a period.
+ * Used to gate the in-progress calendar month until the label scrape has run.
+ */
+export function hasPublicSpotifyDataForPeriod(
+  listenerMetrics: ArtistListenerMetric[],
+  trackSnapshots: SpotifyTrackPlaySnapshot[],
+  period: string,
+): boolean {
+  for (const m of listenerMetrics) {
+    if (m.source === PUBLIC_SPOTIFY_SOURCE && m.period === period) return true
+  }
+  for (const s of trackSnapshots) {
+    if (s.period === period) return true
+  }
+  return false
+}
+
+/**
+ * Drop metrics / snapshots for the current UTC month when no public Spotify
+ * scrape data exists yet. Prevents Last.fm/Soundcharts (or partial joins)
+ * from materializing a current-month chart point with Spotify series at 0.
+ */
+export function excludeIncompleteCurrentPeriodInput(input: {
+  listenerMetrics: ArtistListenerMetric[]
+  trackSnapshots: SpotifyTrackPlaySnapshot[]
+  now?: Date
+}): {
+  listenerMetrics: ArtistListenerMetric[]
+  trackSnapshots: SpotifyTrackPlaySnapshot[]
+  currentPeriod: string
+  currentPeriodHasPublicData: boolean
+} {
+  const currentPeriod = utcPeriodMonth(input.now ?? new Date())
+  const currentPeriodHasPublicData = hasPublicSpotifyDataForPeriod(
+    input.listenerMetrics,
+    input.trackSnapshots,
+    currentPeriod,
+  )
+  if (currentPeriodHasPublicData) {
+    return {
+      listenerMetrics: input.listenerMetrics,
+      trackSnapshots: input.trackSnapshots,
+      currentPeriod,
+      currentPeriodHasPublicData,
+    }
+  }
+  return {
+    listenerMetrics: input.listenerMetrics.filter((m) => m.period !== currentPeriod),
+    trackSnapshots: input.trackSnapshots.filter((s) => s.period !== currentPeriod),
+    currentPeriod,
+    currentPeriodHasPublicData,
   }
 }
 
@@ -474,12 +537,23 @@ export function buildPublicSpotifyPresenceModel(input: {
   now?: Date
 }): PublicSpotifyPresenceModel {
   const {
-    listenerMetrics,
-    trackSnapshots,
     releaseTitles = {},
     sosStats = [],
     now,
   } = input
+
+  // Hide the in-progress calendar month until public Spotify scrape data exists.
+  // Otherwise secondary sources (or chart joins) surface Spotify series as 0/null.
+  const {
+    listenerMetrics,
+    trackSnapshots,
+    currentPeriod,
+    currentPeriodHasPublicData,
+  } = excludeIncompleteCurrentPeriodInput({
+    listenerMetrics: input.listenerMetrics,
+    trackSnapshots: input.trackSnapshots,
+    now,
+  })
 
   const listeners = seriesFor(listenerMetrics, PUBLIC_SPOTIFY_SOURCE, 'listeners')
   const followers = seriesFor(listenerMetrics, PUBLIC_SPOTIFY_SOURCE, 'followers')
@@ -554,5 +628,7 @@ export function buildPublicSpotifyPresenceModel(input: {
       lastfm: seriesFor(listenerMetrics, 'lastfm', 'listeners'),
       soundcharts: seriesFor(listenerMetrics, 'soundcharts', 'listeners'),
     },
+    currentPeriod,
+    currentPeriodHasPublicData,
   }
 }

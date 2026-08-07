@@ -82,50 +82,73 @@ export function ExplorerToolbar({
 }: ExplorerToolbarProps) {
   const [usedBytes, setUsedBytes] = useState<number | null>(null)
   const [assetCount, setAssetCount] = useState<number | null>(null)
+  const [zeroSizeCount, setZeroSizeCount] = useState(0)
   const [limitBytes, setLimitBytes] = useState(DEFAULT_LIMIT_BYTES)
   const [statsError, setStatsError] = useState(false)
+  const [statsLoading, setStatsLoading] = useState(true)
   const [bulkKitArtistId, setBulkKitArtistId] = useState<string>('label')
 
-  const fetchStats = useCallback(() => {
-    // Prefer Bearer when available; always send cookies so dual-auth works
-    // while the explorer session token is still hydrating.
-    const headers: HeadersInit = {}
-    if (authToken) {
-      headers.Authorization = `Bearer ${authToken}`
-    }
-    void fetch('/api/admin/assets/storage-stats', {
-      headers,
-      credentials: 'include',
-      cache: 'no-store',
-    })
-      .then(async (r) => {
-        if (!r.ok) {
-          setStatsError(true)
-          return null
+  const fetchStats = useCallback(
+    (signal?: AbortSignal) => {
+      // Prefer cookies (session refresh). Optional Bearer may be stale — server
+      // falls through to cookies on 401, but we also retry without Authorization.
+      const attempt = async (withBearer: boolean): Promise<Record<string, unknown> | null> => {
+        const headers: HeadersInit = {}
+        if (withBearer && authToken) {
+          headers.Authorization = `Bearer ${authToken}`
         }
+        const r = await fetch('/api/admin/assets/storage-stats', {
+          headers,
+          credentials: 'include',
+          cache: 'no-store',
+          signal,
+        })
+        if (r.status === 401 && withBearer && authToken) {
+          return attempt(false)
+        }
+        if (!r.ok) return null
         return (await r.json()) as Record<string, unknown>
-      })
-      .then((json) => {
-        if (!json) return
-        const used = coerceBytes(json.usedBytes)
-        if (used === null) {
+      }
+
+      setStatsLoading(true)
+      void attempt(true)
+        .then((json) => {
+          if (signal?.aborted) return
+          if (!json) {
+            setStatsError(true)
+            setStatsLoading(false)
+            return
+          }
+          const used = coerceBytes(json.usedBytes)
+          if (used === null) {
+            setStatsError(true)
+            setStatsLoading(false)
+            return
+          }
+          setUsedBytes(used)
+          setStatsError(false)
+          const count = coerceBytes(json.assetCount)
+          if (count !== null) setAssetCount(count)
+          const zeros = coerceBytes(json.zeroSizeCount)
+          if (zeros !== null) setZeroSizeCount(zeros)
+          const limit = coerceBytes(json.limitBytes)
+          if (limit !== null && limit > 0) setLimitBytes(limit)
+          setStatsLoading(false)
+        })
+        .catch((err: unknown) => {
+          if (signal?.aborted) return
+          if (err instanceof DOMException && err.name === 'AbortError') return
           setStatsError(true)
-          return
-        }
-        setUsedBytes(used)
-        setStatsError(false)
-        const count = coerceBytes(json.assetCount)
-        if (count !== null) setAssetCount(count)
-        const limit = coerceBytes(json.limitBytes)
-        if (limit !== null && limit > 0) setLimitBytes(limit)
-      })
-      .catch(() => {
-        setStatsError(true)
-      })
-  }, [authToken])
+          setStatsLoading(false)
+        })
+    },
+    [authToken],
+  )
 
   useEffect(() => {
-    fetchStats()
+    const ac = new AbortController()
+    fetchStats(ac.signal)
+    return () => ac.abort()
   }, [fetchStats, storageStatsRevision])
 
   const usedPct =
@@ -271,31 +294,51 @@ export function ExplorerToolbar({
       <div className="flex flex-wrap items-center gap-2">
         {usedBytes !== null && usedPct !== null && (
           <div
-            className="flex min-w-44 flex-col gap-1"
+            className="flex w-52 shrink-0 flex-col gap-1"
             title={
-              assetCount != null
-                ? `Catalog total: ${assetCount.toLocaleString()} asset(s) in database`
-                : 'Catalog total from assets table'
+              [
+                'Total of all assets in the database catalog (not only this folder).',
+                assetCount != null ? `${assetCount.toLocaleString()} file(s).` : null,
+                zeroSizeCount > 0
+                  ? `${zeroSizeCount.toLocaleString()} file(s) have size 0 in the catalog (under-reports real R2 usage until sizes are backfilled).`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' ')
             }
           >
             <div className="flex justify-between gap-2 text-xs text-muted-foreground">
-              <span>Storage</span>
+              <span>Catalog storage</span>
               <span className="tabular-nums">
                 {formatBytes(usedBytes)} / {formatBytes(limitBytes)}
-                {assetCount != null ? ` · ${assetCount.toLocaleString()} files` : ''}
+                {assetCount != null ? ` · ${assetCount.toLocaleString()}` : ''}
               </span>
             </div>
             <Progress
               value={usedPct}
-              className="h-1.5"
-              aria-label={`Asset storage usage: ${formatBytes(usedBytes)} of ${formatBytes(limitBytes)}`}
+              className="h-1.5 w-full"
+              aria-label={`Catalog storage usage: ${formatBytes(usedBytes)} of ${formatBytes(limitBytes)}`}
             />
+            {zeroSizeCount > 0 && (
+              <span className="text-[10px] text-amber-600 dark:text-amber-400">
+                {zeroSizeCount.toLocaleString()} file(s) size unknown
+              </span>
+            )}
           </div>
         )}
-        {statsError && usedBytes === null && (
-          <span className="text-xs text-destructive" role="status">
-            Storage stats unavailable
+        {statsLoading && usedBytes === null && !statsError && (
+          <span className="text-xs text-muted-foreground" role="status">
+            Loading storage…
           </span>
+        )}
+        {statsError && usedBytes === null && (
+          <button
+            type="button"
+            className="text-xs text-destructive underline-offset-2 hover:underline"
+            onClick={() => fetchStats()}
+          >
+            Storage stats unavailable — retry
+          </button>
         )}
         <span className="text-sm text-muted-foreground">{itemCount} item(s)</span>
         <div className="flex items-center gap-1 rounded-md border border-border p-1">
