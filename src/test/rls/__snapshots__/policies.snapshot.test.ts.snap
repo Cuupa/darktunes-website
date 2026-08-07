@@ -119,6 +119,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "financial_audit: admin read",
   "genres_read_public",
   "genres_write_admin",
+  "interview_requests: artist delete own",
   "interview_requests: artist read own",
   "interview_requests: artist update own",
   "interview_requests: journalist manage own",
@@ -602,6 +603,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
     "genres_write_admin",
   ],
   "interview_requests": [
+    "interview_requests: artist delete own",
     "interview_requests: artist read own",
     "interview_requests: artist update own",
     "interview_requests: journalist manage own",
