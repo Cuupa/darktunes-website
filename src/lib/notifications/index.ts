@@ -1,13 +1,19 @@
+/**
+ * Client-safe notifications barrel (catalog, routing, preferences helpers).
+ *
+ * Server-only: import `emitNotification` from `@/lib/notifications/emit`
+ * (pulls `web-push` / Node net — never re-export from this barrel).
+ */
 export {
   ALL_NOTIFICATION_EVENT_TYPES,
   NOTIFICATION_CATALOG,
   getCatalogEntry,
   isNotificationEventType,
 } from './catalog'
-export { emitNotification } from './emit'
 export {
   getUserNotificationPreferences,
   getUsersWithInAppDisabled,
+  getUsersWithPushDisabled,
   upsertNotificationPreferences,
   type NotificationPreference,
 } from './preferences'
