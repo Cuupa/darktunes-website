@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Dialog,
@@ -652,7 +653,7 @@ function TasksPanel({ artistId, tourId }: { artistId: string; tourId: string | n
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         <Input placeholder={t('tour_planner_task_title')} value={title} onChange={(e) => setTitle(e.target.value)} />
-        <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} aria-label={t('tour_planner_task_due')} />
+        <DateField id="tour-task-due" value={dueDate} onChange={setDueDate} aria-label={t('tour_planner_task_due')} />
         <Button disabled={!title || !dueDate} onClick={() => create.mutate()}>{t('tour_planner_add_task')}</Button>
       </div>
       <ul className="divide-y divide-border rounded-md border">

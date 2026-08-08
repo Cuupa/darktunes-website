@@ -262,6 +262,9 @@ type PrefillItunesResponse = {
 }
 
 export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistId }: Props) {
+  const tToast = useTranslations('admin.toast')
+
+
   const tErrors = useTranslations('errors')
   const supabase = createBrowserSupabaseClient()
   const { register, handleSubmit, watch, setValue, reset, getValues, control } = useForm<ArtistFormData>({
@@ -337,8 +340,9 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
   }, [name, bandsintownId, setValue, mode])
 
   const handleFetchImage = async () => {
+
     if (!spotifyId && !discogsId) {
-      toast.error('Enter a Spotify ID or Discogs ID first')
+      toast.error(tToast('enter_spotify_or_discogs_first'))
       return
     }
     setIsFetchingImage(true)
@@ -356,7 +360,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
       }
       const { imageUrl } = (await res.json()) as { imageUrl: string }
       setValue('imageUrl', imageUrl)
-      toast.success('Image fetched successfully')
+      toast.success(tToast('image_fetched'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
@@ -365,10 +369,11 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
   }
 
   const handlePrefillFromSpotify = async () => {
+
     const spotifyUrlInput = spotifyUrl.trim()
     const spotifyIdInput = spotifyId.trim()
     if (!spotifyUrlInput && !spotifyIdInput) {
-      toast.error('Enter a Spotify URL or Spotify ID first')
+      toast.error(tToast('enter_spotify_url_first'))
       return
     }
     setIsPrefillingSpotify(true)
@@ -394,7 +399,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
       if (!(current.genres?.trim() ?? '') && profile.genres.length > 0) setValue('genres', profile.genres.join(', '))
       setValue('spotifyId', profile.spotifyId)
       setValue('spotifyUrl', profile.spotifyUrl)
-      toast.success('Artist data prefilled from Spotify')
+      toast.success(tToast('artist_prefilled_spotify'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
@@ -403,9 +408,10 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
   }
 
   const handleEnrichFromDiscogs = async () => {
+
     const discogsIdInput = discogsId.trim()
     if (!discogsIdInput) {
-      toast.error('Enter a Discogs Artist ID first')
+      toast.error(tToast('enter_discogs_id_first'))
       return
     }
     setIsEnrichingDiscogs(true)
@@ -483,9 +489,10 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
   }
 
   const handlePrefillFromItunes = async () => {
+
     const appleMusicUrlInput = appleMusicUrl.trim()
     if (!appleMusicUrlInput) {
-      toast.error('Enter an Apple Music artist URL first')
+      toast.error(tToast('enter_apple_music_url_first'))
       return
     }
     setIsPrefillingItunes(true)
@@ -507,7 +514,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
       if (!(current.imageUrl?.trim() ?? '') && profile.imageUrl) setValue('imageUrl', profile.imageUrl)
       if (!(current.genres?.trim() ?? '') && profile.genres.length > 0) setValue('genres', profile.genres.join(', '))
       setValue('appleMusicUrl', profile.appleMusicUrl)
-      toast.success('Artist data prefilled from Apple Music')
+      toast.success(tToast('artist_prefilled_apple'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
@@ -1143,7 +1150,7 @@ export function ArtistForm({ value, onChange, isLoading, mode = 'admin', artistI
         onSelect={(asset) => {
           if (!assetPickerTarget) return
           setValue(assetPickerTarget, asset.publicUrl)
-          toast.success('Asset selected')
+          toast.success(tToast('asset_selected'))
         }}
       />
 

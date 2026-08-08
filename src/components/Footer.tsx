@@ -6,7 +6,8 @@ import { InstagramLogo, YoutubeLogo, SpotifyLogo, ShoppingBag, Globe } from '@ph
 import { useTranslations } from 'next-intl'
 import type { SiteSettings } from '@/types'
 import { SOCIAL_ICON_MAP } from '@/config/socialIcons'
-import { getOptimizedImageUrl } from '@/lib/imageUtils'
+import { getOptimizedLogoUrl } from '@/lib/imageUtils'
+import { requestPwaInstallPrompt } from '@/lib/pwa/installPrompt'
 
 interface FooterProps {
   siteSettings: SiteSettings
@@ -16,14 +17,14 @@ export function Footer({ siteSettings }: FooterProps) {
   const t = useTranslations('footer')
 
   return (
-    <footer className="border-t border-border bg-background overflow-x-hidden">
-      <div className="container mx-auto px-4 lg:px-8 py-12 overflow-x-hidden">
+    <footer className="relative z-10 border-t border-border bg-background pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="container mx-auto px-4 lg:px-8 py-12">
         <div className="grid md:grid-cols-3 gap-8 mb-8">
           <div>
             <div className="flex items-center mb-4">
               {siteSettings.logoUrl || siteSettings.faviconUrl ? (
                 <Image
-                  src={getOptimizedImageUrl(siteSettings.logoUrl || siteSettings.faviconUrl!, 200)}
+                  src={getOptimizedLogoUrl(siteSettings.logoUrl || siteSettings.faviconUrl!, 400)}
                   alt={`${siteSettings.labelName} logo`}
                   width={160}
                   height={40}
@@ -179,30 +180,46 @@ export function Footer({ siteSettings }: FooterProps) {
           </div>
         </div>
 
-        <div className="pt-8 border-t border-border flex flex-col md:flex-row md:flex-wrap justify-between items-center gap-2 md:gap-4">
-          <p className="text-sm text-muted-foreground">
+        <div className="pt-8 border-t border-border flex flex-col md:flex-row md:flex-wrap justify-between items-center gap-3 md:gap-4">
+          <p className="text-sm text-muted-foreground text-center md:text-left">
             © {new Date().getFullYear()} {siteSettings.labelName}. {t('allRightsReserved')}
           </p>
-          <div className="flex gap-6">
+          <nav
+            aria-label={t('legalNavAria')}
+            className="relative z-10 flex max-w-full flex-wrap items-center justify-center gap-x-1 gap-y-1"
+          >
             <Link
               href="/contact"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex min-h-[44px] items-center px-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             >
               {t('contact')}
             </Link>
             <Link
               href="/impressum"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex min-h-[44px] items-center px-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             >
               {t('legalNotice')}
             </Link>
             <Link
               href="/datenschutz"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className="inline-flex min-h-[44px] items-center px-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             >
               {t('privacyPolicy')}
             </Link>
-          </div>
+            <Link
+              href={siteSettings.termsUrl || '/agb'}
+              className="inline-flex min-h-[44px] items-center px-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              {t('terms')}
+            </Link>
+            <button
+              type="button"
+              onClick={() => requestPwaInstallPrompt()}
+              className="inline-flex min-h-[44px] items-center px-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              {t('installApp')}
+            </button>
+          </nav>
           <p className="w-full text-center mt-1 text-xs text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors select-none">
             Built by{' '}
             <a

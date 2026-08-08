@@ -45,6 +45,9 @@ export function ImageUploadButton({
   artistId,
   maxSizeBytes = CLIENT_MAX_SIZE_BYTES,
 }: ImageUploadButtonProps) {
+  const tToast = useTranslations('admin.toast')
+
+
   const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const inputRef = useRef<HTMLInputElement>(null)
@@ -53,6 +56,7 @@ export function ImageUploadButton({
   const isUploading = uploadProgress !== null && uploadProgress < 100
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+
     const raw = e.target.files?.[0]
     if (!raw) return
 
@@ -112,7 +116,7 @@ export function ImageUploadButton({
         xhr.send(formData)
       })
 
-      toast.success('Image uploaded')
+      toast.success(tToast('image_uploaded'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {

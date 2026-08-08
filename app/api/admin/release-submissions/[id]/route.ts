@@ -8,6 +8,7 @@ import {
   updateReleaseSubmissionStatus,
 } from '@/lib/api/releaseSubmissions'
 import { getTracksBySubmissionId } from '@/lib/api/releaseSubmissionTracks'
+import { emitNotification } from '@/lib/notifications/emit'
 
 function extractId(req: NextRequest): string {
   const segments = new URL(req.url).pathname.split('/')
@@ -17,6 +18,8 @@ function extractId(req: NextRequest): string {
 const patchSchema = z.object({
   status: z.enum(['received', 'reviewed', 'accepted', 'rejected']),
   adminReply: z.string().optional(),
+  /** Free-text pipeline note shown to the artist. Empty string clears. */
+  progressNote: z.string().max(2000).optional().nullable(),
 })
 
 const postSchema = z.object({
@@ -40,26 +43,45 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   const id = extractId(req)
   const body = patchSchema.parse(await req.json())
 
+  const progressNote =
+    body.progressNote === undefined
+      ? undefined
+      : body.progressNote === null || body.progressNote.trim() === ''
+        ? null
+        : body.progressNote.trim()
+
   const submission = await updateReleaseSubmissionStatus(
     supabase,
     id,
     body.status,
     body.adminReply,
+    progressNote,
   )
 
-  // Send label message to artist when status is accepted or rejected
-  if ((body.status === 'accepted' || body.status === 'rejected') && body.adminReply) {
+  if (body.status === 'accepted' || body.status === 'rejected') {
     const serviceRole = await createServiceRoleSupabaseClient()
-    const subjectKey = body.status === 'accepted' ? 'accepted' : 'rejected'
+    const decisionLabel = body.status === 'accepted' ? 'accepted' : 'rejected'
     const subjectMap: Record<string, string> = {
       accepted: `Your release "${submission.title}" has been accepted`,
       rejected: `Your release "${submission.title}" has been rejected`,
     }
-    await serviceRole.from('label_messages').insert({
-      artist_id: submission.artistId,
-      subject: subjectMap[subjectKey],
-      body: body.adminReply,
-      body_html: `<p>${body.adminReply.replace(/\n/g, '<br>')}</p>`,
+
+    if (body.adminReply) {
+      await serviceRole.from('label_messages').insert({
+        artist_id: submission.artistId,
+        subject: subjectMap[decisionLabel],
+        body: body.adminReply,
+        body_html: `<p>${body.adminReply.replace(/\n/g, '<br>')}</p>`,
+      })
+    }
+
+    await emitNotification(serviceRole, {
+      type: 'release_submission_decision',
+      entityId: submission.id,
+      entityName: subjectMap[decisionLabel],
+      artistId: submission.artistId,
+      payload: { status: body.status },
+      dedupeKey: `release_submission_decision:${submission.id}:${body.status}`,
     })
   }
 

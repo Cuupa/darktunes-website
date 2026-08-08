@@ -12,9 +12,92 @@
 | Bearer auth | Portal route handlers use `authenticatePortalBearer()` from `src/lib/portal/bearerAuth.ts` |
 | Writes | Membership first; many routes then use **service role** (pragmatic). Target: user JWT + RLS — see [portal-write-auth.md](portal-write-auth.md) |
 
-**Billing & invoices:** `artist_billing_profiles` at `/portal/billing`. `isBillingProfileComplete()` required before PDF generation. `InlineBillingProfileStep` gates: `/portal/invoices` (`InvoiceForm`, `FreeInvoiceGenerator`), `/portal/analytics` (Earnings), `/portal/statements` (quick invoice). SOS-linked flow: `/portal/invoices?statement={id}` → `artist_invoice_number` + `sales_statements.status = 'invoiced'`.
+**Billing & invoices:** `artist_billing_profiles` at `/portal/billing`. `tax_status` (`standard` | `small_business` | `reverse_charge`) drives §14 UStG PDF tax lines. `isBillingProfileComplete()` required before PDF generation. `InlineBillingProfileStep` gates: `/portal/invoices` (`InvoiceForm`, `FreeInvoiceGenerator`), `/portal/analytics` (Earnings), `/portal/statements` (quick invoice). SOS-linked flow: `/portal/invoices?statement={id}` → `artist_invoice_number` + `sales_statements.status = 'invoiced'`. Label recipient party from `site_settings` via `resolveLabelBillingParty()` (never hardcode). Issued PDFs are write-once (`pdf_sha256`, stable R2 key `invoices/{artistId}/{invoiceId}.pdf`). Billing profile changes log to `financial_audit_events` (IBAN masked).
 
-**Key routes:** profile, analytics (11 tabs + intelligence), statements, billing, invoices, releases, tour (events), **tour-planner** (TRACK production), calendar, marketing, documents, messages, interviews, epk-builder, onboarding, help.
+**VIES / IBAN / FX (compliance helpers):**
+- **EU VAT (VIES):** `checkVatWithVies()` → Commission REST API on billing save; reverse-charge requires live valid VIES at save **and** invoice create. Snapshot: `vat_vies_*` columns.
+- **IBAN:** local only — `src/lib/sos/iban-validator.ts` (ISO 7064). Enforced on `POST /api/portal/billing-profile`. **Never** call third-party IBAN APIs (DSGVO).
+- **ECB FX:** Frankfurter already powers SOS (`/api/exchange-rates`). Non-EUR invoices fetch `getEcbRateForCurrency()` and store `fx_rate` / `fx_rate_date` / `fx_rate_source` + PDF footnote.
+
+**Legal (multi-tenant):** Public `/impressum`, `/datenschutz`, `/agb`. CMS keys `agb_content` / `agb_content_en`, `portal_terms_version`, label billing address fields. Templates support `{{labelName}}`, `{{address}}`, `{{vatId}}`, … via `renderLegalTemplate`. Portal AGB opt-in per **artist** (`portal_terms_*` on `artists`); onboarding terms step + layout gate when version mismatches.
+
+**Key routes:** profile (incl. **Integrations** / Bandsintown credentials), **spotify-trends**, **sos-analytics** (legacy `/portal/analytics` redirects), statements, billing, invoices, releases, tour (events), **tour-planner** (TRACK production), calendar, marketing, documents, messages, interviews, epk-builder, onboarding, help, **feedback**.
+
+### Portal product feedback (`/portal/feedback`)
+
+| Topic | Rule |
+|-------|------|
+| Purpose | Product feedback about portal/site — **not** Zammad tech support (`/admin/support`) |
+| Form | Category (`bug` \| `feature` \| `ux` \| `general` \| `praise`), optional 1–5 rating, optional subject, required message (≥20 chars) |
+| Artist | Always the **active portal artist** (RSC `resolvePortalArtist` + `?artistId=`); multi-artist switcher changes sender. No separate “select artist” dropdown. Nav always appends resolved `artistId`. |
+| History | Artist sees own submissions with status (`new` / `reviewed` / `archived`) |
+| API | `GET/POST /api/portal/feedback?artistId=` — membership + `portalMemberWrite`; rate limit 10/h |
+| Table | `portal_feedback` — RLS: artist insert/read own; editor+ read/update status |
+| Admin | `/admin/feedback` list + status actions; nav badge for `status = new`; DAL `src/lib/api/portalFeedback.ts` |
+
+### Portal analytics (split dashboards)
+
+| Topic | Rule |
+|-------|------|
+| Nav | Two dashboard items under `artist.analytics`: **Spotify Trends** (`/portal/spotify-trends`) and **Sales Analytics** (UI label; route `/portal/sos-analytics`). Legacy `/portal/analytics` redirects (listeners tab → Spotify Trends). |
+| Sources | Statement **sales streams** (SOS backend) vs public **Spotify presence** never mixed into one total or one menu |
+| Spotify Trends | Presence only (listeners, followers, track plays, dual-axis trends, disclaimer). Empty state when no presence data — avoid zero KPI grids. **Current UTC month** only appears after public scrape rows exist for that period (otherwise secondary sources / chart joins would show Spotify as 0). |
+| Sales Analytics | User-facing name for statement streams, territories, earnings, releases, revenue-mix, settlement, events, press, engagement, merch. Empty state when no statement data. Internal keys/routes may still say `sos_*`. |
+| Disclaimer | Spotify page: high-visibility non-binding / liability notice (`PublicMetricsDisclaimer`) — public/third-party figures approximate & unreconciled; statements + settlement only for payouts. PDF includes same disclaimer. Never name scrape vendors in UI. |
+| Waterfall | Top tracks / album play totals dedupe by normalized track name (`publicSpotifyPresence.ts`) — max plays, no double-count |
+| Prefs | Separate localStorage keys: `portal-spotify-trends-view-v1`, `portal-sos-analytics-view-v1` |
+| Export | SOS: CSV + PDF; Spotify Trends: PDF presence summary |
+
+### Portal Bandsintown credentials
+
+| Topic | Rule |
+|-------|------|
+| UI | Profile → **Integrations** tab — per active artist (multi-project switcher) |
+| Fields | `bandsintown_id` + `bandsintown_api_key` on `artists` (same as admin ArtistForm) |
+| API | `GET/PUT /api/portal/integrations/bandsintown?artistId=`; `POST …/sync` — membership write; key never returned in full (`hasApiKey` only) |
+| Sync | One-off concert upsert via `fetchBandsintownArtistEvents` (same as admin sync) |
+
+### Portal notification bell
+
+| Topic | Rule |
+|-------|------|
+| Badge total | messages + interviews + statements + platform alerts (`getPortalBadgeCounts`) |
+| Message unread | **Per-user** `message_receipts` when `userId` known — not only legacy `label_messages.read` / `portal_messages.read_at` |
+| Mark one | `markPortalNotificationItemRead` → legacy flag + receipt |
+| Mark all | `markAllPortalMessagesRead(db, artistId, userId)` must write **receipts** for label+portal ids (otherwise badge stays high after “seen”) |
+| Feed | `getPortalNotificationFeed(..., userId)` — same receipt rules as badges |
+| Non-dismissible | Pending interviews + `artist_notified` statements stay in feed/badge until workflow advances (not clearable via mark-all). Artists may **delete** interview requests (`DELETE /api/portal/interview-requests/[id]?artistId=`) which removes them from inbox + badge. |
+| Platform alerts | Unified `notifications` table (`read` flag); artist-scoped by `artist_id` + RLS |
+| Admin bell | Separate: `DashboardNotificationBell` + `editor`/`notifications` APIs with realtime |
+
+### Messaging (M0 hardening)
+
+| Topic | Rule |
+|-------|------|
+| List limits | DAL uses `MessageListOptions` + caps in `src/lib/messaging/constants.ts` (default 50, max 100) |
+| Per-user read | `message_receipts` via `upsertMessageReceipt` / `upsertMessageReceipts`; pass `userId` into mark-read / badge counts / bell feed |
+| Rules | `applyMessageRulesOnInsert` / `applyPortalMessageRulesOnInsert` after send (server-side) |
+| Attachments | `assertMessageAttachmentAllowed` + `isAllowedAttachmentUrl` before metadata insert |
+| Domain send | Prefer `src/lib/messaging/send.ts` (`sendLabelMessage`, `sendPortalDomainMessage`) — sets `sender_user_id` + optional `client_message_id` |
+| Unified search | `searchArtistMailbox` in `src/lib/messaging/search.ts` |
+| Shared inbox (M2) | Portal `to_label` messages: `assignee_user_id`, `priority`, `tags`; staff notes (`message_internal_notes`); audit (`message_events`); APIs under `/api/admin/messages/[id]/{ops,notes,export}`; UI `SharedInboxPanel` |
+| Chat thread UI | Detail pane uses `MessageChatThread` (chronological bubbles; own messages right). Label threads include original + `artist_replies`. **Admin and portal both have an inline reply composer** under the thread (not only a link to Compose). |
+| Conversation grouping | Client-side threads via `src/lib/messaging/threads.ts` (normalize subject, participant key). Portal inbox API merges sent+received so Re: threads are complete. One list row per conversation (count badge). |
+| Portal mobile mailbox | Messenger pattern in `PortalMailbox`: below `md`, show **list or full-screen chat** (not 3 columns). Back = clear selection; folders via left `Sheet`. Desktop keeps folders \| list \| chat. |
+| Inbox tools | Sort modes (`MailboxSortSelect`); drag conversation → folder/trash (`@dnd-kit` + droppable `FolderTree`). Star/delete/move/restore apply to **all** message ids in the thread. |
+| Live sound | Realtime INSERT → `playNewMessageSound()`; toggle `MessageSoundToggle` (`localStorage` `dt-message-sound-enabled`, default on) |
+| Notifications | Label send: `POST /api/admin/messages/send` emits `label_message` (artist audience). Artist reply: `POST /api/portal/messages/artist-reply` emits `artist_portal_message` (staff). Portal→label already emits on `POST /api/portal/messages/send`. |
+
+### Portal calendar (`/portal/calendar`)
+
+| Topic | Rule |
+|-------|------|
+| Availability | **Always on** for signed-in portal artists (sidebar not gated by `artist.calendar`; page has no disable gate) |
+| Data | Releases: `getAllVisibleReleasesForCalendar` (slim nested select). Events: `getAllVisibleConcertsForCalendar` (past + future, nested artists / featured) |
+| Cache | `getCachedCalendarReleases` (`releases` tag) + `getCachedCalendarConcerts` (`concerts` tag) via cookie-free client |
+| UI filters | Kind: All / Releases / Events. Ownership: All artists / Mine only. Search: artists, titles, venues. Release type chips when releases visible |
+| Filters SSOT | `src/lib/portal/releaseCalendarFilters.ts` (`filterCalendarReleases`, `filterCalendarConcerts`) |
+| Auth | `resolvePortalArtist` request-scoped for “Mine only”; calendar payloads are shared cache |
 
 ### TRACK Tour Planner (`/portal/tour-planner`)
 
@@ -28,7 +111,10 @@ Enterprise tour production module (ported from artist-tour-planner). **Distinct 
 | DAL | `src/lib/api/tours.ts`, `tourStops.ts`, `tourContacts.ts`, `tourTasks.ts`, `tourCrew.ts`, `tourMerch.ts`, `tourConcertBridge.ts` |
 | APIs | `app/api/portal/tour-planner/*` — bearer + `?artistId=` via `authenticatePortalBearerWithArtist` |
 | Offline | Dexie sync queue (`src/lib/tour-planner/offline/`) + TanStack Query persist (tour-planner keys only) |
-| PDF | Day sheet, show settlement, merch settlement — `src/lib/tour-planner/pdf.ts` (jsPDF) |
+| PDF | Day sheet, show settlement, merch settlement, **tour itinerary** — `src/lib/tour-planner/pdf.ts` (jsPDF) |
+| Guided | Mode chooser + `TourProductionWizard` (basics → import concerts → defaults → readiness → share/export). Readiness: `tourReadiness.ts`. |
+| Tour mode | Show-day fullscreen UI (`TourModeView`, `?mode=tour`) — next stop, schedule, maps, day sheet, checks; offline via cached queries. No push. |
+| Public share | `tour_share_links` + `/tour/share/[token]` — logistics + deal framework only (`publicTourShare.ts`) |
 | Admin | Read-only `/admin/tour-planner` — `AdminTourPlannerView`, RLS `"*: admin all"` |
 
 **Concert bridge:** import event → stop (`stops/import-concert`); publish stop → concert (`publishConcert`); sync linked concert (`syncConcert` when `concertId` set). Logic in `tourConcertBridge.ts`.
@@ -55,10 +141,26 @@ Enterprise tour production module (ported from artist-tour-planner). **Distinct 
 
 Enterprise SOS + invoice lifecycle. Workflow helpers: `src/lib/sos/statementWorkflow.ts`, UI: `statementWorkflowUi.tsx`.
 
-**Admin accounting (`/admin/accounting`):** Default **Guided** mode (`AccountingGuidedWizard` in `AccountingPanel.tsx`) — Upload → Review → Publish (settlement). **Advanced** mode: all sub-tabs. Guided stepper is controlled (`activeStep` / `onActiveStepChange`); Review CTA opens settle step and scrolls to `#accounting-guided-settle-panel`.
+**Shared guided kit:** `src/components/guided/` (`GuidedModeChooser`, `GuidedStepShell`, `GuidedStepCoach`) + `src/lib/guided/guidedSteps.ts`. Used by portal billing/invoice/EPK/fan-page assistants and admin release review.
+
+**Portal DAU assistants:**
+| Flow | Entry | Steps |
+|------|--------|--------|
+| Billing | `/portal/billing` | Legal → Tax → Payout (SEPA) → Done. **Skip chooser/assistant when `isBillingProfileComplete`** — open advanced form; `?mode=assistant` or incomplete profile still forces guide. |
+| Invoice from Statement | `/portal/invoices?statement=` (CTA from Statements/Analytics) | Confirm → Billing if needed → Send |
+| EPK first share | `/portal/epk-builder` mode chooser | Template → PDF/Share → Done |
+| Fan page first publish | `/portal/fan-page` mode chooser | Layout template → Checks → Publish |
+
+**Admin release review assistant:** `/admin/release-submissions` mode chooser → Queue → Checklist → Decision → optional draft.
+
+**Admin accounting (`/admin/accounting`):** Default **Guided** mode with **Assistant-first** chooser (`SosWizardModeChooser`). Assistant: Setup → Upload → Checks → Payouts → Publish. Quick: Upload → Payouts → Publish (experts). Step coach (`SosWizardStepCoach`) + `guidedContinueBlockedReason` explain why Continue is disabled. **Advanced** mode: all sub-tabs.
+
+**FX / ECB:** Spot + historical rates via `/api/exchange-rates` (Frankfurter). Processing is gated until rates are non-empty (`useSosCSVProcessor`). Sticky `CurrencyRatesBanner` for loading / live ECB / fallback + refresh. Missing currency throws (no silent €0).
 
 | Module | Role |
 |--------|------|
+| `AccountingGuidedWizard` + `SosWizardStepCoach` | DAU step UI, progress, blocked reasons |
+| `CurrencyRatesBanner` | Sticky FX status + refresh |
 | `SettlementCenterPanel` | Shell: overview, toolbar, register, dialogs |
 | `useSettlementCenter` | Register fetch, bulk actions, correction/payment/lock/archive |
 | `SettlementWorkflowOverview` | Workflow + ledger mismatch warning (`settlementReconciliation`) |
@@ -78,6 +180,8 @@ Enterprise SOS + invoice lifecycle. Workflow helpers: `src/lib/sos/statementWork
 **Admin APIs:** `GET /api/admin/settlements/register`, periods lock/archive, bulk-approve, correction, invoice received/payment.
 
 **Bronze CSV:** Never browser `fetch()` to presigned R2. Upload ≤45 MB via `…/upload`; 45–200 MB via `…/multipart/*`; download via `…/download`. Limits: `bronzeUploadLimits.ts`. UI: `ImportBatchesPanel`.
+
+**Portal statement provenance (chain of custody):** `/portal/statements` shows a trust banner + per-statement “source proof” (distributor, period, SHA-256, batch id, archive time). Download via `GET /api/portal/statements/[id]/source-csv?artistId=` (membership + stream from R2, never browser→presigned). DAL: `getStatementProvenanceByStatementIds` / `toStatementSourceProvenance`. Statements map `batch_id`; RLS `distributor_import_batches: artist read linked` in `reset.sql`. Manual PDF-only statements show “no batch linked”.
 
 ## Document vault
 
@@ -130,10 +234,13 @@ Artists are guided step-by-step; only fields visible/required for the selected t
 
 - **Legacy:** browser print via `printEpkDocument.ts` / `EPKPreview` (`forceMount` on EPK tab)
 - **Canvas builder:** `/portal/epk-builder` — JSON v2 on `artist_epks.epk_document`; server PDF `POST /api/portal/epk/export`; share links `/epk/share/[token]`; analytics `epk_download_events`
+- **Mobile editor:** `EpkBuilderShell` uses `useIsLg()` — single panel (Canvas | Layers | Properties) below `lg`; **do not mount** `ResizablePanelGroup` on mobile (inline `display:flex` defeats CSS `hidden`). Compact toolbar + overflow “More tools”. Portal `lockScroll` + `p-0`.
 
 API surface: document, versions, fonts, share, templates, press export. DAL: `epkDocument.ts`, `epkFonts.ts`, `epkShareLinks.ts`.
 
-## Fan Page (`/portal/fan-page`, public `/@{slug}`)
+## Personal Artist Page (`/portal/fan-page`, public `/@{slug}`)
+
+User-facing name: **Personal Artist Page** (legacy code paths still use `fan-page` / `fan_page`).
 
 Distinct from EPK (press/PDF) and the fixed `/artists/[slug]` profile. One customizable fan landing page per artist.
 
@@ -142,6 +249,7 @@ Distinct from EPK (press/PDF) and the fixed `/artists/[slug]` profile. One custo
 | Flag | `artist.fan_page` in `portal_feature_flags` |
 | Storage | `artist_landing_pages` (1:1 `artist_id`, JSON `LandingPageDocumentV1`) |
 | Editor | Section-based builder (`@dnd-kit`), TipTap bio blocks, shared image crop from EPK |
+| Mobile | Same as EPK: `useIsLg`, one panel (Sections \| Preview \| Properties), compact toolbar, full-bleed `lockScroll` |
 | Public URL | Rewrite `/@:slug` → `/fan/:slug`; ISR tag `fan-page-{slug}` |
 | Publish | `draft` → `pending_review` (default) or direct when `artists.landing_publish_trusted` |
 | Assets | Upload `source=landing` → `asset_folders/landing`, tag `landing_editor` |
@@ -170,14 +278,14 @@ Two independent systems — do not conflate with **Settings → Roles** (`role_p
 
 **Portal flags (seed in `supabase/reset.sql`)**
 
-- **Artist:** `artist.analytics`, `artist.statements`, `artist.marketing`, `artist.invoices`, `artist.documents`, `artist.calendar`, `artist.epk_builder`, `artist.fan_page`, `artist.tour_planner`
+- **Artist:** `artist.analytics`, `artist.statements`, `artist.marketing`, `artist.invoices`, `artist.documents`, `artist.epk_builder`, `artist.fan_page`, `artist.tour_planner` (calendar is always on — not gated)
 - **Journalist:** `journalist.accreditation`, `press.applications`, `press.zip_download`, `press.audio_preview`, `press.contact`
 
 **Press helpers** (`src/lib/pressAccess.ts`): `isPressApplicationsEnabled()`, `isPressZipDownloadEnabled()`, `isPressAudioPreviewEnabled()` — each reads `portal_feature_flags` for role `journalist`.
 
 **Deprecated:** `press.promo_tracks` — replaced by global `promoPool`; hidden in admin UI (`DEPRECATED_PORTAL_FEATURE_FLAGS`), not seeded.
 
-**Route-guard pattern:** RSC page (or server action) loads flags/toggles via DAL, returns disabled message or `notFound()`; nav hides links when flag is off. Examples: `app/portal/calendar/page.tsx` (`artist.calendar`), `app/press/apply/page.tsx` (`press.applications`), `app/press/dashboard/promo-pool/page.tsx` (global `promoPool`).
+**Route-guard pattern:** RSC page (or server action) loads flags/toggles via DAL, returns disabled message or `notFound()`; nav hides links when flag is off. Examples: `app/press/apply/page.tsx` (`press.applications`), `app/press/dashboard/promo-pool/page.tsx` (global `promoPool`). Portal calendar is always available (no flag gate).
 
 Admin UI: `AdminFeaturesWrapper` — section 1 `FeatureTogglesManager` (global, saved with site settings), section 2 `FeatureFlagsManager` (portal rows, immediate PATCH).
 
@@ -187,7 +295,29 @@ SSOT: `assets` + `press_kit_items` via `pressKit.ts`. Promo audio: presigned str
 
 ## PWA
 
-Serwist (`app/sw.ts`). SW excludes `/api/*`, `/admin/*`, `/portal/*`, `/press/*`, `/promo-pool/*`. Single `PWAInstallPrompt` in `Providers.tsx`.
+Serwist (`app/sw.ts`). SW excludes `/api/*` from typical app caches. Dashboard **document** navigations (`/admin`, `/portal`, `/editor`, `/press/dashboard`, `/login`, `/account`) use **NetworkOnly** so locale cookies always hit a fresh RSC tree. Public pages stay NetworkFirst with offline fallback.
+
+- Install copy is **generic** (quick access / offline) — no artist-only product pitches.
+- Auto-banner dismiss is stored in `localStorage` (`pwa-install-dismissed`) but can be re-opened anytime via `requestPwaInstallPrompt()` (`src/lib/pwa/installPrompt.ts`): Footer link, portal Settings, admin/portal sidebar footers.
+- Manual re-open clears the dismiss flag and shows a fallback hint when `beforeinstallprompt` is unavailable.
+- Install entry is hidden when already running as installed PWA (`display-mode: standalone`).
+
+### Web Push + app icon badge
+
+| Piece | Location |
+|-------|----------|
+| SW push / click | `app/sw.ts` — `showNotification`, open URL, optional `setAppBadge` from payload |
+| Subscribe APIs | `/api/push/*` (auth cookie; any logged-in user) |
+| Send path | `emitNotification` → `sendPushForNotification` (service role list + `web-push`) |
+| Zero-config UI | Soft banner in portal + admin shells; device toggle on preferences pages |
+| Icon badge | `setAppIconBadge` from portal badge totals / admin nav badge sum |
+| Schema | `push_subscriptions`; `notification_preferences.push` |
+
+**User path:** log in → tap **Enable** once (browser permission) → done. No VAPID/keys in the UI. Deployer sets VAPID env once (see `DEPLOYMENT.md`).
+
+## Locale switcher
+
+`LocaleFlagSwitcher` + SVG `LocaleFlagIcon` (not emoji — Windows shows DE/GB/FR letters for flag emoji). Opens DE/EN/FR menu, sets `NEXT_LOCALE`, full navigation (not `router.refresh()`). SSOT: `src/i18n/locales.ts`. One control per shell chrome (header), not sidebar footers. Message trees under `src/i18n/messages/{en,de,fr}/`.
 
 ## Website tracking
 

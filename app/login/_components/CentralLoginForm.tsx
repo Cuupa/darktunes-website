@@ -21,6 +21,9 @@ import {
   isRecoverySessionEvent,
 } from '@/lib/auth/recoverySession'
 import { resolveRedirectPath } from '@/lib/auth/resolveRedirectPath'
+import { PASSWORD_MIN_LENGTH } from '@/lib/auth/passwordPolicy'
+import { PasswordRequirements } from '@/components/auth/PasswordRequirements'
+import { getLocalizedPasswordPairError } from '@/components/auth/passwordPolicyUi'
 import { useTranslations } from 'next-intl'
 import type { UserRole } from '@/types/users'
 
@@ -95,7 +98,7 @@ export function CentralLoginForm() {
 
     const fail = () => {
       if (cancelled) return
-      setRecoveryError(t('login_recovery_error'))
+      setRecoveryError(allowInviteSignIn ? t('acceptInvite_error') : t('login_recovery_error'))
     }
 
     const acceptRecoverySession = (
@@ -250,13 +253,9 @@ export function CentralLoginForm() {
   const handleRecovery = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (newPassword.length < 8) {
-      toast.error(t('settings_password_too_short'))
-      return
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast.error(t('settings_password_mismatch'))
+    const policyError = getLocalizedPasswordPairError(newPassword, confirmPassword, (key) => t(key))
+    if (policyError) {
+      toast.error(policyError)
       return
     }
 
@@ -267,6 +266,10 @@ export function CentralLoginForm() {
         data: { session },
       } = await supabase.auth.getSession()
 
+      const recoveryErrorMessage = allowInviteSignIn
+        ? t('acceptInvite_error')
+        : t('login_recovery_error')
+
       if (
         !session ||
         !canUseRecoverySession(session.access_token, {
@@ -274,24 +277,27 @@ export function CentralLoginForm() {
           allowInviteSignIn,
         })
       ) {
-        setRecoveryError(t('login_recovery_error'))
-        toast.error(t('login_recovery_error'))
+        setRecoveryError(recoveryErrorMessage)
+        toast.error(recoveryErrorMessage)
         return
       }
 
       const { error } = await supabase.auth.updateUser({ password: newPassword })
 
       if (error) {
-        setRecoveryError(t('login_recovery_error'))
-        toast.error(t('login_recovery_error'))
+        setRecoveryError(recoveryErrorMessage)
+        toast.error(recoveryErrorMessage)
         return
       }
 
       toast.success(t('login_recovery_success'))
       await redirectAfterAuth()
     } catch {
-      setRecoveryError(t('login_recovery_error'))
-      toast.error(t('login_recovery_error'))
+      const recoveryErrorMessage = allowInviteSignIn
+        ? t('acceptInvite_error')
+        : t('login_recovery_error')
+      setRecoveryError(recoveryErrorMessage)
+      toast.error(recoveryErrorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -301,14 +307,18 @@ export function CentralLoginForm() {
     view === 'forgot'
       ? t('login_forgot_title')
       : view === 'recovery'
-        ? t('login_recovery_title')
+        ? allowInviteSignIn
+          ? t('acceptInvite_title')
+          : t('login_recovery_title')
         : t('login_title')
 
   const description =
     view === 'forgot'
       ? t('login_forgot_description')
       : view === 'recovery'
-        ? t('login_recovery_description')
+        ? allowInviteSignIn
+          ? t('acceptInvite_subtitle')
+          : t('login_recovery_description')
         : t('login_description')
 
   return (
@@ -430,10 +440,27 @@ export function CentralLoginForm() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     required
-                    minLength={8}
+                    minLength={PASSWORD_MIN_LENGTH}
                     disabled={isLoading || !sessionReady}
                     className="bg-muted border-border"
                     autoComplete="new-password"
+                  />
+                  <PasswordRequirements
+                    password={newPassword}
+                    heading={t('password_policy_heading')}
+                    labelFor={(id, fallback) => {
+                      const key = `password_req_${id}` as
+                        | 'password_req_length'
+                        | 'password_req_upper'
+                        | 'password_req_lower'
+                        | 'password_req_digit'
+                        | 'password_req_special'
+                      try {
+                        return t(key)
+                      } catch {
+                        return fallback
+                      }
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
@@ -444,7 +471,7 @@ export function CentralLoginForm() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    minLength={8}
+                    minLength={PASSWORD_MIN_LENGTH}
                     disabled={isLoading || !sessionReady}
                     className="bg-muted border-border"
                     autoComplete="new-password"
@@ -461,7 +488,11 @@ export function CentralLoginForm() {
                   disabled={isLoading || !sessionReady}
                   size="lg"
                 >
-                  {isLoading ? t('login_recovery_submitting') : t('login_recovery_submit')}
+                  {isLoading
+                    ? t('login_recovery_submitting')
+                    : allowInviteSignIn
+                      ? t('acceptInvite_submit')
+                      : t('login_recovery_submit')}
                 </Button>
                 <p className="text-center text-sm">
                   <button

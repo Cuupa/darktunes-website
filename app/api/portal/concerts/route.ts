@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { createConcert, updateConcert, deleteConcert, setConcertArtists } from '@/lib/api/concerts'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 
 /** Normalize a URL string: prepend https:// if no scheme is present. */
 function normalizeUrl(url: string | null | undefined): string | null {
@@ -69,72 +69,91 @@ const updateSchema = z.object({
   status: z.string().optional(),
 })
 
+function artistIdFromReq(req: NextRequest): string | null {
+  return req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
+}
+
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
-  const { supabase, artist, user } = await authenticatePortalBearerWithArtist(req, artistId)
+  const ctx = await withPortalMembershipWrite(req, artistIdFromReq(req))
   const body = createSchema.parse(await req.json())
 
-  const concert = await createConcert(supabase, {
-    artist_id: artist.id,
-    event_name: body.eventName,
-    concert_date: body.concertDate,
-    event_time: body.concertTime ?? null,
-    event_type: body.eventType,
-    venue_name: body.venueName ?? null,
-    venue_address: body.venueAddress ?? null,
-    venue_city: body.venueCity ?? null,
-    venue_country: body.venueCountry ?? null,
-    venue_lat: body.venueLat ?? null,
-    venue_lng: body.venueLng ?? null,
-    venue_osm_id: body.venueOsmId ?? null,
-    ticket_url: body.ticketUrl ?? null,
-    trailer_url: body.trailerUrl ?? null,
-    news_post_id: body.newsPostId ?? null,
-    status: body.status,
-    created_by: user.id,
-    source: 'artist',
-  })
+  const { value: concert } = await portalMemberWrite(
+    ctx,
+    { route: 'POST /api/portal/concerts', table: 'concerts', operation: 'insert' },
+    (db) =>
+      createConcert(db, {
+        artist_id: ctx.artist.id,
+        event_name: body.eventName,
+        concert_date: body.concertDate,
+        event_time: body.concertTime ?? null,
+        event_type: body.eventType,
+        venue_name: body.venueName ?? null,
+        venue_address: body.venueAddress ?? null,
+        venue_city: body.venueCity ?? null,
+        venue_country: body.venueCountry ?? null,
+        venue_lat: body.venueLat ?? null,
+        venue_lng: body.venueLng ?? null,
+        venue_osm_id: body.venueOsmId ?? null,
+        ticket_url: body.ticketUrl ?? null,
+        trailer_url: body.trailerUrl ?? null,
+        news_post_id: body.newsPostId ?? null,
+        status: body.status,
+        created_by: ctx.user.id,
+        source: 'artist',
+      }),
+  )
 
   if (body.featuredArtistIds?.length) {
-    await setConcertArtists(supabase, concert.id, body.featuredArtistIds)
+    await portalMemberWrite(
+      ctx,
+      { route: 'POST /api/portal/concerts', table: 'concert_artists', operation: 'upsert' },
+      (db) => setConcertArtists(db, concert.id, body.featuredArtistIds!),
+    )
   }
 
   return NextResponse.json({ ...concert, featuredArtists: [] })
 })
 
 export const PATCH = withErrorHandler(async (req: NextRequest) => {
-  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
-  const { supabase } = await authenticatePortalBearerWithArtist(req, artistId)
+  const ctx = await withPortalMembershipWrite(req, artistIdFromReq(req))
   const body = updateSchema.parse(await req.json())
 
-  const concert = await updateConcert(supabase, body.id, {
-    event_name: body.eventName,
-    concert_date: body.concertDate,
-    event_time: body.concertTime,
-    event_type: body.eventType,
-    venue_name: body.venueName,
-    venue_address: body.venueAddress,
-    venue_city: body.venueCity,
-    venue_country: body.venueCountry,
-    venue_lat: body.venueLat,
-    venue_lng: body.venueLng,
-    venue_osm_id: body.venueOsmId,
-    ticket_url: body.ticketUrl,
-    trailer_url: body.trailerUrl,
-    news_post_id: body.newsPostId,
-    status: body.status,
-  })
+  const { value: concert } = await portalMemberWrite(
+    ctx,
+    { route: 'PATCH /api/portal/concerts', table: 'concerts', operation: 'update' },
+    (db) =>
+      updateConcert(db, body.id, {
+        event_name: body.eventName,
+        concert_date: body.concertDate,
+        event_time: body.concertTime,
+        event_type: body.eventType,
+        venue_name: body.venueName,
+        venue_address: body.venueAddress,
+        venue_city: body.venueCity,
+        venue_country: body.venueCountry,
+        venue_lat: body.venueLat,
+        venue_lng: body.venueLng,
+        venue_osm_id: body.venueOsmId,
+        ticket_url: body.ticketUrl,
+        trailer_url: body.trailerUrl,
+        news_post_id: body.newsPostId,
+        status: body.status,
+      }),
+  )
 
   if (body.featuredArtistIds !== undefined) {
-    await setConcertArtists(supabase, body.id, body.featuredArtistIds)
+    await portalMemberWrite(
+      ctx,
+      { route: 'PATCH /api/portal/concerts', table: 'concert_artists', operation: 'upsert' },
+      (db) => setConcertArtists(db, body.id, body.featuredArtistIds!),
+    )
   }
 
   return NextResponse.json(concert)
 })
 
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
-  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
-  const { supabase } = await authenticatePortalBearerWithArtist(req, artistId)
+  const ctx = await withPortalMembershipWrite(req, artistIdFromReq(req))
   let id = req.nextUrl.searchParams.get('id')
   if (!id) {
     const body = (await req.json().catch(() => null)) as { id?: string } | null
@@ -142,6 +161,10 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
   }
 
   if (!id) throw new ApiError(400, 'Missing concert id')
-  await deleteConcert(supabase, id)
+  await portalMemberWrite(
+    ctx,
+    { route: 'DELETE /api/portal/concerts', table: 'concerts', operation: 'delete' },
+    (db) => deleteConcert(db, id!),
+  )
   return NextResponse.json({ success: true })
 })

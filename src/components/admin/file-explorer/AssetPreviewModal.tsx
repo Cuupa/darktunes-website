@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowCounterClockwise, ArrowsOut, Copy, DownloadSimple, X } from '@phosphor-icons/react'
 import { toast } from 'sonner'
@@ -26,6 +27,9 @@ export function AssetPreviewModal({
   onSavePress,
   onAssetUpdated,
 }: AssetPreviewModalProps) {
+  const tToast = useTranslations('admin.toast')
+
+
   const open = asset !== null
   const [rotation, setRotation] = useState(0)
   const [isCropping, setIsCropping] = useState(false)
@@ -48,8 +52,8 @@ export function AssetPreviewModal({
 
   const copyUrl = useCallback(() => {
     if (!asset) return
-    void navigator.clipboard.writeText(asset.publicUrl).then(() => toast.success('URL copied'))
-  }, [asset])
+    void navigator.clipboard.writeText(asset.publicUrl).then(() => toast.success(tToast('url_copied')))
+  }, [asset, tToast])
 
   const download = useCallback(() => {
     if (!asset) return
@@ -89,12 +93,12 @@ export function AssetPreviewModal({
       a.download = `cropped-${asset.originalFilename}`
       a.click()
       URL.revokeObjectURL(url)
-      toast.success('Cropped image downloaded')
+      toast.success(tToast('cropped_image_downloaded'))
     }, 'image/png')
 
     setIsCropping(false)
     setCropRect(null)
-  }, [asset, cropRect])
+  }, [asset, cropRect, tToast])
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isCropping) return

@@ -13,6 +13,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import type { AppDefaults } from '@/lib/sos/types'
+import { PercentField, IntegerField } from '@/components/admin/sos/fields/AccountingNumberFields'
+import { EmailField } from '@/components/admin/sos/fields/AccountingTextFields'
+import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 
 interface DefaultSettingsManagerProps {
   defaults: AppDefaults
@@ -29,12 +32,19 @@ function SectionHeading({ icon: Icon, title }: { icon: React.ElementType; title:
   )
 }
 
-function clampPct(value: number): number {
-  return Math.min(100, Math.max(0, value))
-}
-
 export function DefaultSettingsManager({ defaults, onUpdate, onApplyDefaultSplitToAll }: DefaultSettingsManagerProps) {
+  const t = useAccountingLabels()
   const patch = (partial: Partial<AppDefaults>) => onUpdate({ ...defaults, ...partial })
+  const percentMessages = {
+    out_of_range: t.validationPercentRange,
+    invalid: t.validationFieldInvalidNumber,
+    required: t.validationFieldRequired,
+  }
+  const daysMessages = {
+    out_of_range: t.validationDaysRange,
+    invalid: t.validationFieldInvalidNumber,
+    required: t.validationFieldRequired,
+  }
 
   return (
     <div className="space-y-4">
@@ -44,171 +54,91 @@ export function DefaultSettingsManager({ defaults, onUpdate, onApplyDefaultSplit
       </div>
 
       <Card className="p-6 space-y-8">
-
-        {/* ── Split Rate ─────────────────────────────────── */}
         <div className="space-y-4">
           <SectionHeading icon={Coins} title="Payout Default" />
 
-          <div className="space-y-2">
-            <Label htmlFor="default-split">Default Split Rate (%)</Label>
-            <Input
-              id="default-split"
-              type="number"
-              min={0}
-              max={100}
-              step={0.1}
-              value={defaults.defaultSplitPercentage}
-              onChange={e => {
-                const val = parseFloat(e.target.value)
-                if (!Number.isNaN(val)) patch({ defaultSplitPercentage: clampPct(val) })
-              }}
-              placeholder="e.g. 50"
-              className="max-w-xs"
-            />
-            <p className="text-xs text-muted-foreground">
-              Used for new artists when no individual split rate has been set.
-            </p>
-            {onApplyDefaultSplitToAll && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onApplyDefaultSplitToAll}
-                className="mt-1 gap-1.5"
-              >
-                <ArrowClockwise size={14} />
-                Apply default split to all artists
-              </Button>
-            )}
-          </div>
+          <PercentField
+            id="default-split"
+            label="Default Split Rate (%)"
+            value={defaults.defaultSplitPercentage}
+            onChange={(v) => patch({ defaultSplitPercentage: v ?? 0 })}
+            description="Used for new artists when no individual split rate has been set."
+            className="max-w-xs"
+            messages={percentMessages}
+          />
+          {onApplyDefaultSplitToAll && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onApplyDefaultSplitToAll}
+              className="mt-1 gap-1.5"
+            >
+              <ArrowClockwise size={14} />
+              Apply default split to all artists
+            </Button>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="default-split-digital">Digital Split (%) – optional</Label>
-              <Input
-                id="default-split-digital"
-                type="number"
-                min={0}
-                max={100}
-                step={0.1}
-                value={defaults.defaultSplitPercentageDigital ?? ''}
-                onChange={e => {
-                  const raw = e.target.value
-                  if (raw === '') {
-                    patch({ defaultSplitPercentageDigital: undefined })
-                  } else {
-                    const val = parseFloat(raw)
-                    if (!Number.isNaN(val)) patch({ defaultSplitPercentageDigital: clampPct(val) })
-                  }
-                }}
-                placeholder="Empty = global rate"
-              />
-              <p className="text-xs text-muted-foreground">
-                Overrides global split for streaming revenue.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="default-split-physical">Physical/Merch Split (%) – optional</Label>
-              <Input
-                id="default-split-physical"
-                type="number"
-                min={0}
-                max={100}
-                step={0.1}
-                value={defaults.defaultSplitPercentagePhysical ?? ''}
-                onChange={e => {
-                  const raw = e.target.value
-                  if (raw === '') {
-                    patch({ defaultSplitPercentagePhysical: undefined })
-                  } else {
-                    const val = parseFloat(raw)
-                    if (!Number.isNaN(val)) patch({ defaultSplitPercentagePhysical: clampPct(val) })
-                  }
-                }}
-                placeholder="Empty = global rate"
-              />
-              <p className="text-xs text-muted-foreground">
-                Overrides global split for physical / merch revenue.
-              </p>
-            </div>
+            <PercentField
+              id="default-split-digital"
+              label="Digital Split (%) – optional"
+              value={defaults.defaultSplitPercentageDigital}
+              onChange={(v) => patch({ defaultSplitPercentageDigital: v })}
+              optional
+              placeholder="Empty = global rate"
+              description="Overrides global split for streaming revenue."
+              messages={percentMessages}
+            />
+            <PercentField
+              id="default-split-physical"
+              label="Physical/Merch Split (%) – optional"
+              value={defaults.defaultSplitPercentagePhysical}
+              onChange={(v) => patch({ defaultSplitPercentagePhysical: v })}
+              optional
+              placeholder="Empty = global rate"
+              description="Overrides global split for physical / merch revenue."
+              messages={percentMessages}
+            />
           </div>
         </div>
 
-        {/* ── Distribution Fee ───────────────────────────── */}
         <div className="space-y-4">
           <SectionHeading icon={Percent} title="Label Distribution Fee" />
 
-          <div className="space-y-2">
-            <Label htmlFor="distribution-fee">Global Distribution Fee (%)</Label>
-            <Input
-              id="distribution-fee"
-              type="number"
-              min={0}
-              max={100}
-              step={0.1}
-              value={defaults.distributionFeePercentage ?? 0}
-              onChange={e => {
-                const val = parseFloat(e.target.value)
-                if (!Number.isNaN(val)) patch({ distributionFeePercentage: clampPct(val) })
-              }}
-              placeholder="e.g. 15"
-              className="max-w-xs"
-            />
-            <p className="text-xs text-muted-foreground">
-              Retained from each artist&apos;s revenue before the split rate is applied. 0% = no fee.
-            </p>
-          </div>
+          <PercentField
+            id="distribution-fee"
+            label="Global Distribution Fee (%)"
+            value={defaults.distributionFeePercentage ?? 0}
+            onChange={(v) => patch({ distributionFeePercentage: v ?? 0 })}
+            description="Retained from each artist's revenue before the split rate is applied. 0% = no fee."
+            className="max-w-xs"
+            messages={percentMessages}
+          />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="distribution-fee-digital">Digital Fee (%) – optional</Label>
-              <Input
-                id="distribution-fee-digital"
-                type="number"
-                min={0}
-                max={100}
-                step={0.1}
-                value={defaults.distributionFeeDigital ?? ''}
-                onChange={e => {
-                  const raw = e.target.value
-                  if (raw === '') {
-                    patch({ distributionFeeDigital: undefined })
-                  } else {
-                    const val = parseFloat(raw)
-                    if (!Number.isNaN(val)) patch({ distributionFeeDigital: clampPct(val) })
-                  }
-                }}
-                placeholder="Empty = global rate"
-              />
-              <p className="text-xs text-muted-foreground">Overrides global rate for streaming.</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="distribution-fee-physical">Physical/Merch Fee (%) – optional</Label>
-              <Input
-                id="distribution-fee-physical"
-                type="number"
-                min={0}
-                max={100}
-                step={0.1}
-                value={defaults.distributionFeePhysical ?? ''}
-                onChange={e => {
-                  const raw = e.target.value
-                  if (raw === '') {
-                    patch({ distributionFeePhysical: undefined })
-                  } else {
-                    const val = parseFloat(raw)
-                    if (!Number.isNaN(val)) patch({ distributionFeePhysical: clampPct(val) })
-                  }
-                }}
-                placeholder="Empty = global rate"
-              />
-              <p className="text-xs text-muted-foreground">Overrides global rate for physical / merch.</p>
-            </div>
+            <PercentField
+              id="distribution-fee-digital"
+              label="Digital Fee (%) – optional"
+              value={defaults.distributionFeeDigital}
+              onChange={(v) => patch({ distributionFeeDigital: v })}
+              optional
+              placeholder="Empty = global rate"
+              description="Overrides global rate for streaming."
+              messages={percentMessages}
+            />
+            <PercentField
+              id="distribution-fee-physical"
+              label="Physical/Merch Fee (%) – optional"
+              value={defaults.distributionFeePhysical}
+              onChange={(v) => patch({ distributionFeePhysical: v })}
+              optional
+              placeholder="Empty = global rate"
+              description="Overrides global rate for physical / merch."
+              messages={percentMessages}
+            />
           </div>
         </div>
 
-        {/* ── Per-Source Split Overrides ─────────────────── */}
         <div className="space-y-4">
           <SectionHeading icon={Database} title="Global Source Split Rates" />
           <p className="text-xs text-muted-foreground">
@@ -219,71 +149,53 @@ export function DefaultSettingsManager({ defaults, onUpdate, onApplyDefaultSplit
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {(
               [
-                { id: 'source-believe',  key: 'believe',  label: 'Believe (Digital / Streaming)' },
+                { id: 'source-believe', key: 'believe', label: 'Believe (Digital / Streaming)' },
                 { id: 'source-bandcamp', key: 'bandcamp', label: 'Bandcamp' },
                 { id: 'source-darkmerch', key: 'darkmerch', label: 'Darkmerch / Merchandise' },
                 { id: 'source-physical', key: 'physical', label: 'Physical (Shopify / Printful)' },
               ] as const
             ).map(({ id, key, label }) => (
-              <div key={key} className="space-y-2">
-                <Label htmlFor={id}>{label} (%) – optional</Label>
-                <Input
-                  id={id}
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={0.1}
-                  value={defaults.sourceSplits?.[key] ?? ''}
-                  onChange={e => {
-                    const raw = e.target.value
-                    if (raw === '') {
-                      patch({ sourceSplits: { ...defaults.sourceSplits, [key]: undefined } })
-                    } else {
-                      const val = parseFloat(raw)
-                      if (!Number.isNaN(val)) {
-                        patch({ sourceSplits: { ...defaults.sourceSplits, [key]: clampPct(val) } })
-                      }
-                    }
-                  }}
-                  placeholder="Empty = global rate"
-                />
-              </div>
+              <PercentField
+                key={key}
+                id={id}
+                label={`${label} (%) – optional`}
+                value={defaults.sourceSplits?.[key]}
+                onChange={(v) =>
+                  patch({ sourceSplits: { ...defaults.sourceSplits, [key]: v } })
+                }
+                optional
+                placeholder="Empty = global rate"
+                messages={percentMessages}
+              />
             ))}
           </div>
         </div>
 
-        {/* ── Invoice Deadline ───────────────────────────── */}
         <div className="space-y-4">
           <SectionHeading icon={CalendarBlank} title="Invoice Deadline" />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="deadline-days">Payment Deadline (days)</Label>
-              <Input
-                id="deadline-days"
-                type="number"
-                min={1}
-                max={365}
-                step={1}
-                value={defaults.invoiceDeadlineDays}
-                onChange={e => {
-                  const val = parseInt(e.target.value, 10)
-                  if (!Number.isNaN(val)) patch({ invoiceDeadlineDays: Math.max(1, val) })
-                }}
-                placeholder="e.g. 25"
-              />
-              <p className="text-xs text-muted-foreground">
-                Days after statement delivery within which artists must submit their invoice.
-              </p>
-            </div>
+            <IntegerField
+              id="deadline-days"
+              label="Payment Deadline (days)"
+              value={defaults.invoiceDeadlineDays}
+              onChange={(v) => patch({ invoiceDeadlineDays: v })}
+              min={1}
+              max={365}
+              placeholder="e.g. 25"
+              description="Days after statement delivery within which artists must submit their invoice."
+              messages={daysMessages}
+            />
 
             <div className="space-y-2">
+              {/* Free text on purpose: used as email template placeholder (e.g. "20 December"), not ISO date. */}
               <Label htmlFor="deadline-date">Specific due date (optional)</Label>
               <Input
                 id="deadline-date"
                 type="text"
                 value={defaults.invoiceDeadlineDate}
-                onChange={e => patch({ invoiceDeadlineDate: e.target.value })}
+                maxLength={80}
+                onChange={(e) => patch({ invoiceDeadlineDate: e.target.value.slice(0, 80) })}
                 placeholder="e.g. 20 December"
               />
               <p className="text-xs text-muted-foreground">
@@ -298,7 +210,8 @@ export function DefaultSettingsManager({ defaults, onUpdate, onApplyDefaultSplit
               id="donation-org"
               type="text"
               value={defaults.royaltyDonationOrg}
-              onChange={e => patch({ royaltyDonationOrg: e.target.value })}
+              maxLength={200}
+              onChange={(e) => patch({ royaltyDonationOrg: e.target.value.slice(0, 200) })}
               placeholder="e.g. Animal Shelter"
             />
             <p className="text-xs text-muted-foreground">
@@ -307,25 +220,18 @@ export function DefaultSettingsManager({ defaults, onUpdate, onApplyDefaultSplit
           </div>
         </div>
 
-        {/* ── Finance Contact ────────────────────────────── */}
         <div className="space-y-4">
           <SectionHeading icon={EnvelopeSimple} title="Invoice Receipt" />
-
-          <div className="space-y-2">
-            <Label htmlFor="finance-email">Finance Email</Label>
-            <Input
-              id="finance-email"
-              type="email"
-              value={defaults.financeEmail}
-              onChange={e => patch({ financeEmail: e.target.value })}
-              placeholder="e.g. finance@label.com"
-            />
-            <p className="text-xs text-muted-foreground">
-              Artists send their invoice to this address. Used as {'{invoice_email}'} in templates.
-            </p>
-          </div>
+          <EmailField
+            id="finance-email"
+            label="Finance Email"
+            value={defaults.financeEmail}
+            onChange={(v) => patch({ financeEmail: v })}
+            placeholder="e.g. finance@label.com"
+            description="Artists send their invoice to this address. Used as {invoice_email} in templates."
+            errorMessage={t.validationInvalidEmail}
+          />
         </div>
-
       </Card>
     </div>
   )

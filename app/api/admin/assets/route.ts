@@ -3,7 +3,6 @@ import { getAssetsByArtist, getAssetsByFolder, getPressAssets, searchAssets } fr
 import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
 import { withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 export const GET = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(request.headers.get('authorization'))
   await verifyPermission(token, 'can_view_admin_panel')

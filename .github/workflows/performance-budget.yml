@@ -2,19 +2,34 @@ name: Performance Budget
 
 on:
   pull_request:
+    branches: [main]
     paths:
       - 'src/**'
       - 'app/**'
       - 'package.json'
+      - 'package-lock.json'
+      - 'next.config.*'
+      - 'scripts/check-bundle-budget.js'
+      - '.github/workflows/performance-budget.yml'
   push:
     branches: [main]
     paths:
       - 'src/**'
       - 'app/**'
       - 'package.json'
+      - 'package-lock.json'
+      - 'next.config.*'
+      - 'scripts/check-bundle-budget.js'
+      - '.github/workflows/performance-budget.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: perf-budget-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   bundle-budget:
+    name: Bundle Budget
     runs-on: ubuntu-latest
 
     steps:
@@ -30,8 +45,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Next.js cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('app/**/*.[jt]s', 'app/**/*.[jt]sx', 'src/**/*.[jt]s', 'src/**/*.[jt]sx', 'next.config.*') }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+            next-${{ runner.os }}-
+
       - name: Build app
         run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key-for-ci-build' }}
 
       - name: Enforce bundle budget
         run: node scripts/check-bundle-budget.js

@@ -34,7 +34,9 @@ import { ODESLI_PLATFORM_CONFIG } from '@/lib/platforms/odesliPlatformConfig'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { BandcampIcon } from '@/components/icons/BandcampIcon'
 import { useLocale, useTranslations } from 'next-intl'
-import type { Artist, Release, Concert, Video, NewsPost } from '@/types'
+import { toBcp47 } from '@/i18n/locales'
+import type { Release, Concert, Video, NewsPost } from '@/types'
+import type { PublicArtist } from '@/lib/api/publicArtist'
 import { trackShopClick, trackSmartLinkClick } from '@/lib/analytics/trackPageEvent'
 import { ShareButton } from './ShareButton'
 import { RelatedArtists } from './RelatedArtists'
@@ -44,13 +46,13 @@ import { galleryUrlToPressAsset } from '@/lib/api/portalGalleryPress'
 import { getOptimizedImageUrl, getSquareThumbnail } from '@/lib/imageUtils'
 
 interface ArtistDetailContentProps {
-  artist: Artist
+  artist: PublicArtist
   releases: Release[]
   concerts: Concert[]
   videos: Video[]
   news: NewsPost[]
   galleryPhotos: string[]
-  relatedArtists?: Artist[]
+  relatedArtists?: PublicArtist[]
 }
 
 function extractYouTubeId(url: string): string | null {
@@ -105,7 +107,7 @@ export function ArtistDetailContent({
   const tConsent = useTranslations('consent')
   const locale = useLocale()
   const prefersReducedMotion = useReducedMotion()
-  const dateLocale = locale === 'de' ? 'de-DE' : 'en-US'
+  const dateLocale = toBcp47(locale)
   const youtubeId = artist.youtubeUrl ? extractYouTubeId(artist.youtubeUrl) : null
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)

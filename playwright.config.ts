@@ -4,10 +4,14 @@
  * Runs against a locally built Next.js production server (npm run build &&
  * npm run start) for production-parity results.
  *
- * Three browser projects cover all critical viewport combinations:
- *  - Desktop Chrome  (1920 × 1080)
- *  - Mobile Safari   (iPhone 13 — 390 × 844)
- *  - Mobile Chrome   (Pixel 5   — 393 × 851)
+ * Projects:
+ *  - Desktop Chrome  (1920 × 1080) — PR default in QA workflow
+ *  - Mobile Safari   (iPhone 13 — 390 × 844) — main / full matrix
+ *  - Mobile Chrome   (Pixel 5   — 393 × 851) — main / full matrix
+ *  - Performance Chrome — `npm run perf:test` / performance-tests workflow
+ *
+ * CI selects projects via `npx playwright test --project=...` (see qa.yml).
+ * Workers: CI defaults to 2 (override with PLAYWRIGHT_WORKERS).
  */
 
 import { defineConfig, devices } from '@playwright/test'
@@ -20,6 +24,8 @@ import { config as loadEnv } from 'dotenv'
  * so both the webServer's Next process AND the Playwright test runner itself
  * (tests/helpers/*) see the same values. */
 loadEnv({ path: '.env.e2e.local', quiet: true })
+
+const ciWorkers = Number(process.env.PLAYWRIGHT_WORKERS || '2')
 
 export default defineConfig({
   testDir: './tests',
@@ -44,12 +50,14 @@ export default defineConfig({
   /* Retry once on CI to reduce flakiness caused by resource contention. */
   retries: process.env.CI ? 1 : 0,
 
-  /* Parallelism: all DB-backed runs (local and CI) share one real Supabase
-   * stack and a fixed set of fixture users/rows (see tests/helpers/README.md),
-   * so tests run serially everywhere to avoid cross-test races on that shared
-   * state — this is a deliberate architecture decision, not just a CI cost
-   * control (see "Test isolation" in E2E-TESTS.md). */
-  workers: 1,
+  /* Parallelism: DB-backed runs share one Supabase stack + fixture users
+   * (tests/helpers/README.md), so workers stay serial to avoid races
+   * (E2E-TESTS.md "Test isolation"). Override with PLAYWRIGHT_WORKERS only
+   * for non-DB smoke runs. */
+  workers:
+    process.env.PLAYWRIGHT_WORKERS && Number.isFinite(Number(process.env.PLAYWRIGHT_WORKERS))
+      ? Number(process.env.PLAYWRIGHT_WORKERS)
+      : 1,
 
   /* Reporter: 'list' for concise terminal output; HTML report always generated. */
   reporter: [['list'], ['html', { open: 'never' }]],

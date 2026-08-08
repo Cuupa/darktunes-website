@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { RichTextEditor } from '@/components/messaging/RichTextEditor'
+import { getPortalAuthHeaders } from '@/lib/portal/portalFetchAuth'
 import type { Artist } from '@/types'
 
 interface PortalComposeClientProps {
@@ -60,7 +61,10 @@ export function PortalComposeClient({ artistId, artists }: PortalComposeClientPr
     try {
       const res = await fetch('/api/portal/messages/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(await getPortalAuthHeaders()),
+        },
         body: JSON.stringify({
           fromArtistId: artistId,
           toArtistId: toArtistId || null,

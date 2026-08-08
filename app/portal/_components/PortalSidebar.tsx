@@ -1,12 +1,13 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
   CaretUpDown,
   ChartBar,
+  ChartLine,
   ChatCircleText,
   Chats,
   Eye,
@@ -24,8 +25,11 @@ import {
   User,
   Gear,
   Globe,
+  ChatTeardropDots,
 } from '@phosphor-icons/react'
 import { useBrand } from '@/components/brand/BrandProvider'
+import { LocaleFlagSwitcher } from '@/components/LocaleFlagSwitcher'
+import { isStandaloneDisplayMode, requestPwaInstallPrompt } from '@/lib/pwa/installPrompt'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -73,7 +77,18 @@ const NAV_GROUPS: NavGroup[] = [
     groupKey: 'nav_group_dashboard',
     items: [
       { href: '/portal', label: 'overview', icon: ChartBar },
-      { href: '/portal/analytics', label: 'analytics', icon: ChartBar, flag: 'artist.analytics' },
+      {
+        href: '/portal/spotify-trends',
+        label: 'spotify_trends',
+        icon: ChartLine,
+        flag: 'artist.analytics',
+      },
+      {
+        href: '/portal/sos-analytics',
+        label: 'sos_analytics',
+        icon: ChartBar,
+        flag: 'artist.analytics',
+      },
     ],
   },
   {
@@ -83,7 +98,8 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/portal/epk-builder', label: 'epk_builder_nav', icon: FileText, flag: 'artist.epk_builder' },
       { href: '/portal/fan-page', label: 'fan_page_nav', icon: Globe, flag: 'artist.fan_page' },
       { href: '/portal/releases', label: 'releases', icon: MusicNotes },
-      { href: '/portal/calendar', label: 'calendar', icon: CalendarDots, flag: 'artist.calendar' },
+      // Always available for artists (releases + events calendar).
+      { href: '/portal/calendar', label: 'calendar', icon: CalendarDots },
       { href: '/portal/releases/submissions', label: 'releases_submissions_heading', icon: List },
       { href: '/portal/releases/videos', label: 'video_submissions_heading', icon: Eye },
     ],
@@ -121,6 +137,7 @@ const NAV_GROUPS: NavGroup[] = [
     groupKey: 'nav_group_account',
     items: [
       { href: '/portal/settings', label: 'settings', icon: Gear },
+      { href: '/portal/feedback', label: 'feedback', icon: ChatTeardropDots },
       { href: '/portal/help', label: 'help', icon: Question },
     ],
   },
@@ -134,8 +151,13 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [pwaInstalled, setPwaInstalled] = useState(false)
   const { badges } = useUnreadMessages()
   const { offline, canNavigateTo } = usePortalOffline()
+
+  useEffect(() => {
+    setPwaInstalled(isStandaloneDisplayMode())
+  }, [])
 
   // Derive active artist directly from URL — no stale local state
   const activeArtistId = searchParams.get('artistId')
@@ -147,9 +169,12 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
     [activeArtistId, artists],
   )
 
-  /** Append artistId to nav links so server components always get the correct artist */
-  const navHref = (base: string) =>
-    artists.length > 1 && activeArtistId ? `${base}?artistId=${activeArtistId}` : base
+  /** Always append resolved artistId so pages/APIs that require membership never miss context */
+  const navHref = (base: string) => {
+    const id = activeArtistId ?? activeArtist?.id
+    if (!id) return base
+    return `${base}?artistId=${id}`
+  }
 
   const navGroups = useMemo(
     () =>
@@ -283,7 +308,17 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
       {artistBlock}
       {renderNav(onNavigate)}
       <Separator className="bg-border" />
-      <div className="p-4">
+      <div className="p-4 space-y-1">
+        {/* Language switcher lives only in the portal header — avoid duplicates. */}
+        {!pwaInstalled ? (
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+            onClick={() => requestPwaInstallPrompt()}
+          >
+            {t('settings_pwa_show')}
+          </Button>
+        ) : null}
         <Button
           variant="ghost"
           className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
@@ -301,6 +336,7 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
       <header className="portal-main-header sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
         <div className="font-bold tracking-widest text-primary">{labelShortName}</div>
         <div className="flex items-center gap-2">
+          <LocaleFlagSwitcher align="end" />
           <PortalNotificationBell artistId={activeArtist?.id ?? null} />
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
@@ -321,9 +357,12 @@ export function PortalSidebar({ artists, featureFlags }: PortalSidebarProps) {
       </header>
 
       <aside className="portal-sidebar hidden h-full min-h-0 w-64 shrink-0 flex-col border-r border-border bg-card md:flex">
-        <div className="flex items-center justify-between p-6">
+        <div className="flex items-center justify-between gap-2 p-6">
           <span className="font-bold text-lg tracking-widest text-primary">{labelShortName}</span>
-          <PortalNotificationBell artistId={activeArtist?.id ?? null} />
+          <div className="flex items-center gap-1 shrink-0">
+            <LocaleFlagSwitcher align="end" />
+            <PortalNotificationBell artistId={activeArtist?.id ?? null} />
+          </div>
         </div>
         <Separator className="bg-border" />
         <PortalNavShell />

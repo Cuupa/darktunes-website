@@ -12,21 +12,15 @@
  * Transport: Resend credentials from Admin → API Keys (encrypted in api_credentials).
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserRoleWithClient } from '@/lib/getUserRole'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-  if (authError || !user) throw new ApiError(401, 'Unauthorized')
-  const role = await getUserRoleWithClient(supabase, user.id)
-  if (role !== 'admin') throw new ApiError(403, 'Admin only')
+  await requireAdminFromRequest(req)
 
   const body = await req.json() as unknown
   if (!body || typeof body !== 'object') throw new ApiError(400, 'Invalid request body')

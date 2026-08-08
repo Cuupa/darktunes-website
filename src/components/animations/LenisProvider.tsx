@@ -34,14 +34,19 @@ function ScrollLockObserver() {
   return null
 }
 
+/**
+ * Public routes only. `syncTouch: false` so phones keep native touch scroll
+ * (syncTouch caused rubber-band ghosting with VFX layers). Wheel/trackpad still
+ * get smooth Lenis on desktop. Do not conditionally mount Lenis after media
+ * queries — remounting the whole tree detaches focused elements and flakes e2e.
+ */
 const LENIS_OPTIONS = {
   lerp: 0.08,
   duration: 0.55,
   easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-  syncTouch: true,
-  syncTouchLerp: 0.075,
+  syncTouch: false,
   wheelMultiplier: 0.9,
-  touchMultiplier: 1.3,
+  touchMultiplier: 1,
   infinite: false,
   prevent: shouldPreventLenis,
 } as const

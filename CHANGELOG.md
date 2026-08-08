@@ -8,92 +8,151 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Message compose pages:** Admin `/admin/messages/compose` and portal `/portal/messages/compose` replace dismissible compose overlays.
-- **Custom role assignment:** Admin user detail can assign custom roles (`GET/PUT /api/admin/users/:id/custom-roles`) with RBAC audit entries.
-- **Accounting guided setup:** Month picker component, structured label address fields, legal/bank optional section; clearer subtab/action styling.
-- **Asset storage stats RPC:** `get_assets_storage_stats()` for accurate catalog storage totals (no PostgREST 1000-row undercount).
-- **P0 portal security/reliability:** `verify:portal-rls` static gate; `artistId` required on submit/drafts mutations; distributed rate-limit helper (Upstash optional); `withIdempotency` + video submit / invoice payment keys; atomic `create_release_submission_with_tracks` RPC; documents upload via `portalMemberWrite` canary.
-- **Portal release submission wizard:** guided multi-step flow (type → field groups → tracks → review) driven by `field_group`; track focus mode, copy/apply-all, `?step=` URL, review completeness, prefill from last submission.
-- **Server submission drafts:** `submission_form_drafts` + portal draft API (release/video); local IndexedDB cache.
-- **Cover art verification:** server JPEG 3000×3000 check with stable error codes, retries, and short-lived HMAC token so submit can skip re-download; no R2 during form.
-- **Required idempotency** on release submit (UUID); duplicate key returns prior submission when known.
-- **Video submission wizard** shell parity with release form.
-- **Admin wizard groups:** submission form manager can set each field’s wizard group (`metadata`, `distribution`, `rights`, `track`, custom).
-
-### Fixed
-- **Assets storage bar:** Sum via service-role RPC/pagination; refresh after upload/delete; configurable limit via `NEXT_PUBLIC_R2_STORAGE_LIMIT_BYTES`.
-- **Asset → artist folder placement:** Assigning artists always moves the file into the artist folder (single) or primary `collabs` subfolder (multi); creates missing artist folders under `artists/`. Never treats a collabs folder as the artist root.
-- **Portal mailbox i18n:** Compose/reply/trash strings use `portal` message keys (en/de).
-- **Message compose draft:** URL prefill (reply artist/subject) is not overwritten by a stale localStorage draft.
-- **Accounting address fields:** Structured address inputs stay in sync with preset/server loads without mid-edit re-parse glitches.
-- **Distributed rate limit fixed window:** Upstash path EXPIRE only on first INCR (atomic EVAL); continuous traffic no longer extends the window incorrectly.
-- **Invoice payment idempotency:** client type requires UUID; settlement center always sends a key (fallback generate).
-- **Release submit rate limit** aligned with video submit (20 / 10 min / user+IP).
-- **Atomic track insert payload** no longer uses a placeholder submission UUID (RPC assigns id).
-- **Release submit blocked by Drive CORS:** cover art check no longer runs in the browser against CORS-blocked hosts.
-- **Sync reliability (covers / queue / Odesli):** R2 cover uploads retry transient DNS errors (`getaddrinfo EBUSY`) and are concurrency-capped; iTunes release concurrency lowered to 2. Queue executor is single-flight (`sync_executor_lease`) with a ~280s budget (`maxDuration` 300). Admin progress uses backlog drain (not 24h `done`) and only shows 100% when drained; poller re-kicks only when `running === 0`. Odesli throttled to ~4 req/s, does not retry 429 in-request, and batches artist `platform_links`. iTunes 200-collection cap is logged when hit.
-- **Sync → frontend stale data**: queue executor now revalidates public tags **and** list paths (`revalidatePublicContent`) at batch end; YouTube/sync-api/artist routes share the same helper. Admin full release sync polls the queue, reloads the list, and busts public cache instead of reloading immediately after `{ accepted: true }`. Video CRUD/sync also revalidates the `videos` tag. `GET /api/sync/queue` returns queue stats (no longer aliases POST enqueue). `/api/sync` accepts `verifySyncTrigger` (admin/editor), matching the queue route.
-- **Settlements — ledger double-booking**: statement-linked invoice payments no longer post a second negative ledger row when `invoice_liability` already exists; open balance returns to zero after full pay.
-- **Settlements — approve idempotency**: single statement approve only accepts `draft`; re-approve / retry cannot double-book `statement_payout`.
-- **Settlements — correction workflow**: creating a correction no longer supersedes the original or books ledger delta; supersede + delta happen on correction approve so artists keep seeing the live statement.
-- **Invoices — USt / gross totals**: payment caps and carry-forward unpaid amounts use gross (net + tax) matching the PDF.
-- **Portal invoices — locked periods**: creating a statement-linked invoice rejects locked/archived settlement periods (422).
-- **News — press exclusivity**: public news queries and RLS exclude `is_press_only`; press readers require published/scheduled + due `published_at`.
-- **News — unknown status**: mapper defaults unknown statuses to `draft` (was `published`).
-- **SOS UI**: “Sonstiges Digital” residual no longer double-counts Believe/Bandcamp.
-- **Auth — finance APIs**: sales-statements, settlements, invoices, and SOS admin routes require **admin** (editors blocked; matches UI).
-- **XSS — theme customCss**: admin CSS is sanitized before `<style>` injection (`sanitizeThemeCss`).
-- **Portal messages**: MessagesInbox uses shared `sanitizeHtml` on SSR (no raw HTML passthrough).
-- **Health**: `GET /api/health?mode=full` requires admin Bearer or `CRON_SECRET`; SystemHealthWidget sends the admin token.
-
-### Performance
-- **Image optimization cleanup**: removed all `unoptimized` props and `wsrv.nl` helper wrappers (`getOptimizedImageUrl`, `getSquareThumbnail`) from every public-facing `<Image>` component (11 files). All images now flow through Next.js's built-in optimizer and Cloudflare CDN.
-- **`sizes` prop** added to every `fill` image that was missing it (PressReleaseDetailClient, ArtistEpkClient, PressReleasesClient, News.tsx, VideoGridBlock, ReleaseGridBlock) — prevents browsers from over-downloading near-viewport-width images.
-- **`priority` prop** added to above-the-fold images: first news card in `News.tsx`, artist hero in `ArtistDetailContent.tsx`, artist hero in `ArtistEpkClient`.
-
-### Refactored
-- **Centralized `createPublicSupabaseClient`**: removed 6 in-file duplicates (releases/[id]/page, artists/[slug]/page, news/[slug]/page, about/page, sitemap, datenschutz/page) in favour of the shared `@/lib/supabase/publicClient` module.
-- **Deduplicated data fetches** in `press/releases/[slug]/page` and `press/artists/[slug]/page` using `React.cache()` — `getPressReleaseBySlug` and `getArtistBySlug` are now called once per request across `generateMetadata` and the page component.
+- **PWA Web Push + app icon badge (portal + admin):** One-tap **Enable** banner (no technical setup for users). Subscriptions in `push_subscriptions`; per-event `notification_preferences.push`; `emitNotification` sends Web Push via VAPID/`web-push` when configured. Service worker handles `push` / `notificationclick` and Badging API. Deployer sets `NEXT_PUBLIC_VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` once (see `DEPLOYMENT.md` / `.env.example`). Preferences include device toggle + Push column.
+- **CI mobile layout contract:** `npm run check:mobile-layout` (`scripts/check-mobile-layout-contract.mjs`) in `ci:contracts` — bans CSS-only hide of ResizablePanelGroup, requires `useIsLg` on builder shells, full-bleed fan-page parity, footer touch targets. Unit tests for shells + footer.
 
 ### Added
-- **ISR pre-rendering**: `releases/[id]` and `news/[slug]` now export `generateStaticParams()` + `dynamicParams = true`, pre-rendering all visible entries at build time so ISR starts warm rather than cold on-demand.
-- **Loading skeletons** (zero CLS): added `loading.tsx` for all previously uncovered async routes — `/artists`, `/events`, `/events/[id]`, `/news/[slug]`, `/fan/[slug]`, `/datenschutz`, `/impressum`, `/login`, `/promo-pool`, `/epk/share/[token]`, `/newsletter`, `/newsletter/confirmed`, `/offline`, `/account/privacy`, `/account/delete`, `/press/releases/[slug]`, `/press/artists/[slug]`, and all 12 admin sub-pages (`/admin/features`, `/admin/settings`, `/admin/analytics`, `/admin/assets`, `/admin/users`, `/admin/statements`, `/admin/videos`, `/admin/tour-planner`, `/admin/portal-faq`, `/admin/api-keys`, `/admin/support`, `/admin/promo-log`).
-- **Metadata exports**: `/promo-pool` and `/editor` now export `generateMetadata()` with `robots: noindex`.
-
-### Changed
-- **`generateInvoicePdf`** converted from synchronous with `require()` to `async` with `await import()` — eliminates `@typescript-eslint/no-require-imports` suppressions.
-- **ESLint `react-hooks/exhaustive-deps` suppressions removed** from `TiptapEditor.tsx`, `FileExplorer.tsx`, `PromoLogManager.tsx`, `AdminDashboard.tsx`, `ArtistForm.tsx`, and `useSosCSVProcessor.ts` by fixing root causes: ref-based stable callbacks, functional `setState` updaters, and a `sendProcessRef` to decouple worker lifecycle from `sendProcess` identity.
-
-- **Enterprise Analytics — Portal** (`/portal/analytics`): 11 tabs — Streaming, Listeners, Territories, Events (concert + promo impact), Earnings, Releases, Revenue Mix, EPK & Press, Settlement, Website engagement, Merch. Overview intelligence panel on `/portal` with deep links. Authenticated Supabase reads for correct RLS.
-- **Enterprise Analytics — Admin** (`/admin/analytics`): Label Intelligence Hub — roster health, period trends, press CRM, website engagement, financial audit viewer. Sidebar entry under MANAGEMENT.
-- **Gold-layer tables**: `promo_impact`, `page_events`, `merch_orders` in `supabase/reset.sql` + `src/types/database.ts`.
-- **Website tracking**: consent-gated `PageTracker` + `POST /api/page-events` (rate-limited, service-role insert, slug resolution). Shop clicks from roster cards.
-- **Merch pipeline**: `buildMerchOrderRows()` in SOS worker → upsert on Accounting **Save to Portal**.
-- **DAL**: `pageEvents.ts`, `merchOrders.ts`, `labelAnalytics.ts`, `promoImpact.ts`; analytics compute modules in `src/lib/analytics/`.
-- **Artist Portal — Document Vault**: `/portal/documents` — artists upload and manage PDF/DOCX contracts, GEMA forms, and splits documents. Stored in R2 under `artist-documents/{artistId}/`. `artist_documents` table with RLS. Route handlers: `POST /api/portal/documents/upload` (20 MB), `DELETE /api/portal/documents/[id]`.
-- **Artist Portal — Calendar**: `/portal/calendar` — tour date / event calendar view for the artist's own concerts.
-- **Artist Portal — Interviews**: `/portal/interviews` — interview request management and scheduling.
-- **Artist Portal — Onboarding Wizard**: `/portal/onboarding` — first-run wizard guiding new artists through profile setup, photo upload, and social links.
-- **Artist Portal — Help / FAQ**: `/portal/help` — FAQ page and artist support contact form.
-- **Artist Portal — Video Submission**: `/portal/releases/videos/new` — artists submit new video entries for admin review (`is_visible=false`). Notifies admins via `editor_notifications` and email.
-- **Admin — Accounting tab**: `/admin/accounting` — Tab A: SOS Generator (upload royalty PDFs for any artist via `uploadStatement` Server Action); Tab B: Statement History table.
-- **Admin — System tab**: `/admin/system` — Health dashboard, Audit/Error/App-Error logs with filtering, Media Library, and Maintenance panel (clear logs, purge orphaned releases, reset checklists, manage accreditations, clear stats).
-- **Admin — Release Submissions**: `/admin/release-submissions` — review and approve/reject artist-submitted releases.
-- **Admin — Video Submissions**: `/admin/video-submissions` — review and approve/reject artist-submitted videos.
-- **Supabase Read Replica client**: `src/lib/supabase/replica.ts` exports `createReplicaSupabaseClient()`. When `SUPABASE_REPLICA_URL` and `SUPABASE_REPLICA_ANON_KEY` are set, analytics queries and admin health/log reads are routed to the replica. Falls back to primary DB when env vars are unset.
-- **Admin Maintenance API routes**: `POST /api/admin/maintenance/clear-logs`, `purge-releases`, `reset-checklists`, `clear-accreditations`, `reset-accreditations`, `clear-stats`.
-
-### Changed
-- **SOS webhook removed**: `POST /api/webhooks/sos` and `POST /api/webhooks/sos/confirm` deleted. Statement-of-Sales PDFs are now uploaded via a direct `uploadStatement` Server Action (`app/portal/statements/_actions/uploadStatement.ts`) authenticated by the admin's Supabase session. `SOS_WEBHOOK_SECRET` env var is no longer needed.
-- `isValidArtistId` and `isValidPeriod` moved from the deleted `src/lib/sos/sosWebhook.ts` into the new `src/lib/sos/validation.ts`.
+- **Portal unified calendar:** Always available for artists. Month grid shows **releases + live events** with kind toggle (All / Releases / Events), ownership quick filter (All artists / Mine only), and search across artists, titles, and venues. Event detail dialog (tickets, public event page). Cached concert payload via `getCachedCalendarConcerts`.
 
 ### Fixed
-- **Admin overview counts**: `/admin` now loads artists, releases, news, and videos counts server-side, eliminating client-side Supabase CORS failures and the perpetual loading dashes in “Content at a glance”.
-- **Service worker admin navigation warning**: disabled navigation preload in `app/sw.ts` so admin/portal/press navigations excluded from the service worker no longer log cancelled `preloadResponse` warnings.
-- **ESLint 0 warnings**: Added `argsIgnorePattern: '^_'`, `varsIgnorePattern: '^_'`, `caughtErrorsIgnorePattern: '^_'` to the `@typescript-eslint/no-unused-vars` rule in `eslint.config.js`. Removed stale `eslint-disable-next-line` directives in `heroItems.ts` and `sos-csv-processor.worker.ts`.
-- **`ArtistsManager.tsx` dead state**: Removed vestigial `editingArtist` / `setEditingArtist` state and `artistToFormData()` — editing now navigates to `/admin/artists/[id]/edit`; the inline dialog is create-only.
-- **`ColorThemeManager.tsx` useEffect deps**: Added `draft.typography` to the dependency array alongside the individual font-family properties.
-- **Upload size limits in SECURITY.md**: Corrected `/api/portal/upload-release-cover` from 10 MB → 5 MB. Added `/api/portal/upload-asset` as 20 MB (was incorrectly listed as 50 MB). Added `/api/portal/documents/upload` at 20 MB.
+- **Portal release calendar load time:** Slim nested select + `getCachedCalendarReleases` (Data Cache / `releases` tag) instead of `select(*)` + sequential `release_artists` batches on every navigation.
+- **Portal mailbox on mobile:** Messenger-style UX — conversation list OR full-screen chat (back control), folders in a left sheet, 44px touch targets, sticky reply composer. Desktop keeps 3-column layout.
+- **EPK + Personal Artist Page builders on mobile:** Desktop three-column layout no longer paints beside mobile tabs. Root cause: `react-resizable-panels` sets inline `display:flex`, so Tailwind `hidden lg:flex` failed. Shells now mount `ResizablePanelGroup` only at `lg+` via `useIsLg()`; compact toolbars + single-panel tabs below `lg`.
+- **Homepage footer legal links (mobile):** Impressum / Datenschutz / AGB wrap with 44px touch targets; removed overflow clipping that made links untappable.
+- **Mobile public scroll ghosting:** Lenis uses `syncTouch: false` (native touch); VFX lite mode (no CRT/chromatic/will-change); `ScrollReveal` drops permanent `will-change` after animate-in.
+
+### Changed
+- **Portal fan-page shell:** Same full-bleed `lockScroll` + `p-0` as EPK builder.
+- **Agent / CI process (phase-1 bad-practice enforcement):** Session-start section in `AGENTS.md`; `npm run ci` split into `ci:contracts` → `ci:typecheck` → `ci:tests`; PR template (`.github/pull_request_template.md`) with conditional docs checklist; `verify:schema-columns` fails if `supabase/migrations/*.sql` appears. Docs enforcement stays PR/process-based (no naive “any code → any docs” CI gate).
+
+### Fixed
+- **Admin Assets storage bar:** Stale Bearer tokens no longer block cookie auth (401 → cookie fallback). Catalog totals use multi-strategy aggregation (RPC JSON → PostgREST `sum()` → paginated); no-store cache; clearer “Catalog storage” UI with zero-size warning and retry.
+
+### Changed
+- **Portal billing:** Complete billing profiles open the full form directly — no guided mode chooser / setup wizard on every visit. Incomplete profiles and `?mode=assistant` / `?focus=payout` still use the assistant.
+- **Portal nav label:** Statement dashboard renamed **SOS Analytics** → **Sales Analytics** (en/de/fr UI + help). Route `/portal/sos-analytics` and i18n keys unchanged.
+
+### Fixed
+- **Portal Spotify Trends — current month:** Figures for the in-progress calendar month appear only after public presence data exists for that period (post label scrape). Until then the UI keeps the last completed snapshot and does not invent Spotify zeros for the open month.
+- **Admin messages chat:** Inline reply field under the conversation (like the artist portal), not only a link to Compose.
+- **Message reply notifications:** Label→artist sends emit `label_message` to artist members; artist replies to label messages emit staff `artist_portal_message` notifications (bell + history), not only realtime toasts when the mailbox is open.
+
+### Changed
+- **Sync executor continuous drain:** One logical queue run now self-chains across Vercel duration slices (budget headroom before claim, inter-artist pacing, owner-token lease, 6m stuck-job recovery). Rate-limited artists cool down; others keep processing without manual Force Sync every few minutes.
+- **Admin System Health — no infra ops UI:** Removed Supabase Cron / Edge Function / `CRON_SECRET` setup checklist and Cron Schedulers panel from label admin. Health copy stays product-facing (Force Sync, API Keys, contact technical operator); hosting/cron setup remains in `DEPLOYMENT.md` only.
+- **Personal Artist Page rename:** User-facing “Fan Page” labels (portal nav, builder, admin reviews, help, public metadata) → **Personal Artist Page** (routes/keys unchanged).
+- **Assets storage bar:** Cookie+Bearer auth, robust RPC/paginated totals, stable ordering for pagination, file count + clearer error when stats fail.
+
+### Security
+- **Debt cleanup (overlay / over-fetch / brand UA):** Portaled HoverCard, ContextMenu, Tooltip at `z-[10000]` with CI `check:overlay`; Drawer aligned to Dialog stack; auth/role/file-explorer selects column-whitelisted; outbound User-Agents via `src/lib/brand/userAgent.ts` + env; residual CSP/rate-limit risks documented (`SECURITY.md`, `docs/agent/debt-inventory.md`).
+- **Public artist DTOs:** Public pages select a column whitelist only (`PUBLIC_ARTIST_COLUMNS`); no `bandsintown_api_key`, email, VAT, notes, or `user_id` in RSC/client payloads.
+- **`artist_private_data` table:** Secrets/PII (email, VAT, notes, Bandsintown API key, storage quota, EU flag) dual-written here; RLS staff/member only; cleared from `artists` after backfill so `select(*)` cannot leak.
+- **RLS tighten:** Videos require `is_visible` (or staff); assets/folders staff-only read (press-approved path unchanged); `artist_epks` no longer public-read (service-role + column whitelist for public EPK); `site_settings` public key allowlist (billing + invite expiry staff-only).
+- **Public EPK:** Served via service-role server code only (`getPublicArtistEpkByArtistId`).
+
+### Changed
+- **Mailbox chrome i18n:** Admin/portal sort options, system folder labels, search placeholder, compose/sound labels use `admin.messages` / portal message keys (en/de/fr).
+- **Newsletter confirm Edge function:** Brand name / from-display from env (`BRAND_LABEL_NAME` / `LABEL_NAME`); no hard-coded label in email copy.
+- **Dependabot batch (#518–#522):** `@radix-ui/react-avatar` 1.2.6, `@radix-ui/react-context-menu` 2.3.7, `@hookform/resolvers` 5.5.7, `typescript-eslint` 8.65.0, `@vitejs/plugin-react` 6.0.4.
+
+### Added
+- **Mailbox as conversations:** Portal + admin inbox groups `Re:`/`Aw:`/`Fwd:` correspondence into one thread (no duplicate list rows). Detail is a chat timeline (`MessageChatThread`). Sort (newest/oldest/unread/subject/most replies). Drag threads onto folders or Trash. Optional live chime (`MessageSoundToggle`, `localStorage`). Thread actions (star/delete/move/restore) apply to the whole conversation.
+
+### Fixed
+- **Homepage scroll over Videos:** Lenis no longer treats the video grid as a nested scrollport on desktop; `shouldPreventLenis` uses real overflow metrics (not class substrings / permanent `data-lenis-prevent` on grids).
+- **Date/month pickers in modals:** Popover + DropdownMenu `z-[10000]` so calendars open above Dialog/Sheet (`z-[9999]`). Fixes Admin → Releases → Release Date (and other DateField/MonthField-in-dialog cases).
+- **Admin/editor chrome language:** Sidebar + editor dashboard tab labels, Sign Out, roles, and switcher aria-labels resolve via `admin.nav` / `pwa` (en/de/fr). Locale switch updates the menu; editor standalone header gets a flag switcher; active nav uses exact path/tab matching (no false “Releases” highlight on release-submissions; editor tabs highlight correctly).
+- **Bundle budget:** Artist detail route-specific JS ceiling raised to 580 KB (was 530; ~570 KB after public-artist DTO/security work on main).
+- **Homepage anchors:** Remove duplicate `id="videos|releases|news"` wrappers (section components already own the anchors) so e2e/`#videos` is unique.
+- **npm audit (prod):** Override `brace-expansion` ≥5.0.9 and `ip-address` ≥10.4.0 for Security Audit clean on production deps.
+- **A11y (public):** 44px touch targets on Consent/PWA dismiss/Videos pagination/Contact submit; contact form `aria-invalid`/`aria-describedby`; header menu icons `aria-hidden`; Related Artists meta contrast.
+- **Scroll:** Notification preferences table uses horizontal scroll contract + `data-lenis-prevent`.
+- **Locale switcher UX:** SVG flags (no emoji letter fallbacks on Windows); single switcher in portal/admin chrome (not footer duplicate); hard navigation for reliable language change; portal sidebar PWA install entry restored.
+- **Locale + PWA dashboard bugs:** SW no longer NetworkFirst-caches `/admin|/portal|/editor` HTML (stale locale after switch); dropdown above sticky headers; press mobile no double flag; hide install when already standalone.
+- **Health “Never” / buried last-runs:** Full health snapshot loads latest `sync_logs` per API (`limit(1)` per source) instead of a global recent-N window, so a chatty source no longer hides other APIs.
+- **Cron heartbeats reliability:** `sync_execute` awaits heartbeats (incl. mid-drain + finally); YouTube path records `sync_youtube` at start; concurrent heartbeat upserts retry once.
+- **YouTube sync ops:** Cap 500 newest videos/run, structured `sync_logs` on success/error/empty, shared artist attribution + `is_short`, preserve admin-hidden `is_visible` on upsert via `sync-api`.
+- **Hero promo vs site description:** Featured release/news promo/excerpt always wins (teaser + ellipsis); global `heroDescription` only when the item has no own text.
+
+### Added
+
+- **French locale (`fr`):** Selectable alongside DE/EN via flag switcher; full `src/i18n/messages/fr/*` dictionaries; Accept-Language + cookie detection.
+
+#### Product & compliance
+- **Portal analytics split:** Dashboard nav now has **Spotify Trends** (`/portal/spotify-trends`) and **SOS Analytics** (`/portal/sos-analytics`) instead of one overloaded hub. Legacy `/portal/analytics` redirects. Empty states when a source has no data (no misleading zero grids).
+- **Portal Bandsintown credentials:** Profile → Integrations — artists set per-project Bandsintown ID + API key and can sync concerts (`/api/portal/integrations/bandsintown`).
+- **Artist portal product feedback:** `/portal/feedback` — category, optional star rating, optional subject, required message, own history with status. Admin inbox `/admin/feedback` (filter, search, mark reviewed/archive). Table `portal_feedback`. Distinct from Zammad `/admin/support`.
+- **VIES + local IBAN + ECB FX on invoices:** EU VAT IDs via official VIES on billing save; reverse-charge requires live-valid VIES; local ISO 7064 IBAN only; non-EUR invoices store ECB/Frankfurter rate on PDF + `fx_rate*` columns.
+- **Legal multi-tenant + §14 UStG / GoBD:** Public `/agb` with CMS templates and `{{placeholders}}`; Datenschutz portal/settlement retention; label billing party from `site_settings`; billing `tax_status` on PDF; portal AGB opt-in per artist; invoice PDF write-once + `pdf_sha256` + stable R2 keys.
+- **Statement source proof (chain of custody):** Portal statements trust banner + provenance + server-streamed source CSV download; artists may read linked `distributor_import_batches` metadata.
+- **Public metrics disclaimer (portal analytics):** Non-binding notice on Spotify presence vs SOS settlement truth; PDF includes the same disclaimer.
+
+#### Portal & admin product
+- **Portal analytics hub polish:** Dual-axis Spotify presence trends, donut shares, period presets, series prefs, PDF/CSV export, in-page assistant.
+- **Apify Spotify public play counts:** Admin API Keys + Accounting dry-run/sync; monthly URL cap; portal Listeners chart; never writes SOS gold.
+- **Sync control plane (Guided / Advanced):** Admin System Health checklist, live `sync_queue`, cancel/retry APIs.
+- **Portal/Admin DAU assistants:** Shared guided kit; billing SEPA; invoice-from-statement; EPK first share; fan-page first publish; release-submission review; Accounting assistant wizard + FX banner.
+- **Admin release submissions (Eingang):** Artist name, desired release date, inline status, CSV/Excel export + export column prefs.
+- **Messaging M0–M2:** Paginated lists, receipts, rules, attachments, domain send, shared inbox (claim, priority, notes, audit, export).
+- **Notification platform (Phase 1–3):** Unified `notifications` + catalog emit; admin/portal bells, history, preferences.
+- **Invite pipeline:** Configurable link validity, resend invite, strong password policy, rate limits, durable `user_invites`.
+- **Message compose pages:** `/admin/messages/compose` and `/portal/messages/compose`.
+- **Custom role assignment** on admin user detail.
+- **Portal release/video submission wizards** + server drafts + cover art verification + idempotency.
+- **Asset storage stats RPC** `get_assets_storage_stats()`.
+- **Enterprise analytics:** Portal 11-tab hub + admin Label Intelligence; gold tables; page events; merch pipeline.
+- **Portal document vault, calendar, interviews, onboarding, help FAQ, video submission.**
+- **Admin accounting / system / release & video submissions** surfaces; read-replica client; maintenance APIs.
+- **ISR + loading skeletons + metadata** for previously cold public/admin routes.
+
+### Changed
+- **Locale UX:** Flag-based language switcher (`LocaleFlagSwitcher`) on public header, admin, portal, and press dashboard (current flag → pick DE/EN/FR).
+- **PWA install:** Generic offline/quick-access copy; install banner re-openable anytime via Footer, portal Settings, and admin sidebar (`requestPwaInstallPrompt`).
+- **Legal i18n:** Impressum labels DE/EN/FR; default Datenschutz expanded; CMS legal body DE/EN with FR→EN fallback.
+- **Logo delivery:** Higher-res wsrv logo proxy (`getOptimizedLogoUrl`, q=90, wider widths).
+
+### Fixed
+- **Portal notification bell read state:** “Mark all” / open-as-read now writes per-user `message_receipts` (same source as badge counts). Feed + badges stay aligned after refresh.
+- **Portal feedback “Select an artist”:** Feedback always uses the active portal artist (server resolve + nav always passes `artistId`). Multi-artist: submits for the band currently selected in the switcher.
+- **Waterfall top tracks:** Public Spotify top tracks / album plays dedupe by normalized name (max plays).
+- **Apify Force Sync:** System Health Force Sync hits Spotify plays route, not listener sync.
+- **Advanced sync jobs 500:** List jobs without brittle PostgREST artist embeds; separate name lookup.
+- **Accounting FX race / field UX:** Rates gate CSV processing; Percent/Integer fields; clearer DE labels.
+- **Portal profile hometown 500:** Idempotent `artists.hometown` columns; resilient EPK reads.
+- **Admin overview counts:** Server-side counts (no client CORS dashes).
+- **Service worker admin nav:** Navigation preload disabled for dashboard routes.
+- **ESLint 0 warnings:** unused-vars ignore patterns; removed stale disables.
+- **ArtistsManager dead state:** Create dialog only; edit navigates to dedicated route.
+- **ColorThemeManager useEffect deps** for typography draft.
+- **SECURITY.md upload limits** corrected for portal cover/asset/documents routes.
+
+### Changed
+- **GitHub Actions speed (phases A–C):** Parallel jobs, caches, PR E2E Chrome-only, path filters.
+- **API SOTA (A–E):** Schema-column + API-contract verifies in CI; portal membership write helpers; admin dual-auth helpers; upload SSOT limits; rate limits; log-error hardening.
+- **Invite pipeline hardening:** Rate limits, normalization, atomic consume, audit, `createUser` provisioning.
+- **Assets:** Storage bar via service-role sum; assign-to-artist always places under artist folder.
+- **Portal mailbox i18n + compose draft** URL prefill not overwritten by stale localStorage.
+- **Accounting address fields** stay in sync with presets without re-parse glitches.
+- **Distributed rate limit:** Upstash EXPIRE only on first INCR.
+- **Invoice payment idempotency** + release submit rate limit + atomic track insert + Drive CORS cover check.
+- **Sync reliability:** R2 DNS retries, single-flight executor lease, Odesli throttle, revalidatePublicContent at batch end, admin progress drain semantics.
+- **Settlements:** No double ledger on invoice pay; approve idempotency; correction supersede on approve; USt gross totals; locked period invoice reject.
+- **News:** Press-only excluded from public; unknown status → draft.
+- **SOS UI:** Sonstiges Digital residual no longer double-counts.
+- **Auth:** Finance APIs admin-only (editors blocked).
+- **XSS:** Theme `customCss` sanitized.
+- **Portal messages:** Shared `sanitizeHtml` on SSR.
+- **Health full mode:** Requires admin Bearer or `CRON_SECRET`.
+- **SOS webhook removed:** Upload via Server Action only; validation moved to `sos/validation.ts`.
+- **generateInvoicePdf** async dynamic import; exhaustive-deps suppressions fixed at root cause.
+
+### Performance
+- Image path cleanup: public `<Image>` through Next optimizer / CDN; `sizes` on fill images; `priority` on LCP heroes.
+
+### Refactored
+- Centralized `createPublicSupabaseClient` (removed page-local duplicates).
+- Press detail routes: `React.cache()` for shared slug fetches across metadata + page.
+- **Dead code cleanup:** removed unused legacy UI (AdminApp/login wrappers, SpotifyPlayer, Tactical*, MessagesInbox, ListenersChart, PromoLogAdmin, fixtures), unused image-processor worker, unused server actions, and orphaned `publicContentMaintenance` chain (maintenance remains on Supabase Cron path per `publicQueries` comment).
 
 ## [1.1.0] — 2026-06-06
 

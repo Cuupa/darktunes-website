@@ -56,10 +56,13 @@ export async function getApiCredential(
   key: CredentialKey,
 ): Promise<string | null> {
   const cache = await loadCredentialCache(db)
-  if (!cache.configured.has(key)) return null
+  // Prefer cache hits, but never treat a stale "configured" set as authoritative:
+  // a key may have been saved on another instance or after this cache was filled.
   if (cache.values.has(key)) return cache.values.get(key) ?? null
+
   const value = await getDecryptedCredential(db, key, DEFAULT_LABEL_ID)
   cache.values.set(key, value)
+  if (value) cache.configured.add(key)
   return value
 }
 
@@ -150,6 +153,15 @@ export async function getListenerAnalyticsCredentials(
   return { lastfmApiKey, soundchartsApiKey }
 }
 
+export interface ApifyCredentials {
+  apifyToken: string | null
+}
+
+export async function getApifyCredentials(db: DbClient): Promise<ApifyCredentials> {
+  const apifyToken = await getApiCredential(db, 'apify_token')
+  return { apifyToken }
+}
+
 export async function getKnownApiConfiguration(
   db: DbClient,
 ): Promise<Record<string, boolean>> {
@@ -161,6 +173,7 @@ export async function getKnownApiConfiguration(
     bandsintownApiKey,
     lastfmApiKey,
     soundchartsApiKey,
+    apifyToken,
     youtubeApiKey,
     youtubeChannelId,
     artistsWithBandsintownKey,
@@ -172,6 +185,7 @@ export async function getKnownApiConfiguration(
     getApiCredential(db, 'bandsintown_api_key'),
     getApiCredential(db, 'lastfm_api_key'),
     getApiCredential(db, 'soundcharts_api_key'),
+    getApiCredential(db, 'apify_token'),
     getApiCredential(db, 'youtube_api_key'),
     getApiCredential(db, 'youtube_channel_id'),
     db
@@ -193,6 +207,7 @@ export async function getKnownApiConfiguration(
     odesli: true,
     lastfm: Boolean(lastfmApiKey),
     soundcharts: Boolean(soundchartsApiKey),
+    apify: Boolean(apifyToken),
     youtube: Boolean(youtubeApiKey && youtubeChannelId),
   }
 }

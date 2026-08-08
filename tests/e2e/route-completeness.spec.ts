@@ -1,6 +1,18 @@
 import { test, expect } from '@playwright/test'
 
-const PUBLIC_ROUTES = ['/', '/about', '/artists', '/releases', '/news', '/contact', '/press', '/offline']
+const PUBLIC_ROUTES = [
+  '/',
+  '/about',
+  '/artists',
+  '/releases',
+  '/news',
+  '/contact',
+  '/press',
+  '/offline',
+  '/impressum',
+  '/datenschutz',
+  '/agb',
+]
 const PROTECTED_PREFIXES = ['/admin/', '/portal/', '/press/dashboard/', '/promo-pool/']
 const MAX_CRAWL_PAGES = 100
 
@@ -28,13 +40,17 @@ function normalizeInternalPath(href: string, baseURL: string): string | null {
 
 test.describe('Route completeness', () => {
   test('all known public static routes respond without 404', async ({ request }) => {
+    // Legal pages + homepage SSR can be cold in CI; allow headroom beyond default 30s.
+    test.setTimeout(90_000)
     for (const route of PUBLIC_ROUTES) {
-      const response = await request.get(route)
+      const response = await request.get(route, { timeout: 20_000 })
       expect(response.status(), `${route} should return HTTP 200`).toBe(200)
     }
   })
 
   test('crawler visits internal links and verifies HTTP 200 responses', async ({ page, baseURL }) => {
+    // Cold SSR + many public links can exceed Playwright's default 30s in CI.
+    test.setTimeout(180_000)
     const appBaseURL = baseURL ?? 'http://localhost:3000'
     const queue = ['/']
     const visited = new Set<string>()

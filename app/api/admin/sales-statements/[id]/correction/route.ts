@@ -10,7 +10,6 @@ import {
   uploadStatementPdfToR2,
 } from '@/lib/portal/statementPdfStorage'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 const correctionSchema = z.object({
   amount_eur: z.number(),
   pdf_base64: z.string().min(1),

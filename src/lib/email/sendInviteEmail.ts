@@ -10,10 +10,13 @@ import {
   buildPlainUrlFallbackHtml,
   buildTransactionalEmailHtml,
 } from '@/lib/email/buildTransactionalEmailLayout'
+import { formatInviteExpiresAt } from '@/lib/auth/inviteLinkExpiry'
 
 export interface SendInviteEmailDeps {
   recipientEmail: string
   inviteUrl: string
+  /** Absolute expiry of the durable invite link. */
+  expiresAt: Date
   settings: SiteSettings
   resendApiKey: string
   resendFromEmail: string
@@ -39,7 +42,12 @@ function roleLabel(role: UserRole): string {
   }
 }
 
-function buildInviteBodyHtml(inviteUrl: string, role: UserRole, labelName: string): string {
+function buildInviteBodyHtml(
+  inviteUrl: string,
+  role: UserRole,
+  labelName: string,
+  expiresAtLabel: string,
+): string {
   const roleText = roleLabel(role)
   const accountHint =
     role === 'artist'
@@ -54,12 +62,21 @@ function buildInviteBodyHtml(inviteUrl: string, role: UserRole, labelName: strin
     </p>
     ${buildCtaButtonHtml('Accept invitation', inviteUrl)}
     ${buildPlainUrlFallbackHtml(inviteUrl)}
-    <p style="margin: 24px 0 0; font-size: 12px; color: #666666; line-height: 1.6;">
-      This link expires after a limited time. If you did not expect this invitation, you can safely ignore this email.
+    <p style="margin: 24px 0 0; font-size: 13px; color: #b0b0b0; line-height: 1.6;">
+      <strong style="color: #ffffff;">This invitation link expires on ${expiresAtLabel}.</strong>
+      After that time you will need a new invitation from the label.
+    </p>
+    <p style="margin: 12px 0 0; font-size: 12px; color: #666666; line-height: 1.6;">
+      If you did not expect this invitation, you can safely ignore this email.
     </p>`
 }
 
-function buildInviteText(inviteUrl: string, role: UserRole, settings: SiteSettings): string {
+function buildInviteText(
+  inviteUrl: string,
+  role: UserRole,
+  settings: SiteSettings,
+  expiresAtLabel: string,
+): string {
   const footerLines = [
     settings.impressumCompanyName,
     settings.impressumLegalForm,
@@ -77,7 +94,10 @@ You have been invited to join ${settings.labelName} as ${roleLabel(role)}.
 Accept your invitation:
 ${inviteUrl}
 
-This link expires after a limited time. If you did not expect this invitation, you can safely ignore this email.
+This invitation link expires on ${expiresAtLabel}.
+After that time you will need a new invitation from the label.
+
+If you did not expect this invitation, you can safely ignore this email.
 
 —
 ${footerLines.join('\n')}`
@@ -91,13 +111,19 @@ export async function sendInviteEmail(
   }
 
   const siteUrl = deps.siteUrl.replace(/\/$/, '')
+  const expiresAtLabel = formatInviteExpiresAt(deps.expiresAt)
   const html = buildTransactionalEmailHtml({
     labelName: deps.settings.labelName,
     title: INVITE_EMAIL_SUBJECT,
-    bodyHtml: buildInviteBodyHtml(deps.inviteUrl, deps.role, deps.settings.labelName),
+    bodyHtml: buildInviteBodyHtml(
+      deps.inviteUrl,
+      deps.role,
+      deps.settings.labelName,
+      expiresAtLabel,
+    ),
     footerHtml: buildImpressumFooterHtml(deps.settings, siteUrl),
   })
-  const text = buildInviteText(deps.inviteUrl, deps.role, deps.settings)
+  const text = buildInviteText(deps.inviteUrl, deps.role, deps.settings, expiresAtLabel)
 
   let resendRes: Response
   try {

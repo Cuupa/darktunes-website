@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useMemo, useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -105,6 +106,9 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
 }
 
 export default function ArtistEditPage() {
+  const tToast = useTranslations('admin.toast')
+
+
   const params = useParams()
   const router = useRouter()
   const cms = useCmsPaths()
@@ -121,30 +125,39 @@ export default function ArtistEditPage() {
   // Redirect to admin if artist not found once loading is complete
   useEffect(() => {
     if (!isLoading && artists.length > 0 && !artist) {
-      toast.error('Artist not found')
+      toast.error(tToast('artist_not_found'))
       router.push(cms.artists)
     }
-  }, [isLoading, artists.length, artist, router, cms.artists])
+  }, [isLoading, artists.length, artist, router, cms.artists, tToast])
 
   const handleInvite = async () => {
+
     if (!artist) return
     setIsInviting(true)
     try {
       const res = await fetch(`/api/admin/artists/${artist.id}/invite`, { method: 'POST' })
-      const json = (await res.json()) as { ok: boolean; email?: string; error?: string }
+      const json = (await res.json()) as {
+        ok: boolean
+        email?: string
+        error?: string
+        mode?: 'invite' | 'resend'
+      }
       if (!res.ok || !json.ok) {
         toast.error(json.error ?? 'Failed to send invite')
+      } else if (json.mode === 'resend') {
+        toast.success(`New invite link sent to ${json.email ?? artist.email ?? 'artist'}`)
       } else {
         toast.success(`Invite sent to ${json.email ?? artist.email ?? 'artist'}`)
       }
     } catch {
-      toast.error('Failed to send invite')
+      toast.error(tToast('failed_send_invite'))
     } finally {
       setIsInviting(false)
     }
   }
 
   const handleSave = async (data: ArtistFormData) => {
+
     if (!artist) return
     setIsSaving(true)
     try {
@@ -164,7 +177,7 @@ export default function ArtistEditPage() {
             body: JSON.stringify({ artistId: artist.id }),
           }).then(res => {
             if (!res.ok) throw new Error(`Sync failed (${res.status})`)
-            toast.success('Release sync triggered')
+            toast.success(tToast('release_sync_triggered'))
           }).catch(err => {
             toast.error(err instanceof Error ? err.message : 'Release sync failed')
           })
@@ -208,7 +221,7 @@ export default function ArtistEditPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle>Artist Details</CardTitle>
-              {artist?.email && !artist.userId && (
+              {artist?.email && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -217,7 +230,11 @@ export default function ArtistEditPage() {
                   className="gap-2"
                 >
                   <Envelope size={16} aria-hidden="true" />
-                  {isInviting ? 'Sending…' : 'Send Portal Invite'}
+                  {isInviting
+                    ? 'Sending…'
+                    : artist.userId
+                      ? 'Resend invite (new link)'
+                      : 'Send Portal Invite'}
                 </Button>
               )}
             </CardHeader>

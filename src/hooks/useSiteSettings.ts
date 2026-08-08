@@ -42,6 +42,13 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     impressum_email: s.impressumEmail,
     datenschutz_content: s.datenschutzContent,
     datenschutz_content_en: s.datenschutzContentEn ?? '',
+    agb_content: s.agbContent ?? '',
+    agb_content_en: s.agbContentEn ?? '',
+    portal_terms_version: s.portalTermsVersion ?? '',
+    label_billing_street: s.labelBillingStreet ?? '',
+    label_billing_postal_code: s.labelBillingPostalCode ?? '',
+    label_billing_city: s.labelBillingCity ?? '',
+    label_billing_country: s.labelBillingCountry ?? '',
     consent_placeholder_url: s.consentPlaceholderUrl,
     noise_opacity: String(s.noiseOpacity),
     crt_scanlines_enabled: String(s.crtScanlinesEnabled),
@@ -83,6 +90,7 @@ function settingsToRecord(s: SiteSettings): Record<string, string> {
     theme_gradient_accent_to: s.themeGradientAccentTo ?? '',
     theme_gradient_accent_dir: s.themeGradientAccentDir ?? '135deg',
     theme_config: s.themeConfig ? JSON.stringify(s.themeConfig) : '',
+    invite_link_expiry_hours: String(s.inviteLinkExpiryHours ?? 168),
   }
 }
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useLocale, useTranslations } from 'next-intl'
 import { Popover, PopoverContent } from '@/components/ui/popover'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -61,8 +62,8 @@ export function DashboardNotificationBell({ userId }: DashboardNotificationBellP
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'editor_notifications',
-          filter: `recipient_id=eq.${userId}`,
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
         },
         () => { void loadNotificationsRef.current() },
       )
@@ -71,8 +72,8 @@ export function DashboardNotificationBell({ userId }: DashboardNotificationBellP
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'editor_notifications',
-          filter: `recipient_id=eq.${userId}`,
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
         },
         () => { void loadNotificationsRef.current() },
       )
@@ -141,6 +142,17 @@ export function DashboardNotificationBell({ userId }: DashboardNotificationBellP
           onMarkAll={handleMarkAll}
           markAllDisabled={unreadCount === 0 || markingAll}
           isEmpty={items.length === 0}
+          footer={
+            <div className="border-t border-border px-1 pt-2">
+              <Link
+                href="/admin/notifications"
+                onClick={() => setOpen(false)}
+                className="text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {t('viewAll')}
+              </Link>
+            </div>
+          }
         >
           {items.map((item) => {
             const href = getDashboardNotificationHref(item, profile?.role)

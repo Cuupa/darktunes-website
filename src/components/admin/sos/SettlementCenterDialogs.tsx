@@ -10,8 +10,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { MonthField } from '@/components/ui/month-field'
+import { MoneyField, isMoneyInputValid } from '@/components/admin/sos/fields/AccountingNumberFields'
+import { isValidIsoDateRange } from '@/lib/sos/accountingInputValidation'
+import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -135,17 +139,21 @@ export function SettlementCenterDialogs({ settlement }: SettlementCenterDialogsP
                   </AlertDescription>
                 </Alert>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="correction-amount">{t.settlementCorrectedAmountLabel}</Label>
-                <Input
-                  id="correction-amount"
-                  type="text"
-                  inputMode="decimal"
-                  value={correctionAmountEur}
-                  onChange={(event) => setCorrectionAmountEur(event.target.value)}
-                  placeholder={t.settlementCorrectedAmountPlaceholder}
-                />
-              </div>
+              <MoneyField
+                id="correction-amount"
+                label={t.settlementCorrectedAmountLabel}
+                value={correctionAmountEur}
+                onChange={setCorrectionAmountEur}
+                allowZero
+                min={0}
+                placeholder={t.settlementCorrectedAmountPlaceholder}
+                messages={{
+                  required: t.validationFieldRequired,
+                  invalid: t.validationFieldInvalidNumber,
+                  out_of_range: t.validationFieldOutOfRange,
+                  too_many_decimals: t.validationAmountMaxDecimals,
+                }}
+              />
               <div className="space-y-2">
                 <Label htmlFor="correction-notes">{t.settlementInternalNoteLabel}</Label>
                 <Textarea
@@ -162,7 +170,14 @@ export function SettlementCenterDialogs({ settlement }: SettlementCenterDialogsP
             <Button variant="outline" onClick={() => setCorrectionDialogOpen(false)}>
               {t.settlementCancel}
             </Button>
-            <Button disabled={correcting || !correctionTarget} onClick={() => void runCorrection()}>
+            <Button
+              disabled={
+                correcting ||
+                !correctionTarget ||
+                !isMoneyInputValid(correctionAmountEur, { allowZero: true, min: 0 })
+              }
+              onClick={() => void runCorrection()}
+            >
               {correcting ? <CircleNotch size={16} className="animate-spin" /> : null}
               {t.settlementCreateCorrectionDraft}
             </Button>
@@ -195,19 +210,22 @@ export function SettlementCenterDialogs({ settlement }: SettlementCenterDialogsP
                         ? interpolate(t.settlementOutstandingSuffix, { amount: outstanding })
                         : ''}
                     </Label>
-                    <Input
+                    <MoneyField
                       id={`payment-amount-${target.invoiceId}`}
-                      type="number"
-                      min={0.01}
-                      step={0.01}
                       value={paymentAmountsEur[target.invoiceId] ?? ''}
-                      onChange={(event) =>
+                      onChange={(value) =>
                         setPaymentAmountsEur((prev) => ({
                           ...prev,
-                          [target.invoiceId!]: event.target.value,
+                          [target.invoiceId!]: value,
                         }))
                       }
                       placeholder={t.settlementPaymentAmountPlaceholder}
+                      messages={{
+                        required: t.validationFieldRequired,
+                        invalid: t.validationFieldInvalidNumber,
+                        out_of_range: t.validationAmountPositive,
+                        too_many_decimals: t.validationAmountMaxDecimals,
+                      }}
                     />
                   </div>
                 )
@@ -241,7 +259,20 @@ export function SettlementCenterDialogs({ settlement }: SettlementCenterDialogsP
             <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
               {t.settlementCancel}
             </Button>
-            <Button disabled={recordingPayment} onClick={() => void runRecordPayment()}>
+            <Button
+              disabled={
+                recordingPayment ||
+                selectedPaymentTargets.filter((target) => target.invoiceId).length === 0 ||
+                selectedPaymentTargets.some(
+                  (target) =>
+                    !!target.invoiceId &&
+                    !isMoneyInputValid(paymentAmountsEur[target.invoiceId] ?? '', {
+                      allowZero: false,
+                    }),
+                )
+              }
+              onClick={() => void runRecordPayment()}
+            >
               {recordingPayment ? <CircleNotch size={16} className="animate-spin" /> : null}
               {t.settlementSavePayment}
             </Button>
@@ -271,26 +302,59 @@ export function SettlementCenterDialogs({ settlement }: SettlementCenterDialogsP
             <AlertDialogDescription>{t.settlementArchiveDesc}</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="grid gap-3 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="next-period-start">{t.settlementNextPeriodStart}</Label>
-              <Input
-                id="next-period-start"
-                value={nextPeriodStart}
-                onChange={(event) => setNextPeriodStart(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="next-period-end">{t.settlementNextPeriodEnd}</Label>
-              <Input
-                id="next-period-end"
-                value={nextPeriodEnd}
-                onChange={(event) => setNextPeriodEnd(event.target.value)}
-              />
-            </div>
+            <MonthField
+              id="next-period-start"
+              label={t.settlementNextPeriodStart}
+              value={nextPeriodStart.length >= 7 ? nextPeriodStart.slice(0, 7) : nextPeriodStart}
+              onChange={(ym) => {
+                // Archive API expects full ISO dates; map month → first/last day.
+                const start = monthToPeriodDate(ym, false) ?? `${ym}-01`
+                setNextPeriodStart(start)
+                const endOfMonth = monthToPeriodDate(ym, true) ?? start
+                if (!nextPeriodEnd || nextPeriodEnd < start) {
+                  setNextPeriodEnd(endOfMonth)
+                }
+              }}
+              required
+              max={
+                nextPeriodEnd.length >= 7
+                  ? nextPeriodEnd.slice(0, 7)
+                  : undefined
+              }
+            />
+            <MonthField
+              id="next-period-end"
+              label={t.settlementNextPeriodEnd}
+              value={nextPeriodEnd.length >= 7 ? nextPeriodEnd.slice(0, 7) : nextPeriodEnd}
+              onChange={(ym) => {
+                setNextPeriodEnd(monthToPeriodDate(ym, true) ?? `${ym}-01`)
+              }}
+              required
+              min={
+                nextPeriodStart.length >= 7
+                  ? nextPeriodStart.slice(0, 7)
+                  : undefined
+              }
+              error={
+                nextPeriodStart &&
+                nextPeriodEnd &&
+                !isValidIsoDateRange(nextPeriodStart, nextPeriodEnd)
+                  ? t.validationInvalidDateRange
+                  : undefined
+              }
+            />
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>{t.settlementCancel}</AlertDialogCancel>
-            <AlertDialogAction disabled={archiving} onClick={() => void runArchivePeriod()}>
+            <AlertDialogAction
+              disabled={
+                archiving ||
+                !nextPeriodStart ||
+                !nextPeriodEnd ||
+                !isValidIsoDateRange(nextPeriodStart, nextPeriodEnd)
+              }
+              onClick={() => void runArchivePeriod()}
+            >
               {archiving ? t.settlementArchiving : t.settlementArchiveConfirm}
             </AlertDialogAction>
           </AlertDialogFooter>

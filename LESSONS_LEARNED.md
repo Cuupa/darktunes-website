@@ -10,10 +10,53 @@ Distilled anti-patterns from project history. **Append session findings before o
 |--------------|------|
 | Files in `supabase/migrations/` | ⛔ Forbidden. Only `supabase/reset.sql` + `src/types/database.ts` |
 | Helpers after tables that use them | Order: extensions → enums → **functions** → tables → RLS → backfills |
-| Duplicate `ADD COLUMN` for columns already in `CREATE TABLE` | Guards only for columns added after initial definition |
+| CREATE-only columns on evolved tables (`artists`, …) | Live DBs no-op `CREATE TABLE IF NOT EXISTS` — every non-structural column needs `ADD COLUMN IF NOT EXISTS` (`verify:schema-columns`) |
 | Denormalised columns across related tables | Check `supabase/DB_REQUIREMENTS.md` first (3NF) |
 | `has_permission(auth.uid(), …)` | ✅ `has_permission('can_manage_releases')` — one arg only |
 | `CREATE TYPE IF NOT EXISTS` in Supabase SQL Editor | Use `DO $$ … IF NOT EXISTS (pg_type) …` blocks |
+
+## UI stacking & overlays
+
+| Anti-pattern | Rule |
+|--------------|------|
+| Dialog at `z-[9999]` but Popover/Dropdown at default `z-50` | Portaled pickers/menus must use `z-[10000]` (same as Select) or calendars/menus open *behind* the modal and look dead |
+| Raising only Select after a modal z-index bump | Audit **all** portaled overlays (Popover, DropdownMenu, HoverCard, …) in the same change |
+| Replacing `type="date"` with Popover DateField without checking modal hosts | Forms in Dialog (Releases, Videos, Expenses, …) depend on Popover stacking |
+
+## Lenis / public scroll
+
+| Anti-pattern | Rule |
+|--------------|------|
+| Permanent `data-lenis-prevent` on a desktop grid that is only a mobile horizontal strip | Prevent only real nested scrollports; desktop page scroll must keep Lenis |
+| Matching `[class*="overflow-x-auto"]` for Lenis prevent | Tailwind keeps the token in the class string under responsive overrides — check **computed overflow + scroll metrics** |
+| Lenis `syncTouch: true` on phones with fixed VFX / `will-change` layers | Disable Lenis on `(pointer: coarse)`; native scroll. Ghosting/double-image otherwise |
+| Permanent `will-change: transform` after ScrollReveal | Clear to `auto` on animation complete |
+
+## Mobile multi-column editors
+
+| Anti-pattern | Rule |
+|--------------|------|
+| `ResizablePanelGroup` + `className="hidden lg:flex"` | Library sets **inline** `display:flex` → CSS `hidden` loses. **Conditional mount** with `useIsLg()` only |
+| Desktop toolbar `flex-wrap` of 20+ controls on phone | Compact primary row + overflow menu; segment control for panels |
+| Fixed 3-column mailbox (`w-52` + `w-72` + chat) on phones | Messenger pattern: list **or** full-screen thread below `md`; folders in a sheet |
+
+## Session additions
+
+### 2026-08-08 — Calendar cold load + portal mailbox mobile
+
+- **Calendar:** `select('*')` + sequential `release_artists` batches made `/portal/calendar` feel stuck on loading. Prefer one slim nested select for the UI surface, then `unstable_cache` with the public cookie-free client (`getCachedCalendarReleases`) so auth/flag work stays request-scoped but the heavy release payload is shared.
+- **Unified calendar:** Artists expect one calendar for roster life (releases + shows), not a release-only tool. Kind + ownership + artist search beats separate pages for coordination.
+- **Mailbox:** Admin already hid columns on mobile; portal still forced all three panes. Artists need list → chat → back, not a shrunk desktop email client.
+| Footer legal `flex gap-6` + parent `overflow-x-hidden` | Links clip and are untappable — always `flex-wrap` + `min-h-[44px]` |
+
+## Web Push / PWA
+
+| Anti-pattern | Rule |
+|--------------|------|
+| Expect users to configure VAPID or endpoints | Deployer sets env once; UI is one-tap **Enable** only |
+| Upsert `push_subscriptions` with user JWT when `endpoint` is globally unique | Another account on the same browser hits RLS on UPDATE — use **service role** after auth for subscribe reassignment |
+| Rely on push alone without in-app | Always keep `emitNotification` DB path; push is fire-and-forget best-effort |
+| Assume SW + badge work in `next dev` | Serwist SW is production-only here — test push on deployed HTTPS |
 
 ## Next.js & RSC
 
@@ -23,14 +66,28 @@ Distilled anti-patterns from project history. **Append session findings before o
 | `createServerSupabaseClient()` in `unstable_cache` | Cookie-free anon client only (see `AGENTS.md`) |
 | Async routes without `loading.tsx` | Skeleton must match loaded layout (zero CLS) |
 | Missing `metadata` / `generateMetadata` | Never `<title>` in JSX |
+| Logo via `getOptimizedImageUrl(..., 200)` in chrome | Use `getOptimizedLogoUrl` + source ≥2–3× display size; small PNGs stay soft on Retina |
+| Permanent PWA dismiss with no re-entry | Store dismiss, but always expose `requestPwaInstallPrompt()` from Footer/Settings |
+| Legal page body only in one language | Labels/boilerplate via `next-intl`; CMS fields stay bilingual when needed |
+| Hard-coded `locale === 'de' ? 'de-DE' : 'en-US'` | Use `toBcp47(locale)` from `src/i18n/locales.ts` so FR (and future locales) format correctly |
+| New locale without full message tree | Add `messages/<locale>/*` with key parity vs EN; extend `loadMessages` loaders + `LOCALES` + parity tests |
+| Flag emoji in locale switcher | On Windows, regional-indicator emoji show as letters (DE/GB/FR) — use SVG flags |
+| `router.refresh()` for locale cookie change | Force-dynamic portal/admin often lag or ignore; use cookie + full navigation |
+| Locale switcher in header *and* sidebar footer | One chrome control per surface; dedicated Settings card may still host one |
+| SW NetworkFirst cache for dashboard HTML | Locale/cookie-dependent shells (`/admin`, `/portal`, …) must be NetworkOnly or language switches serve stale HTML |
+| Locale switch works but admin menu stays English | Hard reload only helps if labels use `useTranslations` — never hardcode sidebar strings; full `admin.nav` tree in en/de/fr |
 
 ## CI & TypeScript
 
 | Anti-pattern | Rule |
 |--------------|------|
-| PR without full check sequence | `lint` → `tsc` → `test` → `build` — all green in one run |
+| PR without full check sequence | `npm run ci` (or `ci:contracts` → `ci:typecheck` → `ci:tests`) — all green |
 | Lockfile not updated after dep change | Run `npm install`; commit `package-lock.json` |
 | `as any` / `@ts-ignore` / `eslint-disable` to silence CI | Fix root cause |
+| Code shipped without docs/markdown refresh | Agents **always** update docs at session end (`AGENTS.md` + `docs/agent/workflow.md`); stale README/agent/living docs = incomplete work |
+| Prose-only bans with no CI | Prefer contract scripts (`verify:*`, `check:*`) so agents cannot ignore rules |
+| Naive “any code change → any docs file” CI | Causes no-op doc edits; use PR template + `workflow.md` living-doc rules instead |
+| `supabase/migrations/*.sql` | Forbidden — `verify:schema-columns` fails CI |
 
 ## Lenis & scroll
 
@@ -62,6 +119,7 @@ Distilled anti-patterns from project history. **Append session findings before o
 | PII in `app_logs` | UUIDs only; no emails/names |
 | Vulnerable deps without audit | `npm audit` before adding packages |
 | Browser `fetch()` to bronze CSV presigned R2 URLs | Same-origin `/api/admin/sos/import-batches/*` only |
+| Process SOS CSVs while `exchangeRates` is still `{}` | Gate worker `process` until rates non-empty; sticky FX banner on ECB fallback |
 
 ## Accessibility & i18n
 
@@ -71,6 +129,15 @@ Distilled anti-patterns from project history. **Append session findings before o
 | Dialogs without `aria-labelledby` | + `useReducedMotion`, `aria-pressed` on toggles, 44px targets |
 | Hardcoded English strings | `en.json` + `de.json`; RSC passes dict as props |
 | `alert()` / `confirm()` | `sonner` toasts |
+
+## Portal tenancy
+
+| Anti-pattern | Rule |
+|--------------|------|
+| Client pages that only read `?artistId=` with no server fallback | RSC `resolvePortalArtist` + always append resolved id in nav (`activeArtistId ?? activeArtist.id`) |
+| One mega-dashboard mixing unrelated data sources | Separate nav items when sources differ (e.g. Spotify public vs SOS statements) |
+| Returning stored secrets to portal clients | Mask secrets (`hasApiKey`); empty input keeps existing key |
+| Bell mark-all only flips legacy `read` flags | Badge counts use `message_receipts` when `userId` is set — always write receipts on mark-read / mark-all |
 
 ## State & UI
 
@@ -97,6 +164,38 @@ Distilled anti-patterns from project history. **Append session findings before o
 | `get_my_role()` on `profiles` RLS | Direct `auth.uid() = id` on profiles table |
 | Anon client for admin bypass ops | Service-role in route handlers / Server Actions |
 | Column type change without dropping policies | `DROP POLICY IF EXISTS` before `ALTER COLUMN` |
+| `select('*')` + full domain mapper on public RSC | Public column whitelist + `PublicArtist`; secrets in private table |
+| RLS row filter only while secrets share the public table | Row-level ≠ column-level — move secrets off the public-readable row |
+| `authenticated read` on shared media tables | Staff permission or press-approved flags — not every logged-in user |
+
+## Session additions
+
+### 2026-08-07 — Bad-practice “enforcement” drafts need reality checks
+
+- **Finding:** A full agent task dump (emoji START HERE, naive docs-freshness CI, CommonJS in ESM scripts, wholesale `package.json` rewrite, generators with wrong `SectionProps` / raw `fetch` tests) would fight progressive disclosure and existing `routeTestkit` / contract scripts.
+- **Rule:** Prefer structural gates that match the stack (`verify:*` ESM, `ci:*` phase aliases, PR template with *conditional* docs). Do not add “any code → any docs file” CI (no-op docs); do not teach generators that invent APIs (`SectionProps` is not `isLoading`/`onError`).
+
+### 2026-08-07 — Sync executor hang / constant re-kick
+
+- **Finding:** `/api/sync` stopped after ~280s and left jobs `running` until a 10m lock; admin had to Force Sync repeatedly. `force=1` infinite loops ignored the budget and could outlive the lease.
+- **Rule:** Claim only with headroom under maxDuration; pace between artists; self-chain after lease release while due pending remain; owner-token lease release; recover stuck on stats GET. Rate-limit one artist without stopping the whole drain.
+
+### 2026-08-07 — No infra ops in label admin UI
+
+- **Finding:** Label admins were shown Supabase Cron paths, Edge Function secrets, `CRON_SECRET`, and Vercel setup inside Admin → System Health — hosting/ops work that does not belong in product UI.
+- **Rule:** Admin surfaces only product health and actions (API status, queue KPIs, Force Sync, Advanced job console). R2 / Vercel / Supabase Cron / Edge secrets stay in `DEPLOYMENT.md` and operator dashboards — never as admin menu copy or setup checklists.
+
+### 2026-08-07 — Overlay stack + brand residual debt
+
+- **Finding:** Dialog/Sheet at `z-[9999]` made any remaining portaled UI at `z-50` (HoverCard, ContextMenu, Tooltip) unusable inside modals — same class of bug as DateField.
+- **Fix:** Shared portaled stack `z-[10000]` + CI `check:overlay`. Track residual CSP/rate-limit/`select('*')` in `docs/agent/debt-inventory.md`.
+- **Brand UAs:** Put partner User-Agents behind env helpers with brand-neutral defaults so `check:brand` stays clean; set `BRAND_USER_AGENT` in production when APIs need an allowlisted identity.
+
+### 2026-08-06 — Public data / a11y hardening
+
+- **Finding:** Visible `artists` rows exposed `bandsintown_api_key`, email, VAT, notes via anon RLS + `rowToArtist` into client components.
+- **Fix:** `publicArtist.ts` whitelist, `artist_private_data` dual-write, RLS for videos/assets/epks/settings, public a11y targets.
+- **Ops:** Apply `supabase/reset.sql` policy/table sections on live DB after deploy.
 
 ## Documentation
 
@@ -110,6 +209,22 @@ Distilled anti-patterns from project history. **Append session findings before o
 ---
 
 ## Session additions
+
+### 2026-08-07 — Admin dual-auth must not let stale Bearer block cookies
+
+**Admin UI often sends an in-memory access token that expires while the refresh cookie is still valid.** If `verifyAdminRequest` only tries Bearer and never falls through on 401, dual-auth routes (e.g. Assets storage-stats) return 401 and the storage bar stays empty/wrong. Rule: Bearer 401 → cookie session fallback; only hard-stop on 403. Prefer `credentials: 'include'` and optional retry without Authorization.
+
+### 2026-08-07 — Billing guide when profile already complete
+
+**Do not show the guided mode chooser on every `/portal/billing` visit once the profile is complete:** Default complete profiles to advanced form; reserve the assistant for incomplete setup or explicit `?mode=assistant` / `?focus=payout`. Users can still open the assistant from advanced mode.
+
+### 2026-08-07 — Spotify Trends current month without scrape
+
+**Do not materialize the open calendar month as Spotify zeros:** Public presence series only exist after the label scrape writes `apify` listener metrics / track snapshots for `YYYY-MM`. Chart joins that fill missing Spotify series with `0` (e.g. Last.fm-only periods) make the current month look empty/null. Gate the in-progress UTC month until public Spotify data exists; show the last completed snapshot and a pending hint instead.
+
+### 2026-08-04 — Legal billing / VIES / IBAN / FX
+
+**Reverse charge without a hard VIES gate is a tax risk:** Do not allow `tax_status = reverse_charge` without a VAT ID, and do not store VIES downtime as `valid: false` (keep the last good snapshot). Re-check VIES at invoice create. **IBAN stays local-only** (ISO 7064) — never third-party bank APIs (DSGVO). Label recipient party and invoice email brand must come from `site_settings`. SOS-linked invoices should 422 if label contact email/address is missing in CMS.
 
 ### 2026-07-23 — Cover art CORS vs client-side checks
 
@@ -177,6 +292,22 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 **Local sanitize wrappers that no-op on SSR defeat the SSOT:** MessagesInbox returned raw HTML when `window` was undefined; always use `@/lib/sanitizeHtml`.
 
+### 2026-08-04 — Health last-run buried by chatty APIs; void heartbeats
+
+**Global recent-N `sync_logs` is not “latest per API”:** Taking the first row per source from a lookback/limit window makes quiet APIs show “Never” when one source floods the table. Query `order created_at desc limit 1` **per** `api_source` for last-run cards; keep 24h stats as a separate capped aggregation.
+
+**`void recordHealthHeartbeat` + early return drops evidence:** Fire-and-forget heartbeats race isolate freeze after `alreadyRunning` responses. Await heartbeats at kick, refresh during long drains, and write again in `finally`. Concurrent RMW heartbeat upserts need a short retry so cron keys do not clobber each other.
+
+**Item promo must not mix with site hero copy:** Release `promoText` / news `excerpt` always wins for the homepage hero teaser; global `heroDescription` is fallback only when the featured item has no body text.
+
+### 2026-08-07 — Modal pickers, Lenis dead zones, mailbox threads
+
+**Raising Dialog z-index without portaled menus:** After Dialog/Sheet moved to `z-[9999]`, Select was patched to `z-[10000]` but Popover stayed at `z-50` → DateField calendars “do nothing” inside modals. Any portaled overlay that must work in dialogs belongs on the same stack as Select.
+
+**Lenis prevent via class substring:** `[class*="overflow-x-auto"]` matches Tailwind tokens even when `md:overflow-x-visible` wins in CSS. Homepage Videos put permanent `data-lenis-prevent` + `overflow-x-auto` on a desktop grid → vertical scroll dead zone. Prefer real scroll metrics or mobile-only overflow classes; never treat a non-overflowing grid as a nested scrollport.
+
+**Mailbox replies without thread_id:** Sending `Re: subject` as a new row floods the inbox. Group client-side by normalized subject + participants (`src/lib/messaging/threads.ts`); load sent+received for the open conversation so the chat is complete. Thread-level star/delete/move/DnD must touch every message id in the group, not only the root.
+
 ---
 
-*Last updated: 2026-07-21*
+*Last updated: 2026-08-07*

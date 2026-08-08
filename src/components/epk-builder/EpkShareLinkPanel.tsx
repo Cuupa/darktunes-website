@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import {
   Select,
   SelectContent,
@@ -211,16 +212,13 @@ export function EpkShareLinkPanel({ open, onClose, artistId }: EpkShareLinkPanel
               </Select>
             </div>
             {expiryPreset === 'custom' ? (
-              <div className="space-y-2">
-                <Label htmlFor="epk-share-expiry-date">{t('epk_share_expiry_date')}</Label>
-                <Input
-                  id="epk-share-expiry-date"
-                  type="date"
-                  value={customExpiryDate}
-                  onChange={(e) => setCustomExpiryDate(e.target.value)}
-                  min={new Date().toISOString().slice(0, 10)}
-                />
-              </div>
+              <DateField
+                id="epk-share-expiry-date"
+                label={t('epk_share_expiry_date')}
+                value={customExpiryDate}
+                onChange={setCustomExpiryDate}
+                min={new Date().toISOString().slice(0, 10)}
+              />
             ) : null}
             <Button
               type="button"

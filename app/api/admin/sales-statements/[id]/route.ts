@@ -10,7 +10,6 @@ import { assertStatementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { deleteStatementPdfFromR2 } from '@/lib/portal/statementPdfStorage'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const token = extractBearerToken(req.headers.get('authorization'))
   const userId = await verifyAdmin(token)

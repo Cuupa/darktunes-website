@@ -52,6 +52,10 @@ export interface Artist {
   imagePositionY?: number | null
   /** Zoom scale for the portrait image (≥1, default 1). */
   imageScale?: number | null
+  /** Portal AGB version last accepted for this artist (billing terms). */
+  portalTermsVersion?: string | null
+  portalTermsAcceptedAt?: string | null
+  portalTermsAcceptedBy?: string | null
 }
 
 export interface SyncLog {
@@ -224,6 +228,10 @@ export interface LabelMessage {
   forwardedFrom?: string | null
   /** True when the message has associated file attachments. */
   hasAttachments?: boolean
+  /** Auth user who sent on behalf of the label (when known). */
+  senderUserId?: string | null
+  /** Client-supplied idempotency id for send retries. */
+  clientMessageId?: string | null
 }
 
 export interface ArtistReply {
@@ -500,6 +508,17 @@ export interface SiteSettings {
   datenschutzContent: string
   /** English privacy policy text (Markdown or HTML). Displayed on /datenschutz for the EN locale. */
   datenschutzContentEn?: string
+  /** Portal AGB / terms body (Markdown or HTML) — DE. Empty → code default with placeholders. */
+  agbContent: string
+  /** Portal AGB / terms body (Markdown or HTML) — EN. */
+  agbContentEn: string
+  /** Version string for portal terms acceptance (e.g. 2026-08-01). */
+  portalTermsVersion: string
+  /** Structured label billing address for invoice PDFs (optional; falls back to impressum). */
+  labelBillingStreet: string
+  labelBillingPostalCode: string
+  labelBillingCity: string
+  labelBillingCountry: string
   /** URL of the placeholder image shown in ConsentGate before the user opts in. */
   consentPlaceholderUrl: string
   /** Visual overlay: animated noise/grain opacity (0–1). Default 0.04. */
@@ -654,6 +673,12 @@ export interface SiteSettings {
    * backward compatibility.
    */
   themeConfig?: import('@/config/themeConfig').ThemeConfig
+  /**
+   * How long admin invite links remain valid (hours).
+   * Min 24, max 168 (7 days). Default 168.
+   * Stored as site_settings.invite_link_expiry_hours.
+   */
+  inviteLinkExpiryHours: number
 }
 
 // ── Messaging ──────────────────────────────────────────────────────────────
@@ -906,8 +931,12 @@ export interface ReleaseSubmission {
   formData: Record<string, unknown> | null
   adminReply: string | null
   adminReplyAt: string | null
+  /** Label progress note visible to the artist (pipeline update, not a formal decision). */
+  progressNote: string | null
   /** Catalog release created from this submission (draft), if any */
   releaseId?: string | null
+  /** Admin list enrichment (not a DB column). */
+  artistName?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -1042,10 +1071,35 @@ export interface PortalMessage {
   deletedAt: string | null
   folderId: string | null
   hasAttachments: boolean
+  senderUserId?: string | null
+  clientMessageId?: string | null
+  /** Staff assignee for shared inbox (artist → label). */
+  assigneeUserId?: string | null
+  priority?: 'low' | 'normal' | 'high' | 'urgent' | string
+  tags?: string[]
   /** Populated by the API layer — sender artist name */
   fromArtistName?: string
   /** Populated by the API layer — recipient artist name */
   toArtistName?: string
+}
+
+export interface MessageInternalNote {
+  id: string
+  messageSource: 'label' | 'portal'
+  messageId: string
+  authorUserId: string
+  body: string
+  createdAt: string
+}
+
+export interface MessageEvent {
+  id: string
+  messageSource: 'label' | 'portal'
+  messageId: string
+  actorUserId: string | null
+  eventType: string
+  payload: Record<string, unknown>
+  createdAt: string
 }
 
 export interface PortalMessageFolder {

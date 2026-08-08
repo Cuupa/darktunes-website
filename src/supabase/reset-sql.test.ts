@@ -327,16 +327,42 @@ describe('supabase/reset.sql — static analysis', () => {
     )
   })
 
-  it('does not declare artists.apple_music_url twice with an ALTER TABLE guard', () => {
-    const violations: string[] = []
+  it('defines Apify Spotify play snapshot + usage tables with RLS enable', () => {
+    const sql = readFileSync(SQL_PATH, 'utf-8')
+    expect(sql).toMatch(
+      /CREATE TABLE IF NOT EXISTS public\.spotify_track_play_snapshots/,
+    )
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS public\.apify_usage_months/)
+    expect(sql).toMatch(
+      /source IN \('lastfm', 'soundcharts', 'apify'\)/,
+    )
+    expect(sql).toMatch(
+      /metric_type IN \('listeners', 'plays', 'followers'\)/,
+    )
+    expect(sql).toMatch(
+      /ALTER TABLE public\.spotify_track_play_snapshots ENABLE ROW LEVEL SECURITY/,
+    )
+    expect(sql).toMatch(
+      /ALTER TABLE public\.apify_usage_months\s+ENABLE ROW LEVEL SECURITY/,
+    )
+  })
 
-    for (let i = 0; i < lines.length; i++) {
-      const clean = stripComment(lines[i])
-      if (/^ALTER\s+TABLE\s+public\.artists\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+apple_music_url\b/i.test(clean)) {
-        violations.push(`Line ${i + 1}: redundant artists.apple_music_url ALTER TABLE guard`)
-      }
-    }
-
-    expect(violations, violations.join('\n')).toHaveLength(0)
+  it('guards artists CREATE columns with ADD COLUMN IF NOT EXISTS (prod CREATE is a no-op)', () => {
+    // CREATE TABLE IF NOT EXISTS does not add new columns on live DBs.
+    // SSOT: every non-structural artists column must appear in the idempotent
+    // ALTER block — enforced by `npm run verify:schema-columns` for the full set.
+    // apple_music_url is the historical canary (once CREATE-only; caused drift).
+    const hasAppleMusicGuard = lines.some((line) =>
+      /^ALTER\s+TABLE\s+public\.artists\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+apple_music_url\b/i.test(
+        stripComment(line),
+      ),
+    )
+    const hasHometownGuard = lines.some((line) =>
+      /^ALTER\s+TABLE\s+public\.artists\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+hometown\b/i.test(
+        stripComment(line),
+      ),
+    )
+    expect(hasAppleMusicGuard).toBe(true)
+    expect(hasHometownGuard).toBe(true)
   })
 })

@@ -1,8 +1,13 @@
 /**
  * src/lib/portal/bearerAuth.ts
  *
- * Shared Bearer-token authentication for portal Route Handlers.
- * Uses createBearerAuthSupabaseClient so RLS sees auth.uid() correctly.
+ * Shared authentication for portal Route Handlers.
+ *
+ * Prefer Authorization: Bearer <access_token> so RLS sees auth.uid() via
+ * createBearerAuthSupabaseClient.
+ *
+ * Cookie session is accepted as a dual-auth fallback (Phase C2) for legacy
+ * portal clients (messages). Prefer Bearer for all new clients.
  */
 
 import type { NextRequest } from 'next/server'
@@ -27,20 +32,39 @@ export interface PortalBearerAuthWithArtist extends PortalBearerAuth {
   artist: Artist
 }
 
+/**
+ * Authenticate a portal request via Bearer JWT, or fall back to cookie session.
+ */
 export async function authenticatePortalBearer(req: NextRequest): Promise<PortalBearerAuth> {
-  const token = req.headers.get('authorization')?.replace('Bearer ', '')
-  if (!token) throw new ApiError(401, 'Missing authorization token')
+  const authHeader = req.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice('Bearer '.length).trim()
+    if (!token) throw new ApiError(401, 'Missing authorization token')
 
-  const authClient = await createServerSupabaseClient()
+    const authClient = await createServerSupabaseClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await authClient.auth.getUser(token)
+
+    if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
+
+    const supabase = await createBearerAuthSupabaseClient(token)
+    return { token, user, supabase }
+  }
+
+  // Cookie session fallback (dual-auth window for messages / older clients)
+  const cookieClient = await createServerSupabaseClient()
   const {
     data: { user },
-    error: authError,
-  } = await authClient.auth.getUser(token)
+    error: cookieError,
+  } = await cookieClient.auth.getUser()
 
-  if (authError || !user) throw new ApiError(401, 'Invalid or expired token')
+  if (cookieError || !user) {
+    throw new ApiError(401, 'Missing authorization token')
+  }
 
-  const supabase = await createBearerAuthSupabaseClient(token)
-  return { token, user, supabase }
+  return { token: '', user, supabase: cookieClient }
 }
 
 export async function authenticatePortalBearerWithArtist(

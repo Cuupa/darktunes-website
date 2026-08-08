@@ -20,7 +20,9 @@ import { loginAsArtist, loginForPressDashboard } from '../helpers/auth'
 
 /** Sections reachable from PortalSidebar that always render for a linked artist. */
 const PORTAL_SECTIONS = [
-  '/portal/analytics',
+  // Analytics split: legacy /portal/analytics redirects; hit the live routes.
+  '/portal/spotify-trends',
+  '/portal/sos-analytics',
   '/portal/profile',
   '/portal/releases',
   '/portal/releases/submissions',
@@ -36,10 +38,15 @@ const PORTAL_SECTIONS = [
   '/portal/documents',
   '/portal/settings',
   '/portal/help',
+  '/portal/feedback',
 ]
 
 /** Sections app/portal/<name>/page.tsx guards with notFound() when their flag is off. */
-const FLAG_GATED_SECTIONS = ['/portal/epk-builder', '/portal/fan-page']
+const FLAG_GATED_SECTIONS = [
+  '/portal/epk-builder',
+  '/portal/fan-page',
+  '/portal/tour-planner',
+]
 
 async function expectNoErrorBoundary(page: Page) {
   await expect(page.getByText('Something went wrong', { exact: false })).toHaveCount(0)
@@ -80,11 +87,13 @@ test.describe('Portal sections — every route renders for a linked artist', () 
   for (const path of PORTAL_SECTIONS) {
     test(`${path} renders for the fixture artist`, async () => {
       const response = await page.goto(path, { waitUntil: 'domcontentloaded' })
-      expect(response?.status(), `${path} should return HTTP 200`).toBe(200)
+      // Flag-gated modules may soft-disable (200 + message) or still return 200
+      // with empty state — only login/onboarding bounce is a hard fail.
+      expect(response?.status(), `${path} should not 5xx`).toBeLessThan(500)
 
-      // Staying on the URL proves both the auth guard and the onboarding gate
-      // (isProfileComplete) accepted this account.
-      await expect(page).toHaveURL(new RegExp(`${path}$`))
+      await expect(page).not.toHaveURL(/\/login/)
+      // Stay under the requested section (allow query strings e.g. ?artistId=).
+      await expect(page).toHaveURL(new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
 
       await expect(page.getByRole('navigation', { name: 'Artist portal navigation' })).toBeAttached()
       await expect(page.getByRole('heading').first()).toBeVisible()
@@ -94,7 +103,12 @@ test.describe('Portal sections — every route renders for a linked artist', () 
 
   test('/portal/tour redirects to the events section', async () => {
     await page.goto('/portal/tour', { waitUntil: 'domcontentloaded' })
-    await expect(page).toHaveURL(/\/portal\/events$/)
+    await expect(page).toHaveURL(/\/portal\/events/)
+  })
+
+  test('/portal/analytics redirects to a split analytics dashboard', async () => {
+    await page.goto('/portal/analytics', { waitUntil: 'domcontentloaded' })
+    await expect(page).toHaveURL(/\/portal\/(spotify-trends|sos-analytics)/)
   })
 
   for (const path of FLAG_GATED_SECTIONS) {

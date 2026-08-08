@@ -3,10 +3,11 @@
  * POST /api/admin/sos/presets  — create or update a preset by name
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextResponse } from 'next/server'
-import { getUserRoleWithClient } from '@/lib/getUserRole'
 import type { NextRequest } from 'next/server'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   listRulesPresets,
   upsertRulesPresetByName,
@@ -15,17 +16,8 @@ import {
 import { normalizeAccountingConfig } from '@/lib/sos/sosAccountingSettings'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
-async function requireAdmin() {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) throw new ApiError(401, 'Unauthorized')
-  const role = await getUserRoleWithClient(supabase, user.id)
-  if (role !== 'admin') throw new ApiError(403, 'Forbidden')
-  return supabase
-}
-
-export const GET = withErrorHandler(async (): Promise<NextResponse> => {
-  await requireAdmin()
+export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
+  await requireAdminFromRequest(req)
   const serviceSupabase = await createServiceRoleSupabaseClient()
   const presets = await listRulesPresets(serviceSupabase)
   return NextResponse.json({
@@ -40,7 +32,7 @@ export const GET = withErrorHandler(async (): Promise<NextResponse> => {
 })
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  await requireAdmin()
+  await requireAdminFromRequest(req)
   const body = await req.json()
   const { name, config } = body as { name?: string; config?: Partial<RulesPresetConfig> }
   if (!name?.trim()) throw new ApiError(400, 'name is required')

@@ -5,6 +5,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import type { WizardValidationIssue } from '@/lib/sos/wizardValidation'
 import { wizardHasBlockingIssues } from '@/lib/sos/wizardValidation'
+import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
+import { interpolate } from '@/lib/i18n/interpolate'
 
 interface SosValidationPanelProps {
   issues: WizardValidationIssue[]
@@ -12,19 +14,20 @@ interface SosValidationPanelProps {
 }
 
 export function SosValidationPanel({ issues, onIssueAction }: SosValidationPanelProps) {
+  const t = useAccountingLabels()
   const hasBlocking = wizardHasBlockingIssues(issues)
 
   if (issues.length === 0) {
     return (
       <Alert className="mx-6 border-emerald-500/30 bg-emerald-500/5">
         <CheckCircle size={16} className="text-emerald-400" aria-hidden="true" />
-        <AlertTitle className="text-sm">Alles in Ordnung</AlertTitle>
-        <AlertDescription className="text-xs">
-          Keine Probleme gefunden. Sie können mit der Prüfung der Auszahlungen fortfahren.
-        </AlertDescription>
+        <AlertTitle className="text-sm">{t.validationOkTitle}</AlertTitle>
+        <AlertDescription className="text-xs">{t.validationOkBody}</AlertDescription>
       </Alert>
     )
   }
+
+  const errorCount = issues.filter((i) => i.severity === 'error').length
 
   return (
     <div className="p-6 space-y-4">
@@ -36,13 +39,11 @@ export function SosValidationPanel({ issues, onIssueAction }: SosValidationPanel
         )}
         <AlertTitle className="text-sm">
           {hasBlocking
-            ? `${issues.filter((i) => i.severity === 'error').length} Fehler müssen behoben werden`
-            : `${issues.length} Hinweise zur Prüfung`}
+            ? interpolate(t.validationErrorsTitle, { count: errorCount })
+            : interpolate(t.validationWarningsTitle, { count: issues.length })}
         </AlertTitle>
         <AlertDescription className="text-xs">
-          {hasBlocking
-            ? 'Beheben Sie die markierten Fehler, bevor Sie fortfahren.'
-            : 'Warnungen können Sie bestätigen und trotzdem fortfahren.'}
+          {hasBlocking ? t.validationErrorsBody : t.validationWarningsBody}
         </AlertDescription>
       </Alert>
 

@@ -444,6 +444,8 @@ export interface Database {
           started_at: string | null
           finished_at: string | null
           locked_until: string | null
+          cancel_requested_at: string | null
+          cancelled_at: string | null
           error_message: string | null
           attempt_count: number
           created_at: string
@@ -457,6 +459,8 @@ export interface Database {
           started_at?: string | null
           finished_at?: string | null
           locked_until?: string | null
+          cancel_requested_at?: string | null
+          cancelled_at?: string | null
           error_message?: string | null
           attempt_count?: number
           created_at?: string
@@ -470,6 +474,8 @@ export interface Database {
           started_at?: string | null
           finished_at?: string | null
           locked_until?: string | null
+          cancel_requested_at?: string | null
+          cancelled_at?: string | null
           error_message?: string | null
           attempt_count?: number
           created_at?: string
@@ -482,6 +488,62 @@ export interface Database {
             referencedRelation: 'artists'
             referencedColumns: ['id']
           }
+        ]
+      }
+      user_invites: {
+        Row: {
+          id: string
+          email: string
+          role: string
+          token_hash: string
+          portal: boolean
+          artist_id: string | null
+          granted_by: string | null
+          auth_user_id: string | null
+          expires_at: string
+          accepted_at: string | null
+          revoked_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          email: string
+          role: string
+          token_hash: string
+          portal?: boolean
+          artist_id?: string | null
+          granted_by?: string | null
+          auth_user_id?: string | null
+          expires_at: string
+          accepted_at?: string | null
+          revoked_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          email?: string
+          role?: string
+          token_hash?: string
+          portal?: boolean
+          artist_id?: string | null
+          granted_by?: string | null
+          auth_user_id?: string | null
+          expires_at?: string
+          accepted_at?: string | null
+          revoked_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'user_invites_artist_id_fkey'
+            columns: ['artist_id']
+            isOneToOne: false
+            referencedRelation: 'artists'
+            referencedColumns: ['id']
+          },
         ]
       }
       users: {
@@ -612,6 +674,9 @@ export interface Database {
           image_position_y: number | null
           image_scale: number | null
           landing_publish_trusted: boolean
+          portal_terms_version: string | null
+          portal_terms_accepted_at: string | null
+          portal_terms_accepted_by: string | null
           created_at: string
           updated_at: string
         }
@@ -659,6 +724,9 @@ export interface Database {
           image_position_y?: number | null
           image_scale?: number | null
           landing_publish_trusted?: boolean
+          portal_terms_version?: string | null
+          portal_terms_accepted_at?: string | null
+          portal_terms_accepted_by?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -706,10 +774,54 @@ export interface Database {
           image_position_y?: number | null
           image_scale?: number | null
           landing_publish_trusted?: boolean
+          portal_terms_version?: string | null
+          portal_terms_accepted_at?: string | null
+          portal_terms_accepted_by?: string | null
           created_at?: string
           updated_at?: string
         }
         Relationships: []
+      }
+      artist_private_data: {
+        Row: {
+          artist_id: string
+          email: string | null
+          vat_number: string | null
+          notes: string | null
+          bandsintown_api_key: string | null
+          storage_quota_bytes: number | null
+          is_eu_non_german: boolean
+          updated_at: string
+        }
+        Insert: {
+          artist_id: string
+          email?: string | null
+          vat_number?: string | null
+          notes?: string | null
+          bandsintown_api_key?: string | null
+          storage_quota_bytes?: number | null
+          is_eu_non_german?: boolean
+          updated_at?: string
+        }
+        Update: {
+          artist_id?: string
+          email?: string | null
+          vat_number?: string | null
+          notes?: string | null
+          bandsintown_api_key?: string | null
+          storage_quota_bytes?: number | null
+          is_eu_non_german?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'artist_private_data_artist_id_fkey'
+            columns: ['artist_id']
+            isOneToOne: true
+            referencedRelation: 'artists'
+            referencedColumns: ['id']
+          },
+        ]
       }
       artist_epks: {
         Row: {
@@ -900,6 +1012,45 @@ export interface Database {
         }
         Relationships: []
       }
+      tour_share_links: {
+        Row: {
+          id: string
+          tour_id: string
+          artist_id: string
+          token: string
+          label: string | null
+          is_active: boolean
+          expires_at: string | null
+          created_by: string | null
+          created_at: string
+          revoked_at: string | null
+        }
+        Insert: {
+          id?: string
+          tour_id: string
+          artist_id: string
+          token: string
+          label?: string | null
+          is_active?: boolean
+          expires_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          revoked_at?: string | null
+        }
+        Update: {
+          id?: string
+          tour_id?: string
+          artist_id?: string
+          token?: string
+          label?: string | null
+          is_active?: boolean
+          expires_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          revoked_at?: string | null
+        }
+        Relationships: []
+      }
       epk_download_events: {
         Row: {
           id: string
@@ -975,9 +1126,14 @@ export interface Database {
           tax_number: string | null
           vat_id: string | null
           is_small_business: boolean
+          tax_status: string
           iban: string | null
           bic: string | null
           paypal_email: string | null
+          vat_vies_valid: boolean | null
+          vat_vies_checked_at: string | null
+          vat_vies_trader_name: string | null
+          vat_vies_request_id: string | null
           created_at: string
           updated_at: string
         }
@@ -992,9 +1148,14 @@ export interface Database {
           tax_number?: string | null
           vat_id?: string | null
           is_small_business?: boolean
+          tax_status?: string
           iban?: string | null
           bic?: string | null
           paypal_email?: string | null
+          vat_vies_valid?: boolean | null
+          vat_vies_checked_at?: string | null
+          vat_vies_trader_name?: string | null
+          vat_vies_request_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1009,9 +1170,14 @@ export interface Database {
           tax_number?: string | null
           vat_id?: string | null
           is_small_business?: boolean
+          tax_status?: string
           iban?: string | null
           bic?: string | null
           paypal_email?: string | null
+          vat_vies_valid?: boolean | null
+          vat_vies_checked_at?: string | null
+          vat_vies_trader_name?: string | null
+          vat_vies_request_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1035,6 +1201,12 @@ export interface Database {
           issued_date: string
           notes: string | null
           pdf_url: string | null
+          pdf_sha256: string | null
+          service_period_start: string | null
+          service_period_end: string | null
+          fx_rate: number | null
+          fx_rate_date: string | null
+          fx_rate_source: string | null
           received_at: string | null
           received_by: string | null
           paid_at: string | null
@@ -1064,6 +1236,12 @@ export interface Database {
           issued_date?: string
           notes?: string | null
           pdf_url?: string | null
+          pdf_sha256?: string | null
+          service_period_start?: string | null
+          service_period_end?: string | null
+          fx_rate?: number | null
+          fx_rate_date?: string | null
+          fx_rate_source?: string | null
           received_at?: string | null
           received_by?: string | null
           paid_at?: string | null
@@ -1093,6 +1271,12 @@ export interface Database {
           issued_date?: string
           notes?: string | null
           pdf_url?: string | null
+          pdf_sha256?: string | null
+          service_period_start?: string | null
+          service_period_end?: string | null
+          fx_rate?: number | null
+          fx_rate_date?: string | null
+          fx_rate_source?: string | null
           received_at?: string | null
           received_by?: string | null
           paid_at?: string | null
@@ -1435,6 +1619,63 @@ export interface Database {
           value?: number
           country?: string
           fetched_at?: string
+        }
+        Relationships: []
+      }
+      spotify_track_play_snapshots: {
+        Row: {
+          id: string
+          artist_id: string
+          release_id: string | null
+          spotify_track_id: string
+          spotify_album_id: string | null
+          track_name: string | null
+          play_count: number
+          period: string
+          scraped_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          release_id?: string | null
+          spotify_track_id: string
+          spotify_album_id?: string | null
+          track_name?: string | null
+          play_count?: number
+          period: string
+          scraped_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          release_id?: string | null
+          spotify_track_id?: string
+          spotify_album_id?: string | null
+          track_name?: string | null
+          play_count?: number
+          period?: string
+          scraped_at?: string
+        }
+        Relationships: []
+      }
+      apify_usage_months: {
+        Row: {
+          year_month: string
+          urls_charged: number
+          budget: number
+          updated_at: string
+        }
+        Insert: {
+          year_month: string
+          urls_charged?: number
+          budget?: number
+          updated_at?: string
+        }
+        Update: {
+          year_month?: string
+          urls_charged?: number
+          budget?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -3272,6 +3513,84 @@ export interface Database {
         }
         Relationships: []
       }
+      message_receipts: {
+        Row: {
+          message_source: string
+          message_id: string
+          user_id: string
+          read_at: string
+        }
+        Insert: {
+          message_source: string
+          message_id: string
+          user_id: string
+          read_at?: string
+        }
+        Update: {
+          message_source?: string
+          message_id?: string
+          user_id?: string
+          read_at?: string
+        }
+        Relationships: []
+      }
+      message_internal_notes: {
+        Row: {
+          id: string
+          message_source: string
+          message_id: string
+          author_user_id: string
+          body: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          message_source: string
+          message_id: string
+          author_user_id: string
+          body: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          message_source?: string
+          message_id?: string
+          author_user_id?: string
+          body?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      message_events: {
+        Row: {
+          id: string
+          message_source: string
+          message_id: string
+          actor_user_id: string | null
+          event_type: string
+          payload: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          message_source: string
+          message_id: string
+          actor_user_id?: string | null
+          event_type: string
+          payload?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          message_source?: string
+          message_id?: string
+          actor_user_id?: string | null
+          event_type?: string
+          payload?: Json
+          created_at?: string
+        }
+        Relationships: []
+      }
       message_attachments: {
         Row: {
           id: string
@@ -3319,6 +3638,8 @@ export interface Database {
           is_external: boolean
           forwarded_from: string | null
           has_attachments: boolean
+          sender_user_id: string | null
+          client_message_id: string | null
         }
         Insert: {
           id?: string
@@ -3336,6 +3657,8 @@ export interface Database {
           is_external?: boolean
           forwarded_from?: string | null
           has_attachments?: boolean
+          sender_user_id?: string | null
+          client_message_id?: string | null
         }
         Update: {
           id?: string
@@ -3353,6 +3676,8 @@ export interface Database {
           is_external?: boolean
           forwarded_from?: string | null
           has_attachments?: boolean
+          sender_user_id?: string | null
+          client_message_id?: string | null
         }
         Relationships: []
       }
@@ -3582,6 +3907,111 @@ export interface Database {
           sender_id?: string | null
           read?: boolean
           created_at?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          artist_id: string | null
+          type: string
+          entity_type: string
+          entity_id: string | null
+          entity_name: string | null
+          sender_id: string | null
+          payload: Json
+          dedupe_key: string | null
+          read: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          artist_id?: string | null
+          type: string
+          entity_type: string
+          entity_id?: string | null
+          entity_name?: string | null
+          sender_id?: string | null
+          payload?: Json
+          dedupe_key?: string | null
+          read?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          artist_id?: string | null
+          type?: string
+          entity_type?: string
+          entity_id?: string | null
+          entity_name?: string | null
+          sender_id?: string | null
+          payload?: Json
+          dedupe_key?: string | null
+          read?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      notification_preferences: {
+        Row: {
+          user_id: string
+          event_type: string
+          in_app: boolean
+          email: boolean
+          push: boolean
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          event_type: string
+          in_app?: boolean
+          email?: boolean
+          push?: boolean
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          event_type?: string
+          in_app?: boolean
+          email?: boolean
+          push?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          user_agent: string | null
+          created_at: string
+          last_seen_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          user_agent?: string | null
+          created_at?: string
+          last_seen_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          endpoint?: string
+          p256dh?: string
+          auth?: string
+          user_agent?: string | null
+          created_at?: string
+          last_seen_at?: string
         }
         Relationships: []
       }
@@ -3886,6 +4316,7 @@ export interface Database {
           form_data: Record<string, unknown> | null
           admin_reply: string | null
           admin_reply_at: string | null
+          progress_note: string | null
           release_id: string | null
           created_at: string
           updated_at: string
@@ -3911,6 +4342,7 @@ export interface Database {
           form_data?: Record<string, unknown> | null
           admin_reply?: string | null
           admin_reply_at?: string | null
+          progress_note?: string | null
           release_id?: string | null
           created_at?: string
           updated_at?: string
@@ -3936,6 +4368,7 @@ export interface Database {
           form_data?: Record<string, unknown> | null
           admin_reply?: string | null
           admin_reply_at?: string | null
+          progress_note?: string | null
           release_id?: string | null
           created_at?: string
           updated_at?: string
@@ -4327,6 +4760,53 @@ export interface Database {
         }
         Relationships: []
       }
+      portal_feedback: {
+        Row: {
+          id: string
+          artist_id: string
+          user_id: string
+          category: 'bug' | 'feature' | 'ux' | 'general' | 'praise'
+          rating: number | null
+          subject: string | null
+          message: string
+          status: 'new' | 'reviewed' | 'archived'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          user_id: string
+          category: 'bug' | 'feature' | 'ux' | 'general' | 'praise'
+          rating?: number | null
+          subject?: string | null
+          message: string
+          status?: 'new' | 'reviewed' | 'archived'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          user_id?: string
+          category?: 'bug' | 'feature' | 'ux' | 'general' | 'praise'
+          rating?: number | null
+          subject?: string | null
+          message?: string
+          status?: 'new' | 'reviewed' | 'archived'
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_feedback_artist_id_fkey"
+            columns: ["artist_id"]
+            isOneToOne: false
+            referencedRelation: "artists"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       support_known_errors: {
         Row: {
           id: string
@@ -4527,6 +5007,11 @@ export interface Database {
           deleted_at: string | null
           folder_id: string | null
           has_attachments: boolean
+          sender_user_id: string | null
+          client_message_id: string | null
+          assignee_user_id: string | null
+          priority: string
+          tags: string[]
           search_vector: string | null
         }
         Insert: {
@@ -4543,6 +5028,11 @@ export interface Database {
           deleted_at?: string | null
           folder_id?: string | null
           has_attachments?: boolean
+          sender_user_id?: string | null
+          client_message_id?: string | null
+          assignee_user_id?: string | null
+          priority?: string
+          tags?: string[]
         }
         Update: {
           id?: string
@@ -4558,6 +5048,11 @@ export interface Database {
           deleted_at?: string | null
           folder_id?: string | null
           has_attachments?: boolean
+          sender_user_id?: string | null
+          client_message_id?: string | null
+          assignee_user_id?: string | null
+          priority?: string
+          tags?: string[]
         }
         Relationships: [
           {
@@ -4619,7 +5114,12 @@ export interface Database {
     Functions: {
       get_assets_storage_stats: {
         Args: Record<string, never>
-        Returns: { used_bytes: number; asset_count: number }[]
+        /** JSON object: used_bytes, asset_count, zero_size_count */
+        Returns: {
+          used_bytes: number
+          asset_count: number
+          zero_size_count: number
+        }
       }
     }
     Enums: {

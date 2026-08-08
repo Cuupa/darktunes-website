@@ -1,6 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { LabelMessage, MessageTemplate } from '@/types'
+import {
+  resolveMessageListLimit,
+  resolveMessageListOffset,
+  type MessageListOptions,
+  MESSAGE_ADMIN_INBOX_DEFAULT_LIMIT,
+  MESSAGE_LIST_DEFAULT_LIMIT,
+  MESSAGE_SEARCH_DEFAULT_LIMIT,
+} from '@/lib/messaging/constants'
+import { upsertMessageReceipt, countUnreadLabelMessagesForUser } from '@/lib/messaging/receipts'
+import { applyMessageRulesOnInsert } from '@/lib/api/messageRules'
 
 type DbClient = SupabaseClient<Database>
 type MessageRow = Database['public']['Tables']['label_messages']['Row']
@@ -20,6 +30,13 @@ function rowToMessage(row: MessageRow): LabelMessage {
     starred: row.starred,
     deletedAt: row.deleted_at,
     sentAt: row.sent_at,
+    folderId: row.folder_id,
+    senderEmail: row.sender_email,
+    isExternal: row.is_external,
+    forwardedFrom: row.forwarded_from,
+    hasAttachments: row.has_attachments,
+    senderUserId: row.sender_user_id,
+    clientMessageId: row.client_message_id,
   }
 }
 
@@ -33,35 +50,45 @@ function rowToTemplate(row: TemplateRow): MessageTemplate {
   }
 }
 
-export async function getLabelUnreadCount(db: DbClient, artistId: string): Promise<number> {
-  const { count, error } = await db
-    .from('label_messages')
-    .select('id', { count: 'exact', head: true })
-    .eq('artist_id', artistId)
-    .eq('read', false)
-    .is('deleted_at', null)
-
-  if (error) throw new Error(error.message)
-  return count ?? 0
+export async function getLabelUnreadCount(
+  db: DbClient,
+  artistId: string,
+  userId?: string | null,
+): Promise<number> {
+  return countUnreadLabelMessagesForUser(db, artistId, userId)
 }
 
-export async function getLabelMessages(db: DbClient, artistId: string): Promise<LabelMessage[]> {
+export async function getLabelMessages(
+  db: DbClient,
+  artistId: string,
+  opts?: MessageListOptions,
+): Promise<LabelMessage[]> {
+  const limit = resolveMessageListLimit(opts?.limit, MESSAGE_LIST_DEFAULT_LIMIT)
+  const offset = resolveMessageListOffset(opts?.offset)
+
   const { data, error } = await db
     .from('label_messages')
     .select('*')
     .eq('artist_id', artistId)
     .is('deleted_at', null)
     .order('sent_at', { ascending: false })
+    .range(offset, offset + limit - 1)
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToMessage)
 }
 
-export async function getAllLabelMessages(db: DbClient): Promise<LabelMessage[]> {
+export async function getAllLabelMessages(
+  db: DbClient,
+  opts?: MessageListOptions,
+): Promise<LabelMessage[]> {
+  const limit = resolveMessageListLimit(opts?.limit, MESSAGE_ADMIN_INBOX_DEFAULT_LIMIT)
+  const offset = resolveMessageListOffset(opts?.offset)
+
   const { data, error } = await db
     .from('label_messages')
     .select('*')
     .order('sent_at', { ascending: false })
-    .limit(200)
+    .range(offset, offset + limit - 1)
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToMessage)
 }
@@ -69,8 +96,11 @@ export async function getAllLabelMessages(db: DbClient): Promise<LabelMessage[]>
 export async function searchLabelMessages(
   db: DbClient,
   query: string,
-  filters?: { artistId?: string; unreadOnly?: boolean },
+  filters?: { artistId?: string; unreadOnly?: boolean } & MessageListOptions,
 ): Promise<LabelMessage[]> {
+  const limit = resolveMessageListLimit(filters?.limit, MESSAGE_SEARCH_DEFAULT_LIMIT)
+  const offset = resolveMessageListOffset(filters?.offset)
+
   let builder = db.from('label_messages').select('*').is('deleted_at', null)
   if (query.trim()) {
     builder = builder.textSearch('search_vector', query.trim(), { type: 'websearch' })
@@ -81,7 +111,9 @@ export async function searchLabelMessages(
   if (filters?.unreadOnly) {
     builder = builder.eq('read', false)
   }
-  const { data, error } = await builder.order('sent_at', { ascending: false }).limit(100)
+  const { data, error } = await builder
+    .order('sent_at', { ascending: false })
+    .range(offset, offset + limit - 1)
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToMessage)
 }
@@ -92,15 +124,46 @@ export async function sendMessage(
   subject: string,
   body: string,
   bodyHtml?: string,
+  opts?: { senderUserId?: string | null; clientMessageId?: string | null },
 ): Promise<LabelMessage> {
-  const payload: MessageInsert = { artist_id: artistId, subject, body, body_html: bodyHtml ?? null }
+  const payload: MessageInsert = {
+    artist_id: artistId,
+    subject,
+    body,
+    body_html: bodyHtml ?? null,
+    sender_user_id: opts?.senderUserId ?? null,
+    client_message_id: opts?.clientMessageId ?? null,
+  }
   const { data, error } = await db.from('label_messages').insert(payload).select().single()
-  if (error) throw new Error(error.message)
+  if (error) {
+    // Unique client_message_id — return existing
+    if (error.code === '23505' && opts?.clientMessageId) {
+      const { data: existing } = await db
+        .from('label_messages')
+        .select('*')
+        .eq('client_message_id', opts.clientMessageId)
+        .maybeSingle()
+      if (existing) return rowToMessage(existing)
+    }
+    throw new Error(error.message)
+  }
   if (!data) throw new Error('No data returned from sendMessage')
-  return rowToMessage(data)
+  const message = rowToMessage(data)
+
+  try {
+    await applyMessageRulesOnInsert(db, message)
+  } catch (err) {
+    console.error('[sendMessage] rule apply failed:', err)
+  }
+
+  return message
 }
 
-export async function markMessageRead(db: DbClient, id: string): Promise<LabelMessage> {
+export async function markMessageRead(
+  db: DbClient,
+  id: string,
+  userId?: string | null,
+): Promise<LabelMessage> {
   const { data, error } = await db
     .from('label_messages')
     .update({ read: true, read_at: new Date().toISOString() })
@@ -109,6 +172,15 @@ export async function markMessageRead(db: DbClient, id: string): Promise<LabelMe
     .single()
   if (error) throw new Error(error.message)
   if (!data) throw new Error('No data returned from markMessageRead')
+
+  if (userId) {
+    try {
+      await upsertMessageReceipt(db, { source: 'label', messageId: id, userId })
+    } catch (err) {
+      console.error('[markMessageRead] receipt upsert failed:', err)
+    }
+  }
+
   return rowToMessage(data)
 }
 

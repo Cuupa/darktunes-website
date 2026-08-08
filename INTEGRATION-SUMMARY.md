@@ -3,7 +3,7 @@
 Living product-status snapshot. Architecture and agent rules: `AGENTS.md` + `docs/agent/`. User guides: `README.md`, `ADMIN.md`, `DEPLOYMENT.md`.
 
 **Stack:** Next.js 15 · React 19 · Supabase · Cloudflare R2 · Vercel · Tailwind v4  
-**Tests:** 1254 passing (159 files) · **Schema:** `supabase/reset.sql` only (no migrations)
+**Schema:** `supabase/reset.sql` only (no migrations) · **PRD:** [PRD.md](PRD.md)
 
 ---
 
@@ -23,7 +23,7 @@ Living product-status snapshot. Architecture and agent rules: `AGENTS.md` + `doc
 | Area | Status |
 |------|--------|
 | CMS (artists, releases, news, videos, assets, events) | ✅ |
-| Messages, promo log, submissions, accreditations | ✅ |
+| Messages, promo log, submissions, artist feedback, accreditations | ✅ |
 | Users, roles, feature flags, API keys | ✅ |
 | **Accounting** | ✅ Guided workflow (Upload → Review → Publish), Abrechnungszentrale, bronze CSV server-proxy, Save to Portal |
 | Label analytics hub | ✅ |
@@ -40,6 +40,7 @@ Living product-status snapshot. Architecture and agent rules: `AGENTS.md` + `doc
 | **Inline billing** | ✅ `InlineBillingProfileStep` on invoices, analytics earnings, statements |
 | Releases, tour, calendar, marketing, documents | ✅ |
 | Messages, interviews, help, settings | ✅ |
+| **Product feedback** | ✅ `/portal/feedback` form + history; admin `/admin/feedback` inbox |
 | Multi-tenant RLS + `portal_feature_flags` | ✅ |
 
 ## Press & journalist
@@ -70,6 +71,7 @@ Living product-status snapshot. Architecture and agent rules: `AGENTS.md` + `doc
 
 | File | Purpose |
 |------|---------|
+| `PRD.md` | Product requirements (surfaces, modules, NFRs) |
 | `README.md` | Quick start, scripts, env overview |
 | `DEPLOYMENT.md` | Vercel, Supabase, R2 setup |
 | `ADMIN.md` | Admin + portal operator guide |
@@ -78,6 +80,12 @@ Living product-status snapshot. Architecture and agent rules: `AGENTS.md` + `doc
 | `supabase/reset.sql` | Canonical DB schema |
 | `src/types/database.ts` | TypeScript DB types (sync with reset.sql) |
 | `.env.example` | Env var template |
+
+## Dead code cleanup
+
+**2026-08-05:** High-confidence orphans removed in `chore/dead-code-cleanup` (legacy login shells, unused mailbox/charts, fixtures, unused image worker, orphaned `publicContentMaintenance` chain — scheduled news/hero/emoji maintenance is documented as Supabase Cron / Edge, not the Next read path).
+
+Still keep without bulk-delete: `app/sw.ts`, `scripts/*`, `supabase/functions/*`, unused shadcn primitive exports, env-gated `replica.ts`.
 
 ## Quick start
 

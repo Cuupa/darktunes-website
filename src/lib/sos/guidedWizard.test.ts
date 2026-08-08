@@ -5,6 +5,7 @@ import {
   canAdvanceGuidedStep,
   canNavigateToGuidedStep,
   deriveSuggestedGuidedStep,
+  guidedContinueBlockedReason,
   guidedStepIndex,
 } from './guidedWizard'
 
@@ -41,6 +42,31 @@ describe('guidedWizard', () => {
     ).toBe(true)
   })
 
+  it('gates setup advance on setupComplete', () => {
+    expect(
+      canAdvanceGuidedStep(
+        'setup',
+        { hasData: false, isProcessing: false, setupComplete: false },
+        ASSISTANT_WIZARD_STEP_IDS,
+      ),
+    ).toBe(false)
+    expect(
+      canAdvanceGuidedStep(
+        'setup',
+        { hasData: false, isProcessing: false, setupComplete: true },
+        ASSISTANT_WIZARD_STEP_IDS,
+      ),
+    ).toBe(true)
+    // Undefined setupComplete remains allowed (quick mode / default).
+    expect(
+      canAdvanceGuidedStep(
+        'setup',
+        { hasData: false, isProcessing: false },
+        ASSISTANT_WIZARD_STEP_IDS,
+      ),
+    ).toBe(true)
+  })
+
   it('orders quick steps upload → review → settle', () => {
     expect(guidedStepIndex('upload', QUICK_WIZARD_STEP_IDS)).toBe(0)
     expect(guidedStepIndex('review', QUICK_WIZARD_STEP_IDS)).toBe(1)
@@ -61,5 +87,63 @@ describe('guidedWizard', () => {
 
     expect(canNavigateToGuidedStep('review', ready)).toBe(true)
     expect(canNavigateToGuidedStep('settle', ready)).toBe(true)
+  })
+
+  it('blocks upload advance when rates are not ready', () => {
+    expect(
+      canAdvanceGuidedStep('upload', {
+        hasData: true,
+        isProcessing: false,
+        ratesReady: false,
+      }),
+    ).toBe(false)
+    expect(
+      canAdvanceGuidedStep('upload', {
+        hasData: true,
+        isProcessing: false,
+        ratesReady: true,
+      }),
+    ).toBe(true)
+  })
+
+  it('returns plain-language blocked reasons', () => {
+    expect(
+      guidedContinueBlockedReason('setup', {
+        hasData: false,
+        isProcessing: false,
+        setupComplete: false,
+      }),
+    ).toMatch(/period/i)
+
+    expect(
+      guidedContinueBlockedReason('upload', {
+        hasData: false,
+        isProcessing: false,
+        ratesReady: true,
+      }),
+    ).toMatch(/upload/i)
+
+    expect(
+      guidedContinueBlockedReason('upload', {
+        hasData: true,
+        isProcessing: false,
+        ratesReady: false,
+      }),
+    ).toMatch(/exchange rates/i)
+
+    expect(
+      guidedContinueBlockedReason('validate', {
+        hasData: true,
+        isProcessing: false,
+        hasBlockingValidation: true,
+      }),
+    ).toMatch(/blocking/i)
+
+    expect(
+      guidedContinueBlockedReason('review', {
+        hasData: true,
+        isProcessing: false,
+      }),
+    ).toBeNull()
   })
 })

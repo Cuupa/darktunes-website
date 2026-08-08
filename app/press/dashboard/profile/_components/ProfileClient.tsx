@@ -9,6 +9,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { JournalistApplication } from '@/lib/api/journalistApplications'
 import { updatePortalPassword } from '../../../../portal/settings/_actions/updatePassword'
+import { PASSWORD_MIN_LENGTH } from '@/lib/auth/passwordPolicy'
+import { PasswordRequirements } from '@/components/auth/PasswordRequirements'
+import { getLocalizedPasswordPairError } from '@/components/auth/passwordPolicyUi'
 
 interface ProfileClientProps {
   user: { id: string; email: string }
@@ -18,20 +21,28 @@ interface ProfileClientProps {
 
 export function ProfileClient({ user, downloadCount, application }: ProfileClientProps) {
   const t = useTranslations('pressProfile')
+  const tPortal = useTranslations('portal')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [savingPassword, setSavingPassword] = useState(false)
 
   const savePassword = async (event: React.FormEvent) => {
     event.preventDefault()
+    const policyError = getLocalizedPasswordPairError(newPassword, confirmPassword, (key) =>
+      tPortal(key),
+    )
+    if (policyError) {
+      toast.error(policyError)
+      return
+    }
     setSavingPassword(true)
     try {
       await updatePortalPassword({ newPassword, confirmPassword })
       setNewPassword('')
       setConfirmPassword('')
       toast.success(t('saved'))
-    } catch {
-      toast.error('Failed to update password')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update password')
     } finally {
       setSavingPassword(false)
     }
@@ -81,11 +92,44 @@ export function ProfileClient({ user, downloadCount, application }: ProfileClien
           <form onSubmit={savePassword} className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="press-password-new">{t('newPassword')}</Label>
-              <Input id="press-password-new" type="password" minLength={8} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+              <Input
+                id="press-password-new"
+                type="password"
+                minLength={PASSWORD_MIN_LENGTH}
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+              <PasswordRequirements
+                password={newPassword}
+                heading={tPortal('password_policy_heading')}
+                labelFor={(id, fallback) => {
+                  const key = `password_req_${id}` as
+                    | 'password_req_length'
+                    | 'password_req_upper'
+                    | 'password_req_lower'
+                    | 'password_req_digit'
+                    | 'password_req_special'
+                  try {
+                    return tPortal(key)
+                  } catch {
+                    return fallback
+                  }
+                }}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="press-password-confirm">{t('confirmPassword')}</Label>
-              <Input id="press-password-confirm" type="password" minLength={8} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+              <Input
+                id="press-password-confirm"
+                type="password"
+                minLength={PASSWORD_MIN_LENGTH}
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
             </div>
             <div>
               <Button type="submit" disabled={savingPassword}>{savingPassword ? t('saving') : t('savePassword')}</Button>

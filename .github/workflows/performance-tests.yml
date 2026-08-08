@@ -1,11 +1,31 @@
 name: Performance Tests
 
+# Not on every PR — runs on main (relevant paths), weekly, or manual dispatch.
+# Avoids duplicating QA E2E and keeps PR wall-clock lower.
+
 on:
-  pull_request:
+  push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'app/**'
+      - 'tests/performance/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'playwright.config.ts'
+      - 'next.config.*'
+      - '.github/workflows/performance-tests.yml'
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: perf-tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   playwright-performance:
+    name: Playwright Performance
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
@@ -24,8 +44,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Next.js cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('app/**/*.[jt]s', 'app/**/*.[jt]sx', 'src/**/*.[jt]s', 'src/**/*.[jt]sx', 'next.config.*') }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+            next-${{ runner.os }}-
+
+      - name: Playwright browser cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Build
+        run: npm run build
+
       - name: Run performance suite
-        run: npm run perf:test
+        run: SKIP_BUILD=1 npm run perf:test

@@ -3,11 +3,12 @@
  * POST /api/admin/sos/import-batches — register a bronze CSV import (upload via [id]/upload)
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { randomUUID, createHash } from 'crypto'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getUserRoleWithClient } from '@/lib/getUserRole'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   createImportBatch,
   findImportBatchByFileHash,
@@ -16,20 +17,8 @@ import {
 import { assertSettlementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 
-async function requireAdmin() {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error || !user) throw new ApiError(401, 'Unauthorized')
-  const role = await getUserRoleWithClient(supabase, user.id)
-  if (!role || !['admin'].includes(role)) throw new ApiError(403, 'Forbidden')
-  return { user, supabase }
-}
-
-export const GET = withErrorHandler(async (): Promise<NextResponse> => {
-  await requireAdmin()
+export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
+  await requireAdminFromRequest(req)
   const serviceSupabase = await createServiceRoleSupabaseClient()
   const batches = await listImportBatches(serviceSupabase, 100)
   return NextResponse.json({ batches })
@@ -38,7 +27,8 @@ export const GET = withErrorHandler(async (): Promise<NextResponse> => {
 const MAX_REGISTRATION_BODY_BYTES = 16_384
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  const { user } = await requireAdmin()
+  const { userId } = await requireAdminFromRequest(req)
+  const user = { id: userId }
 
   const rawBody = await req.text()
   if (rawBody.length > MAX_REGISTRATION_BODY_BYTES) {

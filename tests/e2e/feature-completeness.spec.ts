@@ -16,7 +16,7 @@ const ADMIN_OVERVIEW_SECTIONS = [
   'System',
 ]
 
-/** Sidebar-only routes (AdminSidebarNav) — not dashboard tabs. */
+/** Sidebar-only routes (AdminSidebarNav) — not dashboard tabs. Labels = admin.nav (en). */
 const ADMIN_SIDEBAR_LINKS = [
   'Dashboard',
   'Submission Form',
@@ -39,8 +39,11 @@ test.describe('Feature completeness', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
 
     await expect(page.locator('#hero')).toBeVisible()
-    await expect(page.locator('section#releases').first()).toBeVisible()
-    await expect(page.locator('section#news').first()).toBeVisible()
+    await expect(page.locator('section#releases, #releases').first()).toBeVisible()
+    await expect(page.locator('section#news, #news').first()).toBeVisible()
+    // Artists live on /artists (not a homepage section id in DEFAULT_SECTION_ORDER)
+    await page.goto('/artists', { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('main, h1').first()).toBeVisible()
   })
 
   test('artist detail shows bio, releases, and concerts sections', async ({ page }) => {
@@ -73,6 +76,12 @@ test.describe('Feature completeness', () => {
 
   test('admin sidebar links are visible for admin role', async ({ page }) => {
     await loginAsAdmin(page)
+    // Force English so assertions match admin.nav en strings (default locale is de).
+    const origin = new URL(page.url()).origin
+    await page.context().addCookies([
+      { name: 'NEXT_LOCALE', value: 'en', url: origin },
+    ])
+    await page.reload({ waitUntil: 'domcontentloaded' })
 
     const nav = page.getByRole('navigation', { name: 'Admin sections' })
     for (const linkLabel of ADMIN_SIDEBAR_LINKS) {

@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -69,6 +70,9 @@ function newsPostToFormData(
 }
 
 export default function NewsEditPage() {
+  const tToast = useTranslations('admin.toast')
+
+
   const params = useParams()
   const router = useRouter()
   const cms = useCmsPaths()
@@ -87,6 +91,7 @@ export default function NewsEditPage() {
   )
 
   const persistNewsPost = async (data: NewsFormData) => {
+
     if (!post) return
     setIsSaving(true)
     try {
@@ -139,7 +144,7 @@ export default function NewsEditPage() {
           .insert(inserts)
         if (insertError) throw new Error(insertError.message)
       }
-      toast.success('News post saved')
+      toast.success(tToast('news_post_saved'))
       router.push(cms.newsList)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save news post')

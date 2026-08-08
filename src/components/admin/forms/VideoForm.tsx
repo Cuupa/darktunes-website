@@ -7,6 +7,7 @@ import type { AdminPanelProps } from '@/lib/component-contracts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { Switch } from '@/components/ui/switch'
 import { ArrowsClockwise, MagnifyingGlass } from '@phosphor-icons/react'
 import { extractYouTubeVideoId } from '@/lib/parsers/platformUrlParser'
@@ -41,6 +42,9 @@ type Props = AdminPanelProps<VideoFormData> & { artists?: Artist[] }
 const localExtractYouTubeId = extractYouTubeVideoId
 
 export function VideoForm({ value, onChange, isLoading, artists }: Props) {
+  const tToast = useTranslations('admin.toast')
+
+
   const tErrors = useTranslations('errors')
   const supabase = createBrowserSupabaseClient()
   const { register, handleSubmit, watch, setValue, reset } = useForm<VideoFormData>({
@@ -57,6 +61,7 @@ export function VideoForm({ value, onChange, isLoading, artists }: Props) {
   const thumbnailUrl = watch('thumbnailUrl')
   const isVisible = watch('isVisible')
   const isShort = watch('isShort')
+  const publishedAt = watch('publishedAt')
 
   // Auto-extract YouTube ID when the user pastes a full URL
   const lastParsed = useRef('')
@@ -84,9 +89,10 @@ export function VideoForm({ value, onChange, isLoading, artists }: Props) {
   }, [youtubeIdField, thumbnailUrl, setValue])
 
   const handleFetchInfo = async () => {
+
     const rawInput = youtubeIdField?.trim()
     if (!rawInput) {
-      toast.error('Enter a YouTube URL or video ID first')
+      toast.error(tToast('enter_youtube_first'))
       return
     }
     setIsFetchingInfo(true)
@@ -121,7 +127,7 @@ export function VideoForm({ value, onChange, isLoading, artists }: Props) {
       if (info.title) setValue('title', info.title)
       if (info.channelTitle) setValue('artistName', info.channelTitle)
       if (info.thumbnailUrl) setValue('thumbnailUrl', info.thumbnailUrl)
-      toast.success('Video info fetched from YouTube')
+      toast.success(tToast('video_info_youtube'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
@@ -214,10 +220,13 @@ export function VideoForm({ value, onChange, isLoading, artists }: Props) {
             <Input id="artistName" {...register('artistName', { required: true })} disabled={isLoading} />
           )}
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="publishedAt">Published At</Label>
-          <Input id="publishedAt" type="date" {...register('publishedAt')} disabled={isLoading} />
-        </div>
+        <DateField
+          id="publishedAt"
+          label="Published At"
+          value={publishedAt ?? ''}
+          onChange={(v) => setValue('publishedAt', v, { shouldDirty: true })}
+          disabled={isLoading}
+        />
       </div>
 
       <div className="space-y-1">

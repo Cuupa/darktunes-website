@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { convertToEur, normalizeRevenueToEur } from './currency'
+import { convertToEur, normalizeRevenueToEur, parseMissingExchangeRateCurrency } from './currency'
 import type { ExchangeRates, HistoricalRates } from './currency'
 
 const RATES: ExchangeRates = {
@@ -41,6 +41,17 @@ describe('convertToEur', () => {
     // code becomes '' after trim+upper → early return with original amount
     // This is the existing "no currency" short-circuit and should stay safe.
     expect(convertToEur(100, '', RATES)).toBe(100)
+  })
+})
+
+describe('parseMissingExchangeRateCurrency', () => {
+  it('extracts ISO currency from worker error text', () => {
+    expect(
+      parseMissingExchangeRateCurrency(
+        'Missing exchange rate for currency "USD" — add the rate before generating statements',
+      ),
+    ).toBe('USD')
+    expect(parseMissingExchangeRateCurrency('invalid csv')).toBeNull()
   })
 })
 

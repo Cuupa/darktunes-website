@@ -25,6 +25,7 @@ import { MapPin, Share, CalendarBlank, YoutubeLogo, MusicNotes, Newspaper, Navig
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
 import {
   Select,
@@ -94,6 +95,9 @@ function resolveTypeInfo(eventType: string): { preset: EventType; custom: string
 }
 
 export function EventManager({ concerts, artistId, allArtists = [], newsPosts = [], concertsApiPath = '/api/portal/concerts', hideIcsExport = false }: EventManagerProps) {
+  // Keys live in the portal dictionary. Admin/editor routes must load the
+  // `portal` namespace via ROUTE_BUNDLES (see src/i18n/loadMessages.ts) or
+  // next-intl will render raw keys like "portal.tour_heading".
   const t = useTranslations('portal')
 
   const [items, setItems] = useState(concerts)
@@ -389,16 +393,13 @@ export function EventManager({ concerts, artistId, allArtists = [], newsPosts = 
           )}
 
           {/* Date */}
-          <div className="space-y-1">
-            <Label htmlFor="ev-date">{t('tour_date')}</Label>
-            <Input
-              id="ev-date"
-              type="date"
-              value={form.concertDate}
-              onChange={(e) => setForm((v) => ({ ...v, concertDate: e.target.value }))}
-              required
-            />
-          </div>
+          <DateField
+            id="ev-date"
+            label={t('tour_date')}
+            value={form.concertDate}
+            onChange={(v) => setForm((prev) => ({ ...prev, concertDate: v }))}
+            required
+          />
 
           {/* Time */}
           <div className="space-y-1">
@@ -462,13 +463,13 @@ export function EventManager({ concerts, artistId, allArtists = [], newsPosts = 
           <div className="space-y-2">
             <div className="rounded-md overflow-hidden border border-border" style={{ height: 200 }}>
               <iframe
-                title="Venue map preview"
+                title={t('tour_map_preview')}
                 src={osmMapUrl}
                 width="100%"
                 height="200"
                 loading="lazy"
                 className="block"
-                aria-label="OpenStreetMap venue preview"
+                aria-label={t('tour_map_preview_aria')}
               />
             </div>
             <a
@@ -486,13 +487,13 @@ export function EventManager({ concerts, artistId, allArtists = [], newsPosts = 
         {osmMapUrl && (!form.venueLat || !form.venueLng) && (
           <div className="rounded-md overflow-hidden border border-border" style={{ height: 200 }}>
             <iframe
-              title="Venue map preview"
+              title={t('tour_map_preview')}
               src={osmMapUrl}
               width="100%"
               height="200"
               loading="lazy"
               className="block"
-              aria-label="OpenStreetMap venue preview"
+              aria-label={t('tour_map_preview_aria')}
             />
           </div>
         )}

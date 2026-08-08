@@ -20,6 +20,7 @@ import { getAdminAccessToken } from '@/lib/admin/getAccessToken'
 import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
 import type { SettlementRegister } from '@/lib/api/settlementRegister'
 import { buildPayoutRowsFromRegister } from '@/lib/sos/payoutRowsFromRegister'
+import { IbanField } from '@/components/admin/sos/fields/AccountingTextFields'
 
 interface PayoutManagerProps {
   labelArtists: LabelArtist[]
@@ -153,6 +154,12 @@ export function PayoutManager({
     labelInfo.sepaAccountHolder ?? labelInfo.name ?? '',
   )
 
+  // Keep drafts in sync when label SEPA details change elsewhere (Rules / Setup).
+  useEffect(() => {
+    setDraftSepaIban(labelInfo.sepaIban ?? '')
+    setDraftSepaAccountHolder(labelInfo.sepaAccountHolder ?? labelInfo.name ?? '')
+  }, [labelInfo.sepaIban, labelInfo.sepaAccountHolder, labelInfo.name])
+
   const rows = useMemo(
     () => buildPayoutRowsFromRegister(register?.rows ?? [], labelArtists),
     [register?.rows, labelArtists],
@@ -224,7 +231,7 @@ export function PayoutManager({
 
     const payoutEntries: SepaPayoutEntry[] = selectedPayouts.map((row, index) => ({
       accountHolder: row.roster?.accountHolder || row.artistName,
-      iban: row.roster!.iban!,
+      iban: (row.roster!.iban ?? '').replace(/[\s-]/g, '').toUpperCase(),
       bic: row.roster?.bic,
       amount: row.amount,
       endToEndId: `E2E-${String(index + 1).padStart(4, '0')}`,
@@ -233,7 +240,7 @@ export function PayoutManager({
     try {
       const xml = generateSepaXml(payoutEntries, {
         accountHolder: labelInfo.sepaAccountHolder || labelInfo.name,
-        iban: labelInfo.sepaIban,
+        iban: labelInfo.sepaIban.replace(/[\s-]/g, '').toUpperCase(),
         bic: undefined,
         periodLabel: buildPeriodLabel(periodStart, periodEnd),
       })
@@ -328,20 +335,20 @@ export function PayoutManager({
                 <Input
                   id="label-sepa-holder"
                   value={draftSepaAccountHolder}
-                  onChange={(e) => setDraftSepaAccountHolder(e.target.value)}
-                  placeholder="z. B. darkTunes Music Group UG"
+                  maxLength={140}
+                  onChange={(e) => setDraftSepaAccountHolder(e.target.value.slice(0, 140))}
+                  placeholder="e.g. darkTunes Music Group UG"
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="label-sepa-iban">{t.payoutSepaIbanLabel}</Label>
-                <Input
-                  id="label-sepa-iban"
-                  value={draftSepaIban}
-                  onChange={(e) => setDraftSepaIban(e.target.value)}
-                  placeholder="DE89 3704 0044 0532 0130 00"
-                  className="font-mono text-sm"
-                />
-              </div>
+              <IbanField
+                id="label-sepa-iban"
+                label={t.payoutSepaIbanLabel}
+                value={draftSepaIban}
+                onChange={setDraftSepaIban}
+                placeholder="DE89 3704 0044 0532 0130 00"
+                required
+                errorMessage={t.payoutInvalidIbanToast}
+              />
             </div>
             <Button
               type="button"

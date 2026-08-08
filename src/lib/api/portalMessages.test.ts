@@ -13,7 +13,8 @@ function createMockDb(rows: Record<string, unknown>[] = [], count = rows.length)
     is: vi.fn().mockReturnThis(),
     not: vi.fn().mockReturnThis(),
     order: vi.fn().mockReturnThis(),
-    limit: vi.fn().mockResolvedValue({ data: rows, error: null }),
+    limit: vi.fn().mockReturnThis(),
+    range: vi.fn().mockResolvedValue({ data: rows, error: null }),
   }
 
   const countResult = { count, error: null }

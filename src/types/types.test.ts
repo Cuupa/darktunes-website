@@ -108,6 +108,13 @@ describe('SiteSettings interface', () => {
     impressumPhone: '',
     impressumEmail: '',
     datenschutzContent: '',
+    agbContent: '',
+    agbContentEn: '',
+    portalTermsVersion: '2026-08-01',
+    labelBillingStreet: '',
+    labelBillingPostalCode: '',
+    labelBillingCity: '',
+    labelBillingCountry: '',
     consentPlaceholderUrl: '',
     noiseOpacity: 0.04,
     crtScanlinesEnabled: false,
@@ -121,6 +128,7 @@ describe('SiteSettings interface', () => {
     concertsLinkToPage: false,
     carouselAutoplayMs: 0,
     featureToggles: { promoPool: true, editorTools: true },
+    inviteLinkExpiryHours: 168,
   }
 
   it('can construct a valid SiteSettings object', () => {

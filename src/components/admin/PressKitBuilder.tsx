@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -32,6 +33,9 @@ interface PressKitBuilderProps {
 }
 
 export function PressKitBuilder({ artists }: PressKitBuilderProps) {
+  const tToast = useTranslations('admin.toast')
+
+
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [scope, setScope] = useState<string>('label')
   const [items, setItems] = useState<PressAsset[]>([])
@@ -74,6 +78,7 @@ export function PressKitBuilder({ artists }: PressKitBuilderProps) {
     : artists.find((artist) => artist.id === scope)?.name ?? 'Artist'
 
   const reorder = async (fromIndex: number, toIndex: number) => {
+
     if (toIndex < 0 || toIndex >= items.length || !token) return
     const next = [...items]
     const [moved] = next.splice(fromIndex, 1)
@@ -92,7 +97,7 @@ export function PressKitBuilder({ artists }: PressKitBuilderProps) {
         }),
       })
       if (!response.ok) throw new Error(await response.text())
-      toast.success('Order updated')
+      toast.success(tToast('order_updated'))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Reorder failed')
       await loadItems()
@@ -100,6 +105,7 @@ export function PressKitBuilder({ artists }: PressKitBuilderProps) {
   }
 
   const removeItem = async (item: PressAsset) => {
+
     if (!token) return
     setBusyId(item.kitItemId)
     try {
@@ -109,7 +115,7 @@ export function PressKitBuilder({ artists }: PressKitBuilderProps) {
       })
       if (!response.ok) throw new Error(await response.text())
       setItems((prev) => prev.filter((row) => row.kitItemId !== item.kitItemId))
-      toast.success('Removed from press kit')
+      toast.success(tToast('removed_from_press_kit'))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Remove failed')
     } finally {
@@ -118,12 +124,13 @@ export function PressKitBuilder({ artists }: PressKitBuilderProps) {
   }
 
   const addAsset = async (asset: PressAsset) => {
+
     if (!token) {
-      toast.error('Not authenticated')
+      toast.error(tToast('not_authenticated'))
       return
     }
     if (!asset.isPressApproved) {
-      toast.error('Approve the asset in the Asset Explorer before adding it to a press kit.')
+      toast.error(tToast('approve_asset_before_press_kit'))
       return
     }
     setPickerOpen(false)
@@ -141,7 +148,7 @@ export function PressKitBuilder({ artists }: PressKitBuilderProps) {
         }),
       })
       if (!response.ok) throw new Error(await response.text())
-      toast.success('Added to press kit')
+      toast.success(tToast('added_to_press_kit'))
       await loadItems()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to add asset')

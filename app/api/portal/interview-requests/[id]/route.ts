@@ -1,35 +1,91 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { updateInterviewRequest } from '@/lib/api/interviewRequests'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import {
+  deleteInterviewRequest,
+  updateInterviewRequest,
+} from '@/lib/api/interviewRequests'
+import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 
 const bodySchema = z.object({
   status: z.enum(['pending', 'accepted', 'rejected']).optional(),
   artistReply: z.string().nullable().optional(),
 })
 
-export const PATCH = withErrorHandler(async (req: NextRequest) => {
-  const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
-  const { supabase, artist } = await authenticatePortalBearerWithArtist(req, artistId)
+const ROUTE_PATCH = 'PATCH /api/portal/interview-requests/[id]'
+const ROUTE_DELETE = 'DELETE /api/portal/interview-requests/[id]'
 
-  const id = new URL(req.url).pathname.split('/').at(-1) ?? ''
+function requestIdFromUrl(url: string): string {
+  return new URL(url).pathname.split('/').at(-1) ?? ''
+}
+
+export const PATCH = withErrorHandler(async (req: NextRequest) => {
+  const artistId =
+    req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
+  const ctx = await withPortalMembershipWrite(req, artistId)
+
+  const id = requestIdFromUrl(req.url)
   if (!id) throw new ApiError(400, 'Missing interview request id')
-  const { data: existing, error: existingError } = await supabase
-    .from('interview_requests')
-    .select('id')
-    .eq('id', id)
-    .eq('artist_id', artist.id)
-    .maybeSingle()
-  if (existingError || !existing) {
-    throw new ApiError(404, 'Interview request not found')
-  }
+
+  const { value: existing } = await portalMemberWrite(
+    ctx,
+    { route: ROUTE_PATCH, table: 'interview_requests', operation: 'select' },
+    async (db) => {
+      const { data, error } = await db
+        .from('interview_requests')
+        .select('id')
+        .eq('id', id)
+        .eq('artist_id', ctx.artist.id)
+        .maybeSingle()
+      if (error) throw new Error(error.message)
+      return data
+    },
+  )
+  if (!existing) throw new ApiError(404, 'Interview request not found')
 
   const body = bodySchema.parse(await req.json())
-  const updated = await updateInterviewRequest(supabase, id, {
-    status: body.status,
-    artist_reply: body.artistReply === undefined ? undefined : body.artistReply,
-  })
+  const { value: updated } = await portalMemberWrite(
+    ctx,
+    { route: ROUTE_PATCH, table: 'interview_requests', operation: 'update' },
+    (db) =>
+      updateInterviewRequest(db, id, {
+        status: body.status,
+        artist_reply: body.artistReply === undefined ? undefined : body.artistReply,
+      }),
+  )
 
   return NextResponse.json(updated)
+})
+
+export const DELETE = withErrorHandler(async (req: NextRequest) => {
+  const artistId =
+    req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
+  const ctx = await withPortalMembershipWrite(req, artistId)
+
+  const id = requestIdFromUrl(req.url)
+  if (!id) throw new ApiError(400, 'Missing interview request id')
+
+  const { value: existing } = await portalMemberWrite(
+    ctx,
+    { route: ROUTE_DELETE, table: 'interview_requests', operation: 'select' },
+    async (db) => {
+      const { data, error } = await db
+        .from('interview_requests')
+        .select('id')
+        .eq('id', id)
+        .eq('artist_id', ctx.artist.id)
+        .maybeSingle()
+      if (error) throw new Error(error.message)
+      return data
+    },
+  )
+  if (!existing) throw new ApiError(404, 'Interview request not found')
+
+  await portalMemberWrite(
+    ctx,
+    { route: ROUTE_DELETE, table: 'interview_requests', operation: 'delete' },
+    (db) => deleteInterviewRequest(db, id, ctx.artist.id),
+  )
+
+  return NextResponse.json({ ok: true })
 })

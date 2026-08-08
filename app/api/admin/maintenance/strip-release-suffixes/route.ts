@@ -3,7 +3,6 @@ import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { stripReleaseSuffix } from '@/lib/sync/deduplication'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(req.headers.get('authorization'))
   await verifyAdmin(token)

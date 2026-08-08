@@ -86,7 +86,7 @@ export async function deleteRule(db: DbClient, id: string): Promise<void> {
 
 /**
  * Evaluate all active rules against a message and return the first matching rule.
- * Client-side evaluation for immediate UI feedback.
+ * Used by UI feedback and server-side applyMessageRulesOnInsert.
  */
 export function evaluateRules(rules: MessageRule[], message: LabelMessage): MessageRule | null {
   for (const rule of rules) {
@@ -114,4 +114,127 @@ export function evaluateRules(rules: MessageRule[], message: LabelMessage): Mess
     if (match) return rule
   }
   return null
+}
+
+export type AppliedRuleResult = {
+  rule: MessageRule
+  updates: {
+    folder_id?: string | null
+    read?: boolean
+    read_at?: string | null
+    starred?: boolean
+    deleted_at?: string | null
+  }
+}
+
+/**
+ * Server-side: load active rules, evaluate first match, apply to label_messages row.
+ * Safe to call after insert; failures should be logged by caller, not fail send.
+ */
+export async function applyMessageRulesOnInsert(
+  db: DbClient,
+  message: LabelMessage,
+): Promise<AppliedRuleResult | null> {
+  const rules = await getRules(db)
+  const matched = evaluateRules(rules, message)
+  if (!matched) return null
+
+  const now = new Date().toISOString()
+  const updates: AppliedRuleResult['updates'] = {}
+
+  switch (matched.actionType) {
+    case 'move_to_folder':
+      if (matched.actionTarget) updates.folder_id = matched.actionTarget
+      break
+    case 'mark_read':
+      updates.read = true
+      updates.read_at = now
+      break
+    case 'star':
+      updates.starred = true
+      break
+    case 'delete':
+      updates.deleted_at = now
+      break
+    default:
+      break
+  }
+
+  if (Object.keys(updates).length === 0) return { rule: matched, updates }
+
+  const { error } = await db.from('label_messages').update(updates).eq('id', message.id)
+  if (error) throw new Error(error.message)
+
+  return { rule: matched, updates }
+}
+
+/**
+ * Apply the same rule engine to portal_messages (e.g. artist → label).
+ * Folder moves use portal folder ids only when actionTarget is a UUID already used there.
+ */
+export async function applyPortalMessageRulesOnInsert(
+  db: DbClient,
+  message: {
+    id: string
+    fromArtistId: string
+    subject: string
+    body: string
+    toLabel: boolean
+  },
+): Promise<AppliedRuleResult | null> {
+  if (!message.toLabel) return null
+
+  const asLabel: LabelMessage = {
+    id: message.id,
+    artistId: message.fromArtistId,
+    subject: message.subject,
+    body: message.body,
+    read: false,
+    sentAt: new Date().toISOString(),
+  }
+
+  const rules = await getRules(db)
+  const matched = evaluateRules(rules, asLabel)
+  if (!matched) return null
+
+  const now = new Date().toISOString()
+  const updates: {
+    read_at?: string
+    starred?: boolean
+    deleted_at?: string
+  } = {}
+
+  switch (matched.actionType) {
+    case 'move_to_folder':
+      // Portal folders are per-artist; skip folder move for to_label (label-side folders differ)
+      break
+    case 'mark_read':
+      updates.read_at = now
+      break
+    case 'star':
+      updates.starred = true
+      break
+    case 'delete':
+      updates.deleted_at = now
+      break
+    default:
+      break
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return { rule: matched, updates: {} }
+  }
+
+  const { error } = await db.from('portal_messages').update(updates).eq('id', message.id)
+  if (error) throw new Error(error.message)
+
+  return {
+    rule: matched,
+    updates: {
+      read: matched.actionType === 'mark_read',
+      read_at: updates.read_at,
+      starred: updates.starred,
+      deleted_at: updates.deleted_at,
+    },
+  }
 }

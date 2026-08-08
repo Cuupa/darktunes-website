@@ -1,15 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { format, parse, isValid } from 'date-fns'
-import { Calendar as CalendarIcon } from '@phosphor-icons/react'
-import { Calendar } from '@/components/ui/calendar'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { cn } from '@/lib/utils'
+import { DateField } from '@/components/ui/date-field'
 import { getFieldLabel, getFieldPlaceholder } from '@/lib/submissions/fieldLabels'
 import type { SelectOption } from '@/lib/submissions/fieldTypes'
 import type { SubmissionFormField } from '@/types'
@@ -111,16 +105,18 @@ export function SchemaDrivenField({
     )
   }
 
-  if (field.fieldType === 'date') {
+  if (field.fieldType === 'date' || field.fieldType === 'date_dmy') {
     return (
       <DateField
         id={id}
-        labelEl={labelEl}
+        label={label}
         value={value}
         onChange={onChange}
         required={field.isRequired}
-        error={error ?? null}
-        placeholder={placeholder}
+        error={error ?? undefined}
+        placeholder={placeholder || 'Select date…'}
+        /** date_dmy stores day-first strings for schema validation; date stores ISO. */
+        storageFormat={field.fieldType === 'date_dmy' ? 'dd/MM/yyyy' : 'yyyy-MM-dd'}
       />
     )
   }
@@ -146,69 +142,6 @@ export function SchemaDrivenField({
         min={field.fieldType === 'year' ? 1900 : field.fieldType === 'seconds' ? 0 : undefined}
         max={field.fieldType === 'year' ? 2100 : undefined}
       />
-      {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
-    </div>
-  )
-}
-
-/** YYYY-MM-DD string ↔ Date conversion helpers */
-function parseYmd(ymd: string): Date | undefined {
-  if (!ymd) return undefined
-  const d = parse(ymd, 'yyyy-MM-dd', new Date())
-  return isValid(d) ? d : undefined
-}
-
-interface DateFieldProps {
-  id: string
-  labelEl: React.ReactNode
-  value: string
-  onChange: (v: string) => void
-  required: boolean
-  error: string | null
-  placeholder: string
-}
-
-function DateField({ id, labelEl, value, onChange, required, error, placeholder }: DateFieldProps) {
-  const [open, setOpen] = useState(false)
-  const selected = parseYmd(value)
-
-  const handleSelect = (day: Date | undefined) => {
-    if (day) {
-      onChange(format(day, 'yyyy-MM-dd'))
-      setOpen(false)
-    }
-  }
-
-  return (
-    <div className="space-y-2">
-      {labelEl}
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            id={id}
-            type="button"
-            variant="outline"
-            className={cn(
-              'w-full justify-start text-left font-normal',
-              !value && 'text-muted-foreground',
-              error && 'border-destructive',
-            )}
-            aria-required={required}
-            aria-invalid={!!error}
-            aria-haspopup="dialog"
-          >
-            <CalendarIcon size={16} className="mr-2 shrink-0 opacity-70" />
-            {selected ? format(selected, 'dd.MM.yyyy') : <span>{placeholder}</span>}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={selected}
-            onSelect={handleSelect}
-          />
-        </PopoverContent>
-      </Popover>
       {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
     </div>
   )

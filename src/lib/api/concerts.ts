@@ -216,4 +216,131 @@ export async function setConcertArtists(
   if (error) throw new Error(error.message)
 }
 
+/**
+ * Slim nested select for the portal calendar (past + future shows).
+ * One PostgREST round-trip with artists + featured artists.
+ */
+const CALENDAR_CONCERT_SELECT = [
+  'id',
+  'artist_id',
+  'event_name',
+  'venue_name',
+  'venue_city',
+  'venue_country',
+  'concert_date',
+  'ticket_url',
+  'status',
+  'event_time',
+  'event_type',
+  'artists(id, name, slug, is_visible)',
+  'concert_artists(sort_order, artists(id, name, slug, is_visible))',
+].join(', ')
+
+type CalendarArtistEmbed = {
+  id: string
+  name: string
+  slug: string
+  is_visible: boolean | null
+}
+
+type CalendarConcertJunction = {
+  sort_order: number | null
+  artists: CalendarArtistEmbed | CalendarArtistEmbed[] | null
+}
+
+type CalendarConcertRow = {
+  id: string
+  artist_id: string | null
+  event_name: string
+  venue_name: string | null
+  venue_city: string | null
+  venue_country: string | null
+  concert_date: string
+  ticket_url: string | null
+  status: string
+  event_time: string | null
+  event_type: string
+  artists: CalendarArtistEmbed | CalendarArtistEmbed[] | null
+  concert_artists?: CalendarConcertJunction[] | null
+}
+
+function unwrapArtist(
+  artists: CalendarArtistEmbed | CalendarArtistEmbed[] | null | undefined,
+): CalendarArtistEmbed | null {
+  if (!artists) return null
+  return Array.isArray(artists) ? (artists[0] ?? null) : artists
+}
+
+function mapCalendarConcertRow(row: CalendarConcertRow): Concert | null {
+  const primary = unwrapArtist(row.artists)
+  if (primary && primary.is_visible === false) {
+    // Primary artist hidden — still keep if a featured artist is visible
+  }
+
+  const featured: { id: string; name: string; slug: string }[] = []
+  for (const entry of [...(row.concert_artists ?? [])].sort(
+    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
+  )) {
+    const artist = unwrapArtist(entry.artists)
+    if (!artist || artist.is_visible === false) continue
+    featured.push({ id: artist.id, name: artist.name, slug: artist.slug })
+  }
+
+  const primaryVisible = primary && primary.is_visible !== false ? primary : null
+  if (!primaryVisible && featured.length === 0 && primary?.is_visible === false) {
+    return null
+  }
+
+  const artistName = primaryVisible?.name ?? featured[0]?.name ?? primary?.name ?? ''
+  const artistId = primaryVisible?.id ?? row.artist_id ?? featured[0]?.id ?? null
+
+  return {
+    id: row.id,
+    artistId,
+    artistName,
+    eventName: row.event_name,
+    venueName: row.venue_name,
+    venueAddress: null,
+    venueCity: row.venue_city,
+    venueCountry: row.venue_country,
+    concertDate: row.concert_date,
+    ticketUrl: row.ticket_url,
+    songkickId: null,
+    bandsintownId: null,
+    status: row.status,
+    createdAt: '',
+    updatedAt: '',
+    eventTime: row.event_time,
+    eventType: row.event_type ?? 'gig',
+    trailerUrl: null,
+    venueLat: null,
+    venueLng: null,
+    venueOsmId: null,
+    newsPostId: null,
+    featuredArtists: featured,
+  }
+}
+
+/**
+ * Calendar query: all label concerts (past + upcoming) for the portal month grid.
+ * Prefer `getCachedCalendarConcerts` on the portal page.
+ */
+export async function getAllVisibleConcertsForCalendar(db: DbClient): Promise<Concert[]> {
+  const { data, error } = await db
+    .from('concerts')
+    .select(CALENDAR_CONCERT_SELECT)
+    .order('concert_date', { ascending: true })
+    .limit(PUBLIC_QUERY_LIMITS.concerts)
+
+  if (error) throw new Error(error.message)
+
+  const rows = (data ?? []) as unknown as CalendarConcertRow[]
+  const mapped: Concert[] = []
+  for (const row of rows) {
+    const concert = mapCalendarConcertRow(row)
+    if (concert) mapped.push(concert)
+  }
+  return mapped
+}
+
 

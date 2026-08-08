@@ -26,7 +26,8 @@ const Videos = dynamic(
 import { DEFAULT_SECTION_ORDER } from '@/config/sections'
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import { useTranslations } from 'next-intl'
-import type { Release, NewsPost, Video, SiteSettings, Concert, HomepageSection, Artist } from '@/types'
+import type { Release, NewsPost, Video, SiteSettings, Concert, HomepageSection } from '@/types'
+import type { PublicArtist } from '@/lib/api/publicArtist'
 import { selectHeroItems } from '@/lib/heroFeatured'
 
 interface HomePageContentProps {
@@ -35,7 +36,7 @@ interface HomePageContentProps {
   videos: Video[]
   concerts: Concert[]
   siteSettings: SiteSettings
-  artists?: Artist[]
+  artists?: PublicArtist[]
 }
 
 const SpotifyMultiPlayer = dynamic(
@@ -114,6 +115,7 @@ export function HomePageContent({
             animate={{ opacity: 1 }}
             transition={{ duration: prefersReducedMotion ? 0 : 0.4 }}
           >
+            {/* Anchor id is on Releases root <section id="releases"> */}
             <Releases
               releases={releases}
               heading={siteSettings.releasesSectionHeading}
@@ -149,6 +151,7 @@ export function HomePageContent({
       case 'videos':
         return (
           <div key="videos">
+            {/* Anchor id lives on Videos root <section id="videos"> — avoid duplicate ids. */}
             <Videos
               videos={videos}
               placeholderUrl={siteSettings.consentPlaceholderUrl || undefined}
@@ -174,6 +177,7 @@ export function HomePageContent({
       case 'news':
         return (
           <div key="news">
+            {/* Anchor id is on News root <section id="news"> */}
             <News
               news={news}
               heading={siteSettings.newsSectionHeading}

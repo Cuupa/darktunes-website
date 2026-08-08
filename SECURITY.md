@@ -25,6 +25,12 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 ## Security Practices
 
 - **Row-Level Security (RLS)** is enabled on all Supabase tables. Only authenticated users with the `admin` or `editor` role can write data. Portal tables (`artist_epks`, `artist_billing_profiles`, `streaming_stats`, `sales_statements`, `release_checklists`, `artist_replies`, `artist_assets`, `artist_invoices`) enforce artist-scoped RLS using ownership checks via `artist_members` — security is enforced at the database layer, not just middleware.
+- **Public vs private artist data:** Public routes use `PUBLIC_ARTIST_COLUMNS` / `PublicArtist` (`src/lib/api/publicArtist.ts`) — never `select('*')` into client props. Secrets and PII live in `artist_private_data` (RLS: admin/editor + `artist_members` only). After `reset.sql` backfill, secret columns on `public.artists` are cleared so anon `select(*)` cannot recover API keys or email.
+- **Videos RLS:** Anon only sees `is_visible = true`; admin/editor see all.
+- **Assets RLS:** Full catalogue is staff-only (`can_view_admin_panel` or admin/editor). Anon/public may only read rows with `is_press_approved AND downloadable_for_press`.
+- **EPK public read:** No direct anon SELECT on `artist_epks` (would expose `epk_password_hash`). Public/press EPK is loaded server-side with the service role and an explicit column whitelist (`PUBLIC_EPK_COLUMNS`).
+- **site_settings:** Anon may only read allowlisted CMS keys (`SITE_SETTINGS_PUBLIC_KEYS`). Admin-only keys include `label_billing_*` and `invite_link_expiry_hours`. Staff (admin/editor) read all keys.
+- **Tour share tokens** (`/tour/share/[token]`): capability URLs; logistics + deal framework only — treat token like a secret.
 - **Multi-tenant isolation**: `artists.user_id` links each artist to a Supabase Auth user. Artists can only access their own rows — even if the client manipulates requests, RLS at the DB layer prevents cross-tenant data access.
 - **Environment variables** containing secrets (`SUPABASE_SERVICE_ROLE_KEY`, `CLOUDFLARE_R2_SECRET_ACCESS_KEY`, etc.) are never prefixed with `NEXT_PUBLIC_` and are therefore never exposed to the browser. Client-safe variables use the `NEXT_PUBLIC_` prefix.
 - **Supabase anon key** (`NEXT_PUBLIC_SUPABASE_ANON_KEY`) is intentionally public (client-side) but is scoped by RLS policies.
@@ -32,7 +38,10 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 - **Service-role key** (`SUPABASE_SERVICE_ROLE_KEY`) bypasses RLS — it is used exclusively in route handlers for token verification and must never be exposed to the client.
 - **Admin asset management APIs** (`/api/admin/assets`, `/api/admin/assets/folders`, `/api/admin/assets/batch`) all reuse the shared admin/editor auth helpers. Destructive deletes remove R2 objects before deleting database records, reducing orphaned-file risk.
 - **Presigned URLs** for private R2 PDFs expire in 300 seconds (5 minutes). URLs are generated in a Server Action; R2 credentials and the raw R2 object key are never sent to the browser.
-- **Billing profile enforcement**: the portal invoice API returns HTTP 422 until `artist_billing_profiles` contains the minimum legal invoice fields (name, address, country, and tax number or VAT ID). This prevents incomplete or non-compliant invoice PDFs from being generated.
+- **Billing profile enforcement**: the portal invoice API returns HTTP 422 until `artist_billing_profiles` contains the minimum legal invoice fields (name, address, country, and tax number or VAT ID). Reverse-charge profiles additionally require a **VIES-valid** EU VAT ID (checked via the European Commission REST API on billing save and again at invoice create). Invalid VIES or VIES downtime blocks reverse-charge saves/invoices rather than silently issuing PDFs.
+- **IBAN privacy**: bank account numbers are validated only with the in-process ISO 7064 implementation (`src/lib/sos/iban-validator.ts`). Do **not** send IBAN/BIC to third-party validation SaaS (DSGVO).
+- **Invoice PDF immutability**: once `pdf_url` / `pdf_sha256` are set on `artist_invoices`, the app refuses overwrite (GoBD-oriented write-once). Enable R2 bucket versioning for `invoices/` and `statements/` in ops (see `DEPLOYMENT.md`).
+- **Portal AGB acceptance**: artists must accept versioned portal terms (`artists.portal_terms_*` vs `site_settings.portal_terms_version`) before using the portal (onboarding step + layout gate).
 - **Admin + Portal route protection** is enforced by Next.js Edge Middleware (`middleware.ts`). Auth checks happen server-side at the edge before any page HTML is rendered, preventing client-side flicker attacks.
 - **Artist auto-sync** (`POST /api/sync/artist`) validates `Authorization: Bearer <token>` via `supabase.auth.getUser()` before running any sync logic. R2 credentials are never exposed to the browser.
 - **Cron endpoint auth** (all sync routes: `/api/sync`, `/api/sync/queue`, `/api/sync/requeue`, `/api/sync-youtube`, `/api/sync-api`) — scheduled calls use `CRON_SECRET` (mandatory for cron triggers). Manual user JWT calls require **admin or editor** role (or a custom role with `sync.trigger` capability via `verifySyncTrigger`). A missing or wrong secret is rejected with HTTP 401. This prevents unauthenticated or under-privileged callers from triggering resource-intensive sync jobs.
@@ -41,6 +50,18 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 - **Image caching** — external cover art images are downloaded server-side and uploaded to Cloudflare R2. The browser only ever loads images from R2 (via wsrv.nl proxy). External image URLs are never stored in the database or sent to the browser.
 - **Rich-text messaging sanitization** — `label_messages.body_html` and `artist_replies.body_html` store formatted content. Every render path sanitizes the HTML with `sanitizeHtml()` from `src/lib/sanitizeHtml.ts`, which applies a regex-based server-safe pass during SSR and delegates to DOMPurify on the client, before using `dangerouslySetInnerHTML`. This covers both the initial server-rendered response and the client hydration, reducing XSS risk across the admin inbox, artist portal, and all other rich-text surfaces (bio fields, privacy policy, about page).
 - Dependencies are kept up to date. Run `npm audit` before adding new packages.
+
+## Known residual risks
+
+| Risk | Why it remains | Mitigation / follow-up |
+|------|----------------|------------------------|
+| CSP `unsafe-inline` (script + style) | Theme CSS inject + embed stack | Documented in `contentSecurityPolicy.ts`; nonce migration is a dedicated project |
+| In-memory IP rate limits | Serverless multi-instance | Prefer Upstash for distributed routes; Vercel WAF in production |
+| Capability share URLs (tour/EPK) | Token = secret in the URL | Treat as credentials; rotate/revoke in product; rate-limit share endpoints |
+| `select('*')` in some staff DAL paths | Historical convenience | Priority hooks/explorer whitelisted; remaining invoice/SOS inventory in `docs/agent/debt-inventory.md` |
+| Portaled menus below dialogs | Historic z-50 defaults | Select/Popover/Dropdown/HoverCard/ContextMenu use `z-[10000]`; CI `check:overlay` |
+
+Debt tracking: [docs/agent/debt-inventory.md](docs/agent/debt-inventory.md).
 
 ## CSRF Protection
 

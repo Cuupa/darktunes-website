@@ -5,7 +5,6 @@ import { assertSettlementPeriodWritableById } from '@/lib/api/settlementPeriods'
 import { logFinancialEvent } from '@/lib/api/financialAudit'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(req.headers.get('authorization'))
   const userId = await verifyAdmin(token)

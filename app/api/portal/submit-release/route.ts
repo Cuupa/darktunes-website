@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { createReleaseSubmissionWithTracksAtomic } from '@/lib/api/releaseSubmissions'
 import { getFormSchema } from '@/lib/api/submissionFormSchema'
 import { getReleaseTypeRules } from '@/lib/api/submissionReleaseTypeRules'
@@ -12,7 +11,7 @@ import {
   updateIdempotencyKeyResourceId,
 } from '@/lib/api/idempotency'
 import { sendSubmissionNotificationEmail } from '@/lib/email/sendSubmissionNotificationEmail'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 import { buildTrackInsert, filterArtistTrackFields } from '@/lib/submissions/trackFieldMapping'
 import { coerceReleaseDate } from '@/lib/submissions/submissionSchemaValidation'
@@ -23,6 +22,7 @@ import { verifyCoverArtToken } from '@/lib/submissions/coverArtToken'
 import type { SubmissionFieldType } from '@/lib/submissions/fieldTypes'
 import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { getClientIp } from '@/lib/ipRateLimit'
+import { emitNotification } from '@/lib/notifications/emit'
 
 const trackInputSchema = z.object({
   trackNumber: z.number().int().min(1),
@@ -59,9 +59,8 @@ const bodySchema = z.object({
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
-  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId, {
-    requireArtistId: true,
-  })
+  const ctx = await withPortalMembershipWrite(req, artistId)
+  const { user, artist, serviceDb: serviceRole, userDb: supabase } = ctx
 
   const ip = getClientIp(req)
   const rl = await checkDistributedRateLimit(`submit-release:${user.id}:${ip}`, 20, 10 * 60_000)
@@ -72,7 +71,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const body = bodySchema.parse(await req.json())
   const formData = (body.formData ?? {}) as Record<string, unknown>
 
-  const serviceRole = await createServiceRoleSupabaseClient()
+  // Idempotency keys — service role forever (system table)
   const claimed = await checkAndClaimIdempotencyKey(
     serviceRole,
     body.idempotencyKey,
@@ -92,10 +91,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       getReleaseTypeRules(supabase),
     ])
 
-    const standardBody: Record<string, unknown> = {
-      ...body,
-      releaseDate: coerceReleaseDate(body.releaseDate),
-    }
+    // Keep raw releaseDate for schema validation (date_dmy expects DD/MM/YYYY).
+    // Coerce to ISO only when writing to the DB below.
+    const standardBody: Record<string, unknown> = { ...body }
     const tracks = body.tracks ?? []
 
     validateReleaseSubmissionByType({
@@ -187,24 +185,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       trackInserts,
     )
 
-    const { data: recipientProfiles } = await serviceRole
-      .from('users')
-      .select('id')
-      .in('role', ['admin', 'editor'])
-
-    const recipients = (recipientProfiles ?? []).map((profile) => ({
-      recipient_id: profile.id,
+    await emitNotification(serviceRole, {
       type: 'artist_release_submission',
-      entity_type: 'release_submission',
-      entity_id: submission.id,
-      entity_name: submission.title,
-      sender_id: user.id,
-      read: false,
-    }))
-
-    if (recipients.length > 0) {
-      await serviceRole.from('editor_notifications').insert(recipients)
-    }
+      entityId: submission.id,
+      entityName: submission.title,
+      senderId: user.id,
+      artistId: artist.id,
+      dedupeKey: `artist_release_submission:${submission.id}`,
+    })
 
     const { resendApiKey: storedResendKey, resendFromEmail: storedFromEmail } =
       await getEmailCredentials(serviceRole)

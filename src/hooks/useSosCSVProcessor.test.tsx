@@ -42,6 +42,19 @@ vi.mock('@/lib/sos/clientAppLog', () => ({
 vi.mock('@/lib/sos/currency', () => ({
   fetchExchangeRates: mockFetchExchangeRates,
   fetchHistoricalExchangeRates: mockFetchHistoricalExchangeRates,
+  FALLBACK_EXCHANGE_RATES: { USD: 1.08 },
+  parseMissingExchangeRateCurrency: (message: string) => {
+    const match = message.match(/Missing exchange rate for currency "([A-Z]{3})"/i)
+    return match?.[1] ?? null
+  },
+}))
+
+vi.mock('@/lib/i18n/interpolate', () => ({
+  interpolate: (template: string, vars: Record<string, string | number>) =>
+    Object.entries(vars).reduce(
+      (acc, [k, v]) => acc.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v)),
+      template,
+    ),
 }))
 
 class WorkerMock {
@@ -72,8 +85,8 @@ describe('useCSVProcessor', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     workerInstances.length = 0
-    mockFetchExchangeRates.mockResolvedValue({ source: 'live', rates: { USD: 1.1 } })
-    mockFetchHistoricalExchangeRates.mockResolvedValue({ source: 'live', rates: {} })
+    mockFetchExchangeRates.mockResolvedValue({ source: 'ecb', rates: { USD: 1.1 } })
+    mockFetchHistoricalExchangeRates.mockResolvedValue({ source: 'ecb', rates: {} })
 
     class MockWorker extends WorkerMock {
       constructor() {
@@ -119,8 +132,49 @@ describe('useCSVProcessor', () => {
       worker?.onmessage?.({ data: { type: 'error', message: 'invalid csv' } } as MessageEvent)
     })
 
-    expect(mockToastError).toHaveBeenCalledWith('CSV processing error', { description: 'invalid csv' })
+    expect(mockToastError).toHaveBeenCalledWith('csvProcessingError', { description: 'invalid csv' })
     expect(result.current.isProcessing).toBe(false)
+  })
+
+  it('does not process until exchange rates are ready', async () => {
+    let resolveRates: (value: { source: string; rates: Record<string, number> }) => void = () => {}
+    mockFetchExchangeRates.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRates = resolve
+        }),
+    )
+
+    const file = {
+      id: 'f-rates',
+      name: 'believe.csv',
+      size: 10,
+      type: 'believe' as const,
+      data: 'artist,revenue\nA,10',
+      uploadedAt: '2026-01-01T00:00:00.000Z',
+    }
+
+    const { result } = renderHook(() => useCSVProcessor([file], [], makeConfig()))
+
+    await waitFor(() => {
+      expect(workerInstances).toHaveLength(1)
+    })
+
+    const worker = workerInstances[0]
+    const processCallsBefore = worker?.postMessage.mock.calls.filter(
+      (c) => (c[0] as { type?: string })?.type === 'process',
+    ).length
+
+    expect(result.current.exchangeRatesReady).toBe(false)
+    expect(processCallsBefore).toBe(0)
+
+    await act(async () => {
+      resolveRates({ source: 'ecb', rates: { USD: 1.1 } })
+    })
+
+    await waitFor(() => {
+      expect(result.current.exchangeRatesReady).toBe(true)
+    })
   })
 
   it('processes worker success result and maps revenues', async () => {

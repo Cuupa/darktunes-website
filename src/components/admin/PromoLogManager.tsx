@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 /**
  * src/components/admin/PromoLogManager.tsx
  *
@@ -13,7 +14,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { format, parseISO } from 'date-fns'
 import {
-  CalendarBlank,
   Camera,
   CurrencyEur,
   Image as ImageIcon,
@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -75,6 +76,9 @@ function formatDate(dateStr: string): string {
 // ---------------------------------------------------------------------------
 
 export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) {
+  const tToast = useTranslations('admin.toast')
+
+
   const [entries, setEntries] = useState<PromoLogEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -113,11 +117,11 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
       const json = (await res.json()) as { entries: PromoLogEntry[] }
       setEntries(json.entries)
     } catch {
-      toast.error('Failed to load promo log entries')
+      toast.error(tToast('failed_load_promo_log'))
     } finally {
       setLoading(false)
     }
-  }, [artistId])
+  }, [artistId, tToast])
 
   useEffect(() => {
     void loadEntries()
@@ -157,7 +161,7 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
       setProofR2Key(r2Key)
       URL.revokeObjectURL(localPreview)
       setProofPreview(url)
-      toast.success('Screenshot uploaded.')
+      toast.success(tToast('screenshot_uploaded'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Proof upload failed')
       URL.revokeObjectURL(localPreview)
@@ -167,7 +171,7 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
     } finally {
       setUploadingProof(false)
     }
-  }, [artistId])
+  }, [artistId, tToast])
 
   // ---------------------------------------------------------------------------
   // Clipboard paste — extract image and upload to R2
@@ -232,9 +236,10 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
   // Submit: create or update
   // ---------------------------------------------------------------------------
   async function handleSubmit(e: React.FormEvent) {
+
     e.preventDefault()
     if (!description.trim() || !actionDate) {
-      toast.error('Date and description are required.')
+      toast.error(tToast('date_description_required'))
       return
     }
 
@@ -276,7 +281,7 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
         const { entry } = (await res.json()) as { entry: PromoLogEntry }
         setEntries((prev) => prev.map((e) => (e.id === editingId ? entry : e)))
         setEditingId(null)
-        toast.success('Marketing activity updated.')
+        toast.success(tToast('marketing_activity_updated'))
       } else {
         // Create new entry via POST
         const res = await fetch('/api/admin/promo-log', {
@@ -303,7 +308,7 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
 
         const { entry } = (await res.json()) as { entry: PromoLogEntry }
         setEntries((prev) => [entry, ...prev])
-        toast.success('Marketing activity logged.')
+        toast.success(tToast('marketing_activity_logged'))
       }
 
       // Reset form
@@ -323,7 +328,8 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
   // Delete entry
   // ---------------------------------------------------------------------------
   async function handleDelete(id: string) {
-    if (!window.confirm('Delete this marketing activity?')) return
+
+    if (!window.confirm(tToast('confirm_delete_marketing'))) return
     setDeletingId(id)
     try {
       const supabase = createBrowserSupabaseClient()
@@ -345,7 +351,7 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
       }
 
       setEntries((prev) => prev.filter((e) => e.id !== id))
-      toast.success('Entry deleted.')
+      toast.success(tToast('entry_deleted'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Delete failed')
     } finally {
@@ -376,20 +382,14 @@ export function PromoLogManager({ artistId, artistName }: PromoLogManagerProps) 
             <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
               {/* Date + Description */}
               <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-4">
-                <div className="space-y-1">
-                  <Label htmlFor="promo-date" className="flex items-center gap-1">
-                    <CalendarBlank size={14} aria-hidden="true" />
-                    Date <span aria-hidden="true">*</span>
-                  </Label>
-                  <Input
-                    id="promo-date"
-                    type="date"
-                    required
-                    value={actionDate}
-                    onChange={(e) => setActionDate(e.target.value)}
-                    className="w-full"
-                  />
-                </div>
+                <DateField
+                  id="promo-date"
+                  label="Date"
+                  required
+                  value={actionDate}
+                  onChange={setActionDate}
+                  className="w-full"
+                />
                 <div className="space-y-1">
                   <Label htmlFor="promo-description">
                     Activity description <span aria-hidden="true">*</span>

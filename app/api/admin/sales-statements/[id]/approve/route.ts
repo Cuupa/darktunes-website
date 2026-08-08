@@ -9,7 +9,6 @@ import { assertStatementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { notifyStatementArtist } from '@/lib/sos/notifyStatementArtist'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-
 const approveSchema = z.object({
   notes: z.string().max(4000).optional(),
 })

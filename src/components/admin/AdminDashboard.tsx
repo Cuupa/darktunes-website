@@ -27,6 +27,7 @@ import { useSiteSettings } from '@/hooks/useSiteSettings'
 import { useRolePermissions } from '@/hooks/useRolePermissions'
 import { isValidTab, canSeeTab as canSeeTabFn, type TabValue } from '@/lib/admin/tabPermissions'
 import { useTranslations } from 'next-intl'
+import { LocaleFlagSwitcher } from '@/components/LocaleFlagSwitcher'
 import { DashboardNotificationBell } from './DashboardNotificationBell'
 import { EditorPromoLogPanel } from './EditorPromoLogPanel'
 
@@ -44,7 +45,9 @@ const ReleaseSubmissionsManager = lazy(() => import('./ReleaseSubmissionsManager
 const VideoSubmissionsManager = lazy(() => import('./VideoSubmissionsManager').then((m) => ({ default: m.VideoSubmissionsManager })))
 const FanPageReviewsManager = lazy(() => import('./FanPageReviewsManager').then((m) => ({ default: m.FanPageReviewsManager })))
 const SubmissionFormManager = lazy(() => import('./SubmissionFormManager').then((m) => ({ default: m.SubmissionFormManager })))
-const AdminConcertsManager = lazy(() => import('./AdminConcertsManager').then((m) => ({ default: m.AdminConcertsManager })))
+const AdminConcertsManagerEmbedded = lazy(() =>
+  import('./AdminConcertsManager').then((m) => ({ default: m.AdminConcertsManagerEmbedded })),
+)
 const MaintenanceManager = lazy(() => import('./MaintenanceManager').then((m) => ({ default: m.MaintenanceManager })))
 const GenresManager = lazy(() => import('./GenresManager').then((m) => ({ default: m.GenresManager })))
 const RolesManager = lazy(() => import('./RolesManager').then((m) => ({ default: m.RolesManager })))
@@ -66,32 +69,52 @@ function TabFallback() {
 
 // TabValue is re-exported from @/lib/admin/tabPermissions
 
+/** Keys under `admin.nav` for dashboard tab labels (locale-aware). */
+type TabLabelKey =
+  | 'artists'
+  | 'releases'
+  | 'news'
+  | 'videos'
+  | 'events'
+  | 'genres'
+  | 'assets'
+  | 'accreditations'
+  | 'pressPortal'
+  | 'statements'
+  | 'releaseSubmissions'
+  | 'videoSubmissions'
+  | 'fanPageReviews'
+  | 'promoLog'
+  | 'submissionForm'
+  | 'rolesPermissions'
+  | 'maintenance'
+
 interface TabDef {
   value: TabValue
-  label: string
+  labelKey: TabLabelKey
   /** True if only admins can see this tab */
   adminOnly: boolean
   icon: React.ElementType
 }
 
 const TAB_DEFS: TabDef[] = [
-  { value: 'artists',        label: 'Artists',            adminOnly: false, icon: User },
-  { value: 'releases',       label: 'Releases',           adminOnly: false, icon: MusicNotes },
-  { value: 'news',           label: 'News',               adminOnly: false, icon: Newspaper },
-  { value: 'videos',         label: 'Videos',             adminOnly: false, icon: VideoCamera },
-  { value: 'events',         label: 'Events',             adminOnly: false, icon: Calendar },
-  { value: 'genres',         label: 'Genres',             adminOnly: false, icon: Tag },
-  { value: 'assets',         label: 'Assets',             adminOnly: true,  icon: ImageIcon },
-  { value: 'accreditations', label: 'Accreditations',     adminOnly: true,  icon: Newspaper },
-  { value: 'press',          label: 'Press Portal',       adminOnly: true,  icon: Newspaper },
-  { value: 'statements',     label: 'Statements',         adminOnly: true,  icon: FileText },
-  { value: 'release-submissions', label: 'Release Submissions', adminOnly: false, icon: MusicNotes },
-  { value: 'video-submissions',   label: 'Video Submissions',   adminOnly: false, icon: VideoCamera },
-  { value: 'fan-page-reviews',    label: 'Fan Page Reviews',    adminOnly: false, icon: Globe },
-  { value: 'promo-log',           label: 'Promo Log',           adminOnly: false, icon: MegaphoneSimple },
-  { value: 'submission-form',     label: 'Submission Form',     adminOnly: true,  icon: FileText },
-  { value: 'roles',               label: 'Roles & Permissions', adminOnly: true,  icon: ShieldStar },
-  { value: 'maintenance',         label: 'Maintenance',         adminOnly: true,  icon: Wrench },
+  { value: 'artists',        labelKey: 'artists',            adminOnly: false, icon: User },
+  { value: 'releases',       labelKey: 'releases',           adminOnly: false, icon: MusicNotes },
+  { value: 'news',           labelKey: 'news',               adminOnly: false, icon: Newspaper },
+  { value: 'videos',         labelKey: 'videos',             adminOnly: false, icon: VideoCamera },
+  { value: 'events',         labelKey: 'events',             adminOnly: false, icon: Calendar },
+  { value: 'genres',         labelKey: 'genres',             adminOnly: false, icon: Tag },
+  { value: 'assets',         labelKey: 'assets',             adminOnly: true,  icon: ImageIcon },
+  { value: 'accreditations', labelKey: 'accreditations',     adminOnly: true,  icon: Newspaper },
+  { value: 'press',          labelKey: 'pressPortal',       adminOnly: true,  icon: Newspaper },
+  { value: 'statements',     labelKey: 'statements',         adminOnly: true,  icon: FileText },
+  { value: 'release-submissions', labelKey: 'releaseSubmissions', adminOnly: false, icon: MusicNotes },
+  { value: 'video-submissions',   labelKey: 'videoSubmissions',   adminOnly: false, icon: VideoCamera },
+  { value: 'fan-page-reviews',    labelKey: 'fanPageReviews',    adminOnly: false, icon: Globe },
+  { value: 'promo-log',           labelKey: 'promoLog',           adminOnly: false, icon: MegaphoneSimple },
+  { value: 'submission-form',     labelKey: 'submissionForm',     adminOnly: true,  icon: FileText },
+  { value: 'roles',               labelKey: 'rolesPermissions', adminOnly: true,  icon: ShieldStar },
+  { value: 'maintenance',         labelKey: 'maintenance',         adminOnly: true,  icon: Wrench },
 ]
 
 // Static card titles and descriptions for each tab panel
@@ -125,8 +148,7 @@ interface AdminDashboardProps {
   contentOnly?: boolean
   /**
    * When true (default) the component renders its own full-page wrapper,
-   * sticky header, and sign-out button — used on the /editor standalone page
-   * and via AdminApp.
+   * sticky header, and sign-out button — used on the /editor standalone page.
    * When false the component renders only the tabs section, relying on the
    * surrounding AdminClientLayout to supply the page shell (sidebar, header).
    */
@@ -134,6 +156,8 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ contentOnly = false, standalone = true }: AdminDashboardProps) {
+  const tToast = useTranslations('admin.toast')
+  const tNav = useTranslations('admin.nav')
   const t = useTranslations('admin')
   const { user, profile, signOut, loading: authLoading } = useAuthContext()
   const router = useRouter()
@@ -142,6 +166,12 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
   const { permissions, loading: permissionsLoading, isAdmin } = useRolePermissions()
 
   const isEditor = profile?.role === 'editor'
+  const roleLabel =
+    profile?.role === 'editor'
+      ? tNav('role_editor')
+      : profile?.role === 'admin' || !profile?.role
+        ? tNav('role_admin')
+        : profile.role
 
   const canSeeTab = useCallback((tab: TabValue) => {
     return canSeeTabFn(tab, { isAdmin, isEditor, contentOnly, permissions })
@@ -189,11 +219,12 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
   }, [router, searchParams, contentOnly])
 
   const handleSignOut = async () => {
+
     const { error } = await signOut()
     if (error) {
-      toast.error('Failed to sign out')
+      toast.error(tToast('failed_sign_out'))
     } else {
-      toast.success('Signed out successfully')
+      toast.success(tToast('signed_out_success'))
       if (standalone && (contentOnly || isEditor)) {
         router.push('/login')
       }
@@ -202,7 +233,7 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
 
   if (authLoading || permissionsLoading || siteSettingsLoading) {
     return (
-      <div className={standalone ? 'min-h-screen bg-background flex items-center justify-center p-4' : 'flex flex-1 items-center justify-center py-16'} aria-busy="true" aria-label="Loading dashboard">
+      <div className={standalone ? 'min-h-screen bg-background flex items-center justify-center p-4' : 'flex flex-1 items-center justify-center py-16'} aria-busy="true" aria-label={tNav('loadingDashboardAria')}>
         <div className="w-full max-w-md space-y-4">
           <Skeleton className="h-8 w-48 mx-auto" />
           <Skeleton className="h-4 w-full" />
@@ -217,15 +248,15 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
     return (
       <div className={standalone ? 'min-h-screen bg-background flex items-center justify-center' : 'flex flex-1 items-center justify-center py-16'}>
         <div className="text-center space-y-4 max-w-md px-4">
-          <ToggleRight size={48} className="text-muted-foreground mx-auto" role="img" aria-label="Feature disabled" />
-          <h1 className="text-2xl font-bold">Editor Tools Disabled</h1>
+          <ToggleRight size={48} className="text-muted-foreground mx-auto" role="img" aria-label={tNav('featureDisabledAria')} />
+          <h1 className="text-2xl font-bold">{tNav('editorToolsDisabledTitle')}</h1>
           <p className="text-muted-foreground">
-            The Editor Tools feature has been disabled by an administrator. Please contact your admin if you believe this is an error.
+            {tNav('editorToolsDisabledBody')}
           </p>
           {standalone && (
             <Button variant="outline" onClick={handleSignOut}>
               <SignOut size={16} className="mr-2" aria-hidden="true" />
-              Sign Out
+              {tNav('signOut')}
             </Button>
           )}
         </div>
@@ -240,15 +271,15 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
     return (
       <div className={standalone ? 'min-h-screen bg-background flex items-center justify-center' : 'flex flex-1 items-center justify-center py-16'}>
         <div className="text-center space-y-4 max-w-md px-4">
-          <ToggleRight size={48} className="text-muted-foreground mx-auto" role="img" aria-label="No permissions" />
-          <h1 className="text-2xl font-bold">No Editor Permissions</h1>
+          <ToggleRight size={48} className="text-muted-foreground mx-auto" role="img" aria-label={tNav('noPermissionsAria')} />
+          <h1 className="text-2xl font-bold">{tNav('noEditorPermissionsTitle')}</h1>
           <p className="text-muted-foreground">
-            Your account does not have any content permissions assigned. Please contact your administrator.
+            {tNav('noEditorPermissionsBody')}
           </p>
           {standalone && (
             <Button variant="outline" onClick={handleSignOut}>
               <SignOut size={16} className="mr-2" aria-hidden="true" />
-              Sign Out
+              {tNav('signOut')}
             </Button>
           )}
         </div>
@@ -268,10 +299,11 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
               </p>
             </div>
             <div className="flex items-center gap-4">
+              <LocaleFlagSwitcher align="end" />
               {contentOnly && user?.id && <DashboardNotificationBell userId={user.id} />}
               <div className="text-right">
                 <p className="text-sm font-medium">{user?.email}</p>
-                <p className="text-xs text-muted-foreground capitalize">{profile?.role}</p>
+                <p className="text-xs text-muted-foreground">{roleLabel}</p>
               </div>
               <Button
                 onClick={handleSignOut}
@@ -279,7 +311,7 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
                 size="sm"
               >
                 <SignOut size={16} weight="bold" className="mr-2" aria-hidden="true" />
-                Sign Out
+                {tNav('signOut')}
               </Button>
             </div>
           </div>
@@ -290,10 +322,10 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           {/* Tab bar */}
           <TabsList className="flex flex-wrap h-auto gap-1 p-1">
-            {visibleTabs.map(({ value, label, icon: Icon }) => (
+            {visibleTabs.map(({ value, labelKey, icon: Icon }) => (
               <TabsTrigger key={value} value={value} className="gap-2">
                 <Icon size={16} weight="bold" aria-hidden="true" />
-                {label}
+                {tNav(labelKey)}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -307,7 +339,7 @@ export function AdminDashboard({ contentOnly = false, standalone = true }: Admin
               releases:        <ReleasesManager />,
               news:            <NewsManager />,
               videos:          <VideosManager />,
-              events:          <AdminConcertsManager />,
+              events:          <AdminConcertsManagerEmbedded />,
               genres:          <GenresManager />,
               assets:          <AssetsManager variant="embedded" />,
               accreditations:  <AccreditationsManager />,

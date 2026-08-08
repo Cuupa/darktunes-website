@@ -53,6 +53,14 @@ describe('isAllowedCoverArtUrl', () => {
     expect(isAllowedCoverArtUrl('https://drive.google.com/uc?export=download&id=x')).toBe(true)
   })
 
+  it('allows drive.usercontent.google.com (download CDN)', () => {
+    expect(
+      isAllowedCoverArtUrl(
+        'https://drive.usercontent.google.com/download?id=x&export=download',
+      ),
+    ).toBe(true)
+  })
+
   it('allows googleusercontent', () => {
     expect(isAllowedCoverArtUrl('https://lh3.googleusercontent.com/d/x')).toBe(true)
   })

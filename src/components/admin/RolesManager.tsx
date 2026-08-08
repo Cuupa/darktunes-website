@@ -104,6 +104,9 @@ async function getAuthHeader(supabase: ReturnType<typeof createBrowserSupabaseCl
 // ---------------------------------------------------------------------------
 
 function SystemRolesTab() {
+  const tToast = useTranslations('admin.toast')
+
+
   const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [isLoading, setIsLoading] = useState(true)
@@ -141,6 +144,7 @@ function SystemRolesTab() {
   }
 
   const handleSave = async () => {
+
     setIsSaving(true)
     try {
       const headers = { ...(await getAuthHeader(supabase)), 'Content-Type': 'application/json' }
@@ -153,7 +157,7 @@ function SystemRolesTab() {
         )
       })
 
-      if (rolesToSave.length === 0) { toast.info('No changes to save'); return }
+      if (rolesToSave.length === 0) { toast.info(tToast('no_changes_to_save')); return }
 
       await Promise.all(
         rolesToSave.map(async (role) => {
@@ -176,7 +180,7 @@ function SystemRolesTab() {
           setLocal((prev) => ({ ...prev, [role]: updated }))
         }),
       )
-      toast.success('Role permissions saved')
+      toast.success(tToast('role_permissions_saved'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
@@ -252,6 +256,9 @@ interface RoleFormState {
 }
 
 function CustomRolesTab() {
+  const tToast = useTranslations('admin.toast')
+
+
   const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [roles, setRoles]             = useState<CustomRole[]>([])
@@ -337,12 +344,13 @@ function CustomRolesTab() {
   }
 
   const handleDelete = async () => {
+
     if (!deleteTarget) return
     try {
       const headers = await getAuthHeader(supabase)
       const res = await fetch(`/api/admin/roles/custom/${deleteTarget.id}`, { method: 'DELETE', headers })
       if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, tErrors))
-      toast.success('Role deleted')
+      toast.success(tToast('role_deleted'))
       setDeleteTarget(null)
       void loadData()
     } catch (err) {
@@ -505,6 +513,9 @@ function CustomRolesTab() {
 // ---------------------------------------------------------------------------
 
 function CustomPermissionsTab() {
+  const tToast = useTranslations('admin.toast')
+
+
   const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [defs, setDefs]             = useState<CustomPermDef[]>([])
@@ -544,8 +555,9 @@ function CustomPermissionsTab() {
   }
 
   const handleSave = async () => {
+
     if (!form.label.trim()) { toast.error(tErrors('VALIDATION_ERROR')); return }
-    if (!editingDef && !form.name.trim()) { toast.error('Name is required'); return }
+    if (!editingDef && !form.name.trim()) { toast.error(tToast('name_required')); return }
     setIsSaving(true)
     try {
       const headers = { ...(await getAuthHeader(supabase)), 'Content-Type': 'application/json' }
@@ -575,12 +587,13 @@ function CustomPermissionsTab() {
   }
 
   const handleDelete = async () => {
+
     if (!deleteTarget) return
     try {
       const headers = await getAuthHeader(supabase)
       const res = await fetch(`/api/admin/roles/permissions-def/${deleteTarget.id}`, { method: 'DELETE', headers })
       if (!res.ok) throw new Error(getErrorMessage((await res.json().catch(() => ({}))) as ApiErrorResponse, tErrors))
-      toast.success('Permission definition deleted')
+      toast.success(tToast('permission_definition_deleted'))
       setDeleteTarget(null)
       void loadDefs()
     } catch (err) {

@@ -93,6 +93,10 @@ WHERE id = (
 
 ## ☁️ Cloudflare R2 Setup
 
+### GoBD / invoice immutability (ops)
+
+Enable **bucket versioning** on the production R2 bucket (or at least for prefixes `invoices/` and `statements/`). The app stores a stable key `invoices/{artistId}/{invoiceId}.pdf` and refuses to overwrite `pdf_url` / `pdf_sha256` once set. Versioning provides an extra recovery trail if objects are replaced outside the app.
+
 ### 1. Create R2 Bucket
 1. Go to Cloudflare Dashboard
 2. Navigate to R2 Object Storage
@@ -174,6 +178,19 @@ External integration API keys (Spotify, Discogs, Resend, YouTube, MailerLite, et
 - `NEXT_PUBLIC_SITE_URL`: Public site URL without trailing slash (e.g. `https://darktunes.com`).
 - `LABEL_NOTIFICATION_EMAIL`: Label inbox for portal submission and health-alert emails. Leave blank to disable.
 - `HEALTH_ALERT_WEBHOOK_URL`: Configure in Admin → API Keys (encrypted in DB), not env.
+
+### Web Push / PWA notifications (optional — one-time deploy setup)
+Artists and admins only tap **Enable** in the portal/admin UI. Operators set VAPID keys once:
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY`: Public key (browser + SW)
+- `VAPID_PRIVATE_KEY`: Private key (**server only**, never commit)
+- `VAPID_SUBJECT` (optional): `mailto:label@your-domain.com` or site URL
+
+After setting keys on Vercel, re-run **`supabase/reset.sql`** (or at least the `push_subscriptions` + `notification_preferences.push` sections) so the table and `push` preference column exist. Without keys, in-app + email still work; push is a silent no-op.
 
 ### Newsletter Double Opt-In
 - **Next.js routes** (contact form, portal notifications): Resend credentials from Admin → API Keys.

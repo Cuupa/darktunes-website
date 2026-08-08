@@ -10,6 +10,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { PortalMessage, PortalMessageFolder, PortalMessageAttachment } from '@/types'
+import {
+  resolveMessageListLimit,
+  resolveMessageListOffset,
+  type MessageListOptions,
+  MESSAGE_LIST_DEFAULT_LIMIT,
+  MESSAGE_SEARCH_DEFAULT_LIMIT,
+  MESSAGE_ADMIN_INBOX_DEFAULT_LIMIT,
+} from '@/lib/messaging/constants'
+import {
+  countUnreadPortalPeerForUser,
+  upsertMessageReceipt,
+} from '@/lib/messaging/receipts'
+import { applyPortalMessageRulesOnInsert } from '@/lib/api/messageRules'
 
 type DbClient = SupabaseClient<Database>
 type MsgRow = Database['public']['Tables']['portal_messages']['Row']
@@ -35,6 +48,11 @@ function rowToMessage(row: MsgRow): PortalMessage {
     deletedAt: row.deleted_at,
     folderId: row.folder_id,
     hasAttachments: row.has_attachments,
+    senderUserId: row.sender_user_id,
+    clientMessageId: row.client_message_id,
+    assigneeUserId: row.assignee_user_id,
+    priority: row.priority,
+    tags: row.tags ?? [],
   }
 }
 
@@ -71,7 +89,11 @@ export async function getInboxMessages(
   db: DbClient,
   artistId: string,
   folderId?: string | null,
+  opts?: MessageListOptions,
 ): Promise<PortalMessage[]> {
+  const limit = resolveMessageListLimit(opts?.limit, MESSAGE_LIST_DEFAULT_LIMIT)
+  const offset = resolveMessageListOffset(opts?.offset)
+
   let query = db
     .from('portal_messages')
     .select('*')
@@ -86,7 +108,9 @@ export async function getInboxMessages(
     }
   }
 
-  const { data, error } = await query.order('sent_at', { ascending: false }).limit(100)
+  const { data, error } = await query
+    .order('sent_at', { ascending: false })
+    .range(offset, offset + limit - 1)
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToMessage)
 }
@@ -95,14 +119,18 @@ export async function getInboxMessages(
 export async function getSentMessages(
   db: DbClient,
   artistId: string,
+  opts?: MessageListOptions,
 ): Promise<PortalMessage[]> {
+  const limit = resolveMessageListLimit(opts?.limit, MESSAGE_LIST_DEFAULT_LIMIT)
+  const offset = resolveMessageListOffset(opts?.offset)
+
   const { data, error } = await db
     .from('portal_messages')
     .select('*')
     .eq('from_artist_id', artistId)
     .is('deleted_at', null)
     .order('sent_at', { ascending: false })
-    .limit(100)
+    .range(offset, offset + limit - 1)
 
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToMessage)
@@ -112,7 +140,11 @@ export async function getSentMessages(
 export async function getStarredMessages(
   db: DbClient,
   artistId: string,
+  opts?: MessageListOptions,
 ): Promise<PortalMessage[]> {
+  const limit = resolveMessageListLimit(opts?.limit, MESSAGE_LIST_DEFAULT_LIMIT)
+  const offset = resolveMessageListOffset(opts?.offset)
+
   const { data, error } = await db
     .from('portal_messages')
     .select('*')
@@ -120,7 +152,7 @@ export async function getStarredMessages(
     .eq('starred', true)
     .is('deleted_at', null)
     .order('sent_at', { ascending: false })
-    .limit(100)
+    .range(offset, offset + limit - 1)
 
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToMessage)
@@ -130,14 +162,18 @@ export async function getStarredMessages(
 export async function getTrashedMessages(
   db: DbClient,
   artistId: string,
+  opts?: MessageListOptions,
 ): Promise<PortalMessage[]> {
+  const limit = resolveMessageListLimit(opts?.limit, MESSAGE_LIST_DEFAULT_LIMIT)
+  const offset = resolveMessageListOffset(opts?.offset)
+
   const { data, error } = await db
     .from('portal_messages')
     .select('*')
     .or(`from_artist_id.eq.${artistId},to_artist_id.eq.${artistId}`)
     .not('deleted_at', 'is', null)
     .order('sent_at', { ascending: false })
-    .limit(100)
+    .range(offset, offset + limit - 1)
 
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToMessage)
@@ -147,7 +183,11 @@ export async function getTrashedMessages(
 export async function getSentToLabelMessages(
   db: DbClient,
   artistId: string,
+  opts?: MessageListOptions,
 ): Promise<PortalMessage[]> {
+  const limit = resolveMessageListLimit(opts?.limit, MESSAGE_LIST_DEFAULT_LIMIT)
+  const offset = resolveMessageListOffset(opts?.offset)
+
   const { data, error } = await db
     .from('portal_messages')
     .select('*')
@@ -155,7 +195,7 @@ export async function getSentToLabelMessages(
     .eq('to_label', true)
     .is('deleted_at', null)
     .order('sent_at', { ascending: false })
-    .limit(100)
+    .range(offset, offset + limit - 1)
 
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToMessage)
@@ -166,7 +206,11 @@ export async function searchPortalMessages(
   db: DbClient,
   artistId: string,
   query: string,
+  opts?: MessageListOptions,
 ): Promise<PortalMessage[]> {
+  const limit = resolveMessageListLimit(opts?.limit, MESSAGE_SEARCH_DEFAULT_LIMIT)
+  const offset = resolveMessageListOffset(opts?.offset)
+
   const { data, error } = await db
     .from('portal_messages')
     .select('*')
@@ -174,7 +218,7 @@ export async function searchPortalMessages(
     .textSearch('search_vector', query.trim(), { type: 'websearch' })
     .is('deleted_at', null)
     .order('sent_at', { ascending: false })
-    .limit(50)
+    .range(offset, offset + limit - 1)
 
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToMessage)
@@ -184,7 +228,11 @@ export async function searchPortalMessages(
 export async function getFromArtistMessages(
   db: DbClient,
   artistId: string,
+  opts?: MessageListOptions,
 ): Promise<PortalMessage[]> {
+  const limit = resolveMessageListLimit(opts?.limit, MESSAGE_LIST_DEFAULT_LIMIT)
+  const offset = resolveMessageListOffset(opts?.offset)
+
   const { data, error } = await db
     .from('portal_messages')
     .select('*')
@@ -193,21 +241,27 @@ export async function getFromArtistMessages(
     .not('from_artist_id', 'is', null)
     .is('deleted_at', null)
     .order('sent_at', { ascending: false })
-    .limit(100)
+    .range(offset, offset + limit - 1)
 
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToMessage)
 }
 
 /** Messages sent by artists to the label (admin inbox). */
-export async function getIncomingToLabelMessages(db: DbClient): Promise<PortalMessage[]> {
+export async function getIncomingToLabelMessages(
+  db: DbClient,
+  opts?: MessageListOptions,
+): Promise<PortalMessage[]> {
+  const limit = resolveMessageListLimit(opts?.limit, MESSAGE_ADMIN_INBOX_DEFAULT_LIMIT)
+  const offset = resolveMessageListOffset(opts?.offset)
+
   const { data, error } = await db
     .from('portal_messages')
     .select('*')
     .eq('to_label', true)
     .is('deleted_at', null)
     .order('sent_at', { ascending: false })
-    .limit(200)
+    .range(offset, offset + limit - 1)
 
   if (error) throw new Error(error.message)
   return (data ?? []).map(rowToMessage)
@@ -227,16 +281,12 @@ export async function getIncomingToLabelUnreadCount(db: DbClient): Promise<numbe
 }
 
 /** Unread count for an artist's peer inbox (portal_messages). */
-export async function getPortalPeerUnreadCount(db: DbClient, artistId: string): Promise<number> {
-  const { count, error } = await db
-    .from('portal_messages')
-    .select('id', { count: 'exact', head: true })
-    .eq('to_artist_id', artistId)
-    .is('read_at', null)
-    .is('deleted_at', null)
-
-  if (error) throw new Error(error.message)
-  return count ?? 0
+export async function getPortalPeerUnreadCount(
+  db: DbClient,
+  artistId: string,
+  userId?: string | null,
+): Promise<number> {
+  return countUnreadPortalPeerForUser(db, artistId, userId)
 }
 
 /** @deprecated Use getSentToLabelMessages */
@@ -253,6 +303,8 @@ export interface SendMessageOpts {
   subject: string
   body: string
   bodyHtml?: string | null
+  senderUserId?: string | null
+  clientMessageId?: string | null
 }
 
 /** Sends a new portal message. Returns the created message. */
@@ -269,16 +321,46 @@ export async function sendPortalMessage(
       subject: opts.subject,
       body: opts.body,
       body_html: opts.bodyHtml ?? null,
+      sender_user_id: opts.senderUserId ?? null,
+      client_message_id: opts.clientMessageId ?? null,
     })
     .select()
     .single()
 
-  if (error) throw new Error(error.message)
-  return rowToMessage(data)
+  if (error) {
+    if (error.code === '23505' && opts.clientMessageId) {
+      const { data: existing } = await db
+        .from('portal_messages')
+        .select('*')
+        .eq('client_message_id', opts.clientMessageId)
+        .maybeSingle()
+      if (existing) return rowToMessage(existing)
+    }
+    throw new Error(error.message)
+  }
+  const message = rowToMessage(data)
+
+  try {
+    await applyPortalMessageRulesOnInsert(db, {
+      id: message.id,
+      fromArtistId: message.fromArtistId,
+      subject: message.subject,
+      body: message.body,
+      toLabel: message.toLabel,
+    })
+  } catch (err) {
+    console.error('[sendPortalMessage] rule apply failed:', err)
+  }
+
+  return message
 }
 
 /** Marks a received message as read. */
-export async function markPortalMessageRead(db: DbClient, messageId: string): Promise<void> {
+export async function markPortalMessageRead(
+  db: DbClient,
+  messageId: string,
+  userId?: string | null,
+): Promise<void> {
   const { error } = await db
     .from('portal_messages')
     .update({ read_at: new Date().toISOString() })
@@ -286,6 +368,14 @@ export async function markPortalMessageRead(db: DbClient, messageId: string): Pr
     .is('read_at', null)
 
   if (error) throw new Error(error.message)
+
+  if (userId) {
+    try {
+      await upsertMessageReceipt(db, { source: 'portal', messageId, userId })
+    } catch (err) {
+      console.error('[markPortalMessageRead] receipt upsert failed:', err)
+    }
+  }
 }
 
 /** Toggles the starred flag on a message. */

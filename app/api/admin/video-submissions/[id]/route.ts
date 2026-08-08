@@ -4,6 +4,7 @@ import { withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
 import { updateVideoSubmissionStatus } from '@/lib/api/videoSubmissions'
+import { emitNotification } from '@/lib/notifications/emit'
 
 function extractId(req: NextRequest): string {
   const segments = new URL(req.url).pathname.split('/')
@@ -30,19 +31,30 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
     body.adminReply,
   )
 
-  // Send label message to artist when status is accepted or rejected
-  if ((body.status === 'accepted' || body.status === 'rejected') && body.adminReply) {
+  if (body.status === 'accepted' || body.status === 'rejected') {
     const serviceRole = await createServiceRoleSupabaseClient()
-    const subjectKey = body.status === 'accepted' ? 'accepted' : 'rejected'
+    const decisionLabel = body.status === 'accepted' ? 'accepted' : 'rejected'
     const subjectMap: Record<string, string> = {
       accepted: `Your video "${submission.title}" has been accepted`,
       rejected: `Your video "${submission.title}" has been rejected`,
     }
-    await serviceRole.from('label_messages').insert({
-      artist_id: submission.artistId,
-      subject: subjectMap[subjectKey],
-      body: body.adminReply,
-      body_html: `<p>${body.adminReply.replace(/\n/g, '<br>')}</p>`,
+
+    if (body.adminReply) {
+      await serviceRole.from('label_messages').insert({
+        artist_id: submission.artistId,
+        subject: subjectMap[decisionLabel],
+        body: body.adminReply,
+        body_html: `<p>${body.adminReply.replace(/\n/g, '<br>')}</p>`,
+      })
+    }
+
+    await emitNotification(serviceRole, {
+      type: 'video_submission_decision',
+      entityId: submission.id,
+      entityName: subjectMap[decisionLabel],
+      artistId: submission.artistId,
+      payload: { status: body.status },
+      dedupeKey: `video_submission_decision:${submission.id}:${body.status}`,
     })
   }
 

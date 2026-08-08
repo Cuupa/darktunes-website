@@ -39,6 +39,9 @@ function makeThenableBuilder(data: unknown, error: unknown = null) {
     order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     gte: vi.fn().mockReturnThis(),
+    // Credential lookup chains: .select().eq().eq().maybeSingle()
+    maybeSingle: vi.fn().mockResolvedValue(result),
+    single: vi.fn().mockResolvedValue(result),
     then: p.then.bind(p),
     catch: p.catch.bind(p),
     finally: p.finally.bind(p),
@@ -82,6 +85,8 @@ function mockSupabaseClientOnline(): void {
               }
               return makeThenableBuilder(fields === 'id' ? [] : [{ status: 'done' }])
             }),
+            // recoverStuckSyncJobs (update → eq → or → select)
+            update: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
             or: vi.fn().mockReturnThis(),
             gte: vi.fn().mockReturnThis(),

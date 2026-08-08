@@ -1,124 +1,132 @@
 name: QA Pipeline
 
+# E2E against a local Supabase stack (Docker). Lint/unit/security/perf live in
+# dedicated workflows (no duplicates).
+# PRs: Desktop Chrome only. main: full browser matrix (Chrome + Mobile Safari + Mobile Chrome).
+
 on:
   pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'CHANGELOG.md'
+      - 'LESSONS_LEARNED.md'
+      - 'QA_CHECKLIST.md'
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'CHANGELOG.md'
+      - 'LESSONS_LEARNED.md'
+      - 'QA_CHECKLIST.md'
+  workflow_dispatch:
+
+concurrency:
+  group: qa-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 env:
   NODE_VERSION: '20'
+  # Cloudflare R2 isn't exercised by E2E (no real object storage) — placeholders
+  # satisfy env validation for every step.
+  CLOUDFLARE_R2_ACCOUNT_ID: placeholder-r2-account
+  CLOUDFLARE_R2_ACCESS_KEY_ID: placeholder-r2-access-key
+  CLOUDFLARE_R2_SECRET_ACCESS_KEY: placeholder-r2-secret-key
+  CLOUDFLARE_R2_BUCKET_NAME: placeholder-bucket
+  CLOUDFLARE_R2_PUBLIC_URL: https://cdn.placeholder.example
+  # 64-char hex placeholder so env.server validation succeeds (not a real secret)
+  API_CREDENTIALS_ENCRYPTION_KEY: a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8
+  # global-teardown.ts stops the Docker stack after CI runs
+  E2E_STOP_DB_AFTER_TESTS: '1'
 
 jobs:
-  lint-and-unit-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run test
-
   e2e-tests:
+    name: E2E
     runs-on: ubuntu-latest
-    env:
-      # Cloudflare R2 isn't exercised by any E2E test (no test hits real
-      # object storage) — static placeholders just satisfy env validation.
-      # Safe to keep set for every step, unlike the Supabase vars below.
-      CLOUDFLARE_R2_ACCOUNT_ID: placeholder-r2-account
-      CLOUDFLARE_R2_ACCESS_KEY_ID: placeholder-r2-access-key
-      CLOUDFLARE_R2_SECRET_ACCESS_KEY: placeholder-r2-secret-key
-      CLOUDFLARE_R2_BUCKET_NAME: placeholder-bucket
-      CLOUDFLARE_R2_PUBLIC_URL: https://cdn.placeholder.example
-      # Required by src/lib/env.server.ts's Zod schema (64-char hex) wherever
-      # api_credentials encrypt/decrypt code runs (e.g. /portal at runtime,
-      # not just build) — no E2E test exercises real encrypted credentials,
-      # so a fixed placeholder is fine. Safe to keep set for every step.
-      API_CREDENTIALS_ENCRYPTION_KEY: a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8
-      # Have global-teardown.ts stop the Docker stack at the end of the run
-      # (default off locally so iterative dev doesn't repay container startup
-      # cost every time — see tests/e2e/global-teardown.ts).
-      E2E_STOP_DB_AFTER_TESTS: '1'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-      - uses: supabase/setup-cli@v1
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
         with:
           version: latest
+
       - name: Ensure psql client is available
         run: command -v psql >/dev/null || (sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client)
-      - run: npm ci
-      - run: npx playwright install --with-deps
-      # Starts the local Supabase stack (Docker), applies supabase/reset.sql,
-      # seeds fixture content + auth users, and writes .env.e2e.local — see
-      # scripts/e2e-db-setup.mjs and E2E-TESTS.md Phase 1/2. No repo secrets
-      # involved: everything comes from this freshly provisioned local stack.
-      - run: npm run db:e2e:start
-      # The build MUST see the *real* local-stack credentials written by the
-      # step above, not placeholders: NEXT_PUBLIC_* vars are inlined into the
-      # client bundle at build time, so a placeholder Supabase URL bakes an
-      # unreachable domain into every browser-side call — signInWithPassword
-      # included — and every auth-dependent E2E test then dies on a login
-      # timeout no matter how the server process is configured afterwards.
-      # `set -a` exports each assignment in .env.e2e.local (plain unquoted
-      # KEY=value lines, see scripts/e2e-db-setup.mjs) for this step only, so
-      # nothing shadows playwright.config.ts's own dotenv load below.
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Next.js cache
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ hashFiles('app/**/*.[jt]s', 'app/**/*.[jt]sx', 'src/**/*.[jt]s', 'src/**/*.[jt]sx', 'next.config.*') }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+            next-${{ runner.os }}-
+
+      - name: Playwright browser cache
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright browsers
+        run: |
+          # PR + manual branch runs: Chromium only. Full matrix on main pushes only.
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            npx playwright install --with-deps
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      # Starts local Supabase (Docker), applies reset.sql, seeds fixtures + auth users,
+      # writes .env.e2e.local — see scripts/e2e-db-setup.mjs and E2E-TESTS.md.
+      - name: Start local Supabase stack + seed fixtures
+        run: npm run db:e2e:start
+
+      # Build MUST see real local-stack credentials (NEXT_PUBLIC_* are inlined).
       - name: Build against the local Supabase stack
         run: |
           set -a
           . ./.env.e2e.local
           set +a
           npm run build
-      - run: SKIP_BUILD=1 npm run test:e2e
-      - uses: actions/upload-artifact@v4
+
+      - name: Run E2E
+        run: |
+          set -a
+          . ./.env.e2e.local
+          set +a
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            SKIP_BUILD=1 npx playwright test \
+              --project="Desktop Chrome" \
+              --project="Mobile Safari" \
+              --project="Mobile Chrome"
+          else
+            SKIP_BUILD=1 npx playwright test --project="Desktop Chrome"
+          fi
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report
           path: playwright-report/
-          retention-days: 30
-
-  security-audit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
-      - run: npm audit --production --audit-level=critical
-
-  performance-tests:
-    runs-on: ubuntu-latest
-    env:
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key-for-ci-build' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run build
-      - run: SKIP_BUILD=1 npm run perf:test
-
-  ci-validation:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-      - run: npm ci
-      - run: npm run test -- tests/unit/ci-colors.spec.ts
+          retention-days: 14
