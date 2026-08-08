@@ -34,6 +34,8 @@ Entity-level (combine with list tag): `artist-${slug}`, `release-${id}`, `news-$
 
 `POST /api/revalidate-content` accepts optional `entityTags` for webhook-driven invalidation.
 
+**Portal calendar:** `getCachedCalendarReleases` (`releases` tag) + `getCachedCalendarConcerts` (`concerts` tag) in `src/lib/cache/publicQueries.ts`. Slim nested selects only; no cookie-bound Supabase inside those cache callbacks.
+
 ## R2 object keys
 
 Store key in DB `r2_key` column for cleanup via `deleteObjectFromR2`.

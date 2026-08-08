@@ -83,9 +83,21 @@
 | Shared inbox (M2) | Portal `to_label` messages: `assignee_user_id`, `priority`, `tags`; staff notes (`message_internal_notes`); audit (`message_events`); APIs under `/api/admin/messages/[id]/{ops,notes,export}`; UI `SharedInboxPanel` |
 | Chat thread UI | Detail pane uses `MessageChatThread` (chronological bubbles; own messages right). Label threads include original + `artist_replies`. **Admin and portal both have an inline reply composer** under the thread (not only a link to Compose). |
 | Conversation grouping | Client-side threads via `src/lib/messaging/threads.ts` (normalize subject, participant key). Portal inbox API merges sent+received so Re: threads are complete. One list row per conversation (count badge). |
+| Portal mobile mailbox | Messenger pattern in `PortalMailbox`: below `md`, show **list or full-screen chat** (not 3 columns). Back = clear selection; folders via left `Sheet`. Desktop keeps folders \| list \| chat. |
 | Inbox tools | Sort modes (`MailboxSortSelect`); drag conversation → folder/trash (`@dnd-kit` + droppable `FolderTree`). Star/delete/move/restore apply to **all** message ids in the thread. |
 | Live sound | Realtime INSERT → `playNewMessageSound()`; toggle `MessageSoundToggle` (`localStorage` `dt-message-sound-enabled`, default on) |
 | Notifications | Label send: `POST /api/admin/messages/send` emits `label_message` (artist audience). Artist reply: `POST /api/portal/messages/artist-reply` emits `artist_portal_message` (staff). Portal→label already emits on `POST /api/portal/messages/send`. |
+
+### Portal calendar (`/portal/calendar`)
+
+| Topic | Rule |
+|-------|------|
+| Availability | **Always on** for signed-in portal artists (sidebar not gated by `artist.calendar`; page has no disable gate) |
+| Data | Releases: `getAllVisibleReleasesForCalendar` (slim nested select). Events: `getAllVisibleConcertsForCalendar` (past + future, nested artists / featured) |
+| Cache | `getCachedCalendarReleases` (`releases` tag) + `getCachedCalendarConcerts` (`concerts` tag) via cookie-free client |
+| UI filters | Kind: All / Releases / Events. Ownership: All artists / Mine only. Search: artists, titles, venues. Release type chips when releases visible |
+| Filters SSOT | `src/lib/portal/releaseCalendarFilters.ts` (`filterCalendarReleases`, `filterCalendarConcerts`) |
+| Auth | `resolvePortalArtist` request-scoped for “Mine only”; calendar payloads are shared cache |
 
 ### TRACK Tour Planner (`/portal/tour-planner`)
 
@@ -266,14 +278,14 @@ Two independent systems — do not conflate with **Settings → Roles** (`role_p
 
 **Portal flags (seed in `supabase/reset.sql`)**
 
-- **Artist:** `artist.analytics`, `artist.statements`, `artist.marketing`, `artist.invoices`, `artist.documents`, `artist.calendar`, `artist.epk_builder`, `artist.fan_page`, `artist.tour_planner`
+- **Artist:** `artist.analytics`, `artist.statements`, `artist.marketing`, `artist.invoices`, `artist.documents`, `artist.epk_builder`, `artist.fan_page`, `artist.tour_planner` (calendar is always on — not gated)
 - **Journalist:** `journalist.accreditation`, `press.applications`, `press.zip_download`, `press.audio_preview`, `press.contact`
 
 **Press helpers** (`src/lib/pressAccess.ts`): `isPressApplicationsEnabled()`, `isPressZipDownloadEnabled()`, `isPressAudioPreviewEnabled()` — each reads `portal_feature_flags` for role `journalist`.
 
 **Deprecated:** `press.promo_tracks` — replaced by global `promoPool`; hidden in admin UI (`DEPRECATED_PORTAL_FEATURE_FLAGS`), not seeded.
 
-**Route-guard pattern:** RSC page (or server action) loads flags/toggles via DAL, returns disabled message or `notFound()`; nav hides links when flag is off. Examples: `app/portal/calendar/page.tsx` (`artist.calendar`), `app/press/apply/page.tsx` (`press.applications`), `app/press/dashboard/promo-pool/page.tsx` (global `promoPool`).
+**Route-guard pattern:** RSC page (or server action) loads flags/toggles via DAL, returns disabled message or `notFound()`; nav hides links when flag is off. Examples: `app/press/apply/page.tsx` (`press.applications`), `app/press/dashboard/promo-pool/page.tsx` (global `promoPool`). Portal calendar is always available (no flag gate).
 
 Admin UI: `AdminFeaturesWrapper` — section 1 `FeatureTogglesManager` (global, saved with site settings), section 2 `FeatureFlagsManager` (portal rows, immediate PATCH).
 

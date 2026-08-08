@@ -1,30 +1,28 @@
 /**
- * app/portal/calendar/page.tsx — Release Calendar (Server Component)
+ * app/portal/calendar/page.tsx — Unified portal calendar (Server Component)
  *
- * Fetches all visible label releases and the current artist's ID for the
- * "My Releases" filter. Passes data to the ReleaseCalendarClient leaf component.
+ * Auth stays request-scoped; release + concert rows come from shared Data Cache
+ * so cold opens stay fast. Calendar is always available for signed-in artists.
  */
-
-export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { resolvePortalArtist } from '@/lib/api/artistProfiles'
-import { getAllVisibleReleasesForCalendar } from '@/lib/api/releases'
-import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
+import {
+  getCachedCalendarConcerts,
+  getCachedCalendarReleases,
+} from '@/lib/cache/publicQueries'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ReleaseCalendarClient } from './_components/ReleaseCalendarClient'
-import { getTranslations } from 'next-intl/server'
 
 function CalendarSkeleton() {
-
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" aria-busy="true">
       <Skeleton className="h-8 w-56" />
+      <Skeleton className="h-4 w-80" />
       <div className="flex gap-2">
-        <Skeleton className="h-9 w-32 rounded-full" />
-        <Skeleton className="h-9 w-32 rounded-full" />
+        <Skeleton className="h-9 w-40 rounded-full" />
+        <Skeleton className="h-9 w-36 rounded-full" />
       </div>
       <div className="flex items-center justify-between">
         <Skeleton className="h-8 w-8 rounded-md" />
@@ -45,8 +43,6 @@ async function CalendarContent({
 }: {
   searchParams: Promise<{ artistId?: string }>
 }) {
-
-  const t = await getTranslations('portal')
   const { artistId } = await searchParams
 
   const supabase = await createServerSupabaseClient()
@@ -55,24 +51,16 @@ async function CalendarContent({
   } = await supabase.auth.getUser()
   if (!user) return null
 
-  const flags = await getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>))
-  if (flags['artist.calendar'] === false) {
-    return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-bold">{t('calendar_heading')}</h1>
-        <p className="text-muted-foreground">{t('calendar_disabled')}</p>
-      </div>
-    )
-  }
-
-  const [releases, artist] = await Promise.all([
-    getAllVisibleReleasesForCalendar(supabase).catch(() => []),
+  const [releases, concerts, artist] = await Promise.all([
+    getCachedCalendarReleases(),
+    getCachedCalendarConcerts(),
     resolvePortalArtist(supabase, user.id, artistId).catch(() => null),
   ])
 
   return (
     <ReleaseCalendarClient
       releases={releases}
+      concerts={concerts}
       currentArtistId={artist?.id ?? null}
     />
   )

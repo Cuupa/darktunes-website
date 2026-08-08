@@ -11,7 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PWA Web Push + app icon badge (portal + admin):** One-tap **Enable** banner (no technical setup for users). Subscriptions in `push_subscriptions`; per-event `notification_preferences.push`; `emitNotification` sends Web Push via VAPID/`web-push` when configured. Service worker handles `push` / `notificationclick` and Badging API. Deployer sets `NEXT_PUBLIC_VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` once (see `DEPLOYMENT.md` / `.env.example`). Preferences include device toggle + Push column.
 - **CI mobile layout contract:** `npm run check:mobile-layout` (`scripts/check-mobile-layout-contract.mjs`) in `ci:contracts` — bans CSS-only hide of ResizablePanelGroup, requires `useIsLg` on builder shells, full-bleed fan-page parity, footer touch targets. Unit tests for shells + footer.
 
+### Added
+- **Portal unified calendar:** Always available for artists. Month grid shows **releases + live events** with kind toggle (All / Releases / Events), ownership quick filter (All artists / Mine only), and search across artists, titles, and venues. Event detail dialog (tickets, public event page). Cached concert payload via `getCachedCalendarConcerts`.
+
 ### Fixed
+- **Portal release calendar load time:** Slim nested select + `getCachedCalendarReleases` (Data Cache / `releases` tag) instead of `select(*)` + sequential `release_artists` batches on every navigation.
+- **Portal mailbox on mobile:** Messenger-style UX — conversation list OR full-screen chat (back control), folders in a left sheet, 44px touch targets, sticky reply composer. Desktop keeps 3-column layout.
 - **EPK + Personal Artist Page builders on mobile:** Desktop three-column layout no longer paints beside mobile tabs. Root cause: `react-resizable-panels` sets inline `display:flex`, so Tailwind `hidden lg:flex` failed. Shells now mount `ResizablePanelGroup` only at `lg+` via `useIsLg()`; compact toolbars + single-panel tabs below `lg`.
 - **Homepage footer legal links (mobile):** Impressum / Datenschutz / AGB wrap with 44px touch targets; removed overflow clipping that made links untappable.
 - **Mobile public scroll ghosting:** Lenis uses `syncTouch: false` (native touch); VFX lite mode (no CRT/chromatic/will-change); `ScrollReveal` drops permanent `will-change` after animate-in.

@@ -208,10 +208,15 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         id: 'calendar',
         titleKey: 'topic_calendar_title',
         route: '/portal/calendar',
-        featureFlag: 'artist.calendar',
+        // Always available for portal artists (nav not gated by artist.calendar).
         sections: [
           section('overview', 'overview', 'topic_calendar_overview_title', 'topic_calendar_overview_body'),
-          section('filters', 'subfeature', 'topic_calendar_filters_title', 'topic_calendar_filters_body', ['pre-save']),
+          section('filters', 'subfeature', 'topic_calendar_filters_title', 'topic_calendar_filters_body', [
+            'pre-save',
+            'events',
+            'releases',
+            'mine',
+          ]),
           section('troubleshoot', 'troubleshoot', 'topic_calendar_troubleshoot_title', 'topic_calendar_troubleshoot_body'),
         ],
       },
