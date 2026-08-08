@@ -63,7 +63,7 @@ export function MessageChatThread({
       role="log"
       aria-label={ariaLabel}
       aria-live="polite"
-      className={cn('flex flex-col gap-3', className)}
+      className={cn('flex flex-col gap-2.5 sm:gap-3', className)}
     >
       {sorted.map((item) => (
         <div
@@ -72,7 +72,8 @@ export function MessageChatThread({
         >
           <article
             className={cn(
-              'max-w-[min(100%,28rem)] rounded-2xl px-3.5 py-2.5 shadow-sm',
+              // Messenger-style: wide bubbles on phones, capped on desktop
+              'max-w-[88%] sm:max-w-[min(100%,28rem)] rounded-2xl px-3.5 py-2.5 shadow-sm',
               item.isOwn
                 ? 'rounded-br-md bg-primary text-primary-foreground'
                 : 'rounded-bl-md border border-border bg-card text-foreground',

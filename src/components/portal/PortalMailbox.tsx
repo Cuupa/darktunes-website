@@ -30,11 +30,20 @@ import {
   MagnifyingGlass,
   Spinner,
   ChatsCircle,
+  CaretLeft,
+  Folders,
 } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
 import { FolderTree, type FolderSelection } from '@/components/messaging/FolderTree'
 import { MessageChatThread, type ChatThreadItem } from '@/components/messaging/MessageChatThread'
 import { MessageSoundToggle } from '@/components/messaging/MessageSoundToggle'
@@ -152,6 +161,8 @@ export function PortalMailbox({
   const [replyHtml, setReplyHtml] = useState('')
   const [replyText, setReplyText] = useState('')
   const [isSendingReply, setIsSendingReply] = useState(false)
+  /** Mobile folder drawer (messenger chrome). */
+  const [foldersOpen, setFoldersOpen] = useState(false)
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
@@ -667,10 +678,47 @@ export function PortalMailbox({
   const primaryPortalMessageId = replyTargetPortal?.messages.find((m) => m.toArtistId === artistId)?.id
     ?? replyTargetPortal?.messages[0]?.id
 
+  const folderTreeProps = {
+    selected: selectedFolder,
+    onSelect: (id: FolderSelection) => {
+      setSelectedFolder(id)
+      setFoldersOpen(false)
+      setSelectedThreadId(null)
+    },
+    customFolders: folders.map((f) => ({
+      id: f.id,
+      name: f.name,
+      icon: f.icon ?? undefined,
+      color: f.color ?? undefined,
+      createdAt: f.createdAt,
+    })),
+    unreadCounts,
+    onCreateFolder: handleCreateFolder,
+    onDeleteFolder: handleDeleteFolder,
+    onRenameFolder: handleRenameFolder,
+    enableDrop: true as const,
+    hideFromArtists: true as const,
+    systemFolderLabels: {
+      inbox: t('messages_folder_inbox'),
+      starred: t('messages_folder_starred'),
+      sent: t('messages_folder_sent'),
+      trash: t('messages_folder_trash'),
+    },
+    foldersSectionLabel: t('messages_folder_section'),
+  }
+
+  const showConversation = !!selectedThread
+
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="flex h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-border">
-        <div className="w-52 shrink-0 border-r border-border bg-card flex flex-col">
+      {/*
+        Messenger layout:
+        - md+: folders | thread list | chat (3 columns)
+        - mobile: list OR full-screen chat with back; folders in a sheet
+      */}
+      <div className="flex h-[min(100dvh-7rem,calc(100vh-7rem))] overflow-hidden rounded-lg border border-border bg-background">
+        {/* Desktop folder rail */}
+        <div className="hidden md:flex w-52 shrink-0 border-r border-border bg-card flex-col">
           <div className="p-3 space-y-2">
             <Button size="sm" className="w-full gap-2" asChild>
               <Link href={`/portal/messages/compose?artistId=${encodeURIComponent(artistId)}`}>
@@ -686,36 +734,80 @@ export function PortalMailbox({
           </div>
           <Separator />
           <div className="flex-1 overflow-y-auto overscroll-contain p-2" data-lenis-prevent>
-            <FolderTree
-              selected={selectedFolder}
-              onSelect={setSelectedFolder}
-              customFolders={folders.map((f) => ({
-                id: f.id,
-                name: f.name,
-                icon: f.icon ?? undefined,
-                color: f.color ?? undefined,
-                createdAt: f.createdAt,
-              }))}
-              unreadCounts={unreadCounts}
-              onCreateFolder={handleCreateFolder}
-              onDeleteFolder={handleDeleteFolder}
-              onRenameFolder={handleRenameFolder}
-              enableDrop
-              hideFromArtists
-              systemFolderLabels={{
-                inbox: t('messages_folder_inbox'),
-                starred: t('messages_folder_starred'),
-                sent: t('messages_folder_sent'),
-                trash: t('messages_folder_trash'),
-              }}
-              foldersSectionLabel={t('messages_folder_section')}
-            />
+            <FolderTree {...folderTreeProps} />
           </div>
         </div>
 
-        <div className="w-72 shrink-0 border-r border-border flex flex-col bg-background">
-          <div className="p-3 border-b border-border space-y-2">
-            <div className="relative">
+        {/* Thread list — full width on mobile when no chat open */}
+        <div
+          className={cn(
+            'flex flex-col bg-background min-w-0',
+            showConversation
+              ? 'hidden md:flex md:w-72 md:shrink-0 md:border-r md:border-border'
+              : 'flex-1 md:w-72 md:shrink-0 md:border-r md:border-border',
+          )}
+        >
+          <div className="p-3 border-b border-border space-y-2 shrink-0">
+            <div className="flex items-center gap-2 md:hidden">
+              <Sheet open={foldersOpen} onOpenChange={setFoldersOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="min-h-[44px] min-w-[44px] shrink-0"
+                    aria-label={t('messages_folders_open')}
+                  >
+                    <Folders size={18} aria-hidden="true" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[min(100%,18rem)] p-0 flex flex-col">
+                  <SheetHeader className="p-4 border-b border-border text-left">
+                    <SheetTitle>{t('messages_folders_title')}</SheetTitle>
+                  </SheetHeader>
+                  <div className="p-3 space-y-2 border-b border-border">
+                    <Button size="sm" className="w-full gap-2" asChild>
+                      <Link
+                        href={`/portal/messages/compose?artistId=${encodeURIComponent(artistId)}`}
+                        onClick={() => setFoldersOpen(false)}
+                      >
+                        <PaperPlaneTilt size={14} aria-hidden="true" />
+                        {t('messages_compose')}
+                      </Link>
+                    </Button>
+                    <MessageSoundToggle
+                      className="w-full justify-center"
+                      labelOn={t('messages_sound_on')}
+                      labelOff={t('messages_sound_off')}
+                    />
+                  </div>
+                  <div className="flex-1 overflow-y-auto overscroll-contain p-2" data-lenis-prevent>
+                    <FolderTree {...folderTreeProps} enableDrop={false} />
+                  </div>
+                </SheetContent>
+              </Sheet>
+              <div className="relative flex-1 min-w-0">
+                <MagnifyingGlass
+                  size={14}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <Input
+                  placeholder={t('messages_search_placeholder')}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 h-11 text-sm"
+                />
+              </div>
+              <Button size="sm" className="shrink-0 min-h-[44px] gap-1.5" asChild>
+                <Link href={`/portal/messages/compose?artistId=${encodeURIComponent(artistId)}`}>
+                  <PaperPlaneTilt size={14} aria-hidden="true" />
+                  <span className="sr-only sm:not-sr-only">{t('messages_compose')}</span>
+                </Link>
+              </Button>
+            </div>
+
+            <div className="hidden md:block relative">
               <MagnifyingGlass
                 size={14}
                 className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -740,7 +832,7 @@ export function PortalMailbox({
                 count_desc: t('messages_sort_count'),
               }}
             />
-            <p className="text-[10px] text-muted-foreground leading-snug">
+            <p className="hidden md:block text-[10px] text-muted-foreground leading-snug">
               {t('messages_dnd_hint')}
             </p>
           </div>
@@ -773,9 +865,15 @@ export function PortalMailbox({
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col overflow-hidden bg-background">
+        {/* Chat pane — full-screen messenger on mobile when a thread is open */}
+        <div
+          className={cn(
+            'flex-1 flex flex-col overflow-hidden bg-background min-w-0',
+            !showConversation && 'hidden md:flex',
+          )}
+        >
           {!selectedThread ? (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="flex-1 flex items-center justify-center p-6">
               <PortalEmptyState
                 icon={ChatsCircle}
                 heading={t('messages_select_conversation')}
@@ -784,11 +882,21 @@ export function PortalMailbox({
             </div>
           ) : (
             <>
-              <div className="p-4 border-b border-border">
-                <div className="flex items-start justify-between gap-4">
+              <div className="border-b border-border shrink-0 bg-card/40">
+                <button
+                  type="button"
+                  onClick={() => setSelectedThreadId(null)}
+                  className="md:hidden flex items-center gap-2 w-full min-h-[44px] px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <CaretLeft size={18} aria-hidden="true" />
+                  {t('messages_back_to_list')}
+                </button>
+                <div className="flex items-start justify-between gap-3 px-3 sm:px-4 pb-3 md:pt-4 md:pb-4">
                   <div className="min-w-0">
-                    <h2 className="text-base font-semibold truncate">{selectedThread.subject}</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <h2 className="text-base font-semibold truncate leading-snug">
+                      {selectedThread.subject}
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
                       {selectedThread.participantsLabel}
                       {selectedThread.messageCount > 1
                         ? ` · ${selectedThread.messageCount} ${t('messages_messages_count')}`
@@ -798,10 +906,11 @@ export function PortalMailbox({
                     </p>
                   </div>
                   {selectedThread.kind === 'portal' && primaryPortalMessageId && (
-                    <div className="flex gap-1 shrink-0">
+                    <div className="flex gap-0.5 shrink-0">
                       <Button
                         size="icon"
                         variant="ghost"
+                        className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9"
                         onClick={() => {
                           const next = !selectedThread.starred
                           for (const m of (selectedThread as PortalConversationThread).messages) {
@@ -820,6 +929,7 @@ export function PortalMailbox({
                         <Button
                           size="icon"
                           variant="ghost"
+                          className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9"
                           onClick={() =>
                             void restoreThread(selectedThread as PortalConversationThread)
                           }
@@ -831,11 +941,11 @@ export function PortalMailbox({
                         <Button
                           size="icon"
                           variant="ghost"
+                          className="min-h-[44px] min-w-[44px] md:min-h-9 md:min-w-9 text-destructive hover:text-destructive"
                           onClick={() =>
                             void softDeleteThread(selectedThread as PortalConversationThread)
                           }
                           aria-label={t('messages_delete_conversation')}
-                          className="text-destructive hover:text-destructive"
                         >
                           <Trash size={16} aria-hidden="true" />
                         </Button>
@@ -845,7 +955,10 @@ export function PortalMailbox({
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto overscroll-contain p-4" data-lenis-prevent>
+              <div
+                className="flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:p-4 bg-muted/20"
+                data-lenis-prevent
+              >
                 <MessageChatThread
                   items={selectedThread.kind === 'portal' ? portalChatItems : labelChatItems}
                   aria-label={t('messages_conversation')}
@@ -853,7 +966,7 @@ export function PortalMailbox({
               </div>
 
               {replyTargetLabel && (
-                <div className="border-t border-border p-4 space-y-2">
+                <div className="border-t border-border p-3 sm:p-4 space-y-2 shrink-0 bg-card/60">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {t('messages_reply_to_label')}
                   </p>
@@ -864,11 +977,12 @@ export function PortalMailbox({
                       setReplyText(text)
                     }}
                     placeholder={t('messages_reply_placeholder')}
-                    minHeight={80}
+                    minHeight={72}
                   />
                   <div className="flex justify-end">
                     <Button
                       size="sm"
+                      className="min-h-[44px] gap-2 px-4"
                       disabled={!replyText.trim() || isSendingReply}
                       onClick={() => {
                         void (async () => {
@@ -916,6 +1030,7 @@ export function PortalMailbox({
                         })()
                       }}
                     >
+                      <PaperPlaneTilt size={14} aria-hidden="true" />
                       {isSendingReply ? t('messages_compose_sending') : t('messages_send_reply')}
                     </Button>
                   </div>
@@ -923,7 +1038,7 @@ export function PortalMailbox({
               )}
 
               {canReplyPortal && peerArtistId && (
-                <div className="border-t border-border p-4 space-y-2">
+                <div className="border-t border-border p-3 sm:p-4 space-y-2 shrink-0 bg-card/60">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {t('messages_reply')}
                   </p>
@@ -934,13 +1049,13 @@ export function PortalMailbox({
                       setReplyText(text)
                     }}
                     placeholder={t('messages_reply_placeholder')}
-                    minHeight={80}
+                    minHeight={72}
                   />
                   <div className="flex justify-end">
                     <Button
                       size="sm"
                       disabled={!replyText.trim() || isSendingReply}
-                      className="gap-2"
+                      className="min-h-[44px] gap-2 px-4"
                       onClick={() => {
                         void (async () => {
                           setIsSendingReply(true)

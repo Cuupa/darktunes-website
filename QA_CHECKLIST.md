@@ -18,6 +18,10 @@
 - [ ] Admin/Portal messages: open a label thread → original + replies show as chat bubbles (own on the right)
 - [ ] New message while mailbox open → toast + optional chime; toggle Sound off/on persists after reload
 - [ ] Inbox: multiple Re:/Aw: messages on same subject appear as **one** conversation (count badge); opening shows full chat
+- [ ] Portal messages (phone width): list full-screen → open thread → full-screen chat + **Back to conversations**; folders open from sheet; reply composer usable; desktop still 3-column
+- [ ] `/portal/calendar` always in portal nav; loads promptly (skeleton → grid); second visit should feel cached
+- [ ] Calendar: kind toggle All / Releases / Events; Mine only; search finds other artists / venues
+- [ ] Calendar event chip → dialog (venue, tickets, public event); release chip still works
 - [ ] Inbox sort: Newest / Unread first / Subject A–Z change list order
 - [ ] Drag conversation onto a custom folder (or Trash) files/deletes the whole thread
 
@@ -215,8 +219,7 @@
 - [ ] Artist user can log in at /portal
 - [ ] PortalAccessGate shown for unlinked users (role=user)
 - [ ] Profile edit saves bio, photo uploads to R2
-- [ ] Feature-flagged modules hidden when flag is disabled
-- [ ] `/portal/calendar` blocked when `artist.calendar` is disabled (direct URL shows disabled message)
+- [ ] Feature-flagged modules hidden when flag is disabled (calendar is always on — not flag-gated)
 - [ ] `/portal/sos-analytics` tabs load (streaming, website, merch) when `artist.analytics` is enabled
 - [ ] Admin → API Keys can store Apify token; Accounting dry-run lists only **visible** artists/releases with Spotify links; live sync respects 1200 URL/month budget and shows clear errors if token missing/budget exhausted
 - [ ] Portal Listeners tab shows Spotify (public) series after Apify sync (disclaimer: not settlement data)

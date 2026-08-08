@@ -98,7 +98,8 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/portal/epk-builder', label: 'epk_builder_nav', icon: FileText, flag: 'artist.epk_builder' },
       { href: '/portal/fan-page', label: 'fan_page_nav', icon: Globe, flag: 'artist.fan_page' },
       { href: '/portal/releases', label: 'releases', icon: MusicNotes },
-      { href: '/portal/calendar', label: 'calendar', icon: CalendarDots, flag: 'artist.calendar' },
+      // Always available for artists (releases + events calendar).
+      { href: '/portal/calendar', label: 'calendar', icon: CalendarDots },
       { href: '/portal/releases/submissions', label: 'releases_submissions_heading', icon: List },
       { href: '/portal/releases/videos', label: 'video_submissions_heading', icon: Eye },
     ],

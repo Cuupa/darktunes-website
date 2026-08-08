@@ -85,25 +85,35 @@ async function attachReleaseArtists(db: DbClient, releases: Release[]): Promise<
   if (releases.length === 0) return releases
   const ids = releases.map((r) => r.id)
 
-  // Split IDs into fixed-size batches and fetch each one sequentially.
-  const allRows: ReturnType<typeof parseJunctionRows<'release_id'>> = []
+  // Split IDs into fixed-size batches and fetch in parallel (was sequential → calendar lag).
+  const batches: string[][] = []
   for (let i = 0; i < ids.length; i += RELEASE_ARTISTS_BATCH_SIZE) {
-    const batch = ids.slice(i, i + RELEASE_ARTISTS_BATCH_SIZE)
-    const { data, error } = await (db as DbClient)
-      .from('release_artists' as const)
-      .select('release_id, sort_order, artists(id, name, slug)')
-      .in('release_id', batch)
-      .order('sort_order', { ascending: true })
+    batches.push(ids.slice(i, i + RELEASE_ARTISTS_BATCH_SIZE))
+  }
 
-    if (error) {
-      // Gracefully degrade when the junction table doesn't exist yet (e.g. schema
-      // migration hasn't run) so that SSG/ISR prerendering is never blocked.
-      // byRelease remains empty → all releases fall through to the legacy artist_id fallback below.
-      console.warn(`release_artists lookup skipped: ${error.message}`)
-      break
-    }
+  const batchResults = await Promise.all(
+    batches.map(async (batch) => {
+      const { data, error } = await (db as DbClient)
+        .from('release_artists' as const)
+        .select('release_id, sort_order, artists(id, name, slug)')
+        .in('release_id', batch)
+        .order('sort_order', { ascending: true })
 
-    allRows.push(...parseJunctionRows(data, 'release_id'))
+      if (error) {
+        // Gracefully degrade when the junction table doesn't exist yet (e.g. schema
+        // migration hasn't run) so that SSG/ISR prerendering is never blocked.
+        // byRelease remains empty → all releases fall through to the legacy artist_id fallback below.
+        console.warn(`release_artists lookup skipped: ${error.message}`)
+        return null
+      }
+      return parseJunctionRows(data, 'release_id')
+    }),
+  )
+
+  const allRows: ReturnType<typeof parseJunctionRows<'release_id'>> = []
+  for (const rows of batchResults) {
+    if (rows === null) break
+    allRows.push(...rows)
   }
 
   const byRelease = new Map<string, { id: string; name: string; slug: string }[]>()
@@ -282,34 +292,180 @@ export async function deleteRelease(db: DbClient, id: string): Promise<void> {
 }
 
 /**
- * Calendar query: returns all visible, non-promo releases whose artist is also
- * visible. Includes artist names via the junction table.
- * Used by the Artist Portal Release Calendar.
+ * Slim nested select for the portal release calendar.
+ * One PostgREST round-trip instead of select(*) + N batched release_artists lookups.
+ * Only columns the calendar UI actually renders (grid + detail dialog).
+ */
+const CALENDAR_RELEASE_SELECT = [
+  'id',
+  'title',
+  'artist_id',
+  'release_date',
+  'cover_art',
+  'type',
+  'spotify_url',
+  'apple_music_url',
+  'youtube_url',
+  'bandcamp_url',
+  'smartlink_url',
+  'platform_links',
+  'is_visible',
+  'is_promo',
+  'promo_text',
+  'release_artists(sort_order, artists(id, name, slug, is_visible))',
+].join(', ')
+
+type CalendarArtistEmbed = {
+  id: string
+  name: string
+  slug: string
+  is_visible: boolean | null
+}
+
+type CalendarJunctionEmbed = {
+  sort_order: number | null
+  artists: CalendarArtistEmbed | CalendarArtistEmbed[] | null
+}
+
+type CalendarReleaseRow = {
+  id: string
+  title: string
+  artist_id: string | null
+  release_date: string
+  cover_art: string | null
+  type: Release['type']
+  spotify_url: string | null
+  apple_music_url: string | null
+  youtube_url: string | null
+  bandcamp_url: string | null
+  smartlink_url: string | null
+  platform_links: Record<string, string> | null
+  is_visible: boolean
+  is_promo: boolean
+  promo_text: string | null
+  release_artists?: CalendarJunctionEmbed[] | null
+}
+
+function unwrapEmbeddedArtist(
+  artists: CalendarJunctionEmbed['artists'],
+): CalendarArtistEmbed | null {
+  if (!artists) return null
+  return Array.isArray(artists) ? (artists[0] ?? null) : artists
+}
+
+function mapCalendarRow(row: CalendarReleaseRow): Release | null {
+  const junction = [...(row.release_artists ?? [])].sort(
+    (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
+  )
+
+  const visibleArtists: { id: string; name: string; slug: string }[] = []
+  let hadAnyJunctionArtist = false
+
+  for (const entry of junction) {
+    const artist = unwrapEmbeddedArtist(entry.artists)
+    if (!artist) continue
+    hadAnyJunctionArtist = true
+    if (artist.is_visible === false) continue
+    visibleArtists.push({ id: artist.id, name: artist.name, slug: artist.slug })
+  }
+
+  // Drop releases whose only linked artists are hidden (junction path).
+  if (hadAnyJunctionArtist && visibleArtists.length === 0) return null
+
+  // Legacy artist_id-only rows: if junction is empty, keep (visibility was already
+  // filtered via primary artist when we know it; unlinked drafts still show).
+  const primary = visibleArtists[0]
+  const artistId = primary?.id ?? row.artist_id ?? ''
+
+  return {
+    id: row.id,
+    title: stripEmojis(row.title),
+    artistId,
+    artistName: primary?.name ?? '',
+    releaseDate: row.release_date,
+    coverArt: row.cover_art ?? '',
+    type: row.type,
+    spotifyUrl: row.spotify_url ?? undefined,
+    appleMusicUrl: row.apple_music_url ?? undefined,
+    youtubeUrl: row.youtube_url ?? undefined,
+    bandcampUrl: row.bandcamp_url ?? undefined,
+    smartlinkUrl: row.smartlink_url ?? undefined,
+    featured: false,
+    platformLinks: row.platform_links ?? undefined,
+    isVisible: row.is_visible,
+    isPromo: row.is_promo,
+    promoText: row.promo_text ? stripEmojis(row.promo_text) : undefined,
+    artists: visibleArtists.length > 0 ? visibleArtists : undefined,
+  }
+}
+
+/**
+ * Calendar query: returns all visible, non-promo releases with artist names.
+ * Single nested select (slim columns) — used by the Artist Portal Release Calendar.
+ *
+ * Prefer `getCachedCalendarReleases` from `src/lib/cache/publicQueries.ts` on the
+ * portal page so cold navigations reuse the Data Cache (`releases` tag).
  */
 export async function getAllVisibleReleasesForCalendar(db: DbClient): Promise<Release[]> {
-  const { data: hiddenArtistRows, error: hiddenErr } = await db
-    .from('artists')
-    .select('id')
-    .eq('is_visible', false)
-  if (hiddenErr) throw new Error(hiddenErr.message)
-
-  const hiddenIds = (hiddenArtistRows ?? []).map((a) => a.id)
-
-  let builder = db
+  const { data, error } = await db
     .from('releases')
-    .select('*')
+    .select(CALENDAR_RELEASE_SELECT)
     .eq('is_visible', true)
     .eq('is_promo', false)
     .order('release_date', { ascending: true })
+    .limit(PUBLIC_QUERY_LIMITS.releases)
 
-  if (hiddenIds.length > 0) {
-    builder = builder.or(`artist_id.is.null,artist_id.not.in.(${hiddenIds.join(',')})`)
+  if (error) throw new Error(error.message)
+
+  const rows = (data ?? []) as unknown as CalendarReleaseRow[]
+  const mapped: Release[] = []
+  for (const row of rows) {
+    const release = mapCalendarRow(row)
+    if (release) mapped.push(release)
   }
 
-  const { data, error } = await builder
-  if (error) throw new Error(error.message)
-  const releases = (data ?? []).map(rowToRelease)
-  return attachReleaseArtists(db, releases)
+  // Legacy rows with artist_id but empty junction: resolve names in one lookup.
+  const missingArtistIds = [
+    ...new Set(
+      mapped
+        .filter((r) => (!r.artists || r.artists.length === 0) && r.artistId)
+        .map((r) => r.artistId),
+    ),
+  ]
+
+  if (missingArtistIds.length === 0) return mapped
+
+  const { data: artistRows, error: artistErr } = await db
+    .from('artists')
+    .select('id, name, slug, is_visible')
+    .in('id', missingArtistIds)
+
+  if (artistErr) {
+    console.warn(`calendar legacy artist lookup skipped: ${artistErr.message}`)
+    return mapped
+  }
+
+  const artistMap = new Map(
+    (artistRows ?? []).map((a) => [
+      a.id,
+      { id: a.id, name: a.name, slug: a.slug, is_visible: a.is_visible },
+    ]),
+  )
+
+  return mapped.flatMap((r) => {
+    if (r.artists && r.artists.length > 0) return [r]
+    if (!r.artistId) return [r]
+    const fallback = artistMap.get(r.artistId)
+    if (!fallback) return [r]
+    if (fallback.is_visible === false) return []
+    return [
+      {
+        ...r,
+        artists: [{ id: fallback.id, name: fallback.name, slug: fallback.slug }],
+        artistName: fallback.name,
+      },
+    ]
+  })
 }
 
 const SYNC_WRITABLE_KEYS = [

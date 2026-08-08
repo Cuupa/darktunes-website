@@ -38,6 +38,15 @@ Distilled anti-patterns from project history. **Append session findings before o
 |--------------|------|
 | `ResizablePanelGroup` + `className="hidden lg:flex"` | Library sets **inline** `display:flex` → CSS `hidden` loses. **Conditional mount** with `useIsLg()` only |
 | Desktop toolbar `flex-wrap` of 20+ controls on phone | Compact primary row + overflow menu; segment control for panels |
+| Fixed 3-column mailbox (`w-52` + `w-72` + chat) on phones | Messenger pattern: list **or** full-screen thread below `md`; folders in a sheet |
+
+## Session additions
+
+### 2026-08-08 — Calendar cold load + portal mailbox mobile
+
+- **Calendar:** `select('*')` + sequential `release_artists` batches made `/portal/calendar` feel stuck on loading. Prefer one slim nested select for the UI surface, then `unstable_cache` with the public cookie-free client (`getCachedCalendarReleases`) so auth/flag work stays request-scoped but the heavy release payload is shared.
+- **Unified calendar:** Artists expect one calendar for roster life (releases + shows), not a release-only tool. Kind + ownership + artist search beats separate pages for coordination.
+- **Mailbox:** Admin already hid columns on mobile; portal still forced all three panes. Artists need list → chat → back, not a shrunk desktop email client.
 | Footer legal `flex gap-6` + parent `overflow-x-hidden` | Links clip and are untappable — always `flex-wrap` + `min-h-[44px]` |
 
 ## Web Push / PWA
