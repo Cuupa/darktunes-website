@@ -1224,6 +1224,8 @@ CREATE INDEX IF NOT EXISTS idx_assets_sha256_hash ON public.assets (sha256_hash)
 
 -- Aggregate catalog storage (avoids PostgREST row-limit undercount on SELECT size_bytes).
 -- Returns JSON object so PostgREST/supabase-js always yields a single object (not empty set edge cases).
+-- DROP first: CREATE OR REPLACE cannot change return type (e.g. TABLE → json).
+DROP FUNCTION IF EXISTS public.get_assets_storage_stats();
 CREATE OR REPLACE FUNCTION public.get_assets_storage_stats()
 RETURNS json
 LANGUAGE sql

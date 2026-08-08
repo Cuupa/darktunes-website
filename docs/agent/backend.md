@@ -77,7 +77,7 @@ Encrypted in `api_credentials` (AES-256-GCM). Admin: `/admin/api-keys`. Resolver
 
 SSOT: `assets` table + `asset_folders`. Upload: `POST /api/upload`. Explorer APIs: `/api/admin/assets/*`. Press curation: `press_kit_items` + `PressKitBuilder`. Deletes: R2 first, then DB.
 
-**Storage bar (`GET /api/admin/assets/storage-stats`):** Dual-auth via `requireAdminOrEditorFromRequest` (stale Bearer **must** fall through to cookies on 401). Totals from `resolveCatalogStorageStats` — RPC `get_assets_storage_stats()` (JSON) → PostgREST `size_bytes.sum()` → paginated sum. Service-role client only. UI label is **Catalog storage** (all DB rows, not current folder). Apply RPC from `reset.sql` on live DBs.
+**Storage bar (`GET /api/admin/assets/storage-stats`):** Dual-auth via `requireAdminOrEditorFromRequest` (stale Bearer **must** fall through to cookies on 401). Totals from `resolveCatalogStorageStats` — RPC `get_assets_storage_stats()` (JSON) → PostgREST `size_bytes.sum()` → paginated sum. Service-role client only. UI label is **Catalog storage** (all DB rows, not current folder). Apply RPC from `reset.sql` on live DBs (`DROP FUNCTION` first if return type changed — Postgres `CREATE OR REPLACE` cannot alter return type).
 
 ## Admin accounting (`/admin/accounting`)
 
