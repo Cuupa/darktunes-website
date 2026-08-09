@@ -35,7 +35,7 @@ const ADMIN_SECTIONS: { path: string; heading: string; note?: string }[] = [
   { path: '/admin/tour-planner', heading: 'Tour Planner', note: 'admin.tour_planner_page_title' },
   { path: '/admin/release-submissions', heading: 'Release Submissions' },
   { path: '/admin/video-submissions', heading: 'Video Submissions' },
-  { path: '/admin/fan-page-reviews', heading: 'Fan Page Reviews' },
+  { path: '/admin/fan-page-reviews', heading: 'Personal Artist Page Reviews' },
   { path: '/admin/submission-form', heading: 'Submission Form' },
   { path: '/admin/accreditations', heading: 'Press Accreditations' },
   { path: '/admin/press', heading: 'Press Portal' },

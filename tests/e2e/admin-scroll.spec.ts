@@ -6,7 +6,10 @@ test.describe('Admin table wheel scroll', () => {
     await loginAsAdmin(page)
     await page.goto('/admin/submission-form', { waitUntil: 'domcontentloaded' })
 
-    const scrollPane = page.locator('[data-lenis-prevent].overflow-y-auto').first()
+    // Scoped to `main`: AdminSidebarNav's own nav list also carries
+    // `data-lenis-prevent` + `overflow-y-auto` (see AdminSidebarNav.tsx), so the
+    // unscoped selector's `.first()` matched the sidebar instead of this pane.
+    const scrollPane = page.locator('main [data-lenis-prevent].overflow-y-auto').first()
     await expect(scrollPane).toBeVisible({ timeout: 15_000 })
 
     const tableRow = page.locator('table tbody tr').first()
@@ -17,7 +20,10 @@ test.describe('Admin table wheel scroll', () => {
     // swallowed by Lenis — not that this page happens to be taller than the
     // viewport. At the project's 1920×1080 the section's content fits, so
     // scrollTop stayed 0 and the contract was never actually exercised.
-    await page.setViewportSize({ width: 1280, height: 400 })
+    // Height 400 is too short for this page specifically: its extra
+    // form/track-limit sub-tabs push the AdminListShell pane's flex-1 area
+    // to a collapsed 0px clientHeight, leaving nothing to scroll.
+    await page.setViewportSize({ width: 1280, height: 800 })
     await expect
       .poll(async () => scrollPane.evaluate((el) => el.scrollHeight - el.clientHeight))
       .toBeGreaterThan(0)

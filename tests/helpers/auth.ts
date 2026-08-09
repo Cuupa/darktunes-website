@@ -36,13 +36,18 @@ export async function loginAsAdmin(page: Page): Promise<void> {
   const creds = getTestUser('admin')
 
   // Centralized login lives at /login (legacy /admin/login and /portal/login are gone).
-  await page.goto('/login?returnTo=/admin', { waitUntil: 'domcontentloaded' })
+  // No ?returnTo= here: the login page ignores it for admin/artist roles (see
+  // loginForPressDashboard's comment below) and it's actively dangerous as a query
+  // string — a substring/regex match against the full URL matches "returnTo=/admin"
+  // on the *pre-login* /login page itself, resolving waitForURL before the session
+  // cookie is written. Matching on pathname avoids that trap entirely.
+  await page.goto('/login', { waitUntil: 'domcontentloaded' })
   await page.getByLabel(/email/i).fill(creds.email)
   await page.getByLabel(/password/i).first().fill(creds.password)
   await page.getByRole('button', { name: /sign in|login|anmelden/i }).first().click()
 
-  await page.waitForURL(/\/admin(\/|\?|$)/, { timeout: 20_000 })
-  await expect(page).toHaveURL(/\/admin(\/|\?|$)/)
+  await page.waitForURL((url) => /^\/admin(\/|$)/.test(url.pathname), { timeout: 20_000 })
+  await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/admin(\/|$)/)
 }
 
 export function getPressDashboardUser(): TestUserCredentials {
@@ -77,13 +82,17 @@ export async function loginForPressDashboard(page: Page): Promise<void> {
 export async function loginAsArtist(page: Page): Promise<void> {
   const creds = getTestUser('artist')
 
-  await page.goto('/login?returnTo=/portal', { waitUntil: 'domcontentloaded' })
+  // No ?returnTo= here — same reasoning as loginAsAdmin above: the login page
+  // ignores it for this role, and as a query string it can falsely satisfy a
+  // URL-substring/regex wait on the pre-login /login page itself. Matching on
+  // pathname (below) avoids that trap entirely.
+  await page.goto('/login', { waitUntil: 'domcontentloaded' })
   await page.getByLabel(/email/i).fill(creds.email)
   await page.getByLabel(/password/i).first().fill(creds.password)
   await page.getByRole('button', { name: /sign in|login|anmelden/i }).first().click()
 
   // Onboarding gate may send incomplete profiles to /portal/onboarding — fixture
   // artist is seeded complete so we expect the overview (or any /portal/*).
-  await page.waitForURL(/\/portal(\/|\?|$)/, { timeout: 20_000 })
-  await expect(page).toHaveURL(/\/portal(\/|\?|$)/)
+  await page.waitForURL((url) => /^\/portal(\/|$)/.test(url.pathname), { timeout: 20_000 })
+  await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/portal(\/|$)/)
 }
