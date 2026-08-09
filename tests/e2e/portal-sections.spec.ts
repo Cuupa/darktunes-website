@@ -39,6 +39,16 @@ const PORTAL_SECTIONS = [
   '/portal/settings',
   '/portal/help',
   '/portal/feedback',
+  '/portal/notifications',
+  '/portal/notifications/preferences',
+  '/portal/messages/compose',
+  '/portal/releases/new',
+  '/portal/releases/videos/new',
+  // No invite token supplied — proxy.ts explicitly exempts this route from
+  // both the unauthenticated and authenticated portal redirects, so it
+  // renders directly for the logged-in fixture artist too (AcceptInviteClient
+  // treats the existing session as an active one rather than bouncing).
+  '/portal/accept-invite',
 ]
 
 /** Sections app/portal/<name>/page.tsx guards with notFound() when their flag is off. */

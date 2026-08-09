@@ -54,12 +54,15 @@ const ADMIN_SECTIONS: { path: string; heading: string; note?: string }[] = [
   { path: '/admin/api-keys', heading: 'Integrations', note: 'admin.apiKeys.pageTitle' },
   { path: '/admin/support', heading: 'Support', note: 'admin.support.pageTitle' },
   { path: '/admin/system', heading: 'System' },
+  { path: '/admin/feedback', heading: 'Artist Feedback', note: 'admin.feedback.pageTitle' },
 ]
 
 /** Sub-routes reached from a section rather than the sidebar. */
-const ADMIN_SUBROUTES: { path: string; heading: string }[] = [
+const ADMIN_SUBROUTES: { path: string; heading: string; note?: string }[] = [
   { path: '/admin/news/new', heading: 'New News Post' },
   { path: '/admin/messages/compose', heading: 'Compose Message' },
+  { path: '/admin/notifications', heading: 'Notification center', note: 'admin.notifications.centerTitle' },
+  { path: '/admin/notifications/preferences', heading: 'Notification preferences', note: 'admin.notifications.preferencesTitle' },
 ]
 
 /** app/error.tsx's boundary — its presence means the route threw while rendering. */
@@ -150,7 +153,11 @@ test.describe('Admin sections — every route renders for an admin', () => {
       const response = await page.goto(sub.path, { waitUntil: 'domcontentloaded' })
       expect(response?.status(), `${sub.path} should return HTTP 200`).toBe(200)
 
-      await expect(page.getByRole('heading', { level: 1, name: sub.heading })).toBeVisible()
+      // .first(): the notifications routes render the shared NotificationCenter /
+      // NotificationPreferencesForm's own <h1> alongside AdminPageShell's identical
+      // one, so two matching headings exist — assert the first is visible rather
+      // than requiring uniqueness.
+      await expect(page.getByRole('heading', { level: 1, name: sub.heading }).first()).toBeVisible()
       await expectNoErrorBoundary(page)
     })
   }
