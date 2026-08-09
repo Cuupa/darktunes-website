@@ -86,9 +86,9 @@ test.describe('Promo pool', () => {
 
 test.describe('Locale fallback', () => {
   test('an unsupported Accept-Language falls back to the default locale', async ({ browser }) => {
-    // parseAcceptLanguage() in src/i18n/request.ts recognises only en/de; any
+    // parseAcceptLanguage() in src/i18n/request.ts recognises en/de/fr; any
     // other primary tag falls through to routing.defaultLocale ('de').
-    const context = await browser.newContext({ locale: 'fr-FR' })
+    const context = await browser.newContext({ locale: 'ja-JP' })
     const page = await context.newPage()
 
     await page.goto('/', { waitUntil: 'domcontentloaded' })

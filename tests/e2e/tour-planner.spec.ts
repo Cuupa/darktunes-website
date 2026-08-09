@@ -34,7 +34,7 @@ test.describe('Tour planner — portal UI', () => {
     await expect(
       page.getByRole('heading', { name: /tour (planner|production)|tourplaner/i, level: 1 }),
     ).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText(/tours|touren/i).first()).toBeVisible()
+    await expect(page.getByRole('button', { name: /advanced/i })).toBeVisible()
   })
 })
 
