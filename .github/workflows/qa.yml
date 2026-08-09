@@ -10,17 +10,11 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - 'CHANGELOG.md'
-      - 'LESSONS_LEARNED.md'
-      - 'QA_CHECKLIST.md'
   push:
     branches: [main]
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - 'CHANGELOG.md'
-      - 'LESSONS_LEARNED.md'
-      - 'QA_CHECKLIST.md'
   workflow_dispatch:
 
 concurrency:
