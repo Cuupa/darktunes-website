@@ -13,6 +13,11 @@ import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { LandingPageDocumentV1, FanPagePublishStatus } from '@/lib/fan-page/schema/documentV1'
 import type { Artist, Release, Concert, Video } from '@/types'
 import type { FanPageLiveData } from '@/components/fan-page/FanPageBlockRenderer'
+import { GuidedModeChooser } from '@/components/guided/GuidedModeChooser'
+import type { GuidedMode } from '@/lib/guided/guidedSteps'
+import { FanPageFirstPublishAssistant } from './FanPageFirstPublishAssistant'
+
+const STORAGE_KEY = 'portal-fan-page-mode'
 
 const FanPageBuilderShell = dynamic(
   () => import('@/components/fan-page/FanPageBuilderShell').then((m) => m.FanPageBuilderShell),
@@ -52,6 +57,25 @@ function FanPageBuilderWorkspace({
   const [publishStatus, setPublishStatus] = useState(initialPublishStatus)
   const [isPublishing, setIsPublishing] = useState(false)
   const [isPreviewLoading, setIsPreviewLoading] = useState(false)
+  const [mode, setMode] = useState<GuidedMode | null>(() => {
+    if (typeof window === 'undefined') return null
+    if (initialPublishStatus !== 'draft') return 'advanced'
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY) as GuidedMode | null
+      return stored === 'assistant' || stored === 'advanced' ? stored : null
+    } catch {
+      return null
+    }
+  })
+
+  const selectMode = (next: GuidedMode) => {
+    setMode(next)
+    try {
+      localStorage.setItem(STORAGE_KEY, next)
+    } catch {
+      /* ignore */
+    }
+  }
 
   const liveData: FanPageLiveData = {
     artist,
@@ -158,6 +182,55 @@ function FanPageBuilderWorkspace({
     }
   }, [artistId, isDirty, saveNow, t])
 
+  if (mode === null) {
+    return (
+      <GuidedModeChooser
+        title={t('fan_assistant_mode_title')}
+        subtitle={t('fan_assistant_mode_subtitle')}
+        recommendedLabel={t('guided_recommended')}
+        assistantTitle={t('fan_assistant_mode_assistant_title')}
+        assistantDesc={t('fan_assistant_mode_assistant_desc')}
+        assistantButton={t('fan_assistant_mode_assistant_btn')}
+        advancedTitle={t('fan_assistant_mode_advanced_title')}
+        advancedDesc={t('fan_assistant_mode_advanced_desc')}
+        advancedButton={t('fan_assistant_mode_advanced_btn')}
+        whatNextTitle={t('fan_assistant_what_next_title')}
+        whatNextSteps={[
+          t('fan_assistant_what_next_1'),
+          t('fan_assistant_what_next_2'),
+          t('fan_assistant_what_next_3'),
+        ]}
+        onSelect={selectMode}
+      />
+    )
+  }
+
+  if (mode === 'assistant') {
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-4 py-3">
+          <Button variant="ghost" size="sm" asChild className="-ml-2 h-8 px-2">
+            <Link href={`/portal/profile?artistId=${artistId}`}>
+              <ArrowLeft className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              {t('fanPage_back_profile')}
+            </Link>
+          </Button>
+          <h1 className="text-lg font-semibold">{t('fanPage_title')}</h1>
+        </div>
+        <FanPageFirstPublishAssistant
+          artist={artist}
+          canPublishDirect={artist.landingPublishTrusted ?? false}
+          onPublish={async (m) => {
+            await handlePublish(m)
+          }}
+          onPreview={handleSmartPreview}
+          onOpenAdvanced={() => selectMode('advanced')}
+          isPublishing={isPublishing}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-3">
@@ -173,12 +246,17 @@ function FanPageBuilderWorkspace({
             {t('fanPage_version_label', { version: String(documentVersion) })}
           </p>
         </div>
+        {publishStatus === 'draft' && (
+          <Button type="button" variant="outline" size="sm" onClick={() => selectMode('assistant')}>
+            {t('guided_open_assistant')}
+          </Button>
+        )}
       </div>
 
       <FanPageBuilderShell
         artistId={artistId}
         liveData={liveData}
-        onPublish={(mode) => void handlePublish(mode)}
+        onPublish={(publishMode) => void handlePublish(publishMode)}
         onSmartPreview={handleSmartPreview}
         isPublishing={isPublishing}
         canPublishDirect={artist.landingPublishTrusted ?? false}

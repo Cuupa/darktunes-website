@@ -9,7 +9,6 @@ import { getAggregatedStreamsByPlatform } from '@/lib/api/streamingStats'
 import type { ArtistTerritoryMetric } from '@/lib/api/artistTerritoryMetrics'
 import { aggregateMetricsByCountry } from '@/lib/api/artistTerritoryMetrics'
 import type { EventImpact } from '@/lib/api/eventImpact'
-import type { ArtistListenerMetric } from '@/lib/api/artistListenerMetrics'
 import type { ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
 import type { SalesStatement } from '@/lib/api/salesStatements'
 import type { ArtistLineItemWithContext } from '@/lib/api/salesStatementLineItems'
@@ -29,10 +28,11 @@ import {
   collectAvailableCountries,
   filterStreamingStats,
   filterTerritoryMetrics,
-  filterListenerMetrics,
   filterEventImpacts,
   filterLineItemsByPeriod,
+  resolvePeriodPreset,
   type AnalyticsFilterState,
+  type PeriodPreset,
 } from '@/lib/analytics/filterMetrics'
 import {
   computeAnalyticsInsights,
@@ -40,17 +40,25 @@ import {
   matchesQuickSearch,
 } from '@/lib/analytics/insights'
 import { buildPortalAnalyticsCsv, triggerCsvDownload } from '@/lib/analytics/reportExport'
-import { visibleTabIds } from '@/lib/analytics/viewPreferences'
+import {
+  buildAnalyticsReportPdf,
+  triggerPdfDownload,
+} from '@/lib/analytics/analyticsReportPdf'
+import {
+  saveViewPreferences,
+  visibleSosTabIds,
+  PORTAL_SOS_ANALYTICS_VIEW_STORAGE_KEY,
+} from '@/lib/analytics/viewPreferences'
 import { AnalyticsFilters } from './AnalyticsFilters'
 import { AnalyticsKpiGrid } from './AnalyticsKpiGrid'
 import { AnalyticsInsightsPanel } from './AnalyticsInsightsPanel'
-import { AnalyticsToolbar, usePortalTabVisibility } from './AnalyticsToolbar'
+import { AnalyticsToolbar, usePortalAnalyticsPreferences } from './AnalyticsToolbar'
+import { AnalyticsHubAssistant } from './AnalyticsHubAssistant'
 import { StreamingChart } from './StreamingChart'
 import { EarningsChart } from './EarningsChart'
 import { EarningsStatementsPanel } from './EarningsStatementsPanel'
 import { TerritoriesChart } from './TerritoriesChart'
 import { EventImpactChart } from './EventImpactChart'
-import { ListenersChart } from './ListenersChart'
 import { ReleasePerformanceChart } from './ReleasePerformanceChart'
 import { RevenueMixChart } from './RevenueMixChart'
 import { EpkPressTab } from './EpkPressTab'
@@ -61,6 +69,7 @@ import { MerchTab } from './MerchTab'
 
 interface AnalyticsPageClientProps {
   artistId: string
+  artistName: string
   billingProfile: ArtistBillingProfile | null
   billingProfileComplete: boolean
   defaultTab: string
@@ -69,7 +78,6 @@ interface AnalyticsPageClientProps {
   statements: SalesStatement[]
   territoryMetrics: ArtistTerritoryMetric[]
   eventImpacts: EventImpact[]
-  listenerMetrics: ArtistListenerMetric[]
   concerts: Concert[]
   lineItems: ArtistLineItemWithContext[]
   epkStats: EpkDownloadStats
@@ -84,6 +92,7 @@ interface AnalyticsPageClientProps {
 
 export function AnalyticsPageClient({
   artistId,
+  artistName,
   billingProfile,
   billingProfileComplete,
   defaultTab,
@@ -92,7 +101,6 @@ export function AnalyticsPageClient({
   statements,
   territoryMetrics,
   eventImpacts,
-  listenerMetrics,
   concerts,
   lineItems,
   epkStats,
@@ -108,10 +116,13 @@ export function AnalyticsPageClient({
 
   const [filters, setFilters] = useState<AnalyticsFilterState>(EMPTY_ANALYTICS_FILTER)
   const [searchQuery, setSearchQuery] = useState('')
-  const [tabVisibility, setTabVisibility] = usePortalTabVisibility()
+  const [preferences, setPreferences] = usePortalAnalyticsPreferences(
+    PORTAL_SOS_ANALYTICS_VIEW_STORAGE_KEY,
+  )
+  const [pdfExporting, setPdfExporting] = useState(false)
 
   const periods = useMemo(
-    () => collectAvailablePeriods(stats, territoryMetrics),
+    () => collectAvailablePeriods(stats, territoryMetrics, []),
     [stats, territoryMetrics],
   )
   const platforms = useMemo(
@@ -139,14 +150,6 @@ export function AnalyticsPageClient({
     )
   }, [territoryMetrics, filters, searchQuery])
 
-  const filteredListeners = useMemo(() => {
-    const byFilter = filterListenerMetrics(listenerMetrics, filters)
-    if (!searchQuery.trim()) return byFilter
-    return byFilter.filter((m) =>
-      matchesQuickSearch(searchQuery, m.period, m.source, m.metricType, m.value, m.country),
-    )
-  }, [listenerMetrics, filters, searchQuery])
-
   const aggregates = useMemo(
     () => getAggregatedStreamsByPlatform(filteredStats),
     [filteredStats],
@@ -160,11 +163,18 @@ export function AnalyticsPageClient({
     () => computeAnalyticsKpis({
       stats: filteredStats,
       territoryMetrics: filteredTerritory,
-      listenerMetrics: filteredListeners,
+      listenerMetrics: [],
       statements,
     }),
-    [filteredStats, filteredTerritory, filteredListeners, statements],
+    [filteredStats, filteredTerritory, statements],
   )
+
+  // Unfiltered: empty state is about source data, not active period filters
+  const hasSosData =
+    stats.length > 0 ||
+    territoryMetrics.length > 0 ||
+    statements.length > 0 ||
+    lineItems.length > 0
 
   const filteredLineItems = useMemo(
     () => filterLineItemsByPeriod(lineItems, filters),
@@ -187,56 +197,156 @@ export function AnalyticsPageClient({
   )
 
   const insights = useMemo(
-    () => computeAnalyticsInsights({
-      stats: filteredStats,
-      territoryMetrics: filteredTerritory,
-      listenerMetrics: filteredListeners,
-      eventImpacts: filteredEventImpacts,
-      promoImpacts,
-      releaseRows,
-      epkStats,
-      pressStats,
-    }),
-    [filteredStats, filteredTerritory, filteredListeners, filteredEventImpacts, promoImpacts, releaseRows, epkStats, pressStats],
+    () =>
+      computeAnalyticsInsights({
+        stats: filteredStats,
+        territoryMetrics: filteredTerritory,
+        listenerMetrics: [],
+        eventImpacts: filteredEventImpacts,
+        promoImpacts,
+        releaseRows,
+        epkStats,
+        pressStats,
+      }),
+    [filteredStats, filteredTerritory, filteredEventImpacts, promoImpacts, releaseRows, epkStats, pressStats],
   )
 
-  const visibleTabs = useMemo(() => visibleTabIds(tabVisibility), [tabVisibility])
+  const visibleTabs = useMemo(() => visibleSosTabIds(preferences.tabs), [preferences.tabs])
   const activeDefaultTab = visibleTabs.includes(defaultTab as typeof visibleTabs[number])
     ? defaultTab
     : visibleTabs[0] ?? 'streaming'
 
   const showFilters = periods.length > 0 || platforms.length > 0 || countries.length > 0
 
-  const handleExport = () => {
+  const periodLabel = useMemo(() => {
+    if (filters.periodFrom && filters.periodTo) {
+      return `${filters.periodFrom} – ${filters.periodTo}`
+    }
+    if (filters.periodFrom) return `${filters.periodFrom} – …`
+    if (filters.periodTo) return `… – ${filters.periodTo}`
+    return t('analytics_filter_all')
+  }, [filters.periodFrom, filters.periodTo, t])
+
+  const handlePeriodPresetChange = (preset: PeriodPreset) => {
+    const next = {
+      ...preferences,
+      charts: { ...preferences.charts, periodPreset: preset },
+    }
+    setPreferences(next)
+    saveViewPreferences(PORTAL_SOS_ANALYTICS_VIEW_STORAGE_KEY, next)
+    if (preset !== 'custom') {
+      setFilters((f) => ({ ...f, ...resolvePeriodPreset(periods, preset) }))
+    }
+  }
+
+  const handleExportCsv = () => {
     const csv = buildPortalAnalyticsCsv({
       stats: filteredStats,
       territoryMetrics: filteredTerritory,
-      listenerMetrics: filteredListeners,
+      listenerMetrics: [],
       statements,
     })
     const stamp = new Date().toISOString().slice(0, 10)
-    triggerCsvDownload(csv, `analytics-export-${stamp}.csv`)
+    triggerCsvDownload(csv, `sos-analytics-export-${stamp}.csv`)
     toast.success(t('analytics_export_success'))
+  }
+
+  const handleExportPdf = async () => {
+    setPdfExporting(true)
+    try {
+      const emptyPresence = {
+        kpis: {
+          latestListeners: null,
+          latestFollowers: null,
+          latestPublicTrackPlays: null,
+          listenersMomPct: null,
+          followersMomPct: null,
+          trackCountLatest: 0,
+          releaseCountLatest: 0,
+          latestPeriod: null,
+          latestScrapedAt: null,
+          hasAnyData: false,
+        },
+        trend: [],
+        topTracks: [],
+        byRelease: [],
+        insights: [],
+        secondaryListeners: { lastfm: [], soundcharts: [] },
+        currentPeriod: '',
+        currentPeriodHasPublicData: false,
+      }
+      const blob = await buildAnalyticsReportPdf({
+        artistName: artistName || 'Artist',
+        periodLabel,
+        generatedAt: new Date(),
+        kpis,
+        presence: emptyPresence,
+        platformAggregates: aggregates,
+        labels: {
+          title: t('sos_analytics_pdf_title'),
+          subtitle: t('sos_analytics_pdf_subtitle'),
+          period: t('analytics_pdf_period'),
+          generated: t('analytics_pdf_generated'),
+          kpiStreams: t('analytics_totalStreams'),
+          kpiRevenue: t('analytics_kpi_revenue'),
+          kpiListeners: t('analytics_presence_kpi_listeners'),
+          kpiFollowers: t('analytics_presence_kpi_followers'),
+          presenceHeading: t('analytics_presence_heading'),
+          topTracks: t('analytics_presence_top_tracks_heading'),
+          byRelease: t('analytics_presence_by_release_heading'),
+          platforms: t('analytics_heading'),
+          colTrack: t('analytics_presence_col_track'),
+          colRelease: t('analytics_presence_col_release'),
+          colPlays: t('analytics_presence_col_plays'),
+          colShare: t('analytics_presence_col_share'),
+          colPlatform: t('analytics_filter_platform'),
+          colStreams: t('analytics_totalStreams'),
+          noData: t('analytics_presence_noData'),
+          disclaimer: t('analytics_pdf_disclaimer'),
+        },
+      })
+      const stamp = new Date().toISOString().slice(0, 10)
+      triggerPdfDownload(blob, `sos-analytics-${stamp}.pdf`)
+      toast.success(t('analytics_export_pdf_success'))
+    } catch {
+      toast.error(t('analytics_export_pdf_error'))
+    } finally {
+      setPdfExporting(false)
+    }
   }
 
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl sm:text-3xl font-bold">{t('analytics_dashboard_heading')}</h1>
-        <p className="text-sm text-muted-foreground">{t('analytics_dashboard_subheading')}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold">{t('sos_analytics_heading')}</h1>
+        <p className="text-sm text-muted-foreground">{t('sos_analytics_subheading')}</p>
       </div>
+
+      <AnalyticsHubAssistant />
 
       <AnalyticsToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        tabVisibility={tabVisibility}
-        onTabVisibilityChange={setTabVisibility}
-        onExport={handleExport}
+        preferences={preferences}
+        onPreferencesChange={setPreferences}
+        onExportCsv={handleExportCsv}
+        onExportPdf={() => void handleExportPdf()}
+        pdfExporting={pdfExporting}
+        storageKey={PORTAL_SOS_ANALYTICS_VIEW_STORAGE_KEY}
+        hub="sos"
+        helpHref="/portal/help#sos-analytics"
       />
 
-      <AnalyticsKpiGrid kpis={kpis} />
+      {!hasSosData ? (
+        <div className="rounded-lg border border-border bg-card/60 p-6 space-y-2">
+          <p className="font-medium">{t('sos_analytics_empty_title')}</p>
+          <p className="text-sm text-muted-foreground">{t('sos_analytics_empty_body')}</p>
+        </div>
+      ) : (
+        <AnalyticsKpiGrid kpis={kpis} />
+      )}
 
-      <AnalyticsInsightsPanel insights={insights} />
+      {insights.length > 0 && <AnalyticsInsightsPanel insights={insights} />}
 
       {showFilters && (
         <AnalyticsFilters
@@ -244,17 +354,16 @@ export function AnalyticsPageClient({
           periods={periods}
           platforms={platforms}
           countries={countries}
+          periodPreset={preferences.charts.periodPreset}
           onChange={setFilters}
+          onPeriodPresetChange={handlePeriodPresetChange}
         />
       )}
 
       <Tabs defaultValue={activeDefaultTab} className="space-y-6">
-        <TabsList className="bg-card border border-border flex-wrap h-auto w-full justify-start">
+        <TabsList className="bg-card border border-border flex-wrap h-auto w-full justify-start gap-1 p-1">
           {visibleTabs.includes('streaming') && (
             <TabsTrigger value="streaming">{t('analytics_tab_streaming')}</TabsTrigger>
-          )}
-          {visibleTabs.includes('listeners') && (
-            <TabsTrigger value="listeners">{t('analytics_tab_listeners')}</TabsTrigger>
           )}
           {visibleTabs.includes('territories') && (
             <TabsTrigger value="territories">{t('analytics_tab_territories')}</TabsTrigger>
@@ -286,7 +395,7 @@ export function AnalyticsPageClient({
         </TabsList>
 
         {visibleTabs.includes('streaming') && (
-          <TabsContent value="streaming" className="mt-0">
+          <TabsContent value="streaming" className="mt-0 space-y-6">
             <StreamingChart
               stats={filteredStats}
               aggregates={aggregates}
@@ -295,22 +404,16 @@ export function AnalyticsPageClient({
           </TabsContent>
         )}
 
-        {visibleTabs.includes('listeners') && (
-          <TabsContent value="listeners" className="mt-0">
-            <ListenersChart metrics={filteredListeners} />
-          </TabsContent>
-        )}
-
         {visibleTabs.includes('territories') && (
-          <TabsContent value="territories" className="mt-0 space-y-4">
-            <h2 className="text-2xl font-bold">{t('analytics_territories_heading')}</h2>
+          <TabsContent value="territories" className="mt-0 space-y-6">
+            <h2 className="text-xl font-semibold">{t('analytics_territories_heading')}</h2>
             <TerritoriesChart countries={countryAggregates} />
           </TabsContent>
         )}
 
         {visibleTabs.includes('events') && (
           <TabsContent value="events" className="mt-0 space-y-6">
-            <h2 className="text-2xl font-bold">{t('analytics_eventImpact_heading')}</h2>
+            <h2 className="text-xl font-semibold">{t('analytics_eventImpact_heading')}</h2>
             <EventImpactChart
               impacts={filteredEventImpacts}
               concerts={concerts}
@@ -337,37 +440,37 @@ export function AnalyticsPageClient({
         )}
 
         {visibleTabs.includes('releases') && (
-          <TabsContent value="releases" className="mt-0">
+          <TabsContent value="releases" className="mt-0 space-y-6">
             <ReleasePerformanceChart rows={releaseRows} />
           </TabsContent>
         )}
 
         {visibleTabs.includes('revenue-mix') && (
-          <TabsContent value="revenue-mix" className="mt-0">
+          <TabsContent value="revenue-mix" className="mt-0 space-y-6">
             <RevenueMixChart slices={revenueMixSlices} />
           </TabsContent>
         )}
 
         {visibleTabs.includes('press') && (
-          <TabsContent value="press" className="mt-0">
+          <TabsContent value="press" className="mt-0 space-y-6">
             <EpkPressTab epkStats={epkStats} pressStats={pressStats} />
           </TabsContent>
         )}
 
         {statementsEnabled && visibleTabs.includes('settlement') && (
-          <TabsContent value="settlement" className="mt-0">
+          <TabsContent value="settlement" className="mt-0 space-y-6">
             <SettlementTab summary={settlementSummary} />
           </TabsContent>
         )}
 
         {visibleTabs.includes('engagement') && (
-          <TabsContent value="engagement" className="mt-0">
+          <TabsContent value="engagement" className="mt-0 space-y-6">
             <EngagementTab stats={engagementStats} />
           </TabsContent>
         )}
 
         {visibleTabs.includes('merch') && (
-          <TabsContent value="merch" className="mt-0">
+          <TabsContent value="merch" className="mt-0 space-y-6">
             <MerchTab stats={merchStats} />
           </TabsContent>
         )}

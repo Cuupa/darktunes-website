@@ -20,6 +20,11 @@ const LogsManager = lazy(() =>
 const MaintenanceManager = lazy(() =>
   import('@/components/admin/MaintenanceManager').then((m) => ({ default: m.MaintenanceManager })),
 )
+const InviteSettingsManager = lazy(() =>
+  import('@/components/admin/InviteSettingsManager').then((m) => ({
+    default: m.InviteSettingsManager,
+  })),
+)
 
 export function AdminSystemWrapper() {
   const { session } = useAuthContext()
@@ -30,6 +35,7 @@ export function AdminSystemWrapper() {
         <TabsList className="flex flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="health">Health &amp; Logs</TabsTrigger>
           <TabsTrigger value="logs">Log Manager</TabsTrigger>
+          <TabsTrigger value="invites">Invites</TabsTrigger>
           <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
         </TabsList>
         <TabsContent value="health">
@@ -37,6 +43,9 @@ export function AdminSystemWrapper() {
         </TabsContent>
         <TabsContent value="logs">
           <LogsManager />
+        </TabsContent>
+        <TabsContent value="invites">
+          <InviteSettingsManager />
         </TabsContent>
         <TabsContent value="maintenance">
           <MaintenanceManager />

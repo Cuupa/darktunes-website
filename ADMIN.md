@@ -13,8 +13,8 @@ Portal features:
 - **EPK PDF Export** (`/portal/profile`) — artists can generate a print-ready EPK via `@react-pdf/renderer` (see `EPKPdfDocument.tsx` + `epkPdfRenderer.tsx`) so the downloaded PDF mirrors the configured profile content, layout, and links.
 - **Enterprise Analytics** (`/portal/analytics`) — artists view streaming stats, listener trends, territory revenue, release performance, revenue mix, concert/promo impact, EPK & press downloads, settlement ledger (when `artist.statements` is enabled), website engagement (`page_events`, consent-gated), and merch orders (`merch_orders` from SOS persist). Overview dashboard shows actionable intelligence cards with deep links. Feature-flag: `artist.analytics`.
 - **Royalty Statements** (`/portal/statements`) — artists download their royalty PDFs via short-lived (5 min) presigned R2 URLs. Approved statements surface a **“Rechnung erstellen”** CTA that deep-links into the invoice flow for that exact statement.
-- **Billing Profile** (`/portal/billing`) — artists manage legal invoice master data (`artist_billing_profiles`): legal name, address, Steuernummer / USt-IdNr., Kleinunternehmer flag, and payout details. Invoice creation is blocked until the profile is complete.
-- **Invoices** (`/portal/invoices`) — artists create invoices manually, via the free PDF generator tab, or directly from an approved Statement of Sales. Incomplete billing profiles are collected inline (`InlineBillingProfileStep`) before any invoice or PDF is generated. SOS-linked invoices lock the approved amount, store the artist’s own bookkeeping number, and generate a dark-themed §14 UStG-ready PDF.
+- **Billing Profile** (`/portal/billing`) — artists manage legal invoice master data (`artist_billing_profiles`): legal name, address, Steuernummer / USt-IdNr., **tax status** (`standard` | `small_business` | `reverse_charge`), and payout details. EU VAT IDs are checked via official **VIES** on save; reverse charge requires a live-valid VIES result. IBANs are validated **locally only** (ISO 7064 — never third-party bank APIs). Invoice creation is blocked until the profile is complete.
+- **Invoices** (`/portal/invoices`) — artists create invoices manually, via the free PDF generator tab, or directly from an approved Statement of Sales. Incomplete billing profiles are collected inline (`InlineBillingProfileStep`) before any invoice or PDF is generated. SOS-linked invoices lock the approved amount, store the artist’s own bookkeeping number, and generate a dark-themed §14 UStG-ready PDF (Kleinunternehmer / reverse-charge notices, optional ECB FX footnote for non-EUR). Issued PDFs are write-once (`pdf_sha256`). Label recipient data comes from site settings (not hardcoded).
 - **Tour Manager** (`/portal/tour`) — artists can create/delete their own concert entries (announced/confirmed/cancelled).
 - **Release Submission** (`/portal/releases/new`) — artists submit metadata for admin review into `release_submissions` (not the public catalog). Admins can click **Create draft release** to insert a hidden `releases` row (`is_visible=false`, sync-protected until street date), then edit under Releases.
 - **Marketing Assets** (`/portal/marketing`) — artists can review the label-managed Promo Log timeline, download assigned assets via short-lived presigned URLs, and upload/delete their own assets via `/api/portal/upload-asset`.
@@ -43,12 +43,13 @@ WHERE slug = 'artist-slug';
 - **Releases Management**: Manage music releases with iTunes API integration, Odesli smart-link resolution, and promo-flag control.
 - **News Management**: Create and publish news posts and announcements. Optionally associate a news post with a specific artist (`news_posts.artist_id`). Toggle **Press-only** visibility (`is_press_only`).
 - **Feature Flags** *(admin-only)*: Toggle Artist + Journalist dashboard modules (`portal_feature_flags` table, API: `PATCH /api/admin/feature-flags/[id]`). Also toggle global `site_settings` feature flags via **FeatureTogglesManager**.
-- **Messages** *(admin-only)*: Rich-text label inbox (`label_messages`) at `/admin/messages`; supports templates, search, per-artist thread view, starring, realtime updates, multi-select, and soft-delete bulk actions.
+- **Messages** *(admin-only)*: Rich-text label inbox (`label_messages`) at `/admin/messages`. Conversations group `Re:`/`Aw:` rows into one list entry (chat detail, sort, drag-to-folder, optional arrival sound). Also: templates, search, starring, realtime, soft-delete.
 - **Promo Log**: `/admin/promo-log` — admins and editors create, review, and delete artist-specific marketing activity entries. Artists see these read-only in `/portal/marketing`.
 - **Accreditations** *(admin-only)*: `/admin/accreditations` — review and approve/reject journalist accreditation requests (`accreditation_requests`).
 - **Release Submissions**: `/admin/release-submissions` — review/approve/reject submissions; **Create draft release** builds a hidden catalog entry from submission data (optional, not automatic on accept).
 - **Video Submissions**: `/admin/video-submissions` — review and approve/reject video submissions from artists (submitted via `/portal/releases/videos/new`).
-- **Accounting** *(admin-only)*: `/admin/accounting` — **Guided** workflow (Upload → Review → Publish) by default, with **Advanced** mode for all tools. Includes SOS CSV processing, **Abrechnungszentrale** (settlement register, corrections, payments, period lock/archive), **Bronze CSV Archives** (server-proxy upload/download — no browser presigned R2), **Save to Portal** (territory metrics, merch orders, period summaries, event/promo impact), and statement approval workflow.
+- **Artist Feedback**: `/admin/feedback` — product feedback from the portal (`/portal/feedback`). Filter by status (new / reviewed / archived) and category; open detail to mark reviewed or archive. Nav badge counts `new` items. Not the same as **Support** (Zammad).
+- **Accounting** *(admin-only)*: `/admin/accounting` — **Guided** workflow (Upload → Review → Publish) by default, with **Advanced** mode for all tools. Includes SOS CSV processing, **Abrechnungszentrale** (settlement register, corrections, payments, period lock/archive), **Bronze CSV Archives** (server-proxy upload/download — no browser presigned R2), **Save to Portal** (territory metrics, merch orders, period summaries, event/promo impact), statement approval workflow, external listener sync (Last.fm/Soundcharts), and **Spotify public stats (Apify)** dry-run/sync (token under **API Keys → Apify**, not Vercel env).
 - **Label Analytics** *(admin-only)*: `/admin/analytics` — **Label Intelligence Hub**: roster health matrix, saved period revenue trends, press download CRM, website engagement rollup, and financial audit trail (`financial_audit_events`).
 - **System** *(admin-only)*: `/admin/system` — Health dashboard (queue stats, DB connectivity), Audit Log (`sync_logs`), Error Log (failed sync runs), App Errors (`app_logs`), and Maintenance tasks (clear logs, purge orphaned releases, reset checklists, manage accreditations, clear stats). Supports full-text search, source/status filters, and pagination.
 - **Logs** included in System tab: Audit Log (all `sync_logs` entries), Error Log (failed/partial), App Errors (`app_logs`).
@@ -59,7 +60,7 @@ WHERE slug = 'artist-slug';
 - **Press Kit** (`/admin/press`): `PressKitBuilder` curates `press_kit_items` per artist or label-wide; uploads happen in the Asset Explorer, not in a separate media library.
 - **Site Settings**: Configure all global site content (social links, SEO metadata, hero text, etc.) without code changes.
 - **Visual Effects**: Configure the dark-industrial overlay effects (noise/grain opacity, CRT scanlines toggle, vignette intensity) from the **Admin → Color Theme** page (Effects tab) — changes go live immediately via ISR cache revalidation.
-- **Legal / DSGVO**: Configure Impressum (§ 5 TMG fields: company name, legal form, VAT-ID, etc.) and Datenschutzerklärung content from the admin panel's "Legal / DSGVO" tab. Also configure the R2 placeholder image shown to users before they consent to external media.
+- **Legal / DSGVO**: Configure Impressum (§ 5 DDG fields: company name, legal form, representative, VAT-ID, register court, etc.), Datenschutzerklärung (DE/EN), **portal AGB** (DE/EN templates with `{{placeholders}}`), AGB version (`portal_terms_version`), and structured **label billing address** for invoice PDFs from the admin panel's "Legal / DSGVO" tab. Public pages: `/impressum`, `/datenschutz`, `/agb`. Also configure the R2 placeholder image shown to users before they consent to external media.
 
 ## Setup
 
@@ -216,14 +217,17 @@ The **SOS Generator** tab in the same Accounting page lets admins upload royalty
 
 **Do NOT** use a webhook or external HTTP POST to upload statements — the Server Action is the only supported upload path.
 
-## Monitoring Sync Schedules
+## Monitoring Sync (label admin)
 
-Sync runs via **Supabase Cron** → `trigger-sync` Edge Function (not Vercel Cron). To verify:
-1. Supabase Dashboard → Cron Jobs → last execution time and status
-2. Admin → System → Health widget (queue stats, last sync per API)
-3. Admin → System → Audit Log → filter by `api_source`
+Label admins do **not** configure hosting, R2, Vercel, Supabase Cron, Edge Functions, or secrets from the dashboard. That stays in operator docs (`DEPLOYMENT.md`).
 
-If sync fails: check Error Log for failed `sync_logs` entries; re-queue via System health or `POST /api/sync/requeue`.
+From **Admin → System → Health** the label admin can:
+1. See product health (APIs, queue KPIs, plain-language issues) without infra setup copy
+2. Run **Force Sync All** / **Sync YouTube** when credentials exist under API Keys
+3. Use **Advanced** for live `sync_queue` jobs — cancel pending/running (cooperative), retry failed/cancelled
+4. Open **Log Manager** for application/API error browsing
+
+Scheduler and secret setup: operators only — Supabase Dashboard + `DEPLOYMENT.md` (not the admin UI).
 
 ## Creating a Journalist Account
 

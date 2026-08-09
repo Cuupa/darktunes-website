@@ -576,7 +576,21 @@ CREATE TABLE IF NOT EXISTS public.artists (
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Idempotent column additions — no-ops on a fresh DB, safe on existing data
+-- Idempotent column additions — no-ops on a fresh DB, safe on existing data.
+-- CI: `npm run verify:schema-columns` requires every non-structural CREATE
+-- column on `artists` / `artist_epks` to appear here (CREATE TABLE IF NOT EXISTS
+-- is a no-op on live DBs).
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS name           TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS slug           TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS bio            TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS genres         TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS image_url      TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS spotify_url    TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS apple_music_url TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS instagram_url  TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS youtube_url    TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS website_url    TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS featured       BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS spotify_id     TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS discogs_id     TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS songkick_id    TEXT;
@@ -589,6 +603,15 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS tiktok_url     TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS bandcamp_url   TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS shop_url       TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS founding_year  INTEGER;
+-- hometown lived on artist_epks until Track 2/3 consolidation; without this
+-- ADD COLUMN, existing prod DBs (CREATE TABLE IF NOT EXISTS no-ops) miss it and
+-- portal profile PUT returns 500 ("Could not find the 'hometown' column").
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS hometown       TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS country        TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS email          TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS vat_number     TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS is_eu_non_german BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS notes          TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS soundcloud_url TEXT;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS is_visible     BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS logo_url       TEXT;
@@ -600,6 +623,10 @@ ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS image_position_x FLOAT DEFAU
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS image_position_y FLOAT DEFAULT 50;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS image_scale      FLOAT DEFAULT 1;
 ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS bandsintown_api_key TEXT;
+-- Portal AGB acceptance (per artist, multi-tenant terms version from site_settings)
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS portal_terms_version TEXT;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS portal_terms_accepted_at TIMESTAMPTZ;
+ALTER TABLE public.artists ADD COLUMN IF NOT EXISTS portal_terms_accepted_by UUID REFERENCES auth.users (id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_artists_slug     ON public.artists (slug);
 CREATE INDEX IF NOT EXISTS idx_artists_featured ON public.artists (featured);
@@ -618,6 +645,98 @@ DROP TRIGGER IF EXISTS trg_artists_updated_at ON public.artists;
 CREATE TRIGGER trg_artists_updated_at
   BEFORE UPDATE ON public.artists
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- TABLE: artist_private_data
+-- Staff/member-only secrets and PII. Never granted to anon.
+-- Public pages must not select these columns (see PUBLIC_ARTIST_COLUMNS).
+-- After backfill, secrets on public.artists are cleared so select(*) cannot leak.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.artist_private_data (
+  artist_id            UUID PRIMARY KEY REFERENCES public.artists(id) ON DELETE CASCADE,
+  email                TEXT,
+  vat_number           TEXT,
+  notes                TEXT,
+  bandsintown_api_key  TEXT,
+  storage_quota_bytes  BIGINT,
+  is_eu_non_german     BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_artist_private_data_email
+  ON public.artist_private_data (email)
+  WHERE email IS NOT NULL;
+
+-- Idempotent backfill from artists (safe to re-run)
+INSERT INTO public.artist_private_data (
+  artist_id, email, vat_number, notes, bandsintown_api_key, storage_quota_bytes, is_eu_non_german
+)
+SELECT
+  a.id,
+  a.email,
+  a.vat_number,
+  a.notes,
+  a.bandsintown_api_key,
+  a.storage_quota_bytes,
+  COALESCE(a.is_eu_non_german, FALSE)
+FROM public.artists a
+ON CONFLICT (artist_id) DO UPDATE SET
+  email = COALESCE(EXCLUDED.email, public.artist_private_data.email),
+  vat_number = COALESCE(EXCLUDED.vat_number, public.artist_private_data.vat_number),
+  notes = COALESCE(EXCLUDED.notes, public.artist_private_data.notes),
+  bandsintown_api_key = COALESCE(EXCLUDED.bandsintown_api_key, public.artist_private_data.bandsintown_api_key),
+  storage_quota_bytes = COALESCE(EXCLUDED.storage_quota_bytes, public.artist_private_data.storage_quota_bytes),
+  is_eu_non_german = EXCLUDED.is_eu_non_german,
+  updated_at = NOW();
+
+-- Clear secrets from the public artists row so anon/authenticated select(*) cannot leak them.
+-- Canonical storage is artist_private_data (admin/member RLS only).
+UPDATE public.artists SET
+  email = NULL,
+  vat_number = NULL,
+  notes = NULL,
+  bandsintown_api_key = NULL
+WHERE
+  email IS NOT NULL
+  OR vat_number IS NOT NULL
+  OR notes IS NOT NULL
+  OR bandsintown_api_key IS NOT NULL;
+
+ALTER TABLE public.artist_private_data ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "artist_private_data: member read" ON public.artist_private_data;
+DROP POLICY IF EXISTS "artist_private_data: member write" ON public.artist_private_data;
+DROP POLICY IF EXISTS "artist_private_data: admin all" ON public.artist_private_data;
+
+CREATE POLICY "artist_private_data: member read" ON public.artist_private_data
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.artist_members am
+      WHERE am.artist_id = artist_id AND am.user_id = auth.uid()
+    )
+    OR public.get_my_role() IN ('admin', 'editor')
+  );
+
+CREATE POLICY "artist_private_data: member write" ON public.artist_private_data
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.artist_members am
+      WHERE am.artist_id = artist_id AND am.user_id = auth.uid()
+    )
+    OR public.get_my_role() IN ('admin', 'editor')
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.artist_members am
+      WHERE am.artist_id = artist_id AND am.user_id = auth.uid()
+    )
+    OR public.get_my_role() IN ('admin', 'editor')
+  );
+
+CREATE POLICY "artist_private_data: admin all" ON public.artist_private_data
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- TABLE: artist_members
@@ -1103,19 +1222,27 @@ CREATE INDEX IF NOT EXISTS idx_assets_folder_id   ON public.assets (folder_id);
 CREATE INDEX IF NOT EXISTS idx_assets_artist_id   ON public.assets (artist_id);
 CREATE INDEX IF NOT EXISTS idx_assets_sha256_hash ON public.assets (sha256_hash);
 
--- Aggregate catalog storage (avoids PostgREST row-limit undercount on SELECT size_bytes)
+-- Aggregate catalog storage (avoids PostgREST row-limit undercount on SELECT size_bytes).
+-- Returns JSON object so PostgREST/supabase-js always yields a single object (not empty set edge cases).
+-- DROP first: CREATE OR REPLACE cannot change return type (e.g. TABLE → json).
+DROP FUNCTION IF EXISTS public.get_assets_storage_stats();
 CREATE OR REPLACE FUNCTION public.get_assets_storage_stats()
-RETURNS TABLE(used_bytes bigint, asset_count bigint)
+RETURNS json
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT
-    COALESCE(SUM(a.size_bytes), 0)::bigint AS used_bytes,
-    COUNT(*)::bigint AS asset_count
+  SELECT json_build_object(
+    'used_bytes', COALESCE(SUM(a.size_bytes), 0),
+    'asset_count', COUNT(*)::bigint,
+    'zero_size_count', COUNT(*) FILTER (WHERE a.size_bytes = 0)::bigint
+  )
   FROM public.assets a;
 $$;
+
+COMMENT ON FUNCTION public.get_assets_storage_stats() IS
+  'JSON: used_bytes, asset_count, zero_size_count over public.assets for admin storage bar';
 
 REVOKE ALL ON FUNCTION public.get_assets_storage_stats() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_assets_storage_stats() TO service_role;
@@ -1177,6 +1304,35 @@ DROP TRIGGER IF EXISTS trg_site_settings_updated_at ON public.site_settings;
 CREATE TRIGGER trg_site_settings_updated_at
   BEFORE UPDATE ON public.site_settings
   FOR EACH ROW EXECUTE FUNCTION public.set_site_settings_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- TABLE: user_invites
+-- Durable admin invite tokens. Validity is controlled by
+-- site_settings.invite_link_expiry_hours (24–168h, default 168).
+-- Only the SHA-256 hash of the emailed token is stored.
+-- Access: service-role only (RLS on, no policies).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.user_invites (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  email        TEXT        NOT NULL,
+  role         TEXT        NOT NULL,
+  token_hash   TEXT        NOT NULL UNIQUE,
+  portal       BOOLEAN     NOT NULL DEFAULT FALSE,
+  artist_id    UUID        REFERENCES public.artists (id) ON DELETE SET NULL,
+  granted_by   UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  auth_user_id UUID        REFERENCES auth.users (id) ON DELETE CASCADE,
+  expires_at   TIMESTAMPTZ NOT NULL,
+  accepted_at  TIMESTAMPTZ,
+  revoked_at   TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_invites_email ON public.user_invites (email);
+CREATE INDEX IF NOT EXISTS idx_user_invites_auth_user_id ON public.user_invites (auth_user_id);
+CREATE INDEX IF NOT EXISTS idx_user_invites_expires_at ON public.user_invites (expires_at);
+
+ALTER TABLE public.user_invites ENABLE ROW LEVEL SECURITY;
 
 -- ---------------------------------------------------------------------------
 -- TABLE: api_credentials  (admin-managed external API keys, AES-256-GCM ciphertext)
@@ -1345,6 +1501,46 @@ CREATE TABLE IF NOT EXISTS public.tours (
 
 CREATE INDEX IF NOT EXISTS idx_tours_artist_id ON public.tours (artist_id);
 CREATE INDEX IF NOT EXISTS idx_tours_archived  ON public.tours (artist_id, archived);
+
+-- Public read-only share links for tours (logistics + deal framework)
+CREATE TABLE IF NOT EXISTS public.tour_share_links (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  tour_id     UUID        NOT NULL REFERENCES public.tours (id) ON DELETE CASCADE,
+  artist_id   UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  token       TEXT        NOT NULL UNIQUE,
+  label       TEXT,
+  is_active   BOOLEAN     NOT NULL DEFAULT TRUE,
+  expires_at  TIMESTAMPTZ,
+  created_by  UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  revoked_at  TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_tour_share_links_tour_id ON public.tour_share_links (tour_id);
+CREATE INDEX IF NOT EXISTS idx_tour_share_links_token ON public.tour_share_links (token);
+CREATE INDEX IF NOT EXISTS idx_tour_share_links_artist_id ON public.tour_share_links (artist_id);
+
+ALTER TABLE public.tour_share_links ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "tour_share_links: artist manage" ON public.tour_share_links;
+CREATE POLICY "tour_share_links: artist manage" ON public.tour_share_links
+  FOR ALL TO authenticated
+  USING (
+    artist_id IN (SELECT am.artist_id FROM public.artist_members am WHERE am.user_id = auth.uid())
+    OR public.has_permission('can_view_admin_panel')
+    OR public.get_my_role() = 'admin'
+  )
+  WITH CHECK (
+    artist_id IN (SELECT am.artist_id FROM public.artist_members am WHERE am.user_id = auth.uid())
+    OR public.has_permission('can_view_admin_panel')
+    OR public.get_my_role() = 'admin'
+  );
+
+DROP POLICY IF EXISTS "tour_share_links: admin all" ON public.tour_share_links;
+CREATE POLICY "tour_share_links: admin all" ON public.tour_share_links
+  FOR ALL TO authenticated
+  USING (public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin')
+  WITH CHECK (public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin');
 
 CREATE TABLE IF NOT EXISTS public.tour_stops (
   id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1891,6 +2087,76 @@ CREATE INDEX IF NOT EXISTS idx_editor_notifications_recipient
   ON public.editor_notifications(recipient_id, read);
 
 -- ---------------------------------------------------------------------------
+-- TABLE: notifications  (unified staff + artist in-app notifications)
+-- Prefer this over editor_notifications for all new emits.
+-- editor_notifications remains for legacy rows until fully migrated.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  artist_id UUID REFERENCES public.artists(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id UUID,
+  entity_name TEXT,
+  sender_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  dedupe_key TEXT,
+  read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read_created
+  ON public.notifications(user_id, read, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_artist
+  ON public.notifications(artist_id, created_at DESC)
+  WHERE artist_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_user_dedupe
+  ON public.notifications(user_id, dedupe_key)
+  WHERE dedupe_key IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- TABLE: notification_preferences (per-user channel toggles)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.notification_preferences (
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  in_app BOOLEAN NOT NULL DEFAULT TRUE,
+  email BOOLEAN NOT NULL DEFAULT TRUE,
+  push BOOLEAN NOT NULL DEFAULT TRUE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, event_type)
+);
+
+-- Existing DBs created before push channel
+ALTER TABLE public.notification_preferences
+  ADD COLUMN IF NOT EXISTS push BOOLEAN NOT NULL DEFAULT TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_notification_preferences_user
+  ON public.notification_preferences(user_id);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: push_subscriptions (Web Push endpoints for PWA / browsers)
+-- One row per browser/device subscription; endpoint is unique globally.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  user_agent TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT push_subscriptions_endpoint_unique UNIQUE (endpoint)
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user
+  ON public.push_subscriptions(user_id);
+
+-- ---------------------------------------------------------------------------
 -- TABLE: interview_requests
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.interview_requests (
@@ -2164,6 +2430,22 @@ CREATE INDEX IF NOT EXISTS idx_sales_statements_artist_id  ON public.sales_state
 CREATE INDEX IF NOT EXISTS idx_sales_statements_created_at ON public.sales_statements (created_at DESC);
 
 -- ---------------------------------------------------------------------------
+-- TABLE: sos_rules_presets  — named rule-set presets for SOS accounting
+-- Must exist before distributor_import_batches (FK rules_preset_id).
+-- RLS/policies are applied later in the SOS section.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.sos_rules_presets (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       TEXT        NOT NULL,
+  config     JSONB       NOT NULL DEFAULT '{}'::JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_sos_rules_presets_name_ci
+  ON public.sos_rules_presets (lower(btrim(name)));
+
+-- ---------------------------------------------------------------------------
 -- TABLE: distributor_import_batches  (Bronze metadata — raw CSV in R2)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.distributor_import_batches (
@@ -2245,6 +2527,26 @@ CREATE INDEX IF NOT EXISTS idx_event_impact_artist
   ON public.event_impact (artist_id);
 
 -- ---------------------------------------------------------------------------
+-- TABLE: promo_log_entries
+-- Label-documented marketing activities (timeline for linked artists).
+-- Must exist before promo_impact (FK promo_log_id). RLS applied later.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.promo_log_entries (
+  id               UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id        UUID           NOT NULL REFERENCES public.artists(id) ON DELETE CASCADE,
+  action_date      DATE           NOT NULL,
+  description      TEXT           NOT NULL,
+  budget_amount    NUMERIC(12, 2),
+  budget_currency  TEXT           NOT NULL DEFAULT 'EUR',
+  proof_url        TEXT,
+  proof_r2_key     TEXT,
+  created_by       UUID           REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at       TIMESTAMPTZ    NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_promo_log_artist_id ON public.promo_log_entries (artist_id, action_date DESC);
+
+-- ---------------------------------------------------------------------------
 -- TABLE: promo_impact  (Gold — precomputed promo log ↔ stream correlation)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.promo_impact (
@@ -2308,13 +2610,13 @@ CREATE INDEX IF NOT EXISTS idx_merch_orders_artist_period
 
 -- ---------------------------------------------------------------------------
 -- TABLE: artist_listener_metrics  (Gold — external listener/play trends)
--- Sources: Last.fm (free), Soundcharts (optional paid API key)
+-- Sources: Last.fm (free), Soundcharts (optional), Apify Spotify public scrapes
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.artist_listener_metrics (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   artist_id   UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
-  source      TEXT        NOT NULL CHECK (source IN ('lastfm', 'soundcharts')),
-  metric_type TEXT        NOT NULL CHECK (metric_type IN ('listeners', 'plays')),
+  source      TEXT        NOT NULL CHECK (source IN ('lastfm', 'soundcharts', 'apify')),
+  metric_type TEXT        NOT NULL CHECK (metric_type IN ('listeners', 'plays', 'followers')),
   period      TEXT        NOT NULL,
   value       BIGINT      NOT NULL DEFAULT 0,
   country     TEXT        NOT NULL DEFAULT '',
@@ -2324,6 +2626,51 @@ CREATE TABLE IF NOT EXISTS public.artist_listener_metrics (
 
 CREATE INDEX IF NOT EXISTS idx_artist_listener_metrics_artist_period
   ON public.artist_listener_metrics (artist_id, period DESC);
+
+-- Idempotent CHECK expansion for existing databases created with older CHECKs
+ALTER TABLE public.artist_listener_metrics
+  DROP CONSTRAINT IF EXISTS artist_listener_metrics_source_check;
+ALTER TABLE public.artist_listener_metrics
+  ADD CONSTRAINT artist_listener_metrics_source_check
+  CHECK (source IN ('lastfm', 'soundcharts', 'apify'));
+ALTER TABLE public.artist_listener_metrics
+  DROP CONSTRAINT IF EXISTS artist_listener_metrics_metric_type_check;
+ALTER TABLE public.artist_listener_metrics
+  ADD CONSTRAINT artist_listener_metrics_metric_type_check
+  CHECK (metric_type IN ('listeners', 'plays', 'followers'));
+
+-- ---------------------------------------------------------------------------
+-- TABLE: spotify_track_play_snapshots  (Apify public track play counts)
+-- Lifetime play_count per track per calendar month snapshot (not SOS settlement)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.spotify_track_play_snapshots (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id         UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  release_id        UUID        REFERENCES public.releases (id) ON DELETE SET NULL,
+  spotify_track_id  TEXT        NOT NULL,
+  spotify_album_id  TEXT,
+  track_name        TEXT,
+  play_count        BIGINT      NOT NULL DEFAULT 0,
+  period            TEXT        NOT NULL,
+  scraped_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (spotify_track_id, period)
+);
+
+CREATE INDEX IF NOT EXISTS idx_spotify_track_play_snapshots_artist_period
+  ON public.spotify_track_play_snapshots (artist_id, period DESC);
+CREATE INDEX IF NOT EXISTS idx_spotify_track_play_snapshots_release_period
+  ON public.spotify_track_play_snapshots (release_id, period DESC)
+  WHERE release_id IS NOT NULL;
+
+-- ---------------------------------------------------------------------------
+-- TABLE: apify_usage_months  (monthly URL budget for Apify free tier)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.apify_usage_months (
+  year_month   TEXT        PRIMARY KEY,
+  urls_charged INTEGER     NOT NULL DEFAULT 0,
+  budget       INTEGER     NOT NULL DEFAULT 1200,
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 -- ---------------------------------------------------------------------------
 -- TABLE: release_checklists  (per-artist release task tracking)
@@ -2514,6 +2861,11 @@ ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS sender_email    TEXT;
 ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS is_external     BOOLEAN     NOT NULL DEFAULT FALSE;
 ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS forwarded_from  UUID        REFERENCES public.label_messages (id) ON DELETE SET NULL;
 ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS has_attachments BOOLEAN     NOT NULL DEFAULT FALSE;
+ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS sender_user_id UUID REFERENCES auth.users (id) ON DELETE SET NULL;
+ALTER TABLE public.label_messages ADD COLUMN IF NOT EXISTS client_message_id UUID;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_label_messages_client_message_id
+  ON public.label_messages (client_message_id)
+  WHERE client_message_id IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- TABLE: message_rules
@@ -2545,6 +2897,52 @@ CREATE TABLE IF NOT EXISTS public.message_attachments (
 
 CREATE INDEX IF NOT EXISTS idx_message_attachments_message_id
   ON public.message_attachments (message_id);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: message_receipts (per-user read state for label + portal messages)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.message_receipts (
+  message_source TEXT NOT NULL CHECK (message_source IN ('label', 'portal')),
+  message_id UUID NOT NULL,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  read_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (message_source, message_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_message_receipts_user
+  ON public.message_receipts (user_id, message_source, read_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: message_internal_notes (staff-only notes on label/portal messages)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.message_internal_notes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_source TEXT NOT NULL CHECK (message_source IN ('label', 'portal')),
+  message_id UUID NOT NULL,
+  author_user_id UUID NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_message_internal_notes_msg
+  ON public.message_internal_notes (message_source, message_id, created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: message_events (audit trail for message ops)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.message_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_source TEXT NOT NULL CHECK (message_source IN ('label', 'portal')),
+  message_id UUID NOT NULL,
+  actor_user_id UUID REFERENCES auth.users (id) ON DELETE SET NULL,
+  event_type TEXT NOT NULL,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_message_events_msg
+  ON public.message_events (message_source, message_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_message_events_actor
+  ON public.message_events (actor_user_id, created_at DESC)
+  WHERE actor_user_id IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- TABLE: journalist_downloads
@@ -2685,21 +3083,26 @@ CREATE TABLE IF NOT EXISTS public.sync_queue (
   id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   artist_id     UUID        REFERENCES public.artists (id) ON DELETE CASCADE,
   job_type      TEXT        NOT NULL DEFAULT 'full',  -- 'full' | 'spotify' | 'discogs' | 'youtube' | 'odesli'
-  status        TEXT        NOT NULL DEFAULT 'pending', -- 'pending' | 'running' | 'done' | 'failed'
+  status        TEXT        NOT NULL DEFAULT 'pending', -- 'pending' | 'running' | 'done' | 'failed' | 'cancelled'
   scheduled_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   started_at    TIMESTAMPTZ,
   finished_at   TIMESTAMPTZ,
   locked_until  TIMESTAMPTZ,
+  cancel_requested_at TIMESTAMPTZ,
+  cancelled_at  TIMESTAMPTZ,
   error_message TEXT,
   attempt_count INTEGER     NOT NULL DEFAULT 0,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE public.sync_queue ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
+ALTER TABLE public.sync_queue ADD COLUMN IF NOT EXISTS cancel_requested_at TIMESTAMPTZ;
+ALTER TABLE public.sync_queue ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_sync_queue_status       ON public.sync_queue (status, scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_sync_queue_artist        ON public.sync_queue (artist_id);
 CREATE INDEX IF NOT EXISTS idx_sync_queue_created_at   ON public.sync_queue (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sync_queue_status_finished ON public.sync_queue (status, finished_at DESC);
 
 ALTER TABLE public.sync_queue ENABLE ROW LEVEL SECURITY;
 
@@ -2772,6 +3175,8 @@ ALTER TABLE public.sales_statements             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.distributor_import_batches     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.artist_territory_metrics     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.artist_listener_metrics      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.spotify_track_play_snapshots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.apify_usage_months           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_statement_line_items     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.event_impact                   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tours                          ENABLE ROW LEVEL SECURITY;
@@ -2793,10 +3198,16 @@ ALTER TABLE public.label_messages        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_folders       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_rules         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_attachments   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_receipts      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_internal_notes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_events        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.journalist_downloads  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.accreditation_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.editor_activity_log   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.editor_notifications  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.push_subscriptions    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interview_requests    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_logs              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.support_known_errors  ENABLE ROW LEVEL SECURITY;
@@ -3001,9 +3412,12 @@ DROP POLICY IF EXISTS "videos: admin delete"             ON public.videos;
 DROP POLICY IF EXISTS "videos: can_manage_videos insert" ON public.videos;
 DROP POLICY IF EXISTS "videos: can_manage_videos update" ON public.videos;
 
--- Allows public read access to all videos
+-- Public: only visible videos. Staff (admin/editor) see all (incl. hidden).
 CREATE POLICY "videos: public read" ON public.videos
-  FOR SELECT USING (TRUE);
+  FOR SELECT USING (
+    is_visible = TRUE
+    OR public.get_my_role() IN ('admin', 'editor')
+  );
 
 -- Requires can_manage_videos permission (admin always bypasses)
 CREATE POLICY "videos: can_manage_videos insert" ON public.videos
@@ -3026,6 +3440,7 @@ CREATE POLICY "videos: admin delete" ON public.videos
 -- RLS: assets
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "assets: authenticated read"          ON public.assets;
+DROP POLICY IF EXISTS "assets: staff read"                  ON public.assets;
 DROP POLICY IF EXISTS "assets: editor+ insert"              ON public.assets;
 DROP POLICY IF EXISTS "assets: admin delete"                ON public.assets;
 DROP POLICY IF EXISTS "assets: editor+ update"              ON public.assets;
@@ -3033,9 +3448,12 @@ DROP POLICY IF EXISTS "assets: can_view_admin_panel insert" ON public.assets;
 DROP POLICY IF EXISTS "assets: can_view_admin_panel update" ON public.assets;
 DROP POLICY IF EXISTS "assets: public press read"            ON public.assets;
 
--- Allows any authenticated user to read assets
-CREATE POLICY "assets: authenticated read" ON public.assets
-  FOR SELECT USING (auth.role() = 'authenticated');
+-- Staff only: full asset catalogue (admin file explorer). Not every logged-in user.
+CREATE POLICY "assets: staff read" ON public.assets
+  FOR SELECT USING (
+    public.has_permission('can_view_admin_panel')
+    OR public.get_my_role() IN ('admin', 'editor')
+  );
 
 -- Allows anonymous/public read of press-approved assets (replaces press_photos public read)
 CREATE POLICY "assets: public press read" ON public.assets
@@ -3062,13 +3480,19 @@ CREATE POLICY "assets: admin delete" ON public.assets
 
 ALTER TABLE public.asset_folders ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "asset_folders: authenticated read"          ON public.asset_folders;
+DROP POLICY IF EXISTS "asset_folders: staff read"                  ON public.asset_folders;
 DROP POLICY IF EXISTS "asset_folders: editor+ write"               ON public.asset_folders;
 DROP POLICY IF EXISTS "asset_folders: admin delete"                ON public.asset_folders;
 DROP POLICY IF EXISTS "asset_folders: editor+ update"              ON public.asset_folders;
 DROP POLICY IF EXISTS "asset_folders: can_view_admin_panel write"  ON public.asset_folders;
 DROP POLICY IF EXISTS "asset_folders: can_view_admin_panel update" ON public.asset_folders;
--- Allows any authenticated user to browse asset folders
-CREATE POLICY "asset_folders: authenticated read" ON public.asset_folders FOR SELECT TO authenticated USING (true);
+-- Staff only: browse all folders (matches assets: staff read)
+CREATE POLICY "asset_folders: staff read" ON public.asset_folders
+  FOR SELECT TO authenticated
+  USING (
+    public.has_permission('can_view_admin_panel')
+    OR public.get_my_role() IN ('admin', 'editor')
+  );
 -- Requires can_view_admin_panel permission
 CREATE POLICY "asset_folders: can_view_admin_panel write"  ON public.asset_folders FOR INSERT TO authenticated WITH CHECK (
   public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
@@ -3112,9 +3536,108 @@ CREATE POLICY "asset_artists: editor+ delete" ON public.asset_artists
 DROP POLICY IF EXISTS "site_settings_public_read"  ON public.site_settings;
 DROP POLICY IF EXISTS "site_settings_admin_write"  ON public.site_settings;
 
--- Allows public read of site settings (label name, contact, etc.)
+-- Public: only non-sensitive CMS keys. Staff (admin/editor) read all keys.
+-- Admin-only examples: label_billing_*, invite_link_expiry_hours.
+-- SSOT list mirrored in src/lib/api/siteSettingsPublicKeys.ts
 CREATE POLICY "site_settings_public_read" ON public.site_settings
-  FOR SELECT USING (TRUE);
+  FOR SELECT USING (
+    public.get_my_role() IN ('admin', 'editor')
+    OR key = ANY (ARRAY[
+      'label_name',
+      'label_short_name',
+      'label_tagline',
+      'contact_email',
+      'privacy_policy_url',
+      'terms_url',
+      'instagram_url',
+      'youtube_url',
+      'spotify_url',
+      'spotify_playlist_uri',
+      'spotify_playlists',
+      'hero_badge',
+      'hero_news_badge',
+      'hero_description',
+      'hero_content_type',
+      'hero_featured_id',
+      'hero_custom_bg_url',
+      'hero_default_primary_btn_label',
+      'hero_default_secondary_btn_label',
+      'seo_title',
+      'seo_description',
+      'og_title',
+      'og_description',
+      'impressum_company_name',
+      'impressum_legal_form',
+      'impressum_representative',
+      'impressum_address',
+      'impressum_vat_id',
+      'impressum_register_court',
+      'impressum_register_number',
+      'impressum_phone',
+      'impressum_email',
+      'datenschutz_content',
+      'datenschutz_content_en',
+      'agb_content',
+      'agb_content_en',
+      'portal_terms_version',
+      'consent_placeholder_url',
+      'noise_opacity',
+      'crt_scanlines_enabled',
+      'vignette_intensity',
+      'shopify_store_url',
+      'submit_hub_url',
+      'submit_hub_label',
+      'submit_hub_description',
+      'submit_hub_section_heading',
+      'show_about_in_header',
+      'show_about_in_footer',
+      'about_nav_label',
+      'youtube_channel_id',
+      'carousel_autoplay_ms',
+      'videos_per_page',
+      'videos_link_to_page',
+      'exclude_shorts_from_public',
+      'concerts_per_page',
+      'concerts_link_to_page',
+      'feature_toggles',
+      'logo_url',
+      'favicon_url',
+      'about_headline',
+      'about_subheading',
+      'about_body',
+      'newsletter_heading',
+      'newsletter_description',
+      'spotify_section_heading',
+      'spotify_section_subheading',
+      'videos_section_heading',
+      'videos_section_subheading',
+      'news_section_heading',
+      'news_section_subheading',
+      'concerts_section_heading',
+      'concerts_section_subheading',
+      'releases_section_heading',
+      'releases_section_subheading',
+      'homepage_section_order',
+      'homepage_news_count',
+      'contact_topics',
+      'custom_social_links',
+      'theme_primary',
+      'theme_secondary',
+      'theme_background',
+      'theme_foreground',
+      'theme_card',
+      'theme_muted',
+      'theme_accent',
+      'theme_border',
+      'theme_gradient_hero_from',
+      'theme_gradient_hero_to',
+      'theme_gradient_hero_dir',
+      'theme_gradient_accent_from',
+      'theme_gradient_accent_to',
+      'theme_gradient_accent_dir',
+      'theme_config'
+    ]::text[])
+  );
 
 -- Allows editors and admins to update site settings
 CREATE POLICY "site_settings_admin_write" ON public.site_settings
@@ -3282,11 +3805,47 @@ CREATE POLICY "editor_notifications: admin manage" ON public.editor_notification
   WITH CHECK (public.get_my_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
+-- RLS: notifications (unified; INSERT via service role only)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "notifications: own read" ON public.notifications;
+DROP POLICY IF EXISTS "notifications: own update" ON public.notifications;
+DROP POLICY IF EXISTS "notifications: admin read all" ON public.notifications;
+
+CREATE POLICY "notifications: own read" ON public.notifications
+  FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "notifications: own update" ON public.notifications
+  FOR UPDATE USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "notifications: admin read all" ON public.notifications
+  FOR SELECT USING (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: notification_preferences
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "notification_preferences: own all" ON public.notification_preferences;
+
+CREATE POLICY "notification_preferences: own all" ON public.notification_preferences
+  FOR ALL USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+-- ---------------------------------------------------------------------------
+-- RLS: push_subscriptions (users manage own; send uses service role)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "push_subscriptions: own all" ON public.push_subscriptions;
+
+CREATE POLICY "push_subscriptions: own all" ON public.push_subscriptions
+  FOR ALL USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+-- ---------------------------------------------------------------------------
 -- RLS: interview_requests
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "interview_requests: journalist manage own" ON public.interview_requests;
 DROP POLICY IF EXISTS "interview_requests: artist read own" ON public.interview_requests;
 DROP POLICY IF EXISTS "interview_requests: artist update own" ON public.interview_requests;
+DROP POLICY IF EXISTS "interview_requests: artist delete own" ON public.interview_requests;
 
 CREATE POLICY "interview_requests: journalist manage own" ON public.interview_requests
   FOR ALL USING (journalist_id = auth.uid())
@@ -3298,6 +3857,10 @@ CREATE POLICY "interview_requests: artist read own" ON public.interview_requests
 CREATE POLICY "interview_requests: artist update own" ON public.interview_requests
   FOR UPDATE USING (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()))
   WITH CHECK (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()));
+
+-- Portal artists may remove requests from their inbox (status reply remains optional).
+CREATE POLICY "interview_requests: artist delete own" ON public.interview_requests
+  FOR DELETE USING (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()));
 
 
 
@@ -3337,15 +3900,10 @@ CREATE POLICY "artist_epks: admin all" ON public.artist_epks
   USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
 
--- Public read for visible artists (press portal + public EPK viewer)
+-- No anon public SELECT on artist_epks (would leak epk_password_hash + full row).
+-- Public/press EPK content is served only via service-role server code
+-- (getPublicArtistEpkByArtistId) with an explicit column whitelist.
 DROP POLICY IF EXISTS "artist_epks: public read visible" ON public.artist_epks;
-CREATE POLICY "artist_epks: public read visible" ON public.artist_epks
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM public.artists a
-      WHERE a.id = artist_id AND a.is_visible = TRUE
-    )
-  );
 
 -- ---------------------------------------------------------------------------
 -- RLS: epk_versions
@@ -3567,6 +4125,23 @@ CREATE POLICY "distributor_import_batches: admin all" ON public.distributor_impo
   USING (public.get_my_role() IN ('admin', 'editor'))
   WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
+-- Artists may read metadata for bronze batches linked to their visible statements
+-- (hash, distributor, period — chain-of-custody / provenance UI). No write access.
+DROP POLICY IF EXISTS "distributor_import_batches: artist read linked" ON public.distributor_import_batches;
+CREATE POLICY "distributor_import_batches: artist read linked" ON public.distributor_import_batches
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1
+      FROM public.sales_statements ss
+      WHERE ss.batch_id = distributor_import_batches.id
+        AND ss.status IN ('label_approved', 'artist_notified', 'viewed', 'invoiced', 'paid', 'acknowledged')
+        AND EXISTS (
+          SELECT 1 FROM public.artist_members am
+          WHERE am.artist_id = ss.artist_id AND am.user_id = auth.uid()
+        )
+    )
+  );
+
 -- ---------------------------------------------------------------------------
 -- RLS: artist_territory_metrics
 -- ---------------------------------------------------------------------------
@@ -3595,6 +4170,32 @@ CREATE POLICY "artist_listener_metrics: artist read own" ON public.artist_listen
   );
 
 CREATE POLICY "artist_listener_metrics: admin all" ON public.artist_listener_metrics
+  FOR ALL
+  USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- RLS: spotify_track_play_snapshots
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "spotify_track_play_snapshots: artist read own" ON public.spotify_track_play_snapshots;
+DROP POLICY IF EXISTS "spotify_track_play_snapshots: admin all"       ON public.spotify_track_play_snapshots;
+
+CREATE POLICY "spotify_track_play_snapshots: artist read own" ON public.spotify_track_play_snapshots
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+CREATE POLICY "spotify_track_play_snapshots: admin all" ON public.spotify_track_play_snapshots
+  FOR ALL
+  USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+
+-- ---------------------------------------------------------------------------
+-- RLS: apify_usage_months (admin/editor only — budget is label infrastructure)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "apify_usage_months: admin all" ON public.apify_usage_months;
+
+CREATE POLICY "apify_usage_months: admin all" ON public.apify_usage_months
   FOR ALL
   USING (public.get_my_role() IN ('admin', 'editor'))
   WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
@@ -3880,6 +4481,47 @@ CREATE POLICY "message_attachments: admin all" ON public.message_attachments
   FOR ALL
   USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: message_receipts
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "message_receipts: own all" ON public.message_receipts;
+DROP POLICY IF EXISTS "message_receipts: admin read" ON public.message_receipts;
+
+CREATE POLICY "message_receipts: own all" ON public.message_receipts
+  FOR ALL USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "message_receipts: admin read" ON public.message_receipts
+  FOR SELECT USING (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: message_internal_notes (staff only)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "message_internal_notes: admin all" ON public.message_internal_notes;
+DROP POLICY IF EXISTS "message_internal_notes: editor read write" ON public.message_internal_notes;
+
+CREATE POLICY "message_internal_notes: admin all" ON public.message_internal_notes
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+CREATE POLICY "message_internal_notes: editor read write" ON public.message_internal_notes
+  FOR ALL USING (public.get_my_role() = 'editor')
+  WITH CHECK (public.get_my_role() = 'editor');
+
+-- ---------------------------------------------------------------------------
+-- RLS: message_events (staff read; insert via service role or staff)
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "message_events: admin all" ON public.message_events;
+DROP POLICY IF EXISTS "message_events: editor insert read" ON public.message_events;
+
+CREATE POLICY "message_events: admin all" ON public.message_events
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+CREATE POLICY "message_events: editor insert read" ON public.message_events
+  FOR ALL USING (public.get_my_role() = 'editor')
+  WITH CHECK (public.get_my_role() = 'editor');
 
 -- ---------------------------------------------------------------------------
 -- RLS: journalist_downloads
@@ -4574,6 +5216,8 @@ CREATE TABLE IF NOT EXISTS public.release_submissions (
   form_data           JSONB,
   admin_reply         TEXT,
   admin_reply_at      TIMESTAMPTZ,
+  -- Label-facing progress text shown to the artist (e.g. "Cover approved, DSP delivery pending")
+  progress_note       TEXT,
   -- Linked catalog release when label creates a draft from this submission
   release_id          UUID                      REFERENCES public.releases (id) ON DELETE SET NULL,
   created_at          TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
@@ -4581,6 +5225,7 @@ CREATE TABLE IF NOT EXISTS public.release_submissions (
 );
 
 ALTER TABLE public.release_submissions ADD COLUMN IF NOT EXISTS release_id UUID REFERENCES public.releases (id) ON DELETE SET NULL;
+ALTER TABLE public.release_submissions ADD COLUMN IF NOT EXISTS progress_note TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_release_submissions_artist_id ON public.release_submissions (artist_id);
 CREATE INDEX IF NOT EXISTS idx_release_submissions_status    ON public.release_submissions (status);
@@ -5292,10 +5937,21 @@ CREATE TABLE IF NOT EXISTS public.artist_invoices (
   issued_date            DATE         NOT NULL DEFAULT CURRENT_DATE,
   notes                  TEXT,
   pdf_url                TEXT,
+  pdf_sha256             TEXT,
+  service_period_start   DATE,
+  service_period_end     DATE,
   created_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   UNIQUE (artist_id, invoice_number)
 );
+
+ALTER TABLE public.artist_invoices ADD COLUMN IF NOT EXISTS pdf_sha256 TEXT;
+ALTER TABLE public.artist_invoices ADD COLUMN IF NOT EXISTS service_period_start DATE;
+ALTER TABLE public.artist_invoices ADD COLUMN IF NOT EXISTS service_period_end DATE;
+-- ECB reference rate when invoice currency ≠ EUR (units of currency per 1 EUR)
+ALTER TABLE public.artist_invoices ADD COLUMN IF NOT EXISTS fx_rate NUMERIC(18, 8);
+ALTER TABLE public.artist_invoices ADD COLUMN IF NOT EXISTS fx_rate_date DATE;
+ALTER TABLE public.artist_invoices ADD COLUMN IF NOT EXISTS fx_rate_source TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_artist_invoices_artist_id ON public.artist_invoices (artist_id);
 
@@ -5351,12 +6007,35 @@ CREATE TABLE IF NOT EXISTS public.artist_billing_profiles (
   tax_number         TEXT,
   vat_id             TEXT,
   is_small_business  BOOLEAN      NOT NULL DEFAULT FALSE,
+  -- standard | small_business | reverse_charge (§ 14 UStG tax presentation)
+  tax_status         TEXT         NOT NULL DEFAULT 'standard',
   iban               TEXT,
   bic                TEXT,
   paypal_email       TEXT,
+  -- EU VIES (MIAS) validation snapshot for reverse-charge safety
+  vat_vies_valid         BOOLEAN,
+  vat_vies_checked_at    TIMESTAMPTZ,
+  vat_vies_trader_name   TEXT,
+  vat_vies_request_id    TEXT,
   created_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at         TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.artist_billing_profiles ADD COLUMN IF NOT EXISTS tax_status TEXT NOT NULL DEFAULT 'standard';
+ALTER TABLE public.artist_billing_profiles ADD COLUMN IF NOT EXISTS vat_vies_valid BOOLEAN;
+ALTER TABLE public.artist_billing_profiles ADD COLUMN IF NOT EXISTS vat_vies_checked_at TIMESTAMPTZ;
+ALTER TABLE public.artist_billing_profiles ADD COLUMN IF NOT EXISTS vat_vies_trader_name TEXT;
+ALTER TABLE public.artist_billing_profiles ADD COLUMN IF NOT EXISTS vat_vies_request_id TEXT;
+
+UPDATE public.artist_billing_profiles
+SET tax_status = CASE WHEN is_small_business THEN 'small_business' ELSE 'standard' END
+WHERE tax_status IS NULL
+   OR tax_status NOT IN ('standard', 'small_business', 'reverse_charge');
+
+ALTER TABLE public.artist_billing_profiles DROP CONSTRAINT IF EXISTS artist_billing_profiles_tax_status_check;
+ALTER TABLE public.artist_billing_profiles
+  ADD CONSTRAINT artist_billing_profiles_tax_status_check
+  CHECK (tax_status IN ('standard', 'small_business', 'reverse_charge'));
 
 CREATE INDEX IF NOT EXISTS idx_artist_billing_profiles_artist_id ON public.artist_billing_profiles (artist_id);
 
@@ -5453,6 +6132,66 @@ DROP POLICY IF EXISTS "artist_documents: admin all" ON public.artist_documents;
 CREATE POLICY "artist_documents: admin all" ON public.artist_documents
   FOR ALL USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- TABLE: portal_feedback  (artist product feedback about portal / site)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.portal_feedback (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id   UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  user_id     UUID        NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  category    TEXT        NOT NULL CHECK (category IN ('bug', 'feature', 'ux', 'general', 'praise')),
+  rating      SMALLINT    CHECK (rating IS NULL OR (rating >= 1 AND rating <= 5)),
+  subject     TEXT,
+  message     TEXT        NOT NULL,
+  status      TEXT        NOT NULL DEFAULT 'new'
+                CHECK (status IN ('new', 'reviewed', 'archived')),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_portal_feedback_status_created
+  ON public.portal_feedback (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_portal_feedback_artist_created
+  ON public.portal_feedback (artist_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_portal_feedback_created
+  ON public.portal_feedback (created_at DESC);
+
+DROP TRIGGER IF EXISTS trg_portal_feedback_updated_at ON public.portal_feedback;
+CREATE TRIGGER trg_portal_feedback_updated_at
+  BEFORE UPDATE ON public.portal_feedback
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.portal_feedback ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "portal_feedback: artist insert own" ON public.portal_feedback;
+CREATE POLICY "portal_feedback: artist insert own" ON public.portal_feedback
+  FOR INSERT WITH CHECK (
+    user_id = auth.uid()
+    AND EXISTS (
+      SELECT 1 FROM public.artist_members am
+      WHERE am.artist_id = portal_feedback.artist_id
+        AND am.user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "portal_feedback: artist read own" ON public.portal_feedback;
+CREATE POLICY "portal_feedback: artist read own" ON public.portal_feedback
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.artist_members am
+      WHERE am.artist_id = portal_feedback.artist_id
+        AND am.user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "portal_feedback: editor+ read all" ON public.portal_feedback;
+CREATE POLICY "portal_feedback: editor+ read all" ON public.portal_feedback
+  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+
+DROP POLICY IF EXISTS "portal_feedback: editor+ update" ON public.portal_feedback;
+CREATE POLICY "portal_feedback: editor+ update" ON public.portal_feedback
+  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
 
 -- ===========================================================================
 -- USER ROLES (multi-role junction table)  — added 2026-06
@@ -5583,10 +6322,24 @@ CREATE TABLE IF NOT EXISTS public.portal_messages (
   deleted_at      TIMESTAMPTZ,
   folder_id       UUID        REFERENCES public.portal_message_folders (id) ON DELETE SET NULL,
   has_attachments BOOLEAN     NOT NULL DEFAULT FALSE,
+  sender_user_id  UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  client_message_id UUID,
   search_vector   TSVECTOR    GENERATED ALWAYS AS (
     to_tsvector('english', coalesce(subject,'') || ' ' || coalesce(body,''))
   ) STORED
 );
+
+ALTER TABLE public.portal_messages ADD COLUMN IF NOT EXISTS sender_user_id UUID REFERENCES auth.users (id) ON DELETE SET NULL;
+ALTER TABLE public.portal_messages ADD COLUMN IF NOT EXISTS client_message_id UUID;
+ALTER TABLE public.portal_messages ADD COLUMN IF NOT EXISTS assignee_user_id UUID REFERENCES auth.users (id) ON DELETE SET NULL;
+ALTER TABLE public.portal_messages ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'normal';
+ALTER TABLE public.portal_messages ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_portal_messages_client_message_id
+  ON public.portal_messages (client_message_id)
+  WHERE client_message_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_portal_messages_assignee
+  ON public.portal_messages (assignee_user_id)
+  WHERE assignee_user_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_portal_msg_from    ON public.portal_messages (from_artist_id, sent_at DESC);
 CREATE INDEX IF NOT EXISTS idx_portal_msg_to      ON public.portal_messages (to_artist_id,   sent_at DESC);
@@ -5663,17 +6416,8 @@ CREATE POLICY "portal_attach: admin all" ON public.portal_message_attachments
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
--- TABLE: sos_rules_presets  — named rule-set presets for SOS accounting
--- Each row bundles all rule types into a single JSONB config blob.
+-- RLS: sos_rules_presets (table created earlier — before distributor_import_batches)
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS public.sos_rules_presets (
-  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  name       TEXT        NOT NULL,
-  config     JSONB       NOT NULL DEFAULT '{}'::JSONB,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 ALTER TABLE public.sos_rules_presets ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "sos_rules_presets: admin all" ON public.sos_rules_presets;
@@ -5685,9 +6429,6 @@ DROP TRIGGER IF EXISTS sos_rules_presets_updated_at ON public.sos_rules_presets;
 CREATE TRIGGER sos_rules_presets_updated_at
   BEFORE UPDATE ON public.sos_rules_presets
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_sos_rules_presets_name_ci
-  ON public.sos_rules_presets (lower(btrim(name)));
 
 -- ---------------------------------------------------------------------------
 -- TABLE: sos_accounting_workspaces  — server-persisted live workspace for a period
@@ -5998,25 +6739,9 @@ ALTER TABLE public.sales_statement_line_items
   ADD COLUMN IF NOT EXISTS fx_rate_date DATE;
 
 -- =============================================================================
--- TABLE: promo_log_entries
--- Label-documented marketing activities shown to the linked artist as a
--- chronological read-only timeline.  Admins/editors write; artists read.
+-- RLS: promo_log_entries (table created earlier — before promo_impact)
+-- Admins/editors write; artists read their own timeline.
 -- =============================================================================
-
-CREATE TABLE IF NOT EXISTS public.promo_log_entries (
-  id               UUID           PRIMARY KEY DEFAULT gen_random_uuid(),
-  artist_id        UUID           NOT NULL REFERENCES public.artists(id) ON DELETE CASCADE,
-  action_date      DATE           NOT NULL,
-  description      TEXT           NOT NULL,
-  budget_amount    NUMERIC(12, 2),
-  budget_currency  TEXT           NOT NULL DEFAULT 'EUR',
-  proof_url        TEXT,
-  proof_r2_key     TEXT,
-  created_by       UUID           REFERENCES auth.users(id) ON DELETE SET NULL,
-  created_at       TIMESTAMPTZ    NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS idx_promo_log_artist_id ON public.promo_log_entries (artist_id, action_date DESC);
 
 ALTER TABLE public.promo_log_entries ENABLE ROW LEVEL SECURITY;
 

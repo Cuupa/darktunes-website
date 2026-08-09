@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { buildSubmissionExportRows, buildSubmissionsCsv } from './submissionExport'
+import {
+  buildSubmissionExportRows,
+  buildSubmissionsCsv,
+  DEFAULT_EXPORT_COLUMNS,
+  resolveExportColumns,
+} from './submissionExport'
 import type { ReleaseSubmission, ReleaseSubmissionTrack } from '@/types'
 
 const submission: ReleaseSubmission = {
@@ -23,6 +28,7 @@ const submission: ReleaseSubmission = {
   formData: { ean: '4006381333931' },
   adminReply: null,
   adminReplyAt: null,
+  progressNote: null,
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
 }
@@ -61,17 +67,53 @@ describe('submissionExport', () => {
     expect(rows[0].artistName).toBe('Artist X')
     expect(rows[0].ean).toBe('4006381333931')
     expect(rows[0]['Song Title']).toBe('Track One')
+    expect(rows[0].Composer).toBe('A')
+    expect(rows[0].Author).toBe('B')
   })
 
-  it('builds CSV with headers', () => {
+  it('builds CSV with default column order', () => {
+    const rows = buildSubmissionExportRows({
+      submissions: [submission],
+      tracksBySubmission: new Map([['sub-1', [track]]]),
+      artistNames: new Map([['art-1', 'Artist X']]),
+      schemaFields: [],
+    })
+    const csv = buildSubmissionsCsv(rows)
+    const headerLine = csv.split('\n')[0]
+    expect(headerLine.startsWith('artistName,releaseTitle')).toBe(true)
+    expect(headerLine).toContain('Composer')
+    expect(csv).toContain('My Album')
+    expect(csv).toContain('Artist X')
+  })
+
+  it('respects custom column order and fills missing keys empty', () => {
     const rows = buildSubmissionExportRows({
       submissions: [submission],
       tracksBySubmission: new Map(),
       artistNames: new Map([['art-1', 'Artist X']]),
       schemaFields: [],
     })
-    const csv = buildSubmissionsCsv(rows)
-    expect(csv.split('\n')[0]).toContain('submissionId')
-    expect(csv).toContain('My Album')
+    const order = ['releaseTitle', 'artistName', 'Composer']
+    const csv = buildSubmissionsCsv(rows, order)
+    const lines = csv.split('\n')
+    expect(lines[0]).toBe('releaseTitle,artistName,Composer')
+    expect(lines[1]).toBe('My Album,Artist X,')
+  })
+
+  it('DEFAULT_EXPORT_COLUMNS starts with artist then title', () => {
+    expect(DEFAULT_EXPORT_COLUMNS[0]).toBe('artistName')
+    expect(DEFAULT_EXPORT_COLUMNS[1]).toBe('releaseTitle')
+  })
+
+  it('resolveExportColumns with saved does not re-append unchecked columns', () => {
+    const result = resolveExportColumns(['Composer'], ['Composer', 'Author', 'artistName'])
+    expect(result).toEqual(['Composer'])
+  })
+
+  it('resolveExportColumns without saved appends extras after defaults', () => {
+    const available = ['artistName', 'releaseTitle', 'Composer', 'customField']
+    const result = resolveExportColumns(null, available)
+    expect(result[0]).toBe('artistName')
+    expect(result).toContain('customField')
   })
 })

@@ -4,6 +4,7 @@ import type { Database } from '@/types/database'
 import {
   getReleases,
   getPublicReleases,
+  getAllVisibleReleasesForCalendar,
   getReleasesByArtistId,
   createRelease,
   deleteRelease,
@@ -186,6 +187,121 @@ describe('getPublicReleases', () => {
     } as unknown as DbClient
 
     await expect(getPublicReleases(db)).rejects.toThrow('DB error')
+  })
+})
+
+describe('getAllVisibleReleasesForCalendar', () => {
+  it('maps nested release_artists in a single select (no extra junction round-trips)', async () => {
+    const calendarRow = {
+      id: 'rel-cal-1',
+      title: 'Calendar Cut',
+      artist_id: 'art-001',
+      release_date: '2025-06-01',
+      cover_art: 'https://example.com/c.jpg',
+      type: 'single' as const,
+      spotify_url: 'https://open.spotify.com/album/x',
+      apple_music_url: null,
+      youtube_url: null,
+      bandcamp_url: null,
+      smartlink_url: 'https://example.com/presave',
+      platform_links: { deezer: 'https://deezer.com/x' },
+      is_visible: true,
+      is_promo: false,
+      promo_text: 'Promo note',
+      release_artists: [
+        {
+          sort_order: 0,
+          artists: { id: 'art-001', name: 'Visible Band', slug: 'visible-band', is_visible: true },
+        },
+      ],
+    }
+    const releaseBuilder = makeBuilder([calendarRow], null)
+    const db = {
+      from: vi.fn().mockReturnValue(releaseBuilder),
+    } as unknown as DbClient
+
+    const result = await getAllVisibleReleasesForCalendar(db)
+    expect(result).toHaveLength(1)
+    expect(result[0].title).toBe('Calendar Cut')
+    expect(result[0].artistName).toBe('Visible Band')
+    expect(result[0].artists).toEqual([
+      { id: 'art-001', name: 'Visible Band', slug: 'visible-band' },
+    ])
+    expect(result[0].smartlinkUrl).toBe('https://example.com/presave')
+    expect(result[0].platformLinks).toEqual({ deezer: 'https://deezer.com/x' })
+    expect(releaseBuilder.eq).toHaveBeenCalledWith('is_visible', true)
+    expect(releaseBuilder.eq).toHaveBeenCalledWith('is_promo', false)
+    expect(releaseBuilder.limit).toHaveBeenCalled()
+    // Nested artists already present → no second from('artists') call
+    expect(db.from).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops releases whose only junction artists are hidden', async () => {
+    const calendarRow = {
+      id: 'rel-hidden',
+      title: 'Hidden Only',
+      artist_id: 'art-hidden',
+      release_date: '2025-01-01',
+      cover_art: null,
+      type: 'album' as const,
+      spotify_url: null,
+      apple_music_url: null,
+      youtube_url: null,
+      bandcamp_url: null,
+      smartlink_url: null,
+      platform_links: null,
+      is_visible: true,
+      is_promo: false,
+      promo_text: null,
+      release_artists: [
+        {
+          sort_order: 0,
+          artists: { id: 'art-hidden', name: 'Ghost', slug: 'ghost', is_visible: false },
+        },
+      ],
+    }
+    const db = {
+      from: vi.fn().mockReturnValue(makeBuilder([calendarRow], null)),
+    } as unknown as DbClient
+
+    const result = await getAllVisibleReleasesForCalendar(db)
+    expect(result).toEqual([])
+  })
+
+  it('resolves legacy artist_id when junction is empty and filters hidden', async () => {
+    const calendarRow = {
+      id: 'rel-legacy',
+      title: 'Legacy Cut',
+      artist_id: 'art-001',
+      release_date: '2024-01-01',
+      cover_art: null,
+      type: 'ep' as const,
+      spotify_url: null,
+      apple_music_url: null,
+      youtube_url: null,
+      bandcamp_url: null,
+      smartlink_url: null,
+      platform_links: null,
+      is_visible: true,
+      is_promo: false,
+      promo_text: null,
+      release_artists: [],
+    }
+    const releaseBuilder = makeBuilder([calendarRow], null)
+    const artistBuilder = makeBuilder(
+      [{ id: 'art-001', name: 'Legacy Artist', slug: 'legacy', is_visible: true }],
+      null,
+    )
+    const db = {
+      from: vi.fn()
+        .mockReturnValueOnce(releaseBuilder)
+        .mockReturnValueOnce(artistBuilder),
+    } as unknown as DbClient
+
+    const result = await getAllVisibleReleasesForCalendar(db)
+    expect(result).toHaveLength(1)
+    expect(result[0].artistName).toBe('Legacy Artist')
+    expect(result[0].artists?.[0]?.slug).toBe('legacy')
   })
 })
 

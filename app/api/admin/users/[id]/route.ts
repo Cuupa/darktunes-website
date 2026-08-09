@@ -15,10 +15,10 @@
  *   { ban, reason } — ban / unban the user
  */
 
+import { requireAdminWithServiceClient } from '@/lib/adminAuth'
+
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { z } from 'zod'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import {
   DISPLAY_NAME_MAX_LENGTH,
@@ -58,29 +58,13 @@ function extractId(req: NextRequest): string {
 }
 
 /** Shared auth + admin-role check. Returns { user, adminClient }. */
-async function requireAdmin() {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) throw new ApiError(401, 'Unauthorized')
-
-  const role = await getUserRoleWithClient(supabase, user.id)
-
-  if (role !== 'admin') throw new ApiError(403, 'Forbidden')
-
-  const adminClient = await createServiceRoleSupabaseClient()
-  return { currentUserId: user.id, adminClient }
-}
 
 // ---------------------------------------------------------------------------
 // Route handlers
 // ---------------------------------------------------------------------------
 
 export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  const { currentUserId, adminClient } = await requireAdmin()
+  const { userId: currentUserId, serviceClient: adminClient } = await requireAdminWithServiceClient(req)
 
   const targetId = extractId(req)
 
@@ -131,7 +115,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
 })
 
 export const DELETE = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
-  const { currentUserId, adminClient } = await requireAdmin()
+  const { userId: currentUserId, serviceClient: adminClient } = await requireAdminWithServiceClient(req)
 
   const targetId = extractId(req)
 

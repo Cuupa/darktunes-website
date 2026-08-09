@@ -28,7 +28,6 @@ import {
   Gauge,
   Bell,
   ChartLine,
-  Clock,
   Headphones,
   Waveform,
 } from '@phosphor-icons/react'
@@ -43,10 +42,14 @@ import {
   type QueueOperationalState,
 } from '@/lib/health/apiStatus'
 import type { AlertSeverity, HealthResponse } from '@/lib/health/types'
+import { describeSyncQueueIssue } from '@/lib/sync/userFacingErrors'
+import { SyncAdvancedJobsPanel } from '@/components/admin/sync/SyncAdvancedJobsPanel'
 
 interface SystemHealthWidgetProps {
   bearerToken: string
 }
+
+type SystemViewMode = 'guided' | 'advanced'
 
 /** Reads response text first so Vercel/plain-text error pages never crash res.json(). */
 async function parseAdminFetchJson(res: Response): Promise<Record<string, unknown>> {
@@ -80,9 +83,11 @@ const API_META: Record<string, { label: string; icon: React.ReactNode }> = {
   odesli: { label: 'Odesli', icon: <Link size={16} weight="bold" aria-hidden="true" /> },
   lastfm: { label: 'Last.fm', icon: <Headphones size={16} weight="bold" aria-hidden="true" /> },
   soundcharts: { label: 'Soundcharts', icon: <Waveform size={16} weight="bold" aria-hidden="true" /> },
+  apify: { label: 'Apify (Spotify public)', icon: <ChartLine size={16} weight="bold" aria-hidden="true" /> },
   all: { label: 'Full pipeline', icon: <ArrowsClockwise size={16} weight="bold" aria-hidden="true" /> },
 }
 
+/** Last.fm + Soundcharts share POST /api/admin/analytics/sync-listeners. */
 const LISTENER_SYNC_APIS = new Set(['lastfm', 'soundcharts'])
 
 function getApiMeta(api: string): { label: string; icon: React.ReactNode } {
@@ -92,6 +97,18 @@ function getApiMeta(api: string): { label: string; icon: React.ReactNode } {
       icon: <MusicNote size={16} weight="bold" aria-hidden="true" />,
     }
   )
+}
+
+function apifySyncToastMessage(data: Record<string, unknown>): string {
+  const urls = typeof data.urlsCharged === 'number' ? data.urlsCharged : 0
+  const upserted =
+    data.upserted && typeof data.upserted === 'object'
+      ? (data.upserted as { listenerRows?: unknown; trackRows?: unknown })
+      : null
+  const listeners = typeof upserted?.listenerRows === 'number' ? upserted.listenerRows : 0
+  const tracks = typeof upserted?.trackRows === 'number' ? upserted.trackRows : 0
+  const partial = data.partial === true ? ' Partial run — re-run to continue.' : ''
+  return `Apify (Spotify public) sync completed (${urls} URL${urls === 1 ? '' : 's'}, ${listeners} listener row${listeners === 1 ? '' : 's'}, ${tracks} track row${tracks === 1 ? '' : 's'}).${partial}`
 }
 
 function operationalBadgeClass(
@@ -164,6 +181,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   const [syncingYoutube, setSyncingYoutube] = useState(false)
   const [syncingApi, setSyncingApi] = useState<string | null>(null)
   const [expandedErrors, setExpandedErrors] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<SystemViewMode>('guided')
 
   const fetchHealth = useCallback(async (showRefreshSpinner = false) => {
     if (showRefreshSpinner) setRefreshing(true)
@@ -305,19 +323,30 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   const handleSyncApi = async (api: string) => {
     setSyncingApi(api)
     try {
-      const res = LISTENER_SYNC_APIS.has(api)
-        ? await fetch('/api/admin/analytics/sync-listeners', {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${bearerToken}` },
-          })
-        : await fetch('/api/sync-api', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${bearerToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ apiSource: api }),
-          })
+      // Apify is a separate analytics route (not Last.fm/Soundcharts sync-listeners).
+      const res =
+        api === 'apify'
+          ? await fetch('/api/admin/analytics/sync-spotify-plays', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${bearerToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ scope: 'all' }),
+            })
+          : LISTENER_SYNC_APIS.has(api)
+            ? await fetch('/api/admin/analytics/sync-listeners', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${bearerToken}` },
+              })
+            : await fetch('/api/sync-api', {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${bearerToken}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ apiSource: api }),
+              })
 
       const data = await parseAdminFetchJson(res)
       if (!res.ok) {
@@ -326,7 +355,9 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
         )
       }
 
-      if (LISTENER_SYNC_APIS.has(api)) {
+      if (api === 'apify') {
+        toast.success(apifySyncToastMessage(data))
+      } else if (LISTENER_SYNC_APIS.has(api)) {
         const rows =
           api === 'soundcharts'
             ? (data.soundchartsRows as number | undefined)
@@ -384,6 +415,32 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
   const criticalAlerts = health.alerts.filter((a) => a.severity === 'critical')
   const warningAlerts = health.alerts.filter((a) => a.severity === 'warning')
 
+  const queueBacklog =
+    (health.syncQueue?.pending ?? 0) +
+    (health.syncQueue?.running ?? 0) +
+    (health.syncQueue?.stuckRunning ?? 0)
+  const executeJob = health.cronHealth?.jobs.find((j) => j.key === 'sync_execute')
+  const youtubeJob = health.cronHealth?.jobs.find((j) => j.key === 'sync_youtube')
+  const speakingIssues = describeSyncQueueIssue({
+    executorNeverRan: executeJob?.statusLabel === 'Executor never ran',
+    executorOffline:
+      executeJob?.statusLabel === 'Executor offline' ||
+      executeJob?.statusLabel === 'Executor overdue',
+    backlog: queueBacklog,
+    youtubeUnconfigured:
+      youtubeJob?.operationalState === 'unconfigured' ||
+      !(health.apis.youtube?.configured ?? false),
+    youtubeIdle:
+      Boolean(health.apis.youtube?.configured) &&
+      (youtubeJob?.statusLabel === 'Awaiting first run' ||
+        youtubeJob?.lastHeartbeatAt == null),
+    cronSecretMissing:
+      executeJob?.statusLabel === 'Automatic sync unavailable' ||
+      executeJob?.statusLabel === 'Cron auth not configured',
+  })
+
+  const activeWork = queueBacklog > 0
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -408,6 +465,30 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
           <p className="text-sm text-muted-foreground">{health.statusDetail}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <div
+            className="flex rounded-md border border-border p-0.5"
+            role="group"
+            aria-label="System view mode"
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === 'guided' ? 'secondary' : 'ghost'}
+              className="h-8"
+              onClick={() => setViewMode('guided')}
+            >
+              Guided
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={viewMode === 'advanced' ? 'secondary' : 'ghost'}
+              className="h-8"
+              onClick={() => setViewMode('advanced')}
+            >
+              Advanced
+            </Button>
+          </div>
           <Button
             onClick={() => { void fetchHealth(true) }}
             disabled={refreshing}
@@ -510,6 +591,38 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
           </p>
         </Card>
       </div>
+
+      {speakingIssues.length > 0 && (
+        <Card className="border-yellow-500/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">What needs attention</CardTitle>
+            <CardDescription>
+              Product-facing sync issues you can act on from this dashboard. Hosting and scheduler
+              setup is not managed here.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {speakingIssues.map((issue) => (
+                <li key={issue.title} className="rounded-md border border-border px-3 py-2 text-sm">
+                  <p className="font-medium">{issue.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{issue.message}</p>
+                  {issue.fixHint && (
+                    <p className="text-xs text-foreground mt-1">
+                      <span className="font-medium">Next step: </span>
+                      {issue.fixHint}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {viewMode === 'advanced' && (
+        <SyncAdvancedJobsPanel bearerToken={bearerToken} activeWork={activeWork} />
+      )}
 
       {health.alerts.length > 0 && (
         <Card>
@@ -630,50 +743,6 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
         )}
       </div>
 
-      {health.cronHealth && (
-        <Card
-          className={cn(
-            health.cronHealth.operationalState === 'failing' && 'border-red-500/30',
-            health.cronHealth.operationalState === 'degraded' && 'border-yellow-500/30',
-            health.cronHealth.operationalState === 'operational' && 'border-green-500/30',
-          )}
-        >
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Clock size={16} weight="bold" aria-hidden="true" />
-              Cron Schedulers
-            </CardTitle>
-            <CardDescription>{health.cronHealth.statusDetail}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Badge
-              className={operationalBadgeClass(health.cronHealth.operationalState)}
-              aria-label={`Cron health: ${health.cronHealth.statusLabel}`}
-            >
-              {health.cronHealth.statusLabel}
-            </Badge>
-            <ul className="space-y-2">
-              {health.cronHealth.jobs.map((job) => (
-                <li
-                  key={job.key}
-                  className="flex flex-wrap items-center gap-2 text-xs border border-border rounded-md px-3 py-2"
-                >
-                  <span className="font-medium text-foreground">{job.label}</span>
-                  <Badge className={operationalBadgeClass(job.operationalState)}>
-                    {job.statusLabel}
-                  </Badge>
-                  <span className="text-muted-foreground ml-auto">
-                    {job.lastHeartbeatAt
-                      ? formatRelativeTime(job.lastHeartbeatAt)
-                      : 'No heartbeat'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {apiEntries.map(([api, status]) => {
           const meta = getApiMeta(api)
@@ -756,6 +825,9 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
                   {api === 'soundcharts' && status.configured && (
                     <p>Optional paid listener analytics — requires Soundcharts UUID per artist.</p>
                   )}
+                  {api === 'apify' && status.configured && (
+                    <p>Scrapes public Spotify monthly listeners and track plays (budget-capped).</p>
+                  )}
                 </div>
 
                 {(status.releasesSynced !== null ||
@@ -767,7 +839,7 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
                         {status.releasesSynced}{' '}
                         {api === 'youtube'
                           ? 'video'
-                          : api === 'lastfm' || api === 'soundcharts'
+                          : api === 'lastfm' || api === 'soundcharts' || api === 'apify'
                             ? 'metric row'
                             : 'release'}
                         {status.releasesSynced === 1 ? '' : 's'} on last run

@@ -4,7 +4,8 @@ import { SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
 
 const baseDeps = {
   recipientEmail: 'artist@example.com',
-  inviteUrl: 'https://darktunes.com/auth/callback?invite=1&token_hash=abc&type=invite',
+  inviteUrl: 'https://darktunes.com/auth/invite?token=raw-token-abc',
+  expiresAt: new Date('2026-08-04T12:00:00.000Z'),
   settings: {
     ...SITE_SETTINGS_DEFAULTS,
     impressumCompanyName: 'darkTunes Music Group GmbH',
@@ -66,7 +67,10 @@ describe('sendInviteEmail', () => {
     expect(body.html).toContain('Accept invitation')
     expect(body.html).toContain('Artist')
     expect(body.html).toContain('darkTunes Music Group GmbH')
+    expect(body.html).toContain('This invitation link expires on')
+    expect(body.html).toContain('UTC')
     expect(body.text).toContain(baseDeps.inviteUrl)
+    expect(body.text).toContain('This invitation link expires on')
   })
 
   it('returns error when Resend API fails', async () => {

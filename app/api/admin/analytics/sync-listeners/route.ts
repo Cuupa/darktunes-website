@@ -3,26 +3,16 @@
  * Fetches Last.fm (and optional Soundcharts) listener trends for portal artists.
  */
 
-import { NextResponse } from 'next/server'
-import { getUserRoleWithClient } from '@/lib/getUserRole'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
+import { NextResponse, type NextRequest } from 'next/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { syncListenerMetricsForArtists } from '@/lib/analytics/syncListenerMetrics'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { getListenerAnalyticsCredentials } from '@/lib/secrets/getExternalCredentials'
 
-async function requireAdminOrEditor() {
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-  if (error || !user) throw new ApiError(401, 'Unauthorized')
-  const role = await getUserRoleWithClient(supabase, user.id)
-  if (!role || !['admin', 'editor'].includes(role)) throw new ApiError(403, 'Forbidden')
-}
-
-export const POST = withErrorHandler(async (): Promise<NextResponse> => {
-  await requireAdminOrEditor()
+export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
+  await requireAdminFromRequest(req)
 
   const serviceSupabase = await createServiceRoleSupabaseClient()
   const { lastfmApiKey, soundchartsApiKey } = await getListenerAnalyticsCredentials(serviceSupabase)

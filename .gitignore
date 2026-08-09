@@ -50,3 +50,11 @@ public/sw.js
 public/sw.js.map
 public/workbox-*.js
 public/workbox-*.js.map
+
+# ESLint cache (CI + local)
+.eslintcache
+
+
+# Supabase CLI local cache
+supabase/.temp/
+

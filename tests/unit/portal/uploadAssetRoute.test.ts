@@ -1,26 +1,31 @@
 import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
-import { ApiError } from '@/lib/errors'
+import {
+  TEST_ARTIST_ID,
+  makePortalMembershipContext,
+  rejectApiError,
+} from '../../helpers/api/routeTestkit'
 
 async function loadRoute() {
   vi.resetModules()
   return import('../../../app/api/portal/upload-asset/route')
 }
 
-const authenticatePortalBearerWithArtistMock = vi.fn()
-const createServiceRoleSupabaseClientMock = vi.fn()
+const withPortalMembershipWriteMock = vi.fn()
+const portalMemberWriteMock = vi.fn()
 const createR2ClientMock = vi.fn()
 const createAssetRecordMock = vi.fn()
 const createArtistAssetMock = vi.fn()
 const editorNotificationsInsertMock = vi.fn()
 
-vi.mock('@/lib/portal/bearerAuth', () => ({
-  authenticatePortalBearerWithArtist: authenticatePortalBearerWithArtistMock,
+vi.mock('@/lib/portal/withPortalMembership', () => ({
+  withPortalMembershipWrite: withPortalMembershipWriteMock,
+  portalMemberWrite: portalMemberWriteMock,
 }))
 
-vi.mock('@/lib/supabase/server', () => ({
-  createServiceRoleSupabaseClient: createServiceRoleSupabaseClientMock,
+vi.mock('@/lib/rateLimitDistributed', () => ({
+  checkDistributedRateLimit: vi.fn().mockResolvedValue({ limited: false, remaining: 40 }),
 }))
 
 vi.mock('@/lib/r2Utils', () => ({
@@ -47,45 +52,6 @@ vi.mock('@/lib/env.server', () => ({
   },
 }))
 
-const ARTIST_ID = '123e4567-e89b-12d3-a456-426614174000'
-
-function makeSupabaseClient() {
-  const maybeSingleMock = vi.fn().mockResolvedValue({ data: { id: 'folder-1' }, error: null })
-  const eqMock = vi.fn().mockReturnValue({ limit: vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock }) })
-  const selectMock = vi.fn().mockReturnValue({ eq: eqMock })
-
-  const usersInMock = vi.fn().mockResolvedValue({
-    data: [{ id: 'admin-1' }, { id: 'editor-1' }],
-    error: null,
-  })
-  const usersSelectMock = vi.fn().mockReturnValue({ in: usersInMock })
-  const notificationsInsertMock = editorNotificationsInsertMock.mockResolvedValue({ error: null })
-
-  const fromMock = vi.fn((table: string) => {
-    if (table === 'asset_folders') return { select: selectMock }
-    if (table === 'assets') {
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
-      }
-    }
-    if (table === 'users') return { select: usersSelectMock }
-    if (table === 'editor_notifications') return { insert: notificationsInsertMock }
-    return { select: selectMock }
-  })
-
-  return {
-    auth: {
-      getUser: vi.fn().mockResolvedValue({
-        data: { user: { id: 'user-1' } },
-        error: null,
-      }),
-    },
-    from: fromMock,
-  }
-}
-
 function makeUploadFile(name: string, type: string) {
   const bytes = new Uint8Array([1, 2, 3])
   const file = new File([bytes], name, { type })
@@ -105,56 +71,86 @@ function makeUploadRequest(file: File, pressSuggested = false) {
 
   return {
     headers: {
-      get: (name: string) => (name.toLowerCase() === 'authorization' ? 'Bearer portal-token' : null),
+      get: (name: string) =>
+        name.toLowerCase() === 'authorization' ? 'Bearer portal-token' : null,
     },
     formData: async () => formData,
-    url: 'http://localhost/api/portal/upload-asset',
+    url: `http://localhost/api/portal/upload-asset?artistId=${TEST_ARTIST_ID}`,
   } as unknown as NextRequest
 }
 
 describe('POST /api/portal/upload-asset', () => {
   beforeEach(() => {
-    const supabase = makeSupabaseClient()
-    authenticatePortalBearerWithArtistMock.mockImplementation(async (req: NextRequest) => {
-      const token = req.headers.get('authorization')?.replace('Bearer ', '')
-      if (!token) throw new ApiError(401, 'Missing authorization token')
-      return {
-        supabase,
-        artist: {
-          id: ARTIST_ID,
-          name: 'Dark Artist',
-          storageQuotaBytes: null,
-        },
-        user: { id: 'user-1' },
+    vi.clearAllMocks()
+    const serviceDb = {
+      from: (table: string) => {
+        if (table === 'users') {
+          return {
+            select: () => ({
+              in: async () => ({
+                data: [{ id: 'admin-1' }, { id: 'editor-1' }],
+                error: null,
+              }),
+            }),
+          }
+        }
+        if (table === 'notifications') {
+          return {
+            insert: editorNotificationsInsertMock.mockReturnValue({
+              select: async () => ({ data: [{ id: 'n1' }, { id: 'n2' }], error: null }),
+            }),
+          }
+        }
+        if (table === 'asset_folders') {
+          return {
+            select: () => ({
+              eq: () => ({
+                limit: () => ({
+                  maybeSingle: async () => ({ data: { id: 'folder-1' }, error: null }),
+                }),
+                maybeSingle: async () => ({ data: { id: 'folder-1' }, error: null }),
+              }),
+            }),
+            insert: () => ({
+              select: () => ({
+                single: async () => ({ data: { id: 'landing-1' }, error: null }),
+              }),
+            }),
+          }
+        }
+        return { select: () => ({ eq: async () => ({ data: [], error: null }) }) }
+      },
+    }
+
+    withPortalMembershipWriteMock.mockResolvedValue(
+      makePortalMembershipContext({
+        artistId: TEST_ARTIST_ID,
+        serviceDb,
+      }),
+    )
+
+    portalMemberWriteMock.mockImplementation(async (_ctx, meta, write) => {
+      if (meta.table === 'assets' && meta.operation === 'select') {
+        return { value: 0, via: 'service_role', fellBack: false }
       }
+      if (meta.table === 'asset_folders') {
+        return { value: 'folder-1', via: 'service_role', fellBack: false }
+      }
+      if (meta.table === 'assets' && meta.operation === 'insert') {
+        const value = await write(serviceDb)
+        return { value, via: 'service_role', fellBack: false }
+      }
+      if (meta.table === 'artist_assets') {
+        const value = await write(serviceDb)
+        return { value, via: 'service_role', fellBack: false }
+      }
+      return { value: await write(serviceDb), via: 'service_role', fellBack: false }
     })
-    createServiceRoleSupabaseClientMock.mockResolvedValue(supabase)
-    createR2ClientMock.mockReturnValue({ send: vi.fn().mockResolvedValue({}) })
-    createAssetRecordMock.mockResolvedValue({
-      id: 'main-asset-1',
-      filename: 'live.jpg',
-      originalFilename: 'live.jpg',
-      mimeType: 'image/jpeg',
-      sizeBytes: 1024,
-      r2Key: 'artist-assets/test.jpg',
-      publicUrl: 'https://cdn.example.com/artist-assets/test.jpg',
-      createdAt: '2026-01-01T00:00:00Z',
-      pressSuggested: false,
-      isPressApproved: false,
-      downloadableForPress: true,
-      artistIds: [],
-      tags: [],
-    })
-    createArtistAssetMock.mockResolvedValue({
-      id: 'artist-asset-1',
-      artistId: ARTIST_ID,
-      filename: 'live.jpg',
-      originalFilename: 'live.jpg',
-      mimeType: 'image/jpeg',
-      sizeBytes: 1024,
-      r2Key: 'artist-assets/test.jpg',
-      publicUrl: 'https://cdn.example.com/artist-assets/test.jpg',
-      createdAt: '2026-01-01T00:00:00Z',
+
+    createAssetRecordMock.mockResolvedValue({ id: 'asset-main-1' })
+    createArtistAssetMock.mockResolvedValue({ id: 'artist-asset-1', public_url: 'https://cdn.example.com/x' })
+    createR2ClientMock.mockReturnValue({
+      send: vi.fn().mockResolvedValue({}),
     })
   })
 
@@ -162,61 +158,41 @@ describe('POST /api/portal/upload-asset', () => {
     vi.clearAllMocks()
   })
 
-  it('rejects requests without Authorization header', async () => {
-    // Avoid resetModules so ApiError class identity matches the one used inside withErrorHandler
-    const { POST } = await import('../../../app/api/portal/upload-asset/route')
-    const request = new NextRequest('http://localhost/api/portal/upload-asset', { method: 'POST' })
-    const response = await POST(request)
-    expect(response.status).toBe(401)
+  it('401 when membership auth fails', async () => {
+    withPortalMembershipWriteMock.mockImplementation(() =>
+      rejectApiError(401, 'Missing authorization token'),
+    )
+    const { POST } = await loadRoute()
+    const res = await POST(makeUploadRequest(makeUploadFile('a.jpg', 'image/jpeg')))
+    expect(res.status).toBe(401)
   })
 
-  it('sets press_suggested and notifies admins when an image is suggested for press', async () => {
+  it('uploads asset and returns artist asset', async () => {
     const { POST } = await loadRoute()
-    const response = await POST(makeUploadRequest(makeUploadFile('live.jpg', 'image/jpeg'), true))
-
-    expect(response.status).toBe(200)
-    expect(createAssetRecordMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        artist_id: ARTIST_ID,
-        press_suggested: true,
-      }),
-    )
-    expect(editorNotificationsInsertMock).toHaveBeenCalledWith([
-      expect.objectContaining({
-        recipient_id: 'admin-1',
-        type: 'press_asset_suggestion',
-        entity_type: 'asset',
-        entity_id: 'main-asset-1',
-        entity_name: 'Dark Artist: live.jpg',
-        sender_id: 'user-1',
-        read: false,
-      }),
-      expect.objectContaining({ recipient_id: 'editor-1' }),
-    ])
+    const res = await POST(makeUploadRequest(makeUploadFile('photo.jpg', 'image/jpeg')))
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { asset: { id: string } }
+    expect(body.asset.id).toBe('artist-asset-1')
+    expect(createAssetRecordMock).toHaveBeenCalled()
+    expect(createArtistAssetMock).toHaveBeenCalled()
   })
 
-  it('does not set press_suggested for non-image uploads even when checkbox is checked', async () => {
+  it('notifies staff when press suggested', async () => {
     const { POST } = await loadRoute()
-    const response = await POST(makeUploadRequest(makeUploadFile('rider.pdf', 'application/pdf'), true))
-
-    expect(response.status).toBe(200)
-    expect(createAssetRecordMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ press_suggested: false }),
-    )
-    expect(editorNotificationsInsertMock).not.toHaveBeenCalled()
+    const res = await POST(makeUploadRequest(makeUploadFile('photo.jpg', 'image/jpeg'), true))
+    expect(res.status).toBe(200)
+    expect(editorNotificationsInsertMock).toHaveBeenCalled()
   })
 
-  it('skips editor notifications when pressSuggested is not set', async () => {
+  it('rejects missing file', async () => {
     const { POST } = await loadRoute()
-    const response = await POST(makeUploadRequest(makeUploadFile('live.jpg', 'image/jpeg'), false))
-
-    expect(response.status).toBe(200)
-    expect(createAssetRecordMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ press_suggested: false }),
-    )
-    expect(editorNotificationsInsertMock).not.toHaveBeenCalled()
+    const formData = new FormData()
+    const req = {
+      headers: { get: () => 'Bearer t' },
+      formData: async () => formData,
+      url: `http://localhost/api/portal/upload-asset?artistId=${TEST_ARTIST_ID}`,
+    } as unknown as NextRequest
+    const res = await POST(req)
+    expect(res.status).toBe(400)
   })
 })

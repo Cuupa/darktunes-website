@@ -8,7 +8,6 @@ import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
 import { setArtistLandingPublishTrusted } from '@/lib/api/fanPageDocument'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 const bodySchema = z.object({
   trusted: z.boolean(),
 })

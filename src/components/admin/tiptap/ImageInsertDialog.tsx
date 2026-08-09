@@ -95,12 +95,14 @@ function ImagePreview({ src, alt }: { src: string; alt: string }) {
 
 function UploadTab({ onUploaded }: { onUploaded: (url: string) => void }) {
   const tErrors = useTranslations('errors')
+  const tToast = useTranslations('admin.toast')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const inputRef = useRef<HTMLInputElement>(null)
   const [progress, setProgress] = useState<number | null>(null)
   const isUploading = progress !== null && progress < 100
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+
     const file = e.target.files?.[0]
     if (!file) return
     setProgress(0)
@@ -133,7 +135,7 @@ function UploadTab({ onUploaded }: { onUploaded: (url: string) => void }) {
         xhr.setRequestHeader('Authorization', 'Bearer ' + session.access_token)
         xhr.send(formData)
       })
-      toast.success('Image uploaded')
+      toast.success(tToast('image_uploaded'))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {

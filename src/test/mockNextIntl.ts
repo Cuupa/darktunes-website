@@ -5,13 +5,21 @@ import type { Dictionary } from '@/i18n/types'
 export const testMessages = enMessages as unknown as Dictionary
 
 function resolveMessage(namespace: string, key: string): string {
-  const slice = (testMessages as Record<string, unknown>)[namespace]
+  // Support dotted namespaces (e.g. useTranslations('admin.nav')).
+  const nsParts = namespace.split('.')
+  let slice: unknown = testMessages
+  for (const part of nsParts) {
+    if (slice && typeof slice === 'object' && part in (slice as object)) {
+      slice = (slice as Record<string, unknown>)[part]
+    } else {
+      slice = undefined
+      break
+    }
+  }
+
   const value = key.split('.').reduce<unknown>((acc, part) => {
     if (acc && typeof acc === 'object' && part in acc) {
       return (acc as Record<string, unknown>)[part]
-    }
-    if (slice && typeof slice === 'object' && part in slice) {
-      return (slice as Record<string, unknown>)[part]
     }
     return undefined
   }, slice)

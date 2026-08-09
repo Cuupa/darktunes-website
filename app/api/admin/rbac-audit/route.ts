@@ -15,7 +15,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler } from '@/lib/errors'
 import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const token = extractBearerToken(req.headers.get('authorization'))
   await verifyAdmin(token)

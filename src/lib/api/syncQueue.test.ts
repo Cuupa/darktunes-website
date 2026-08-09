@@ -12,6 +12,9 @@ import {
   getSyncQueueStats,
   tryAcquireSyncExecutorLease,
   releaseSyncExecutorLease,
+  cancelSyncJob,
+  retrySyncJob,
+  listSyncJobs,
   SYNC_EXECUTOR_LEASE_KEY,
   MAX_ATTEMPTS,
 } from './syncQueue'
@@ -55,31 +58,42 @@ function makeSequentialMockDb(calls: Array<{ data: unknown; error?: unknown }>):
 describe('tryAcquireSyncExecutorLease', () => {
   it('acquires when no lease row exists', async () => {
     const db = makeSequentialMockDb([{ data: null }, { data: null }])
-    await expect(tryAcquireSyncExecutorLease(db, 60_000)).resolves.toBe(true)
+    const token = await tryAcquireSyncExecutorLease(db, 60_000)
+    expect(token).toEqual(expect.any(String))
+    expect(token!.length).toBeGreaterThan(4)
     expect(db.from).toHaveBeenCalledWith('site_settings')
   })
 
-  it('returns false when lease is still valid', async () => {
+  it('returns null when lease is still valid', async () => {
     const future = new Date(Date.now() + 60_000).toISOString()
-    const db = makeSequentialMockDb([{ data: { value: future } }])
-    await expect(tryAcquireSyncExecutorLease(db, 60_000)).resolves.toBe(false)
+    const db = makeSequentialMockDb([{ data: { value: `${future}|other-token` } }])
+    await expect(tryAcquireSyncExecutorLease(db, 60_000)).resolves.toBeNull()
   })
 
   it('acquires when lease is expired via optimistic update', async () => {
     const past = new Date(Date.now() - 60_000).toISOString()
     const db = makeSequentialMockDb([
-      { data: { value: past } },
+      { data: { value: `${past}|old` } },
       { data: [{ key: SYNC_EXECUTOR_LEASE_KEY }] },
     ])
-    await expect(tryAcquireSyncExecutorLease(db, 60_000)).resolves.toBe(true)
+    const token = await tryAcquireSyncExecutorLease(db, 60_000)
+    expect(token).toEqual(expect.any(String))
   })
 })
 
 describe('releaseSyncExecutorLease', () => {
-  it('upserts expired lease value', async () => {
+  it('upserts expired lease value without token', async () => {
     const db = makeSequentialMockDb([{ data: null }])
     await expect(releaseSyncExecutorLease(db)).resolves.toBeUndefined()
     expect(db.from).toHaveBeenCalledWith('site_settings')
+  })
+
+  it('no-ops when token does not own the lease', async () => {
+    const future = new Date(Date.now() + 60_000).toISOString()
+    const db = makeSequentialMockDb([{ data: { value: `${future}|owner-a` } }])
+    await expect(releaseSyncExecutorLease(db, 'owner-b')).resolves.toBeUndefined()
+    // Only the read path — no update when ownership mismatches
+    expect(db.from).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -146,6 +160,126 @@ describe('enqueueArtistSyncJobs', () => {
   })
 })
 
+describe('cancelSyncJob', () => {
+  it('cancels pending jobs immediately', async () => {
+    const db = makeSequentialMockDb([
+      { data: { id: 'job-1', status: 'pending', cancel_requested_at: null } },
+      { data: { id: 'job-1' } }, // update … select maybeSingle
+    ])
+    await expect(cancelSyncJob(db, 'job-1')).resolves.toBe('cancelled')
+  })
+
+  it('requests cancel for running jobs', async () => {
+    const db = makeSequentialMockDb([
+      { data: { id: 'job-1', status: 'running', cancel_requested_at: null } },
+      { data: { id: 'job-1', status: 'running', cancel_requested_at: null } }, // re-read
+      { data: { id: 'job-1' } }, // cancel_requested update
+    ])
+    await expect(cancelSyncJob(db, 'job-1')).resolves.toBe('cancel_requested')
+  })
+
+  it('noops for done jobs', async () => {
+    const db = makeSequentialMockDb([
+      { data: { id: 'job-1', status: 'done', cancel_requested_at: null } },
+    ])
+    await expect(cancelSyncJob(db, 'job-1')).resolves.toBe('noop')
+  })
+
+  it('falls through to cancel_requested when pending claim races', async () => {
+    const db = makeSequentialMockDb([
+      { data: { id: 'job-1', status: 'pending', cancel_requested_at: null } },
+      { data: null }, // pending update lost race
+      { data: { id: 'job-1', status: 'running', cancel_requested_at: null } }, // re-read
+      { data: { id: 'job-1' } }, // cancel_requested update
+    ])
+    await expect(cancelSyncJob(db, 'job-1')).resolves.toBe('cancel_requested')
+  })
+})
+
+describe('markSyncJobDone', () => {
+  it('marks cancelled when cancel was requested while running', async () => {
+    const db = makeSequentialMockDb([
+      { data: { status: 'running', cancel_requested_at: '2026-07-29T12:00:00.000Z' } },
+      { data: null }, // markSyncJobCancelled update
+    ])
+    await markSyncJobDone(db, 'job-1')
+    expect(db.from).toHaveBeenCalledWith('sync_queue')
+    // First call is cancel check; second is cancelled finalisation — never "done"
+    expect(db.from).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('listSyncJobs', () => {
+  it('lists jobs and attaches artist names from a separate lookup', async () => {
+    const queueRow = {
+      id: 'job-1',
+      artist_id: 'artist-1',
+      job_type: 'spotify',
+      status: 'pending',
+      scheduled_at: '2026-07-29T00:00:00.000Z',
+      started_at: null,
+      finished_at: null,
+      locked_until: null,
+      cancel_requested_at: null,
+      cancelled_at: null,
+      error_message: null,
+      attempt_count: 0,
+      created_at: '2026-07-29T00:00:00.000Z',
+    }
+    const db = makeSequentialMockDb([
+      { data: [queueRow] },
+      { data: [{ id: 'artist-1', name: 'Nightfall' }] },
+    ])
+
+    const jobs = await listSyncJobs(db, { status: 'pending', limit: 10 })
+    expect(jobs).toHaveLength(1)
+    expect(jobs[0]?.id).toBe('job-1')
+    expect(jobs[0]?.artistName).toBe('Nightfall')
+    expect(jobs[0]?.status).toBe('pending')
+    expect(db.from).toHaveBeenNthCalledWith(1, 'sync_queue')
+    expect(db.from).toHaveBeenNthCalledWith(2, 'artists')
+  })
+
+  it('returns jobs without names when no artist_ids are present', async () => {
+    const queueRow = {
+      id: 'job-odesli',
+      artist_id: null,
+      job_type: 'odesli',
+      status: 'running',
+      scheduled_at: '2026-07-29T00:00:00.000Z',
+      started_at: '2026-07-29T00:01:00.000Z',
+      finished_at: null,
+      locked_until: null,
+      cancel_requested_at: null,
+      cancelled_at: null,
+      error_message: null,
+      attempt_count: 1,
+      created_at: '2026-07-29T00:00:00.000Z',
+    }
+    const db = makeSequentialMockDb([{ data: [queueRow] }])
+
+    const jobs = await listSyncJobs(db, { status: ['pending', 'running'] })
+    expect(jobs).toHaveLength(1)
+    expect(jobs[0]?.artistName).toBeNull()
+    expect(db.from).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('retrySyncJob', () => {
+  it('re-queues failed jobs', async () => {
+    const db = makeSequentialMockDb([
+      { data: { id: 'job-1', status: 'failed' } },
+      { data: null },
+    ])
+    await expect(retrySyncJob(db, 'job-1')).resolves.toBe(true)
+  })
+
+  it('returns false for pending jobs', async () => {
+    const db = makeSequentialMockDb([{ data: { id: 'job-1', status: 'pending' } }])
+    await expect(retrySyncJob(db, 'job-1')).resolves.toBe(false)
+  })
+})
+
 describe('markSyncJobDone', () => {
   it('clears locked_until on completion', async () => {
     const db = makeSequentialMockDb([{ data: null }])
@@ -176,41 +310,53 @@ describe('markSyncJobFailed', () => {
 
 describe('getSyncQueueStats', () => {
   it('aggregates per-status counts via head queries', async () => {
-    const db = makeSequentialMockDb([
-      { data: null, error: null },
-      { data: null, error: null },
-      { data: null, error: null },
-      { data: null, error: null },
-    ])
-
+    // First call: recoverStuckSyncJobs (update…select). Then 4 status counts.
     let callIndex = 0
     const counts = [3, 1, 10, 2]
     const gteCalls: string[] = []
-    ;(db.from as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      const count = counts[callIndex] ?? 0
-      callIndex++
-      const countResult = { count, error: null }
-      const countPromise = Promise.resolve(countResult)
-      return {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        gte: vi.fn((field: string) => {
-          gteCalls.push(field)
+    const db = {
+      from: vi.fn().mockImplementation(() => {
+        // recoverStuckSyncJobs
+        if (callIndex === 0) {
+          callIndex++
+          const recoverResult = { data: [], error: null }
+          const recoverPromise = Promise.resolve(recoverResult)
           return {
-            then: countPromise.then.bind(countPromise),
-            catch: countPromise.catch.bind(countPromise),
-            finally: countPromise.finally.bind(countPromise),
+            update: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            or: vi.fn().mockReturnThis(),
+            select: vi.fn().mockReturnThis(),
+            then: recoverPromise.then.bind(recoverPromise),
+            catch: recoverPromise.catch.bind(recoverPromise),
+            finally: recoverPromise.finally.bind(recoverPromise),
           }
-        }),
-        then: countPromise.then.bind(countPromise),
-        catch: countPromise.catch.bind(countPromise),
-        finally: countPromise.finally.bind(countPromise),
-      }
-    })
+        }
+
+        const count = counts[callIndex - 1] ?? 0
+        callIndex++
+        const countResult = { count, error: null }
+        const countPromise = Promise.resolve(countResult)
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          gte: vi.fn((field: string) => {
+            gteCalls.push(field)
+            return {
+              then: countPromise.then.bind(countPromise),
+              catch: countPromise.catch.bind(countPromise),
+              finally: countPromise.finally.bind(countPromise),
+            }
+          }),
+          then: countPromise.then.bind(countPromise),
+          catch: countPromise.catch.bind(countPromise),
+          finally: countPromise.finally.bind(countPromise),
+        }
+      }),
+    } as unknown as DbClient
 
     const stats = await getSyncQueueStats(db)
     expect(stats).toEqual({ pending: 3, running: 1, done: 10, failed: 2 })
-    expect(db.from).toHaveBeenCalledTimes(4)
+    expect(db.from).toHaveBeenCalledTimes(5)
     expect(gteCalls).toEqual(['created_at', 'created_at'])
   })
 })

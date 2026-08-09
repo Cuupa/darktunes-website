@@ -5,20 +5,18 @@
  * POST   — create a new share link
  * DELETE — revoke a share link (?id=&artist_id=)
  *
- * Membership is verified with the bearer client; share-link CRUD uses service-role.
+ * Membership via withPortalMembershipWrite; CRUD via portalMemberWrite.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import {
   createEpkShareLink,
   listEpkShareLinks,
   revokeEpkShareLink,
 } from '@/lib/api/epkShareLinks'
-import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
-import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 
 const createSchema = z.object({
   artist_id: z.string().uuid(),
@@ -33,41 +31,35 @@ const createSchema = z.object({
     }),
 })
 
-async function resolveArtistForUser(
-  req: NextRequest,
-  artistId: string,
-) {
-  const { supabase, user } = await authenticatePortalBearer(req)
-  const artist = await resolvePortalArtist(supabase, user.id, artistId).catch((err) => {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  })
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
-  const serviceDb = await createServiceRoleSupabaseClient()
-  return { serviceDb, user, artist }
-}
-
 export const GET = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artist_id')
   if (!artistId) throw new ApiError(400, 'artist_id is required')
 
-  const { serviceDb, artist } = await resolveArtistForUser(req, artistId)
-  const links = await listEpkShareLinks(serviceDb, artist.id)
+  const ctx = await withPortalMembershipWrite(req, artistId)
+  const { value: links } = await portalMemberWrite(
+    ctx,
+    { route: 'GET /api/portal/epk/share', table: 'epk_share_links', operation: 'select' },
+    (db) => listEpkShareLinks(db, ctx.artist.id),
+  )
   return NextResponse.json({ links })
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const body = createSchema.parse(await req.json())
-  const { serviceDb, user, artist } = await resolveArtistForUser(req, body.artist_id)
+  const ctx = await withPortalMembershipWrite(req, body.artist_id)
 
-  const link = await createEpkShareLink(serviceDb, {
-    artistId: artist.id,
-    createdBy: user.id,
-    label: body.label,
-    password: body.password,
-    expiresAt: body.expires_at,
-  })
+  const { value: link } = await portalMemberWrite(
+    ctx,
+    { route: 'POST /api/portal/epk/share', table: 'epk_share_links', operation: 'insert' },
+    (db) =>
+      createEpkShareLink(db, {
+        artistId: ctx.artist.id,
+        createdBy: ctx.user.id,
+        label: body.label,
+        password: body.password,
+        expiresAt: body.expires_at,
+      }),
+  )
 
   return NextResponse.json({ link })
 })
@@ -77,7 +69,11 @@ export const DELETE = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl.searchParams.get('artist_id')
   if (!linkId || !artistId) throw new ApiError(400, 'id and artist_id are required')
 
-  const { serviceDb, artist } = await resolveArtistForUser(req, artistId)
-  await revokeEpkShareLink(serviceDb, artist.id, linkId)
+  const ctx = await withPortalMembershipWrite(req, artistId)
+  await portalMemberWrite(
+    ctx,
+    { route: 'DELETE /api/portal/epk/share', table: 'epk_share_links', operation: 'delete' },
+    (db) => revokeEpkShareLink(db, ctx.artist.id, linkId),
+  )
   return NextResponse.json({ success: true })
 })

@@ -187,8 +187,14 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
       throw buildApiError('SERVER_ERROR', 500)
     }
   } else {
-    // Hometown-only (etc.): return current EPK row without a no-op upsert
-    profile = await getArtistProfileByArtistId(serviceDb, artist.id)
+    // Hometown-only (etc.): return current EPK row without a no-op upsert.
+    // Never block roster-field saves if the EPK row is missing or unreadable.
+    try {
+      profile = await getArtistProfileByArtistId(serviceDb, artist.id)
+    } catch (epkReadErr) {
+      console.error('[portal/profile] artist_epks read failed (continuing roster update):', epkReadErr)
+      profile = null
+    }
   }
 
   // Press-kit sync only when gallery was part of this request
@@ -234,12 +240,25 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
             .from('artists')
             .update(artistUpdate)
             .eq('id', artist.id)
-          if (artistUpdateError) throw new Error(artistUpdateError.message)
+          if (artistUpdateError) {
+            // Preserve PostgREST message for server logs (e.g. missing column).
+            const err = new Error(artistUpdateError.message) as Error & {
+              code?: string
+              details?: string | null
+              hint?: string | null
+            }
+            err.code = artistUpdateError.code
+            err.details = artistUpdateError.details
+            err.hint = artistUpdateError.hint
+            throw err
+          }
         },
       )
     } catch (artistErr) {
+      // Re-throw so withErrorHandler persists the real PostgREST message to app_logs
+      // (e.g. missing `hometown` column) while still returning a safe 500 body.
       console.error('[portal/profile] artists update failed:', artistErr)
-      throw buildApiError('SERVER_ERROR', 500)
+      throw artistErr
     }
   }
 

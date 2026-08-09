@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { CloudArrowUp, Headphones, Images, Layout, Newspaper, TrendUp, Users } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
@@ -13,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
@@ -26,6 +28,9 @@ function PanelFallback() {
 }
 
 export function PressManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const [applications, setApplications] = useState<JournalistApplication[]>([])
   const [tracks, setTracks] = useState<PromoTrack[]>([])
@@ -75,13 +80,14 @@ export function PressManager() {
   }, [loadAll])
 
   const approveApplication = async (id: string, status: 'approved' | 'rejected') => {
+
     const response = await fetch(`/api/journalist-applications/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
     })
     if (!response.ok) {
-      toast.error('Failed to update application')
+      toast.error(tToast('failed_update_application'))
       return
     }
     toast.success(`Application ${status}`)
@@ -89,6 +95,7 @@ export function PressManager() {
   }
 
   const uploadTrack = async (event: React.FormEvent) => {
+
     event.preventDefault()
     if (!trackFile || !trackForm.title || !trackForm.artistName) return
     setTrackUploading(true)
@@ -121,7 +128,7 @@ export function PressManager() {
       })
       setTrackForm({ title: '', artistName: '', genre: '', bpm: '', key: '', releaseDate: '', embargoUntil: '', ndaRequired: false })
       setTrackFile(null)
-      toast.success('Promo track uploaded')
+      toast.success(tToast('promo_track_uploaded'))
       await loadAll()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Upload failed')
@@ -202,7 +209,12 @@ export function PressManager() {
               <div className="space-y-2"><Label htmlFor="promo-track-genre">Genre</Label><Input id="promo-track-genre" value={trackForm.genre} onChange={(e) => setTrackForm((v) => ({ ...v, genre: e.target.value }))} /></div>
               <div className="space-y-2"><Label htmlFor="promo-track-bpm">BPM</Label><Input id="promo-track-bpm" type="number" min="0" value={trackForm.bpm} onChange={(e) => setTrackForm((v) => ({ ...v, bpm: e.target.value }))} /></div>
               <div className="space-y-2"><Label htmlFor="promo-track-key">Key</Label><Input id="promo-track-key" value={trackForm.key} onChange={(e) => setTrackForm((v) => ({ ...v, key: e.target.value }))} /></div>
-              <div className="space-y-2"><Label htmlFor="promo-track-release-date">Release date</Label><Input id="promo-track-release-date" type="date" value={trackForm.releaseDate} onChange={(e) => setTrackForm((v) => ({ ...v, releaseDate: e.target.value }))} /></div>
+              <DateField
+                id="promo-track-release-date"
+                label="Release date"
+                value={trackForm.releaseDate}
+                onChange={(v) => setTrackForm((prev) => ({ ...prev, releaseDate: v }))}
+              />
               <div className="space-y-2"><Label htmlFor="promo-track-embargo">Embargo until</Label><Input id="promo-track-embargo" type="datetime-local" value={trackForm.embargoUntil} onChange={(e) => setTrackForm((v) => ({ ...v, embargoUntil: e.target.value }))} /></div>
               <div className="flex items-center gap-2 pt-8"><Checkbox id="promo-track-nda" checked={trackForm.ndaRequired} onCheckedChange={(value) => setTrackForm((v) => ({ ...v, ndaRequired: value === true }))} /><Label htmlFor="promo-track-nda">NDA required</Label></div>
               <div className="space-y-2 md:col-span-2"><Label htmlFor="promo-track-file">Audio file</Label><Input id="promo-track-file" type="file" accept="audio/*" onChange={(e) => setTrackFile(e.target.files?.[0] ?? null)} required /></div>
@@ -218,7 +230,7 @@ export function PressManager() {
                   <p className="font-medium">{track.title} — {track.artistName}</p>
                   <p className="text-sm text-muted-foreground">{[track.genre, track.bpm ? `${track.bpm} BPM` : null, track.key].filter(Boolean).join(' · ') || 'No metadata'}</p>
                 </div>
-                <Button size="sm" variant="destructive" onClick={() => deletePromoTrack(supabase, track.id).then(loadAll).catch(() => toast.error('Delete failed'))}>Delete</Button>
+                <Button size="sm" variant="destructive" onClick={() => deletePromoTrack(supabase, track.id).then(loadAll).catch(() => toast.error(tToast('delete_failed')))}>Delete</Button>
               </CardContent>
             </Card>
           ))}

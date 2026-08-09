@@ -3,7 +3,6 @@ import { z } from 'zod'
 import { withErrorHandler } from '@/lib/errors'
 import { extractBearerToken, verifyAdmin, verifyAdminOrEditor } from '@/lib/adminAuth'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 const patchSchema = z.object({
   role: z.enum(['admin', 'editor', 'journalist', 'user', 'artist']),
   permissions: z.object({

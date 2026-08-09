@@ -12,7 +12,6 @@ import { z } from 'zod'
 import { withErrorHandler } from '@/lib/errors'
 import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-
 const createSchema = z.object({
   name: z
     .string()

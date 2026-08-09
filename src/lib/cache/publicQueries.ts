@@ -15,13 +15,13 @@
 import { unstable_cache } from 'next/cache'
 import { cache } from 'react'
 import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
-import { getPublicReleases } from '@/lib/api/releases'
+import { getAllVisibleReleasesForCalendar, getPublicReleases } from '@/lib/api/releases'
 import { getPublicNewsPosts } from '@/lib/api/news'
 import { getPublicVideos } from '@/lib/api/videos'
-import { getPublicConcerts } from '@/lib/api/concerts'
-import { getPublicArtists } from '@/lib/api/artists'
+import { getAllVisibleConcertsForCalendar, getPublicConcerts } from '@/lib/api/concerts'
+import { getPublicArtists, type PublicArtist } from '@/lib/api/publicArtist'
 import { getSiteSettings } from '@/lib/api/siteSettings'
-import type { Release, NewsPost, Video, Concert, Artist, SiteSettings } from '@/types'
+import type { Release, NewsPost, Video, Concert, SiteSettings } from '@/types'
 
 // Rely on on-demand revalidateTag() webhooks (/api/revalidate-content) rather than
 // short-lived TTLs. A 1-hour TTL caps staleness when webhooks miss; content
@@ -35,6 +35,28 @@ export const getCachedPublicReleases = cache(unstable_cache(
     getPublicReleases(createPublicSupabaseClient()).catch(() => [] as Release[]),
   ['public-releases'],
   { revalidate: TTL, tags: ['releases'] },
+))
+
+/**
+ * Slim portal calendar payload (nested artists, calendar columns only).
+ * Cookie-free client inside unstable_cache; invalidated with `releases` tag.
+ */
+export const getCachedCalendarReleases = cache(unstable_cache(
+  async (): Promise<Release[]> =>
+    getAllVisibleReleasesForCalendar(createPublicSupabaseClient()).catch(() => [] as Release[]),
+  ['portal-calendar-releases'],
+  { revalidate: TTL, tags: ['releases'] },
+))
+
+/**
+ * Slim portal calendar concerts (past + future, nested artists).
+ * Cookie-free client; invalidated with `concerts` tag.
+ */
+export const getCachedCalendarConcerts = cache(unstable_cache(
+  async (): Promise<Concert[]> =>
+    getAllVisibleConcertsForCalendar(createPublicSupabaseClient()).catch(() => [] as Concert[]),
+  ['portal-calendar-concerts'],
+  { revalidate: TTL, tags: ['concerts'] },
 ))
 
 /** All public news posts, cache-keyed to the `news` tag. */
@@ -77,10 +99,10 @@ export const getCachedPublicConcerts = cache(unstable_cache(
   { revalidate: TTL, tags: ['concerts'] },
 ))
 
-/** All public artists, cache-keyed to the `artists` tag. */
+/** All public artists (safe columns only), cache-keyed to the `artists` tag. */
 export const getCachedPublicArtists = cache(unstable_cache(
-  async (): Promise<Artist[]> =>
-    getPublicArtists(createPublicSupabaseClient()).catch(() => [] as Artist[]),
+  async (): Promise<PublicArtist[]> =>
+    getPublicArtists(createPublicSupabaseClient()).catch(() => [] as PublicArtist[]),
   ['public-artists'],
   { revalidate: TTL, tags: ['artists'] },
 ))

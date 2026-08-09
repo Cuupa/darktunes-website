@@ -24,6 +24,10 @@ import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getArtistsByUserId, getArtistProfileByArtistId } from '@/lib/api/artistProfiles'
 import { shouldRedirectToOnboarding } from '@/lib/portal/onboardingGate'
+import { needsPortalTermsAcceptance } from '@/lib/portal/termsGate'
+import { getSiteSettings } from '@/lib/api/siteSettings'
+import { DEFAULT_PORTAL_TERMS_VERSION } from '@/lib/legal/defaults'
+import { PortalTermsGate } from './_components/PortalTermsGate'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { getPortalBadgeCounts } from '@/lib/api/portalBadgeCounts'
 import { PortalSidebar } from './_components/PortalSidebar'
@@ -32,6 +36,7 @@ import { PortalOfflineProvider } from './_components/PortalOfflineProvider'
 import { PortalOfflineBanner } from './_components/PortalOfflineBanner'
 import { PortalAccessGate } from './_components/PortalAccessGate'
 import { PortalNotificationProvider } from './_components/PortalNotificationProvider'
+import { PortalPushBootstrap } from '@/components/notifications/PortalPushBootstrap'
 import { PortalHelpPalette } from './_components/PortalHelpPalette'
 import { getCachedPortalFaq } from '@/lib/portal/getCachedPortalFaq'
 import { ScrollableAppShell } from '@/components/layout/ScrollableAppShell'
@@ -173,15 +178,21 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
     ? artists.find((a) => a.id === requestedArtistId)
     : null) ?? artists[0] ?? null
 
-  const [featureFlags, badgeCounts, artistProfile, faqTree] = await Promise.all([
+  const [featureFlags, badgeCounts, artistProfile, faqTree, siteSettings] = await Promise.all([
     getFeatureFlagsForRole(supabase, 'artist').catch(() => ({} as Record<string, boolean>)),
     artist
-      ? getPortalBadgeCounts(supabase, artist.id).catch(() => ({ messages: 0, interviews: 0, statements: 0 }))
-      : Promise.resolve({ messages: 0, interviews: 0, statements: 0 }),
+      ? getPortalBadgeCounts(supabase, artist.id, user.id).catch(() => ({
+          messages: 0,
+          interviews: 0,
+          statements: 0,
+          alerts: 0,
+        }))
+      : Promise.resolve({ messages: 0, interviews: 0, statements: 0, alerts: 0 }),
     artist
       ? getArtistProfileByArtistId(supabase, artist.id).catch(() => null)
       : Promise.resolve(null),
     getCachedPortalFaq(),
+    getSiteSettings(supabase).catch(() => null),
   ])
 
   if (shouldRedirectToOnboarding(artist, artistProfile, currentPath)) {
@@ -189,7 +200,16 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
     redirect(onboardingUrl)
   }
 
-  const isEpkBuilder = currentPath.includes('/portal/epk-builder')
+  const termsVersion =
+    siteSettings?.portalTermsVersion?.trim() || DEFAULT_PORTAL_TERMS_VERSION
+  const skipTermsGate =
+    currentPath.startsWith('/portal/onboarding') ||
+    currentPath.startsWith('/portal/accept-invite')
+  const showTermsGate =
+    !skipTermsGate && Boolean(artist) && needsPortalTermsAcceptance(artist, termsVersion)
+
+  const isFullBleedBuilder =
+    currentPath.includes('/portal/epk-builder') || currentPath.includes('/portal/fan-page')
 
   return (
     <PortalNotificationProvider
@@ -197,9 +217,9 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
       initialBadges={badgeCounts}
     >
       <ScrollableAppShell
-        lockScroll={isEpkBuilder}
+        lockScroll={isFullBleedBuilder}
         mainClassName="border-t border-primary/10 md:border-t-0"
-        contentClassName={isEpkBuilder ? 'p-0' : 'p-4 sm:p-6 md:p-8'}
+        contentClassName={isFullBleedBuilder ? 'p-0' : 'p-4 sm:p-6 md:p-8'}
         sidebar={(
           <PortalSidebar
             artists={artists}
@@ -212,7 +232,11 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
           <PortalQueryProvider>
             <PortalOfflineBanner />
             <PortalHelpPalette faqTree={faqTree} />
+            {showTermsGate && artist ? (
+              <PortalTermsGate artistId={artist.id} termsVersion={termsVersion} />
+            ) : null}
             {children}
+            <PortalPushBootstrap />
           </PortalQueryProvider>
         </PortalOfflineProvider>
       </ScrollableAppShell>

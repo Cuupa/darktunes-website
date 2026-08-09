@@ -8,8 +8,8 @@ import type { Database } from '@/types/database'
 type DbClient = SupabaseClient<Database>
 type Row = Database['public']['Tables']['artist_listener_metrics']['Row']
 
-export type ListenerMetricSource = 'lastfm' | 'soundcharts'
-export type ListenerMetricType = 'listeners' | 'plays'
+export type ListenerMetricSource = 'lastfm' | 'soundcharts' | 'apify'
+export type ListenerMetricType = 'listeners' | 'plays' | 'followers'
 
 export interface ArtistListenerMetric {
   id: string

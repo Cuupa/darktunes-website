@@ -3,40 +3,36 @@
  *
  * POST — restore an EPK document from a version snapshot
  *
- * Membership is verified with the bearer client; restore writes use service-role.
+ * Membership via withPortalMembershipWrite; restore via portalMemberWrite.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { resolvePortalArtist } from '@/lib/api/artistProfiles'
 import { restoreEpkVersion } from '@/lib/api/epkDocument'
-import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
-import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 
 const bodySchema = z.object({
   artist_id: z.string().uuid(),
 })
 
+const ROUTE = 'POST /api/portal/epk/versions/[id]/restore'
+
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const { supabase, user } = await authenticatePortalBearer(req)
   const segments = req.nextUrl.pathname.split('/')
   const restoreIndex = segments.lastIndexOf('restore')
   const versionId = restoreIndex > 0 ? segments[restoreIndex - 1] : undefined
   if (!versionId) throw new ApiError(400, 'Missing version id')
 
   const body = bodySchema.parse(await req.json())
-
-  const artist = await resolvePortalArtist(supabase, user.id, body.artist_id).catch((err) => {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  })
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
+  const ctx = await withPortalMembershipWrite(req, body.artist_id)
 
   try {
-    const serviceDb = await createServiceRoleSupabaseClient()
-    const state = await restoreEpkVersion(serviceDb, artist.id, versionId, user.id)
+    const { value: state } = await portalMemberWrite(
+      ctx,
+      { route: ROUTE, table: 'artist_epks', operation: 'update' },
+      (db) => restoreEpkVersion(db, ctx.artist.id, versionId, ctx.user.id),
+    )
     return NextResponse.json(state)
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Restore failed'

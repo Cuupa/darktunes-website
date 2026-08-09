@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { UploadSimple } from '@phosphor-icons/react'
@@ -26,13 +27,17 @@ export const UploadDropZone = forwardRef<UploadDropZoneRef, UploadDropZoneProps>
   { folderId, artistId = null, token, uploadEndpoint = '/api/upload', onUploadComplete, children },
   ref,
 ) {
+  const tToast = useTranslations('admin.toast')
+
+
   const inputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({})
 
   const handleUpload = async (files: File[], targetFolderId: string | null) => {
+
     if (!token) {
-      toast.error('You need to sign in again before uploading.')
+      toast.error(tToast('sign_in_again_before_upload'))
       return
     }
 

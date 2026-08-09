@@ -14,7 +14,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-
 const ALLOWED_STATS_TABLES = [
   'streaming_stats',
   'sos_period_summaries',

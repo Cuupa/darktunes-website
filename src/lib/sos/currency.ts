@@ -33,8 +33,9 @@ export type HistoricalExchangeRateFetchResult = {
 /**
  * Static fallback rates used when the Frankfurter API is unavailable.
  * These are approximate values and should only be used as a last resort.
+ * Exported so callers can seed state on unexpected fetch failures.
  */
-const FALLBACK_RATES: ExchangeRates = {
+export const FALLBACK_EXCHANGE_RATES: ExchangeRates = {
   USD: 1.08,
   GBP: 0.86,
   CHF: 0.96,
@@ -62,7 +63,7 @@ const FALLBACK_RATES: ExchangeRates = {
 }
 
 /**
- * Builds a `HistoricalRates` object filled with `FALLBACK_RATES` for every
+ * Builds a `HistoricalRates` object filled with `FALLBACK_EXCHANGE_RATES` for every
  * month key between `periodStart` and `periodEnd` (inclusive, "YYYY-MM").
  * Used as a last-resort fallback when the Frankfurter time-series API fails.
  *
@@ -79,7 +80,7 @@ function buildFallbackHistoricalRates(periodStart: string, periodEnd: string): H
 
   while (year < endYear || (year === endYear && month <= endMonth)) {
     const key = `${year}-${String(month).padStart(2, '0')}`
-    result[key] = FALLBACK_RATES
+    result[key] = FALLBACK_EXCHANGE_RATES
     month++
     if (month > 12) {
       month = 1
@@ -88,6 +89,12 @@ function buildFallbackHistoricalRates(periodStart: string, periodEnd: string): H
   }
 
   return result
+}
+
+/** Detect worker/UI error messages for missing FX rates (English throw text). */
+export function parseMissingExchangeRateCurrency(message: string): string | null {
+  const match = message.match(/Missing exchange rate for currency "([A-Z]{3})"/i)
+  return match?.[1] ?? null
 }
 
 /**
@@ -107,17 +114,17 @@ export async function fetchExchangeRates(): Promise<ExchangeRateFetchResult> {
     })
     if (!response.ok) {
       console.warn(`[currency] Frankfurter API returned ${response.status} — using fallback rates`)
-      return { rates: FALLBACK_RATES, source: 'fallback' }
+      return { rates: FALLBACK_EXCHANGE_RATES, source: 'fallback' }
     }
     const data = await response.json() as { base: string; rates: Record<string, number> }
     if (!data?.rates || typeof data.rates !== 'object') {
       console.warn('[currency] Unexpected Frankfurter API response shape — using fallback rates')
-      return { rates: FALLBACK_RATES, source: 'fallback' }
+      return { rates: FALLBACK_EXCHANGE_RATES, source: 'fallback' }
     }
     return { rates: data.rates, source: 'ecb' }
   } catch (err) {
     console.warn('[currency] Failed to fetch exchange rates:', err instanceof Error ? err.message : err, '— using fallback rates')
-    return { rates: FALLBACK_RATES, source: 'fallback' }
+    return { rates: FALLBACK_EXCHANGE_RATES, source: 'fallback' }
   }
 }
 
@@ -132,7 +139,7 @@ export async function fetchExchangeRates(): Promise<ExchangeRateFetchResult> {
  * royalty statements: each transaction is converted at the ECB average rate
  * for the month in which the sale occurred.
  *
- * Falls back to static `FALLBACK_RATES` for every month in the period if the
+ * Falls back to static `FALLBACK_EXCHANGE_RATES` for every month in the period if the
  * upstream request fails, so processing always completes even offline.
  *
  * @param periodStart - First month of the billing period, format "YYYY-MM".

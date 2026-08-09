@@ -22,6 +22,7 @@ import { useCSVProcessor } from '@/hooks/useSosCSVProcessor'
 import { useExports } from '@/hooks/useSosExports'
 import { useFileManager } from '@/hooks/useSosFileManager'
 import { mapArtistsToLabelArtists } from '@/lib/sos/artistBridge'
+import { listBillingProfiles, type ArtistBillingProfile } from '@/lib/api/artistBillingProfiles'
 import type {
   LabelInfo, PdfExportSettings, AppDefaults,
   ArtistMapping, CompilationFilter, SplitFee,
@@ -47,18 +48,21 @@ import {
   wizardHasBlockingIssues,
   type WizardValidationIssue,
 } from '@/lib/sos/wizardValidation'
+import { isValidPeriodRange } from '@/lib/sos/accountingInputValidation'
 import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUploadZone'
 import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
 import { AccountingGuidedWizard } from '@/components/admin/sos/AccountingGuidedWizard'
+import { CurrencyRatesBanner } from '@/components/admin/sos/CurrencyRatesBanner'
 import { SettlementCenterPanel } from '@/components/admin/sos/SettlementCenterPanel'
+import { OperatorPlaybook } from '@/components/admin/sos/OperatorPlaybook'
 import { PayoutManager } from '@/components/admin/sos/PayoutManager'
 import { PdfExportSettingsPanel } from '@/components/admin/sos/PdfExportSettingsPanel'
 import { RulesPanel } from '@/components/admin/sos/RulesPanel'
 import { SosAnalyticsPersistPanel } from '@/components/admin/sos/SosAnalyticsPersistPanel'
-import { OperatorPlaybook } from '@/components/admin/sos/OperatorPlaybook'
 import { ImportBatchesPanel } from '@/components/admin/sos/ImportBatchesPanel'
 import { SosConfirmDialog } from '@/components/admin/sos/SosConfirmDialog'
 import { ExternalMetricsSyncPanel } from '@/components/admin/sos/ExternalMetricsSyncPanel'
+import { ApifySpotifySyncPanel } from '@/components/admin/sos/ApifySpotifySyncPanel'
 import dynamic from 'next/dynamic'
 const TrendsDashboard = dynamic(() => import('@/components/admin/sos/TrendsDashboard').then(mod => mod.TrendsDashboard), { ssr: false, loading: () => <Skeleton className="h-96 w-full" /> })
 import { CsvProfileManager } from '@/components/admin/sos/CsvProfileManager'
@@ -81,6 +85,7 @@ import { Button } from '@/components/ui/button'
 import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'sonner'
 import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
+import { interpolate } from '@/lib/i18n/interpolate'
 
 const StatementsManager = lazy(
   () => import('@/components/admin/StatementsManager').then(m => ({ default: m.StatementsManager }))
@@ -101,8 +106,30 @@ function SosGeneratorPanel() {
   const t = useAccountingLabels()
   const { artists } = useArtists()
   const { settings } = useSiteSettings()
-  // Map portal artists to SOS LabelArtist[]
-  const labelArtists = useMemo(() => mapArtistsToLabelArtists(artists), [artists])
+  // Portal artist roster + billing profiles (never CSV master data)
+  const [billingByArtistId, setBillingByArtistId] = useState<Map<string, ArtistBillingProfile>>(
+    () => new Map(),
+  )
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const supabase = createBrowserSupabaseClient()
+        const profiles = await listBillingProfiles(supabase)
+        if (cancelled) return
+        setBillingByArtistId(new Map(profiles.map((p) => [p.artistId, p])))
+      } catch {
+        if (!cancelled) setBillingByArtistId(new Map())
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [artists])
+  const labelArtists = useMemo(
+    () => mapArtistsToLabelArtists(artists, billingByArtistId),
+    [artists, billingByArtistId],
+  )
 
   const [labelBranding, setLabelBranding] = useState<Partial<LabelInfo>>(DEFAULT_LABEL_INFO)
   const [pdfSettings, setPdfSettings] = useState<PdfExportSettings>(DEFAULT_PDF_EXPORT_SETTINGS)
@@ -114,21 +141,33 @@ function SosGeneratorPanel() {
     deleteProfile: deleteCsvProfile,
   } = useCsvImportProfiles(csvImportProfilesCustom, setCsvImportProfilesCustom)
 
-  // Site settings override public branding fields; SEPA/bank details persist in Supabase.
+  // Workspace branding wins when set; site impressum is fallback for empty fields only.
+  // Address is always structured in the UI (LabelAddressFields) and stored multi-line on LabelInfo.address.
   const labelInfo = useMemo<LabelInfo>(() => ({
     ...DEFAULT_LABEL_INFO,
     ...labelBranding,
-    name: settings.labelName ?? labelBranding?.name ?? DEFAULT_LABEL_INFO.name,
-    address: settings.impressumAddress ?? labelBranding?.address ?? DEFAULT_LABEL_INFO.address,
-    taxId: settings.impressumVatId ?? labelBranding?.taxId ?? DEFAULT_LABEL_INFO.taxId,
+    name: labelBranding?.name?.trim() || settings.labelName || DEFAULT_LABEL_INFO.name,
+    address: labelBranding?.address?.trim() || settings.impressumAddress || DEFAULT_LABEL_INFO.address,
+    taxId: labelBranding?.taxId?.trim() || settings.impressumVatId || DEFAULT_LABEL_INFO.taxId,
   }), [labelBranding, settings])
+
+  const handleLabelInfoUpdate = useCallback((next: LabelInfo) => {
+    setLabelBranding({
+      ...DEFAULT_LABEL_INFO,
+      ...next,
+      sepaIban: next.sepaIban
+        ? next.sepaIban.replace(/[\s-]/g, '').toUpperCase()
+        : next.sepaIban,
+      sepaAccountHolder: next.sepaAccountHolder?.trim() || undefined,
+    })
+  }, [])
 
   const handleLabelSepaUpdate = useCallback(
     (sepaIban: string, sepaAccountHolder: string) => {
       setLabelBranding((current) => ({
         ...DEFAULT_LABEL_INFO,
         ...current,
-        sepaIban: sepaIban.replace(/\s/g, '').toUpperCase(),
+        sepaIban: sepaIban.replace(/[\s-]/g, '').toUpperCase(),
         sepaAccountHolder: sepaAccountHolder.trim(),
       }))
     },
@@ -388,6 +427,10 @@ function SosGeneratorPanel() {
     releaseTitlesByArtistIncFeaturing,
     territoryMetrics,
     merchOrderRows,
+    exchangeRatesLoading,
+    exchangeRatesReady,
+    exchangeRatesSource,
+    refreshExchangeRates,
   } = useCSVProcessor(
     believeManager.files,
     bandcampManager.files,
@@ -472,6 +515,10 @@ function SosGeneratorPanel() {
 
   const hasData = revenues.length > 0
 
+  const setupPeriodStart = manualPeriodStart || detectedPeriodStart
+  const setupPeriodEnd = manualPeriodEnd || detectedPeriodEnd || manualPeriodStart || detectedPeriodStart
+  const setupComplete = isValidPeriodRange(setupPeriodStart, setupPeriodEnd)
+
   useEffect(() => {
     if (detectedPeriodStart && !manualPeriodStart) {
       setManualPeriodStart(detectedPeriodStart)
@@ -487,8 +534,8 @@ function SosGeneratorPanel() {
     darkmerchManager.clearAll()
     setCarryForwardByArtist({})
     setGuidedStep(wizardMode === 'assistant' ? 'setup' : 'upload')
-    toast.message('Session zurückgesetzt', {
-      description: 'Alle hochgeladenen Dateien und lokale Berechnungen wurden gelöscht.',
+    toast.message(t.sessionResetTitle, {
+      description: t.sessionResetDesc,
     })
   }, [
     believeManager,
@@ -497,21 +544,54 @@ function SosGeneratorPanel() {
     printfulManager,
     darkmerchManager,
     wizardMode,
+    t.sessionResetTitle,
+    t.sessionResetDesc,
   ])
 
   const wizardValidationIssues = useMemo(() => {
-    return validateSosWizardState({
-      revenues,
-      labelArtists,
-      splitFees,
-      periodStart: manualPeriodStart || detectedPeriodStart,
-      periodEnd: manualPeriodEnd || detectedPeriodEnd || manualPeriodStart,
-      hasBelieveFile: believeManager.files.length > 0,
-      hasBandcampFile: bandcampManager.files.length > 0,
-      hasShopifyFile: shopifyManager.files.length > 0,
-      hasPrintfulFile: printfulManager.files.length > 0,
-      hasDarkmerchFile: darkmerchManager.files.length > 0,
-    })
+    return validateSosWizardState(
+      {
+        revenues,
+        labelArtists,
+        splitFees,
+        periodStart: manualPeriodStart || detectedPeriodStart,
+        periodEnd: manualPeriodEnd || detectedPeriodEnd || manualPeriodStart,
+        hasBelieveFile: believeManager.files.length > 0,
+        hasBandcampFile: bandcampManager.files.length > 0,
+        hasShopifyFile: shopifyManager.files.length > 0,
+        hasPrintfulFile: printfulManager.files.length > 0,
+        hasDarkmerchFile: darkmerchManager.files.length > 0,
+      },
+      {
+        validationMissingPeriodTitle: t.validationMissingPeriodTitle,
+        validationMissingPeriodDesc: t.validationMissingPeriodDesc,
+        validationMissingPeriodAction: t.validationMissingPeriodAction,
+        validationNoRevenuesTitle: t.validationNoRevenuesTitle,
+        validationNoRevenuesDesc: t.validationNoRevenuesDesc,
+        validationNoRevenuesAction: t.validationNoRevenuesAction,
+        validationUnknownArtistTitle: t.validationUnknownArtistTitle,
+        validationUnknownArtistDesc: t.validationUnknownArtistDesc,
+        validationUnknownArtistAction: t.validationUnknownArtistAction,
+        validationNoPortalIdTitle: t.validationNoPortalIdTitle,
+        validationNoPortalIdDesc: t.validationNoPortalIdDesc,
+        validationNoPortalIdAction: t.validationNoPortalIdAction,
+        validationMissingSplitTitle: t.validationMissingSplitTitle,
+        validationMissingSplitDesc: t.validationMissingSplitDesc,
+        validationMissingSplitAction: t.validationMissingSplitAction,
+        validationZeroPayoutTitle: t.validationZeroPayoutTitle,
+        validationZeroPayoutDesc: t.validationZeroPayoutDesc,
+        validationZeroPayoutAction: t.validationZeroPayoutAction,
+        validationExistingDraftTitle: t.validationExistingDraftTitle,
+        validationExistingDraftDesc: t.validationExistingDraftDesc,
+        validationExistingDraftAction: t.validationExistingDraftAction,
+        validationNoFilesTitle: t.validationNoFilesTitle,
+        validationNoFilesDesc: t.validationNoFilesDesc,
+        validationNoFilesAction: t.validationNoFilesAction,
+        validationRosterNoPortalTitle: t.validationRosterNoPortalTitle,
+        validationRosterNoPortalDesc: t.validationRosterNoPortalDesc,
+        validationRosterNoPortalAction: t.validationRosterNoPortalAction,
+      },
+    )
   }, [
     revenues,
     labelArtists,
@@ -525,6 +605,7 @@ function SosGeneratorPanel() {
     shopifyManager.files.length,
     printfulManager.files.length,
     darkmerchManager.files.length,
+    t,
   ])
 
   const hasBlockingValidation = wizardHasBlockingIssues(wizardValidationIssues)
@@ -533,6 +614,10 @@ function SosGeneratorPanel() {
     if (issue.actionTarget === 'rules-mappings' || issue.actionTarget === 'rules-splits' || issue.actionTarget === 'rules-defaults') {
       setViewMode('advanced')
       setActiveSubTab('rules')
+      return
+    }
+    if (issue.actionTarget === 'setup') {
+      setGuidedStep('setup')
       return
     }
     if (issue.actionTarget === 'upload') {
@@ -698,7 +783,7 @@ function SosGeneratorPanel() {
       appDefaults={appDefaults}
       onAppDefaultsChange={setAppDefaults}
       labelInfo={labelInfo}
-      onLabelInfoChange={setLabelBranding}
+      onLabelInfoChange={handleLabelInfoUpdate}
       onLoadPreset={() => void loadDefaultPreset()}
       presetLoading={isWorkspaceLoading}
     />
@@ -721,6 +806,13 @@ function SosGeneratorPanel() {
           {t.resetSessionLabel}
         </Button>
       </div>
+      <div className="rounded-md border border-border bg-muted/10 p-3 space-y-1">
+        <p className="text-xs font-semibold text-foreground">{t.uploadHelpTitle}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">{t.uploadHelpBody}</p>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {interpolate(t.rosterFromDbHint, { count: labelArtists.length })}
+      </p>
       <UniversalFileUploadZone
         believeManager={believeManager}
         bandcampManager={bandcampManager}
@@ -758,23 +850,50 @@ function SosGeneratorPanel() {
   )
 
   const settlePanel = hasData ? (
-    <SettlementCenterPanel
-      revenues={revenues}
-      labelArtists={labelArtists}
-      periodStart={detectedPeriodStart}
-      periodEnd={detectedPeriodEnd}
-      territoryMetrics={territoryMetrics}
-      merchOrderRows={merchOrderRows}
-      bronzeBatchIds={bronzeBatchIds}
-      persistDisabled={isProcessing}
-      onCreateDraft={handlePublishToPortal}
-      onBuildCorrectionPdf={buildCorrectionPdfBase64}
-    />
+    <div className="space-y-4">
+      <div className="px-6 pt-4 space-y-3">
+        <p className="text-sm text-muted-foreground leading-relaxed">{t.settlementDauIntro}</p>
+        <OperatorPlaybook
+          title={t.playbookTitle}
+          step1={t.coachCheckDrafts}
+          step2={t.coachCheckApprove}
+          step3={t.coachCheckPay}
+        />
+        {wizardMode === 'quick' && hasBlockingValidation && (
+          <Alert className="border-amber-500/40 bg-amber-500/10">
+            <AlertDescription className="text-xs space-y-1">
+              <p className="font-medium text-foreground">{t.quickSettleWarningTitle}</p>
+              <p className="text-muted-foreground">{t.quickSettleWarningBody}</p>
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+      <SettlementCenterPanel
+        revenues={revenues}
+        labelArtists={labelArtists}
+        periodStart={detectedPeriodStart}
+        periodEnd={detectedPeriodEnd}
+        territoryMetrics={territoryMetrics}
+        merchOrderRows={merchOrderRows}
+        bronzeBatchIds={bronzeBatchIds}
+        persistDisabled={isProcessing}
+        onCreateDraft={handlePublishToPortal}
+        onBuildCorrectionPdf={buildCorrectionPdfBase64}
+      />
+    </div>
   ) : (
     <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
       <SealCheck size={32} className="opacity-30" />
       <p className="text-sm">{t.emptySettlements}</p>
     </div>
+  )
+
+  const currencyBanner = (
+    <CurrencyRatesBanner
+      loading={exchangeRatesLoading}
+      source={exchangeRatesSource}
+      onRefresh={refreshExchangeRates}
+    />
   )
 
   const rulesStatusBanner = settingsReady ? (
@@ -807,6 +926,7 @@ function SosGeneratorPanel() {
       return (
         <div className="space-y-0">
           {rulesStatusBanner}
+          {currencyBanner}
           <SosWizardModeChooser
             onSelect={(mode) => {
               setWizardMode(mode)
@@ -833,12 +953,18 @@ function SosGeneratorPanel() {
           onActiveStepChange={setGuidedStep}
           onSwitchToAdvanced={() => setViewMode('advanced')}
           onImportReady={() => {
-            toast.success('Import abgeschlossen', {
-              description: 'CSV-Daten wurden verarbeitet. Prüfen Sie die Auszahlungen und klicken Sie auf Weiter.',
+            toast.success(t.importReadyTitle, {
+              description: t.importReadyDesc,
             })
           }}
           stepIds={stepIds}
           hasBlockingValidation={hasBlockingValidation}
+          setupComplete={setupComplete}
+          ratesReady={exchangeRatesReady}
+          exchangeRatesLoading={exchangeRatesLoading}
+          revenueCount={revenues.length}
+          issueCount={wizardValidationIssues.length}
+          statusBanner={currencyBanner}
           setupPanel={wizardMode === 'assistant' ? setupPanel : undefined}
           validatePanel={wizardMode === 'assistant' ? validatePanel : undefined}
           uploadPanel={uploadPanel}
@@ -846,8 +972,12 @@ function SosGeneratorPanel() {
           settlePanel={settlePanel}
           labels={{
             guidedSwitchAdvanced: t.guidedSwitchAdvanced,
+            guidedStepSetup: t.guidedStepSetup,
+            guidedStepSetupDesc: t.guidedStepSetupDesc,
             guidedStepUpload: t.guidedStepUpload,
             guidedStepUploadDesc: t.guidedStepUploadDesc,
+            guidedStepValidate: t.guidedStepValidate,
+            guidedStepValidateDesc: t.guidedStepValidateDesc,
             guidedStepReview: t.guidedStepReview,
             guidedStepReviewDesc: t.guidedStepReviewDesc,
             guidedStepSettle: t.guidedStepSettle,
@@ -860,6 +990,13 @@ function SosGeneratorPanel() {
             guidedReviewHint: t.guidedReviewHint,
             guidedSettleHint: t.guidedSettleHint,
             guidedStepperAria: t.guidedStepperAria,
+            guidedStepOf: t.guidedStepOf,
+            blockedSetupPeriod: t.blockedSetupPeriod,
+            blockedUploadNoData: t.blockedUploadNoData,
+            blockedUploadProcessing: t.blockedUploadProcessing,
+            blockedUploadRates: t.blockedUploadRates,
+            blockedValidateErrors: t.blockedValidateErrors,
+            blockedReviewNoData: t.blockedReviewNoData,
           }}
         />
       </div>
@@ -868,6 +1005,7 @@ function SosGeneratorPanel() {
 
   return (
     <div className="space-y-0">
+      {currencyBanner}
       {/* Sub-tab navigation */}
       <div
         className={cn('flex items-center gap-1 px-6 pt-4 border-b border-border', horizontalScrollClass)}
@@ -1024,7 +1162,10 @@ function SosGeneratorPanel() {
             role="tabpanel"
             aria-labelledby="accounting-subtab-upload"
           >
-          <div className="p-6">
+          <div className="p-6 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              {interpolate(t.rosterFromDbHint, { count: labelArtists.length })}
+            </p>
             <UniversalFileUploadZone
               believeManager={believeManager}
               bandcampManager={bandcampManager}
@@ -1154,7 +1295,7 @@ function SosGeneratorPanel() {
                     onClick={() => setWorkspaceDeleteOpen(true)}
                     className="rounded border border-destructive/40 px-2 py-0.5 text-destructive hover:bg-destructive/10 disabled:opacity-50"
                   >
-                    Workspace löschen
+                    {t.workspaceDeleteTitle}
                   </button>
                 )}
                 <span className="text-[10px] text-muted-foreground">
@@ -1172,6 +1313,7 @@ function SosGeneratorPanel() {
               />
               <ImportBatchesPanel labelArtists={labelArtists} onLoadBatch={loadBronzeBatch} />
               <ExternalMetricsSyncPanel />
+              <ApifySpotifySyncPanel />
               {hasData ? (
                 <SosAnalyticsPersistPanel
                   periodStart={detectedPeriodStart}
@@ -1267,6 +1409,8 @@ function SosGeneratorPanel() {
             trackRevenueAssignments={trackRevenueAssignments}
             appDefaults={appDefaults}
             emailConfig={emailConfig}
+            labelInfo={labelInfo}
+            onUpdateLabelInfo={handleLabelInfoUpdate}
             onAddArtistMapping={handleAddMapping}
             onRemoveArtistMapping={handleRemoveMapping}
             onUpdateArtistMapping={handleUpdateMapping}
@@ -1299,10 +1443,10 @@ function SosGeneratorPanel() {
       <SosConfirmDialog
         open={reloadConfirmOpen}
         onOpenChange={setReloadConfirmOpen}
-        title={t.workspaceReloadConfirmTitle ?? 'Reload from server?'}
-        description={t.workspaceReloadConfirmBody ?? 'Unsaved changes in this browser will be replaced by the server copy.'}
-        confirmLabel={t.workspaceReloadConfirm ?? t.workspaceReload ?? 'Reload'}
-        cancelLabel="Cancel"
+        title={t.workspaceReloadConfirmTitle}
+        description={t.workspaceReloadConfirmBody}
+        confirmLabel={t.workspaceReloadConfirm}
+        cancelLabel={t.commonCancel}
         loading={isWorkspaceLoading}
         onConfirm={() => void confirmReloadFromServer()}
       />
@@ -1313,13 +1457,13 @@ function SosGeneratorPanel() {
         title={t.workspaceDeleteTitle}
         description={
           currentPeriodKey
-? t.workspaceDeleteDesc
-    .replaceAll('{start}', currentPeriodKey.start)
-    .replaceAll('{end}', currentPeriodKey.end)
+            ? t.workspaceDeleteDesc
+                .replaceAll('{start}', currentPeriodKey.start)
+                .replaceAll('{end}', currentPeriodKey.end)
             : ''
         }
         confirmLabel={t.workspaceDeleteConfirm}
-        cancelLabel={t.settlementCancel}
+        cancelLabel={t.commonCancel}
         destructive
         loading={workspaceDeleting}
         onConfirm={confirmWorkspaceDelete}

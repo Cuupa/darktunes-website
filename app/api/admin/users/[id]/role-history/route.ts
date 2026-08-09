@@ -7,10 +7,10 @@
  * Security: only admin users may call this endpoint.
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserRoleWithClient } from '@/lib/getUserRole'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
-import { ApiError, withErrorHandler } from '@/lib/errors'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { withErrorHandler } from '@/lib/errors'
 import { getRoleHistory, getBanHistory } from '@/lib/api/users'
 
 function extractId(req: NextRequest): string {
@@ -21,17 +21,7 @@ function extractId(req: NextRequest): string {
 
 export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   // 1. Auth + admin check
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) throw new ApiError(401, 'Unauthorized')
-
-  const role = await getUserRoleWithClient(supabase, user.id)
-
-  if (role !== 'admin') throw new ApiError(403, 'Forbidden')
+  await requireAdminFromRequest(req)
 
   // 2. Fetch history
   const targetId = extractId(req)

@@ -11,10 +11,11 @@
  * Security: only users with role = 'admin' may call this endpoint.
  */
 
+import { requireAdminFromRequest } from '@/lib/adminAuth'
+
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { z } from 'zod'
-import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { ApiError, buildApiError, withErrorHandler } from '@/lib/errors'
 
 // ---------------------------------------------------------------------------
@@ -45,17 +46,7 @@ function extractUserId(req: NextRequest): string {
 
 export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   // 1. Auth + role check
-  const supabase = await createServerSupabaseClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) throw new ApiError(401, 'Unauthorized')
-
-  const role = await getUserRoleWithClient(supabase, user.id)
-
-  if (role !== 'admin') throw new ApiError(403, 'Forbidden')
+  await requireAdminFromRequest(req)
 
   // 2. Parse body
   const body: unknown = await req.json()

@@ -7,13 +7,23 @@
     "dev": "next dev",
     "kill": "fuser -k 3000/tcp",
     "build": "next build --webpack",
-    "lint": "eslint app src tests scripts lib supabase proxy.ts playwright.config.ts next.config.ts vitest.config.ts global.d.ts",
+    "lint": "eslint --cache --cache-location .eslintcache app src tests scripts supabase proxy.ts playwright.config.ts next.config.ts vitest.config.ts global.d.ts",
     "check:scroll": "node scripts/check-scroll-contract.mjs",
+    "check:overlay": "node scripts/check-overlay-stack-contract.mjs",
+    "check:mobile-layout": "node scripts/check-mobile-layout-contract.mjs",
     "check:brand": "node scripts/check-brand-contract.mjs",
-    "ci": "npm run lint && npm run check:scroll && npm run check:brand && npm run verify:portal-rls && npx tsc --noEmit && npm test && npm run build",
+    "check:i18n": "node scripts/check-i18n-contract.mjs",
+    "check:i18n:baseline": "node scripts/check-i18n-contract.mjs --write-baseline",
+    "ci:contracts": "npm run lint && npm run check:scroll && npm run check:overlay && npm run check:mobile-layout && npm run check:brand && npm run check:i18n && npm run verify:portal-rls && npm run verify:schema-columns && npm run verify:api-contracts",
+    "ci:typecheck": "npx tsc --noEmit",
+    "ci:tests": "npm run test && npm run build",
+    "ci": "npm run ci:contracts && npm run ci:typecheck && npm run ci:tests",
     "preview": "next start",
     "validate:rbac": "npx tsx scripts/validate-rbac.ts",
     "verify:portal-rls": "node scripts/verify-portal-rls.mjs",
+    "verify:schema-columns": "node scripts/verify-schema-columns.mjs",
+    "verify:api-contracts": "node scripts/verify-api-contracts.mjs",
+    "api:inventory": "node scripts/extract-api-routes.mjs",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
     "test:e2e": "playwright test",
@@ -31,23 +41,23 @@
     "perf:test": "playwright test tests/performance"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1062.0",
-    "@aws-sdk/s3-request-presigner": "^3.1056.0",
+    "@aws-sdk/client-s3": "^3.1097.0",
+    "@aws-sdk/s3-request-presigner": "^3.1097.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@fontsource/noto-sans": "^5.2.10",
-    "@hookform/resolvers": "^5.4.0",
+    "@hookform/resolvers": "^5.5.7",
     "@octokit/core": "^7.0.6",
     "@pdf-lib/fontkit": "^1.1.1",
     "@phosphor-icons/react": "^2.1.7",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
     "@radix-ui/react-aspect-ratio": "^1.1.2",
-    "@radix-ui/react-avatar": "^1.1.3",
+    "@radix-ui/react-avatar": "^1.2.6",
     "@radix-ui/react-checkbox": "^1.1.4",
     "@radix-ui/react-collapsible": "^1.1.3",
-    "@radix-ui/react-context-menu": "^2.2.6",
+    "@radix-ui/react-context-menu": "^2.3.7",
     "@radix-ui/react-dialog": "^1.1.6",
     "@radix-ui/react-dropdown-menu": "^2.1.6",
     "@radix-ui/react-hover-card": "^1.1.6",
@@ -68,30 +78,31 @@
     "@radix-ui/react-toggle-group": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.8",
     "@serwist/next": "^9.5.11",
-    "@supabase/ssr": "^0.10.3",
+    "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.106.2",
     "@tailwindcss/container-queries": "^0.1.1",
     "@tanstack/query-async-storage-persister": "^5.101.1",
     "@tanstack/react-query": "^5.83.1",
     "@tanstack/react-query-persist-client": "^5.101.1",
     "@tanstack/react-table": "^8.21.3",
-    "@tiptap/extension-color": "^3.27.1",
-    "@tiptap/extension-image": "^3.27.1",
-    "@tiptap/extension-link": "^3.27.1",
-    "@tiptap/extension-text-align": "^3.27.1",
-    "@tiptap/extension-text-style": "^3.27.1",
-    "@tiptap/extension-underline": "^3.27.1",
-    "@tiptap/react": "^3.27.1",
-    "@tiptap/starter-kit": "^3.27.1",
+    "@tiptap/extension-color": "^3.29.2",
+    "@tiptap/extension-image": "^3.29.2",
+    "@tiptap/extension-link": "^3.29.2",
+    "@tiptap/extension-text-align": "^3.29.2",
+    "@tiptap/extension-text-style": "^3.29.2",
+    "@tiptap/extension-underline": "^3.29.2",
+    "@tiptap/react": "^3.29.2",
+    "@tiptap/starter-kit": "^3.29.2",
     "@types/papaparse": "^5.5.2",
-    "@vercel/functions": "^3.7.1",
+    "@vercel/functions": "^3.7.7",
+    "apify-client": "^2.24.0",
     "busboy": "^1.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
     "dexie": "^4.4.4",
-    "dompurify": "^3.4.12",
+    "dompurify": "^3.4.13",
     "embla-carousel-react": "^8.5.2",
     "exceljs": "^4.4.0",
     "fontkit": "^2.0.4",
@@ -118,14 +129,15 @@
     "react-konva": "^19.2.5",
     "react-resizable-panels": "^4.12.0",
     "recharts": "^3.9.0",
-    "serwist": "^9.5.11",
+    "serwist": "^9.5.12",
     "sharp": "^0.35.3",
     "sonner": "^2.0.1",
-    "swiper": "^12.2.0",
+    "swiper": "^14.0.7",
     "tailwind-merge": "^3.0.2",
     "tw-animate-css": "^1.2.4",
     "uuid": "^14.0.0",
     "vaul": "^1.1.2",
+    "web-push": "^3.6.7",
     "zod": "^4.4.3",
     "zundo": "^2.3.0",
     "zustand": "^5.0.14"
@@ -142,9 +154,10 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19.2.16",
     "@types/react-dom": "^19.0.4",
+    "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.1",
     "@vercel/node": "^5.7.15",
-    "@vitejs/plugin-react": "^6.0.3",
+    "@vitejs/plugin-react": "^6.0.4",
     "dotenv": "^17.4.2",
     "eslint": "^9.28.0",
     "eslint-config-next": "^16.2.11",
@@ -153,10 +166,10 @@
     "globals": "^17.7.0",
     "jsdom": "^29.1.1",
     "pg": "^8.22.0",
-    "postcss": "^8.5.15",
+    "postcss": "^8.5.18",
     "tailwindcss": "^4.1.11",
     "typescript": "~5.7.2",
-    "typescript-eslint": "^8.62.0",
+    "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.5",
     "ws": "^8.21.1"
   },
@@ -165,14 +178,43 @@
     "picomatch": "4.0.4",
     "path-to-regexp": "8.4.0",
     "lodash": "4.18.0",
+    "dompurify": "^3.4.13",
+    "nanoid": "^3.3.17",
     "exceljs": {
       "uuid": "^11.1.1"
     },
     "@typescript-eslint/typescript-estree": {
       "minimatch": "9.0.7"
     },
+    "@eslint/config-array": {
+      "minimatch": "9.0.7"
+    },
+    "@eslint/eslintrc": {
+      "minimatch": "9.0.7"
+    },
+    "eslint": {
+      "minimatch": "9.0.7"
+    },
+    "eslint-config-next": {
+      "minimatch": "9.0.7"
+    },
+    "@ts-morph/common": {
+      "minimatch": "9.0.7"
+    },
+    "archiver-utils": {
+      "minimatch": "9.0.7"
+    },
+    "fstream": {
+      "minimatch": "9.0.7"
+    },
+    "rimraf": {
+      "minimatch": "9.0.7"
+    },
+    "zip-stream": {
+      "minimatch": "9.0.7"
+    },
     "smol-toml": "1.6.1",
-    "postcss": "^8.5.15",
+    "postcss": "^8.5.18",
     "@vercel/node": {
       "undici": "6.27.0"
     },
@@ -183,7 +225,8 @@
     "next": {
       "sharp": "0.35.3"
     },
-    "brace-expansion": "2.1.2"
+    "brace-expansion": "^5.0.9",
+    "ip-address": "^10.4.0"
   },
   "license": "UNLICENSED"
 }

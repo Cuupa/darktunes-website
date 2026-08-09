@@ -4,6 +4,7 @@ import {
   deriveOverallHealth,
   deriveSyncQueueHealth,
   formatDurationMs,
+  normalizeHealthApiSource,
   parseSyncLogSnapshot,
   sortApiSources,
   STALE_SYNC_MS,
@@ -144,5 +145,12 @@ describe('sortApiSources', () => {
       'youtube',
       'custom',
     ])
+  })
+})
+
+describe('normalizeHealthApiSource', () => {
+  it('maps apify_spotify logs onto the apify health card', () => {
+    expect(normalizeHealthApiSource('apify_spotify')).toBe('apify')
+    expect(normalizeHealthApiSource('spotify')).toBe('spotify')
   })
 })

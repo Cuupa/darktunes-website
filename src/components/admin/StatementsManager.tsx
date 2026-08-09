@@ -89,6 +89,11 @@ const STATEMENTS_FALLBACK = {
   historyKpiPaidHint: 'Complete',
   historyKpiSuperseded: 'Superseded',
   historyKpiSupersededHint: 'Replaced by correction',
+  settlementDeleteDraftBtn: 'Delete draft',
+  settlementDeleteDraftSuccess: 'Draft deleted for {artist}',
+  settlementDeleteDraftFailed: 'Failed to delete draft for {artist}',
+  settlementDeleteDraftConfirm: 'Delete draft statement for {artist}? This cannot be undone.',
+  commonCancel: 'Cancel',
 } as const
 
 function formatEur(amount: number | null): string {
@@ -220,11 +225,19 @@ export function StatementsManager({
     try {
       const token = await getAdminAccessToken()
       if (!token) throw new Error(t.historySessionExpired)
-      await deleteSalesStatement(token, statementId, 'Draft konnte nicht gelöscht werden')
+      await deleteSalesStatement(
+        token,
+        statementId,
+        interpolate(t.settlementDeleteDraftFailed, { artist: artistName }),
+      )
       await fetchStatements()
-      toast.success(`Draft für ${artistName} gelöscht`)
+      toast.success(interpolate(t.settlementDeleteDraftSuccess, { artist: artistName }))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Draft konnte nicht gelöscht werden')
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : interpolate(t.settlementDeleteDraftFailed, { artist: artistName }),
+      )
     } finally {
       setDeletingId(null)
     }
@@ -304,7 +317,7 @@ export function StatementsManager({
                 ) : (
                   <Trash size={14} />
                 )}
-                Löschen
+                {t.settlementDeleteDraftBtn}
               </Button>
             </>
           )}
@@ -599,14 +612,14 @@ export function StatementsManager({
       <SosConfirmDialog
         open={deleteTarget != null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}
-        title="Draft löschen"
+        title={t.settlementDeleteDraftBtn}
         description={
           deleteTarget
-            ? `Draft für ${deleteTarget.artistName} unwiderruflich löschen?`
+            ? interpolate(t.settlementDeleteDraftConfirm, { artist: deleteTarget.artistName })
             : ''
         }
-        confirmLabel="Löschen"
-        cancelLabel="Abbrechen"
+        confirmLabel={t.settlementDeleteDraftBtn}
+        cancelLabel={t.commonCancel}
         destructive
         loading={deletingId != null}
         onConfirm={() => {

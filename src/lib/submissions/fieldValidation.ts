@@ -3,7 +3,9 @@ import type { SubmissionFieldType } from '@/lib/submissions/fieldTypes'
 
 const ISRC_REGEX = /^[A-Z]{2}-[A-Z0-9]{3}-\d{2}-\d{5}$/i
 const EAN_REGEX = /^\d{13}$/
-const DATE_DMY_REGEX = /^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])\/(\d{4})$/
+/** DD/MM/YYYY, DD.MM.YYYY, or D/M/YYYY (slashes or dots; optional leading zeros). */
+const DATE_DMY_REGEX = /^(\d{1,2})[./](\d{1,2})[./](\d{4})$/
+const DATE_ISO_REGEX = /^\d{4}-\d{2}-\d{2}$/
 const DURATION_REGEX = /^(\d{1,2}):([0-5]\d):([0-5]\d)$/
 
 export function validateEanChecksum(ean: string): boolean {
@@ -14,11 +16,37 @@ export function validateEanChecksum(ean: string): boolean {
   return check === digits[12]
 }
 
+/**
+ * Parse a day-first date string to ISO YYYY-MM-DD.
+ * Accepts DD/MM/YYYY, DD.MM.YYYY (common DE input), optional leading zeros,
+ * and already-ISO values so coerced storage forms still validate.
+ */
 export function parseDateDmyToIso(value: string): string | null {
-  const match = DATE_DMY_REGEX.exec(value.trim())
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (DATE_ISO_REGEX.test(trimmed)) {
+    const [y, m, d] = trimmed.split('-').map(Number)
+    if (!isValidCalendarDate(y, m, d)) return null
+    return trimmed
+  }
+  const match = DATE_DMY_REGEX.exec(trimmed)
   if (!match) return null
-  const [, day, month, year] = match
-  return `${year}-${month}-${day}`
+  const day = Number(match[1])
+  const month = Number(match[2])
+  const year = Number(match[3])
+  if (!isValidCalendarDate(year, month, day)) return null
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function isValidCalendarDate(year: number, month: number, day: number): boolean {
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return false
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false
+  const dt = new Date(Date.UTC(year, month - 1, day))
+  return (
+    dt.getUTCFullYear() === year &&
+    dt.getUTCMonth() === month - 1 &&
+    dt.getUTCDate() === day
+  )
 }
 
 export function parseDurationToSeconds(value: string): number | null {

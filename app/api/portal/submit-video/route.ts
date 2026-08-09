@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { createVideoSubmission } from '@/lib/api/videoSubmissions'
 import { getFormSchema } from '@/lib/api/submissionFormSchema'
 import { sendSubmissionNotificationEmail } from '@/lib/email/sendSubmissionNotificationEmail'
-import { authenticatePortalBearerWithArtist } from '@/lib/portal/bearerAuth'
+import { withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 import { withIdempotency } from '@/lib/api/idempotency'
 import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { getClientIp } from '@/lib/ipRateLimit'
+import { emitNotification } from '@/lib/notifications/emit'
 
 const bodySchema = z.object({
   title: z.string().min(1),
@@ -41,16 +41,14 @@ const STANDARD_FIELD_TO_BODY_KEY: Record<string, string> = {
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const artistId = req.nextUrl?.searchParams.get('artistId') ?? new URL(req.url).searchParams.get('artistId')
-  const { supabase, user, artist } = await authenticatePortalBearerWithArtist(req, artistId, {
-    requireArtistId: true,
-  })
+  const ctx = await withPortalMembershipWrite(req, artistId)
+  const { user, artist, serviceDb: serviceRole, userDb: supabase } = ctx
 
   const ip = getClientIp(req)
   const rl = await checkDistributedRateLimit(`submit-video:${user.id}:${ip}`, 20, 10 * 60_000)
   if (rl.limited) throw new ApiError(429, 'Too many video submissions. Please wait and try again.')
 
   const body = bodySchema.parse(await req.json())
-  const serviceRole = await createServiceRoleSupabaseClient()
 
   const schemaFields = await getFormSchema(supabase, 'video')
   for (const field of schemaFields) {
@@ -64,8 +62,9 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }
   }
 
+  // Idempotency + submission insert via service role after membership pin
   const idem = await withIdempotency(serviceRole, body.idempotencyKey, 'submit-video', async () => {
-    return createVideoSubmission(supabase, {
+    return createVideoSubmission(serviceRole, {
       artist_id: artist.id,
       title: body.title,
       download_url: body.downloadUrl,
@@ -90,24 +89,14 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const submission = idem.value
 
-  const { data: recipientProfiles } = await serviceRole
-    .from('users')
-    .select('id')
-    .in('role', ['admin', 'editor'])
-
-  const recipients = (recipientProfiles ?? []).map((profile) => ({
-    recipient_id: profile.id,
+  await emitNotification(serviceRole, {
     type: 'artist_video_submission',
-    entity_type: 'video_submission',
-    entity_id: submission.id,
-    entity_name: submission.title,
-    sender_id: user.id,
-    read: false,
-  }))
-
-  if (recipients.length > 0) {
-    await serviceRole.from('editor_notifications').insert(recipients)
-  }
+    entityId: submission.id,
+    entityName: submission.title,
+    senderId: user.id,
+    artistId: artist.id,
+    dedupeKey: `artist_video_submission:${submission.id}`,
+  })
 
   const { resendApiKey: storedResendKey, resendFromEmail: storedFromEmail } =
     await getEmailCredentials(serviceRole)

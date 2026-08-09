@@ -7,6 +7,7 @@ import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { InterviewRequest } from '@/types'
@@ -101,10 +102,12 @@ export function InterviewRequestsClient({
           <Label>{t('message')}</Label>
           <Textarea value={message} onChange={(e) => setMessage(e.target.value)} required rows={4} />
         </div>
-        <div className="space-y-1">
-          <Label>{t('preferredDate')}</Label>
-          <Input type="date" value={preferredDate} onChange={(e) => setPreferredDate(e.target.value)} />
-        </div>
+        <DateField
+          id="interview-preferred-date"
+          label={t('preferredDate')}
+          value={preferredDate}
+          onChange={setPreferredDate}
+        />
         <Button type="submit" className="min-h-[44px]" disabled={submitting}>
           {submitting ? t('submitting') : t('submit')}
         </Button>

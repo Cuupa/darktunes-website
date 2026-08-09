@@ -1,7 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Plus, PencilSimple, Trash, ArrowsClockwise, LinkSimple, Warning, MagnifyingGlass, CheckSquare } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, ArrowsClockwise, LinkSimple, Warning, MagnifyingGlass } from '@phosphor-icons/react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { useReleases } from '@/hooks/useReleases'
 import { useNews } from '@/hooks/useNews'
@@ -10,7 +10,6 @@ import { featuredDurationFromUntil, featuredUntilFromDuration } from '@/lib/feat
 import { FeaturedRemovedBadge } from '@/components/admin/FeaturedRemovedBadge'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { ReleaseForm, type ReleaseFormData } from './forms/ReleaseForm'
-import { getOrCreateReleaseChecklist, toggleChecklistItem, type ReleaseChecklist } from '@/lib/api/releaseChecklists'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -159,6 +158,9 @@ function formDataToInsert(data: ReleaseFormData): ReleaseInsert {
 }
 
 export function ReleasesManager() {
+  const tToast = useTranslations('admin.toast')
+
+
   const tErrors = useTranslations('errors')
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const { releases, isLoading, isSyncing, syncProgress, createRelease, updateRelease, deleteRelease, syncAllReleases } = useReleases()
@@ -181,11 +183,6 @@ export function ReleasesManager() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
-
-  // Checklist dialog
-  const [checklistRelease, setChecklistRelease] = useState<Release | null>(null)
-  const [checklistItems, setChecklistItems] = useState<ReleaseChecklist[]>([])
-  const [checklistLoading, setChecklistLoading] = useState(false)
 
   const [search, setSearch] = useState('')
 
@@ -310,20 +307,23 @@ export function ReleasesManager() {
         } else {
           setSyncResult(outcome.legacyResult)
           toast.warning(
-            `Sync completed with ${outcome.legacyResult.totalErrors} error(s). ${totalSynced} item(s) synced. Click "View Errors" to see details.`,
+            tToast('sync_completed_with_errors', {
+              errors: outcome.legacyResult.totalErrors,
+              synced: totalSynced,
+            }),
             { duration: 8000 },
           )
         }
         return
       }
       if (outcome.drained) {
-        toast.success(
-          'Sync queue finished. Admin list reloaded and public cache revalidated.',
-        )
+        toast.success(tToast('sync_queue_finished'))
         return
       }
       toast.info(
-        `Sync still running in the background (${outcome.pending + outcome.running} job(s) left). List reloaded with current data; cron will finish the rest.`,
+        tToast('sync_still_running', {
+          count: outcome.pending + outcome.running,
+        }),
         { duration: 8000 },
       )
     } catch (err) {
@@ -332,6 +332,7 @@ export function ReleasesManager() {
   }
 
   const handleCleanupOrphaned = async () => {
+
     setIsCleaningUp(true)
     try {
       const {
@@ -355,7 +356,7 @@ export function ReleasesManager() {
       if (deleted > 0) {
         toast.success(`Deleted ${deleted} orphaned release(s)`)
       } else {
-        toast.info('No orphaned releases found')
+        toast.info(tToast('no_orphaned_releases'))
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
@@ -507,45 +508,6 @@ export function ReleasesManager() {
     setIsBulkDeleting(false)
   }
 
-  const openChecklist = async (release: Release) => {
-    setChecklistRelease(release)
-    setChecklistLoading(true)
-    setChecklistItems([])
-    try {
-      const items = await getOrCreateReleaseChecklist(supabase, release.artistId, release.id)
-      setChecklistItems(items)
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
-    } finally {
-      setChecklistLoading(false)
-    }
-  }
-
-  const handleToggleChecklistItem = async (item: ReleaseChecklist) => {
-    try {
-      const updated = await toggleChecklistItem(supabase, item.id, !item.isCompleted)
-      setChecklistItems((prev) => prev.map((i) => i.id === updated.id ? updated : i))
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
-    }
-  }
-
-  const handleMarkAllDone = async () => {
-    const pending = checklistItems.filter((i) => !i.isCompleted)
-    if (pending.length === 0) return
-    try {
-      const updated = await Promise.all(pending.map((i) => toggleChecklistItem(supabase, i.id, true)))
-      setChecklistItems((prev) =>
-        prev.map((i) => {
-          const found = updated.find((u) => u.id === i.id)
-          return found ?? i
-        }),
-      )
-      toast.success('All checklist items marked as done')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
-    }
-  }
 
   const columns: ColumnDef<Release>[] = [
     {
@@ -681,15 +643,6 @@ export function ReleasesManager() {
                     : 'regular'
                 }
               />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => void openChecklist(release)}
-              title="Release checklist"
-              aria-label={`Release checklist for ${release.title}`}
-            >
-              <CheckSquare size={16} aria-hidden="true" />
             </Button>
             <Button
               size="icon"
@@ -949,61 +902,6 @@ export function ReleasesManager() {
         </DialogContent>
       </Dialog>
 
-      {/* Release Checklist Dialog */}
-      <Dialog open={!!checklistRelease} onOpenChange={(open) => !open && setChecklistRelease(null)}>
-        <DialogContent aria-labelledby="checklist-dialog-title" data-lenis-prevent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle id="checklist-dialog-title">
-              Release Checklist — {checklistRelease?.title}
-            </DialogTitle>
-            <DialogDescription>
-              Track the completion of release tasks. Check off items as they are done.
-            </DialogDescription>
-          </DialogHeader>
-          {checklistLoading ? (
-            <div className="space-y-2 py-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-8 rounded bg-muted animate-pulse" />
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-3 py-2">
-              {checklistItems.map((item) => (
-                <div key={item.id} className="flex items-start gap-3">
-                  <Checkbox
-                    id={`checklist-${item.id}`}
-                    checked={item.isCompleted}
-                    onCheckedChange={() => void handleToggleChecklistItem(item)}
-                    className="mt-0.5"
-                  />
-                  <label
-                    htmlFor={`checklist-${item.id}`}
-                    className={`text-sm leading-snug cursor-pointer ${item.isCompleted ? 'line-through text-muted-foreground' : ''}`}
-                  >
-                    {item.task}
-                  </label>
-                </div>
-              ))}
-              {checklistItems.length === 0 && (
-                <p className="text-sm text-muted-foreground">No checklist items found.</p>
-              )}
-              {checklistItems.some((i) => !i.isCompleted) && (
-                <div className="pt-2 border-t border-border">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void handleMarkAllDone()}
-                    className="gap-2"
-                  >
-                    <CheckSquare size={14} aria-hidden="true" />
-                    Mark all as done
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </>
   )
 }

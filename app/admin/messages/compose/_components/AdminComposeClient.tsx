@@ -11,7 +11,7 @@ import { MessageComposer } from '@/components/messaging/MessageComposer'
 import { useAuthContext } from '@/contexts/AuthContext'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getArtists } from '@/lib/api/artists'
-import { getMessageTemplates, sendMessage } from '@/lib/api/labelMessages'
+import { getMessageTemplates } from '@/lib/api/labelMessages'
 import type { MessageTemplate } from '@/types'
 
 export function AdminComposeClient() {
@@ -79,7 +79,29 @@ export function AdminComposeClient() {
     async (artistIds: string[], subject: string, html: string, text: string) => {
       setIsSending(true)
       try {
-        await Promise.all(artistIds.map((id) => sendMessage(supabase, id, subject, text, html)))
+        const token = session?.access_token
+        const res = await fetch('/api/admin/messages/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            artistIds,
+            subject,
+            body: text,
+            bodyHtml: html || null,
+            clientMessageId:
+              artistIds.length === 1 && typeof crypto !== 'undefined' && 'randomUUID' in crypto
+                ? crypto.randomUUID()
+                : undefined,
+          }),
+        })
+        if (!res.ok) {
+          const errBody = (await res.json().catch(() => ({}))) as { error?: string }
+          throw new Error(errBody.error ?? 'Failed to send message')
+        }
         toast.success(`Message sent to ${artistIds.length} artist${artistIds.length === 1 ? '' : 's'}`)
         router.push('/admin/messages')
       } catch (e) {
@@ -89,7 +111,7 @@ export function AdminComposeClient() {
         setIsSending(false)
       }
     },
-    [router, supabase],
+    [router, session?.access_token],
   )
 
   return (

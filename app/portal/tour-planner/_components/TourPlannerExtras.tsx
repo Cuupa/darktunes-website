@@ -8,6 +8,7 @@ import { Trash } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DateField } from '@/components/ui/date-field'
 import { Textarea } from '@/components/ui/textarea'
 import { tourPlannerFetch, wasQueuedOffline } from '@/lib/tour-planner/clientApi'
 import { useOnlineStatus } from '@/lib/offline/useOnlineStatus'
@@ -18,6 +19,7 @@ import { dbStopToTrack } from '@/lib/tour-planner/mappers'
 import {
   downloadMerchSettlementPdf,
   downloadSettlementPdf,
+  downloadTourItineraryPdf,
   type TourPlannerPdfLabels,
 } from '@/lib/tour-planner/pdf'
 import {
@@ -74,6 +76,11 @@ export function buildTourPlannerPdfLabels(t: PortalTranslator): TourPlannerPdfLa
     itemsSold: t('tour_planner_merch_items_sold'),
     signedAt: t('tour_planner_pdf_signed_at'),
     signature: t('tour_planner_pdf_signature'),
+    itinerary: t('tour_guide_export_itinerary'),
+    status: t('tour_planner_show_status_label'),
+    hotel: t('tour_planner_hotel_name'),
+    travelDay: t('tour_planner_travel_day_label'),
+    deal: t('tour_planner_deal_type'),
   }
 }
 
@@ -159,6 +166,14 @@ export function MapRoutePanel({ artistId, activeTour, stops }: { artistId: strin
           <>
             <Button variant="outline" onClick={exportCsv}>{t('tour_planner_export_csv')}</Button>
             <Button variant="outline" onClick={exportText}>{t('tour_planner_export_text')}</Button>
+            {activeTour && (
+              <Button
+                variant="outline"
+                onClick={() => downloadTourItineraryPdf(activeTour, stops, buildTourPlannerPdfLabels(t))}
+              >
+                {t('tour_guide_export_itinerary')}
+              </Button>
+            )}
           </>
         )}
       </div>
@@ -215,7 +230,12 @@ function CrewMemberForm({
       <Input placeholder={t('tour_planner_contact_email')} value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
       <Input placeholder={t('tour_planner_contact_phone')} value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
       <Input placeholder={t('tour_planner_passport_number')} value={draft.passportNumber} onChange={(e) => setDraft({ ...draft, passportNumber: e.target.value })} />
-      <Input type="date" value={draft.passportExpiry} onChange={(e) => setDraft({ ...draft, passportExpiry: e.target.value })} aria-label={t('tour_planner_passport_expiry')} />
+      <DateField
+        id="tour-passport-expiry"
+        value={draft.passportExpiry}
+        onChange={(v) => setDraft({ ...draft, passportExpiry: v })}
+        aria-label={t('tour_planner_passport_expiry')}
+      />
       <Input placeholder={t('tour_planner_nationality')} value={draft.nationality} onChange={(e) => setDraft({ ...draft, nationality: e.target.value })} />
       <Input placeholder={t('tour_planner_visa_info')} value={draft.visaInfo} onChange={(e) => setDraft({ ...draft, visaInfo: e.target.value })} />
       <Input placeholder={t('tour_planner_room_assignment')} value={draft.roomAssignment} onChange={(e) => setDraft({ ...draft, roomAssignment: e.target.value })} />

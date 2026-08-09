@@ -7,20 +7,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { authenticatePortalBearer } from '@/lib/portal/bearerAuth'
-import {
-  getArtistProfileByArtistId,
-  resolvePortalArtist,
-} from '@/lib/api/artistProfiles'
+import { getArtistProfileByArtistId } from '@/lib/api/artistProfiles'
 import { ensureMigratedEpkDocument } from '@/lib/api/epkDocument'
+import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withPortalMembership'
 import { generateEpkPdfBytes } from '@/lib/epk/export/generateEpkPdfBytes'
 import { ensureDocumentFontsForExport } from '@/lib/epk/editor/ensureDocumentFontsForExport'
 import { buildEpkFontPublicUrl, listEpkFonts } from '@/lib/api/epkFonts'
 import { epkDocumentV2Schema } from '@/lib/epk/schema/documentV2'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
-import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
+import { getClientIp } from '@/lib/ipRateLimit'
+import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { emptyArtistProfile } from '@/lib/epk/migrate/emptyArtistProfile'
 import { recordEpkDownloadAsync } from '@/lib/epk/recordEpkDownload'
+import { PORTAL_EPK_EXPORT_RATE } from '@/lib/uploads/portalUploadLimits'
 
 export const maxDuration = 60
 
@@ -30,37 +29,48 @@ const bodySchema = z.object({
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  const ip = getClientIp(req)
-  const { limited } = checkRateLimit(`epk-export:${ip}`, 10, 10 * 60_000)
-  if (limited) throw new ApiError(429, 'Too many export requests. Please try again later.')
-
-  const { supabase, user } = await authenticatePortalBearer(req)
   const body = bodySchema.parse(await req.json())
+  const ctx = await withPortalMembershipWrite(req, body.artist_id)
+  const { artist } = ctx
 
-  const artist = await resolvePortalArtist(supabase, user.id, body.artist_id).catch((err) => {
-    const msg = err instanceof Error ? err.message : ''
-    if (msg.startsWith('FORBIDDEN')) throw new ApiError(403, 'No artist linked to this account')
-    throw err
-  })
-  if (!artist) throw new ApiError(403, 'No artist linked to this account')
+  const ip = getClientIp(req)
+  const rl = await checkDistributedRateLimit(
+    `epk-export:${ctx.user.id}:${ip}`,
+    PORTAL_EPK_EXPORT_RATE.max,
+    PORTAL_EPK_EXPORT_RATE.windowMs,
+  )
+  if (rl.limited) throw new ApiError(429, 'Too many export requests. Please try again later.')
 
   let document = body.document
 
   if (!document) {
-    const profile = await getArtistProfileByArtistId(supabase, artist.id)
+    const { value: profile } = await portalMemberWrite(
+      ctx,
+      { route: 'POST /api/portal/epk/export', table: 'artist_epks', operation: 'select' },
+      (db) => getArtistProfileByArtistId(db, artist.id),
+    )
     const siteSettings = await getCachedSiteSettings().catch(() => null)
-    const state = await ensureMigratedEpkDocument(
-      supabase,
-      artist.id,
-      profile ?? emptyArtistProfile(artist.id),
-      artist,
-      siteSettings?.labelName ?? undefined,
+    const { value: state } = await portalMemberWrite(
+      ctx,
+      { route: 'POST /api/portal/epk/export', table: 'artist_epks', operation: 'select' },
+      (db) =>
+        ensureMigratedEpkDocument(
+          db,
+          artist.id,
+          profile ?? emptyArtistProfile(artist.id),
+          artist,
+          siteSettings?.labelName ?? undefined,
+        ),
     )
     document = state.document
   }
 
   const { serverEnv } = await import('@/lib/env.server')
-  const fontRecords = await listEpkFonts(supabase, artist.id).catch(() => [])
+  const { value: fontRecords } = await portalMemberWrite(
+    ctx,
+    { route: 'POST /api/portal/epk/export', table: 'epk_fonts', operation: 'select' },
+    (db) => listEpkFonts(db, artist.id).catch(() => []),
+  )
   const hydratedDocument = ensureDocumentFontsForExport(document, fontRecords.map((font) => ({
     id: font.id,
     name: font.name,

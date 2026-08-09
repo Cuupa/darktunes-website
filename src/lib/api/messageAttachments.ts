@@ -8,6 +8,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import type { MessageAttachment } from '@/types'
+import {
+  assertMessageAttachmentAllowed,
+  isAllowedAttachmentUrl,
+} from '@/lib/messaging/attachments'
 
 type DbClient = SupabaseClient<Database>
 type Row = Database['public']['Tables']['message_attachments']['Row']
@@ -44,7 +48,13 @@ export async function createAttachmentRecord(
   url: string,
   mimeType: string,
   size: number,
+  opts?: { r2PublicUrl?: string },
 ): Promise<MessageAttachment> {
+  assertMessageAttachmentAllowed({ mimeType, sizeBytes: size, filename })
+  if (!isAllowedAttachmentUrl(url, opts?.r2PublicUrl)) {
+    throw new Error('Attachment URL host is not allowed (use R2 / signed storage paths)')
+  }
+
   const { data, error } = await db
     .from('message_attachments')
     .insert({ message_id: messageId, filename, url, mime_type: mimeType, size })

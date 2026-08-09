@@ -226,6 +226,7 @@ export function UsersManager() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState<InvitableRole>('artist')
   const [isInviting, setIsInviting] = useState(false)
+  const [resendingUserId, setResendingUserId] = useState<string | null>(null)
   const [nameEditTarget, setNameEditTarget] = useState<UserWithProfile | null>(null)
   const [nameEditValue, setNameEditValue] = useState('')
 
@@ -364,6 +365,26 @@ export function UsersManager() {
       toast.error(err instanceof Error ? err.message : 'Failed to send invite')
     } finally {
       setIsInviting(false)
+    }
+  }
+
+  const handleResendInvite = async (user: UserWithProfile) => {
+    if (user.last_sign_in_at) return
+    setResendingUserId(user.id)
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/resend-invite`, {
+        method: 'POST',
+      })
+      const json = (await res.json()) as { ok?: boolean; error?: string; expiresAt?: string | null }
+      if (!res.ok) {
+        toast.error(json.error ?? 'Failed to resend invite')
+        return
+      }
+      toast.success(`New invite link sent to ${user.email}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to resend invite')
+    } finally {
+      setResendingUserId(null)
     }
   }
 
@@ -587,6 +608,28 @@ export function UsersManager() {
                             </TooltipTrigger>
                             <TooltipContent>Edit user detail</TooltipContent>
                           </Tooltip>
+
+                          {/* Resend invite — only for users who never signed in */}
+                          {!u.last_sign_in_at && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => void handleResendInvite(u)}
+                                  disabled={isMutating || resendingUserId === u.id}
+                                  aria-label={`Resend invite to ${u.email}`}
+                                >
+                                  <EnvelopeSimple size={15} aria-hidden="true" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {resendingUserId === u.id
+                                  ? 'Sending…'
+                                  : 'Resend invite (new link)'}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
 
                           {/* View History */}
                           <Tooltip>

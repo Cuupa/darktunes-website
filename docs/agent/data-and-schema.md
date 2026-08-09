@@ -18,7 +18,9 @@ UI data originates from Supabase. After writes, invalidate ISR via the relevant 
 
 Hooks in `src/hooks/` wrap DAL; short-circuit when `isSupabaseConfigured` is false.
 
-**Public vs admin:** `getPublicArtists/Releases/Concerts()` filter `is_visible`; releases also `is_promo = FALSE`. Admin hooks use unrestricted getters.
+**Public vs admin:** `getPublicArtists` / `getPublicArtistBySlug` / `getPublicRelatedArtists` (`publicArtist.ts`) use **column whitelist only** — never secrets. Full `getArtists` / `getArtistById` merge `artist_private_data` for staff/portal. Releases/concerts still filter `is_visible`; releases also `is_promo = FALSE`. Admin hooks use unrestricted getters.
+
+**Private artist secrets:** Table `artist_private_data` (`email`, `vat_number`, `notes`, `bandsintown_api_key`, `storage_quota_bytes`, `is_eu_non_german`). DAL: `artistPrivateData.ts` + dual-write in `updateArtist`/`createArtist` and portal Bandsintown routes. Public EPK: `publicArtistEpk.ts` + service-role only (no anon RLS on `artist_epks`).
 
 **Server clients:** `createServerSupabaseClient()` (RSC/handlers), `createBrowserSupabaseClient()` (client). **Deprecated:** `src/lib/supabase.ts`.
 
@@ -32,6 +34,8 @@ Entity-level (combine with list tag): `artist-${slug}`, `release-${id}`, `news-$
 
 `POST /api/revalidate-content` accepts optional `entityTags` for webhook-driven invalidation.
 
+**Portal calendar:** `getCachedCalendarReleases` (`releases` tag) + `getCachedCalendarConcerts` (`concerts` tag) in `src/lib/cache/publicQueries.ts`. Slim nested selects only; no cookie-bound Supabase inside those cache callbacks.
+
 ## R2 object keys
 
 Store key in DB `r2_key` column for cleanup via `deleteObjectFromR2`.
@@ -43,6 +47,7 @@ Store key in DB `r2_key` column for cleanup via `deleteObjectFromR2`.
 | `profile-photos/{artistId}/` | Portal photos |
 | `release-covers/{artistId}/` | Portal release covers |
 | `statements/{artistId}/` | SOS PDFs |
+| `invoices/{artistId}/{invoiceId}.pdf` | Issued invoice PDFs (write-once; store `pdf_sha256`) |
 | `artist-assets/{artistId}/` | Marketing uploads |
 | `artist-documents/{artistId}/` | Document vault |
 | `press-kit/{category}/` | EPK assets |
@@ -51,9 +56,13 @@ Store key in DB `r2_key` column for cleanup via `deleteObjectFromR2`.
 
 Bronze limits: SSOT `src/lib/sos/bronzeUploadLimits.ts` only.
 
+**Statement provenance:** `sales_statements.batch_id` → `distributor_import_batches` (`file_hash`, `distributor`, period, `r2_key`). Portal artists may SELECT linked batches (policy `distributor_import_batches: artist read linked`). Source CSV download is server-streamed only.
+
 ## Schema management
 
 ⛔ **No** `supabase/migrations/`. Only `supabase/reset.sql` + `src/types/database.ts`.
+
+CI: `npm run verify:schema-columns` (part of `ci:contracts` / `npm run ci`) **fails** if any `supabase/migrations/*.sql` file exists. Empty dir / README-only is fine. Fold all schema into idempotent `reset.sql` + update `src/types/database.ts`.
 
 Schema change checklist:
 
@@ -82,5 +91,10 @@ Apply: paste `reset.sql` into Supabase SQL Editor (idempotent on live DB).
 | `merch_orders` | Worker → persist |
 | `page_events` | `POST /api/page-events` |
 | `epk_download_events` | Export routes |
+| `artist_listener_metrics` (`source`: lastfm \| soundcharts \| **apify**) | Admin listener sync / Apify Spotify plays |
+| `spotify_track_play_snapshots` | Apify album scrapes — public lifetime play counts per track/period (**not** SOS) |
+| `apify_usage_months` | Monthly Apify URL budget counter (default 1200) |
+
+**Apify vs SOS:** Public Spotify scrapes must never write `streaming_stats` / territory revenue gold. Portal copy labels Apify as non-settlement.
 
 Portal analytics uses authenticated primary client (RLS), not replica.

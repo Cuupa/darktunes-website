@@ -19,6 +19,7 @@ export const SYSTEM_BELIEVE_PROFILE_ID = 'system-believe'
 export const SYSTEM_SHOPIFY_PROFILE_ID = 'system-shopify'
 export const SYSTEM_PRINTFUL_PROFILE_ID = 'system-printful'
 export const SYSTEM_DARKMERCH_PROFILE_ID = 'system-darkmerch'
+/** @deprecated Artist roster is loaded from the portal DB — not from CSV. */
 export const SYSTEM_LABEL_ARTISTS_PROFILE_ID = 'system-label-artists'
 
 // ── Internal field key → streaming-parser internal field name mapping ─────────
@@ -166,26 +167,8 @@ const DARKMERCH_ORDERS: CsvImportProfile = {
   isSystemDefault: true,
 }
 
-const LABEL_ARTISTS_MASTER_DATA: CsvImportProfile = {
-  id: SYSTEM_LABEL_ARTISTS_PROFILE_ID,
-  name: 'Label Artists (Stammdaten)',
-  type: 'master-data',
-  delimiter: ',',
-  autoDetectHeaders: ['name', 'email', 'vatNumber', 'isEuNonGerman', 'notes'],
-  columnMapping: {
-    name:          'name',
-    email:         'email',
-    vatNumber:     'vatNumber',
-    isEuNonGerman: 'isEuNonGerman',
-    notes:         'notes',
-    accountHolder: 'accountHolder',
-    iban:          'iban',
-    bic:           'bic',
-  },
-  isSystemDefault: true,
-}
-
-/** All system default profiles in priority order for auto-detection. */
+/** All system default profiles in priority order for auto-detection.
+ * Artist master data is intentionally excluded — SOS uses the portal artist roster + billing profiles. */
 export const DEFAULT_CSV_PROFILES: CsvImportProfile[] = [
   BELIEVE_DIGITAL,
   BANDCAMP_DDS_PAYOUTS,
@@ -193,5 +176,4 @@ export const DEFAULT_CSV_PROFILES: CsvImportProfile[] = [
   DARKMERCH_ORDERS,
   SHOPIFY_ORDERS,
   PRINTFUL_COSTS,
-  LABEL_ARTISTS_MASTER_DATA,
 ]

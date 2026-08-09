@@ -92,14 +92,15 @@ const PUBLIC_NAMESPACES = [
  * so it is not silently dropped for the relevant route group.
  */
 export const ROUTE_BUNDLES: Record<string, readonly Namespace[]> = {
-  // Standalone centralized login page — needs portal strings for the form.
-  '/login': ['portal'],
+  // Standalone centralized login page — needs portal strings for the form
+  // plus the public shell (header, footer, consent, PWA prompt).
+  '/login': ['portal', 'navigation', 'footer', 'consent', 'errors', 'pwa'],
   // `newsletter`: /portal/fan-page embeds the public NewsletterSection.
-  '/portal': ['portal', 'portalHelp', 'newsletter'],
-  // `portal`: /admin/events reuses the portal event components.
-  '/admin': ['admin', 'adminSubmissions', 'portal'],
-  // /editor renders AdminDashboardWrapper, so it needs the admin namespaces.
-  '/editor': ['admin', 'adminSubmissions', 'portal'],
+  '/portal': ['portal', 'portalHelp', 'newsletter', 'errors', 'pwa'],
+  // Admin reuses portal components (e.g. EventManager) — include portal strings
+  // or keys render as raw "portal.tour_heading" in the admin UI.
+  '/admin': ['admin', 'adminSubmissions', 'portal', 'errors', 'pwa'],
+  '/editor': ['admin', 'adminSubmissions', 'portal', 'errors', 'pwa'],
   '/press': [
     'press',
     'pressLanding',
@@ -208,6 +209,43 @@ const loaders: Record<Locale, Record<Namespace, () => Promise<unknown>>> = {
     errors: () => import('./messages/de/errors.json').then((m) => m.default),
     admin: () => import('./messages/de/admin.json').then((m) => m.default),
     pwa: () => import('./messages/de/pwa.json').then((m) => m.default),
+  },
+  fr: {
+    navigation: () => import('./messages/fr/navigation.json').then((m) => m.default),
+    hero: () => import('./messages/fr/hero.json').then((m) => m.default),
+    artists: () => import('./messages/fr/artists.json').then((m) => m.default),
+    releases: () => import('./messages/fr/releases.json').then((m) => m.default),
+    news: () => import('./messages/fr/news.json').then((m) => m.default),
+    videos: () => import('./messages/fr/videos.json').then((m) => m.default),
+    concerts: () => import('./messages/fr/concerts.json').then((m) => m.default),
+    spotify: () => import('./messages/fr/spotify.json').then((m) => m.default),
+    footer: () => import('./messages/fr/footer.json').then((m) => m.default),
+    newsletter: () => import('./messages/fr/newsletter.json').then((m) => m.default),
+    consent: () => import('./messages/fr/consent.json').then((m) => m.default),
+    releaseDetail: () => import('./messages/fr/releaseDetail.json').then((m) => m.default),
+    artistDetail: () => import('./messages/fr/artistDetail.json').then((m) => m.default),
+    pages: () => import('./messages/fr/pages.json').then((m) => m.default),
+    portal: () => import('./messages/fr/portal.json').then((m) => m.default),
+    portalHelp: () => import('./messages/fr/portalHelp.json').then((m) => m.default),
+    press: () => import('./messages/fr/press.json').then((m) => m.default),
+    pressDashboard: () => import('./messages/fr/pressDashboard.json').then((m) => m.default),
+    promoPool: () => import('./messages/fr/promoPool.json').then((m) => m.default),
+    contact: () => import('./messages/fr/contact.json').then((m) => m.default),
+    newsPage: () => import('./messages/fr/newsPage.json').then((m) => m.default),
+    about: () => import('./messages/fr/about.json').then((m) => m.default),
+    datenschutz: () => import('./messages/fr/datenschutz.json').then((m) => m.default),
+    impressum: () => import('./messages/fr/impressum.json').then((m) => m.default),
+    pressReleases: () => import('./messages/fr/pressReleases.json').then((m) => m.default),
+    pressKit: () => import('./messages/fr/pressKit.json').then((m) => m.default),
+    apply: () => import('./messages/fr/apply.json').then((m) => m.default),
+    pressProfile: () => import('./messages/fr/pressProfile.json').then((m) => m.default),
+    pressContact: () => import('./messages/fr/pressContact.json').then((m) => m.default),
+    pressLanding: () => import('./messages/fr/pressLanding.json').then((m) => m.default),
+    pressLogin: () => import('./messages/fr/pressLogin.json').then((m) => m.default),
+    adminSubmissions: () => import('./messages/fr/adminSubmissions.json').then((m) => m.default),
+    errors: () => import('./messages/fr/errors.json').then((m) => m.default),
+    admin: () => import('./messages/fr/admin.json').then((m) => m.default),
+    pwa: () => import('./messages/fr/pwa.json').then((m) => m.default),
   },
 }
 

@@ -21,6 +21,16 @@ export const ASSISTANT_WIZARD_STEP_IDS: readonly AssistantWizardStep[] = [
 /** @deprecated Use QUICK_WIZARD_STEP_IDS */
 export const GUIDED_WIZARD_STEP_IDS = QUICK_WIZARD_STEP_IDS
 
+export type GuidedStepGateInput = {
+  hasData: boolean
+  isProcessing: boolean
+  hasBlockingValidation?: boolean
+  /** When false, Setup step cannot continue (invalid period / required fields). */
+  setupComplete?: boolean
+  /** When false, Upload cannot continue (exchange rates not loaded yet). */
+  ratesReady?: boolean
+}
+
 export function deriveSuggestedGuidedStep(input: {
   hasData: boolean
   isProcessing: boolean
@@ -38,11 +48,17 @@ export function guidedStepIndex(
 
 export function canAdvanceGuidedStep(
   step: GuidedWizardStep,
-  input: { hasData: boolean; isProcessing: boolean; hasBlockingValidation?: boolean },
+  input: GuidedStepGateInput,
   _stepIds: readonly GuidedWizardStep[] = QUICK_WIZARD_STEP_IDS,
 ): boolean {
-  if (step === 'setup') return true
-  if (step === 'upload') return input.hasData && !input.isProcessing
+  if (step === 'setup') return input.setupComplete !== false
+  if (step === 'upload') {
+    return (
+      input.hasData &&
+      !input.isProcessing &&
+      input.ratesReady !== false
+    )
+  }
   if (step === 'validate') return input.hasData && !input.hasBlockingValidation
   if (step === 'review') return input.hasData
   return false
@@ -60,4 +76,48 @@ export function canNavigateToGuidedStep(
     return input.hasData && !input.isProcessing
   }
   return false
+}
+
+export type GuidedBlockedReasonLabels = {
+  blockedSetupPeriod: string
+  blockedUploadNoData: string
+  blockedUploadProcessing: string
+  blockedUploadRates: string
+  blockedValidateErrors: string
+  blockedReviewNoData: string
+}
+
+const BLOCKED_REASON_FALLBACK: GuidedBlockedReasonLabels = {
+  blockedSetupPeriod: 'Select a valid billing period (start and end month) to continue.',
+  blockedUploadNoData: 'Upload at least one sales file and wait until numbers appear.',
+  blockedUploadProcessing: 'Please wait — files are still being processed.',
+  blockedUploadRates: 'Please wait — exchange rates are still loading.',
+  blockedValidateErrors: 'Fix the blocking errors in the checklist before continuing.',
+  blockedReviewNoData: 'Upload and process sales files before publishing.',
+}
+
+/**
+ * Human-readable reason Continue is disabled, or null when advance is allowed.
+ */
+export function guidedContinueBlockedReason(
+  step: GuidedWizardStep,
+  input: GuidedStepGateInput,
+  labels: Partial<GuidedBlockedReasonLabels> = {},
+): string | null {
+  const t = { ...BLOCKED_REASON_FALLBACK, ...labels }
+  if (canAdvanceGuidedStep(step, input)) return null
+
+  if (step === 'setup') return t.blockedSetupPeriod
+  if (step === 'upload') {
+    if (input.ratesReady === false) return t.blockedUploadRates
+    if (input.isProcessing) return t.blockedUploadProcessing
+    return t.blockedUploadNoData
+  }
+  if (step === 'validate') {
+    if (!input.hasData) return t.blockedUploadNoData
+    if (input.hasBlockingValidation) return t.blockedValidateErrors
+    return t.blockedUploadNoData
+  }
+  if (step === 'review') return t.blockedReviewNoData
+  return null
 }

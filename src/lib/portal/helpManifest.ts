@@ -79,15 +79,24 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         ],
       },
       {
-        id: 'analytics',
-        titleKey: 'topic_analytics_title',
-        route: '/portal/analytics',
+        id: 'spotify-trends',
+        titleKey: 'topic_spotify_trends_title',
+        route: '/portal/spotify-trends',
         featureFlag: 'artist.analytics',
         sections: [
-          section('overview', 'overview', 'topic_analytics_overview_title', 'topic_analytics_overview_body', ['streaming', 'earnings', 'territories', 'analytics']),
+          section('overview', 'overview', 'topic_spotify_trends_overview_title', 'topic_spotify_trends_overview_body', ['spotify', 'listeners', 'followers', 'trends']),
+          section('troubleshoot', 'troubleshoot', 'topic_spotify_trends_troubleshoot_title', 'topic_spotify_trends_troubleshoot_body', ['no data', 'keine daten']),
+        ],
+      },
+      {
+        id: 'sos-analytics',
+        titleKey: 'topic_sos_analytics_title',
+        route: '/portal/sos-analytics',
+        featureFlag: 'artist.analytics',
+        sections: [
+          section('overview', 'overview', 'topic_analytics_overview_title', 'topic_analytics_overview_body', ['streaming', 'earnings', 'territories', 'analytics', 'sos']),
           section('toolbar', 'subfeature', 'topic_analytics_toolbar_title', 'topic_analytics_toolbar_body', ['filter', 'export', 'csv', 'schnellsuche']),
           section('tab_streaming', 'subfeature', 'topic_analytics_tab_streaming_title', 'topic_analytics_tab_streaming_body'),
-          section('tab_listeners', 'subfeature', 'topic_analytics_tab_listeners_title', 'topic_analytics_tab_listeners_body', ['lastfm', 'soundcharts']),
           section('tab_territories', 'subfeature', 'topic_analytics_tab_territories_title', 'topic_analytics_tab_territories_body', ['country', 'land']),
           section('tab_events', 'subfeature', 'topic_analytics_tab_events_title', 'topic_analytics_tab_events_body', ['concert impact', 'promo']),
           section('tab_earnings', 'subfeature', 'topic_analytics_tab_earnings_title', 'topic_analytics_tab_earnings_body', ['revenue', 'umsatz']),
@@ -169,7 +178,6 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         route: '/portal/releases',
         sections: [
           section('overview', 'overview', 'topic_releases_overview_title', 'topic_releases_overview_body'),
-          section('checklist', 'subfeature', 'topic_releases_checklist_title', 'topic_releases_checklist_body'),
           section('troubleshoot', 'troubleshoot', 'topic_releases_troubleshoot_title', 'topic_releases_troubleshoot_body'),
         ],
       },
@@ -182,6 +190,7 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           section('fields', 'subfeature', 'topic_release_submission_fields_title', 'topic_release_submission_fields_body', ['isrc', 'catalog']),
           section('cover-art', 'subfeature', 'topic_release_submission_cover_title', 'topic_release_submission_cover_body', ['3000x3000', 'jpeg']),
           section('workflow', 'workflow', 'topic_release_submission_workflow_title', 'topic_release_submission_workflow_body'),
+          section('status', 'workflow', 'topic_release_submission_status_title', 'topic_release_submission_status_body'),
           section('troubleshoot', 'troubleshoot', 'topic_release_submission_troubleshoot_title', 'topic_release_submission_troubleshoot_body'),
         ],
       },
@@ -199,10 +208,15 @@ export const HELP_CATEGORIES: HelpCategory[] = [
         id: 'calendar',
         titleKey: 'topic_calendar_title',
         route: '/portal/calendar',
-        featureFlag: 'artist.calendar',
+        // Always available for portal artists (nav not gated by artist.calendar).
         sections: [
           section('overview', 'overview', 'topic_calendar_overview_title', 'topic_calendar_overview_body'),
-          section('filters', 'subfeature', 'topic_calendar_filters_title', 'topic_calendar_filters_body', ['pre-save']),
+          section('filters', 'subfeature', 'topic_calendar_filters_title', 'topic_calendar_filters_body', [
+            'pre-save',
+            'events',
+            'releases',
+            'mine',
+          ]),
           section('troubleshoot', 'troubleshoot', 'topic_calendar_troubleshoot_title', 'topic_calendar_troubleshoot_body'),
         ],
       },

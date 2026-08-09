@@ -17,30 +17,45 @@ import {
 import type { InterviewRequest } from '@/types'
 
 interface PortalInterviewsClientProps {
+  artistId: string
   initialRequests: InterviewRequest[]
 }
 
-export function PortalInterviewsClient({ initialRequests }: PortalInterviewsClientProps) {
+export function PortalInterviewsClient({
+  artistId,
+  initialRequests,
+}: PortalInterviewsClientProps) {
   const t = useTranslations('portal')
 
   const [items, setItems] = useState(initialRequests)
   const [savingId, setSavingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const authHeaders = async (): Promise<HeadersInit> => {
+    const supabase = createBrowserSupabaseClient()
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    if (!session?.access_token) throw new Error(t('interviews_error'))
+    return {
+      Authorization: `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    }
+  }
+
+  const requestUrl = (id: string) =>
+    `/api/portal/interview-requests/${encodeURIComponent(id)}?artistId=${encodeURIComponent(artistId)}`
 
   const updateRequest = async (id: string, status: string, artistReply: string) => {
+    if (!artistId) {
+      toast.error(t('interviews_error'))
+      return
+    }
     setSavingId(id)
     try {
-      const supabase = createBrowserSupabaseClient()
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error(t('interviews_error'))
-
-      const res = await fetch(`/api/portal/interview-requests/${id}`, {
+      const res = await fetch(requestUrl(id), {
         method: 'PATCH',
-        headers: {
-          Authorization: 'Bearer ' + session.access_token,
-          'Content-Type': 'application/json',
-        },
+        headers: await authHeaders(),
         body: JSON.stringify({ status, artistReply }),
       })
       if (!res.ok) throw new Error(t('interviews_error'))
@@ -54,6 +69,28 @@ export function PortalInterviewsClient({ initialRequests }: PortalInterviewsClie
     }
   }
 
+  const deleteRequest = async (id: string) => {
+    if (!artistId) {
+      toast.error(t('interviews_delete_error'))
+      return
+    }
+    if (!window.confirm(t('interviews_delete_confirm'))) return
+    setDeletingId(id)
+    try {
+      const res = await fetch(requestUrl(id), {
+        method: 'DELETE',
+        headers: await authHeaders(),
+      })
+      if (!res.ok) throw new Error(t('interviews_delete_error'))
+      setItems((prev) => prev.filter((item) => item.id !== id))
+      toast.success(t('interviews_deleted'))
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t('interviews_delete_error'))
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">{t('interviews_heading')}</h1>
@@ -63,7 +100,9 @@ export function PortalInterviewsClient({ initialRequests }: PortalInterviewsClie
             key={item.id}
             request={item}
             saving={savingId === item.id}
+            deleting={deletingId === item.id}
             onSave={updateRequest}
+            onDelete={deleteRequest}
           />
         ))}
         {items.length === 0 && <p className="text-sm text-muted-foreground">{t('interviews_empty')}</p>}
@@ -75,15 +114,20 @@ export function PortalInterviewsClient({ initialRequests }: PortalInterviewsClie
 function InterviewCard({
   request,
   saving,
+  deleting,
   onSave,
+  onDelete,
 }: {
   request: InterviewRequest
   saving: boolean
+  deleting: boolean
   onSave: (id: string, status: string, artistReply: string) => Promise<void>
+  onDelete: (id: string) => Promise<void>
 }) {
   const t = useTranslations('portal')
   const [status, setStatus] = useState(request.status)
   const [artistReply, setArtistReply] = useState(request.artistReply ?? '')
+  const busy = saving || deleting
 
   return (
     <div className="rounded-lg border border-border p-4 space-y-3">
@@ -94,7 +138,7 @@ function InterviewCard({
       <p className="text-sm">{request.message}</p>
       <div className="space-y-1">
         <Label>{t('interviews_status')}</Label>
-        <Select value={status} onValueChange={setStatus}>
+        <Select value={status} onValueChange={setStatus} disabled={busy}>
           <SelectTrigger className="min-h-[44px]">
             <SelectValue />
           </SelectTrigger>
@@ -107,11 +151,31 @@ function InterviewCard({
       </div>
       <div className="space-y-1">
         <Label>{t('interviews_reply')}</Label>
-        <Textarea rows={3} value={artistReply} onChange={(e) => setArtistReply(e.target.value)} />
+        <Textarea
+          rows={3}
+          value={artistReply}
+          onChange={(e) => setArtistReply(e.target.value)}
+          disabled={busy}
+        />
       </div>
-      <Button className="min-h-[44px]" disabled={saving} onClick={() => void onSave(request.id, status, artistReply)}>
-        {saving ? t('interviews_saving') : t('interviews_save')}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          className="min-h-[44px]"
+          disabled={busy}
+          onClick={() => void onSave(request.id, status, artistReply)}
+        >
+          {saving ? t('interviews_saving') : t('interviews_save')}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-[44px] text-destructive border-destructive/40 hover:bg-destructive/10"
+          disabled={busy}
+          onClick={() => void onDelete(request.id)}
+        >
+          {deleting ? t('interviews_deleting') : t('interviews_delete')}
+        </Button>
+      </div>
     </div>
   )
 }

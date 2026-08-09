@@ -16,6 +16,7 @@ import {
 import { isPressApplicationsEnabled } from '@/lib/pressAccess'
 import { z } from 'zod'
 import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
+import { emitNotification } from '@/lib/notifications/emit'
 
 const ApplySchema = z.object({
   email: z.string().email(),
@@ -66,5 +67,18 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     message: message ?? null,
     user_id: user?.id ?? null,
   })
+
+  try {
+    await emitNotification(db, {
+      type: 'journalist_application_submitted',
+      entityId: application.id,
+      entityName: `${name} — ${outlet}`,
+      senderId: user?.id ?? null,
+      dedupeKey: `journalist_application_submitted:${application.id}`,
+    })
+  } catch (err) {
+    console.error('[journalist-applications] staff notify failed:', err)
+  }
+
   return NextResponse.json({ application }, { status: 201 })
 })

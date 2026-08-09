@@ -35,13 +35,14 @@ export function getTestUser(role: TestUserRole): TestUserCredentials {
 export async function loginAsAdmin(page: Page): Promise<void> {
   const creds = getTestUser('admin')
 
-  await page.goto('/admin/login', { waitUntil: 'domcontentloaded' })
-  await page.getByLabel('Email').fill(creds.email)
-  await page.getByLabel('Password').fill(creds.password)
-  await page.getByRole('button', { name: /sign in/i }).click()
+  // Centralized login lives at /login (legacy /admin/login and /portal/login are gone).
+  await page.goto('/login?returnTo=/admin', { waitUntil: 'domcontentloaded' })
+  await page.getByLabel(/email/i).fill(creds.email)
+  await page.getByLabel(/password/i).first().fill(creds.password)
+  await page.getByRole('button', { name: /sign in|login|anmelden/i }).first().click()
 
-  await page.waitForURL(/\/admin(\?|$)/, { timeout: 15_000 })
-  await expect(page).toHaveURL(/\/admin(\?|$)/)
+  await page.waitForURL(/\/admin(\/|\?|$)/, { timeout: 20_000 })
+  await expect(page).toHaveURL(/\/admin(\/|\?|$)/)
 }
 
 export function getPressDashboardUser(): TestUserCredentials {
@@ -76,11 +77,13 @@ export async function loginForPressDashboard(page: Page): Promise<void> {
 export async function loginAsArtist(page: Page): Promise<void> {
   const creds = getTestUser('artist')
 
-  await page.goto('/portal/login', { waitUntil: 'domcontentloaded' })
+  await page.goto('/login?returnTo=/portal', { waitUntil: 'domcontentloaded' })
   await page.getByLabel(/email/i).fill(creds.email)
   await page.getByLabel(/password/i).first().fill(creds.password)
   await page.getByRole('button', { name: /sign in|login|anmelden/i }).first().click()
 
-  await page.waitForURL(/\/portal(\?|$)/, { timeout: 15_000 })
-  await expect(page).toHaveURL(/\/portal(\?|$)/)
+  // Onboarding gate may send incomplete profiles to /portal/onboarding — fixture
+  // artist is seeded complete so we expect the overview (or any /portal/*).
+  await page.waitForURL(/\/portal(\/|\?|$)/, { timeout: 20_000 })
+  await expect(page).toHaveURL(/\/portal(\/|\?|$)/)
 }

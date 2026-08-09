@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidateTag } from 'next/cache'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
@@ -44,6 +45,8 @@ export const PUT = withErrorHandler(async (req: NextRequest): Promise<NextRespon
   const db = await createServiceRoleSupabaseClient()
   await upsertCredential(db, { key, value, updatedBy: userId })
   invalidateCredentialCache()
+  // Health dashboard caches known-api configuration; bust so Apify/etc. show as configured.
+  revalidateTag('health-snapshot', 'max')
 
   const credentials = await listCredentialStatus(db)
   return NextResponse.json({ credentials })

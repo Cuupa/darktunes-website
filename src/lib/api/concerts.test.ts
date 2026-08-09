@@ -4,6 +4,7 @@ import type { Database } from '@/types/database'
 import {
   getConcerts,
   getConcertsByArtistId,
+  getAllVisibleConcertsForCalendar,
   createConcert,
   updateConcert,
   deleteConcert,
@@ -200,5 +201,68 @@ describe('deleteConcert', () => {
   it('deletes a concert row', async () => {
     const db = makeMockDb(null)
     await expect(deleteConcert(db, 'concert-id')).resolves.toBeUndefined()
+  })
+})
+
+describe('getAllVisibleConcertsForCalendar', () => {
+  it('maps nested artists in a single select (past + future)', async () => {
+    const calendarRow = {
+      id: 'cal-c1',
+      artist_id: 'art-1',
+      event_name: 'Spring Show',
+      venue_name: 'Arena',
+      venue_city: 'Berlin',
+      venue_country: 'DE',
+      concert_date: '2025-04-01',
+      ticket_url: 'https://example.com/t',
+      status: 'ok',
+      event_time: '20:00',
+      event_type: 'gig',
+      artists: { id: 'art-1', name: 'Alpha', slug: 'alpha', is_visible: true },
+      concert_artists: [
+        {
+          sort_order: 0,
+          artists: { id: 'art-2', name: 'Beta', slug: 'beta', is_visible: true },
+        },
+      ],
+    }
+    const builder = makeBuilder([calendarRow], null)
+    const db = { from: vi.fn().mockReturnValue(builder) } as unknown as DbClient
+
+    const result = await getAllVisibleConcertsForCalendar(db)
+    expect(result).toHaveLength(1)
+    expect(result[0].eventName).toBe('Spring Show')
+    expect(result[0].artistName).toBe('Alpha')
+    expect(result[0].featuredArtists).toEqual([
+      { id: 'art-2', name: 'Beta', slug: 'beta' },
+    ])
+    expect(builder.limit).toHaveBeenCalled()
+    // No gte(today) — calendar needs history + future
+    expect(builder.gte).not.toHaveBeenCalled()
+    expect(db.from).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops concerts whose only artists are hidden', async () => {
+    const calendarRow = {
+      id: 'cal-hidden',
+      artist_id: 'art-x',
+      event_name: 'Ghost Gig',
+      venue_name: null,
+      venue_city: null,
+      venue_country: null,
+      concert_date: '2025-01-01',
+      ticket_url: null,
+      status: 'ok',
+      event_time: null,
+      event_type: 'gig',
+      artists: { id: 'art-x', name: 'Hidden', slug: 'hidden', is_visible: false },
+      concert_artists: [],
+    }
+    const db = {
+      from: vi.fn().mockReturnValue(makeBuilder([calendarRow], null)),
+    } as unknown as DbClient
+
+    const result = await getAllVisibleConcertsForCalendar(db)
+    expect(result).toEqual([])
   })
 })

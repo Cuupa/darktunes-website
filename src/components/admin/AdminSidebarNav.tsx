@@ -11,14 +11,21 @@
  * MANAGEMENT, SYSTEM). Groups whose items are all hidden for the current role
  * are not rendered. The Dashboard link sits above all groups without a label.
  *
+ * All visible labels resolve through `admin.nav` so locale switches update
+ * the sidebar (LocaleFlagSwitcher reloads with the new NEXT_LOCALE cookie).
+ *
  * On mobile (< md) the sidebar is hidden; a hamburger button in the layout
  * header opens this nav inside a Sheet drawer.
  */
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { useCallback, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuthContext } from '@/contexts/AuthContext'
+import { useTranslations } from 'next-intl'
+import { LocaleFlagSwitcher } from '@/components/LocaleFlagSwitcher'
+import { isAdminNavActive } from '@/components/admin/adminNavActive'
+import { isStandaloneDisplayMode, requestPwaInstallPrompt } from '@/lib/pwa/installPrompt'
 import {
   SquaresFour,
   Microphone,
@@ -50,6 +57,7 @@ import {
   SlidersHorizontal,
   Globe,
   Question,
+  ChatTeardropDots,
 } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -59,29 +67,65 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/s
 import { DashboardNotificationBell } from '@/components/admin/DashboardNotificationBell'
 import { NavCountBadge } from '@/components/nav/NavCountBadge'
 import { useAdminNavBadges } from '@/hooks/useAdminNavBadges'
-import { useTranslations } from 'next-intl'
 
 import { getCmsPromoLogPath, getCmsTabPath, getCmsHomePath } from '@/lib/editor/cmsPaths'
 
+/** Keys under `admin.nav` for sidebar items and chrome. */
+type NavItemKey =
+  | 'dashboard'
+  | 'artists'
+  | 'releases'
+  | 'news'
+  | 'videos'
+  | 'events'
+  | 'tourProduction'
+  | 'releaseSubmissions'
+  | 'videoSubmissions'
+  | 'fanPageReviews'
+  | 'artistFeedback'
+  | 'submissionForm'
+  | 'pressAccreditations'
+  | 'pressPortal'
+  | 'assets'
+  | 'genres'
+  | 'accounting'
+  | 'labelIntelligence'
+  | 'statements'
+  | 'messages'
+  | 'promotionActivity'
+  | 'users'
+  | 'portalFaq'
+  | 'featureFlags'
+  | 'colors'
+  | 'settings'
+  | 'apiKeys'
+  | 'support'
+  | 'system'
+
+type NavGroupKey =
+  | 'group_content'
+  | 'group_submissions'
+  | 'group_press'
+  | 'group_management'
+  | 'group_system'
+
 interface NavItem {
-  label: string
-  /** When set, overrides `label` with `admin.nav[labelDictKey]` when available. */
-  labelDictKey?: 'labelIntelligence'
+  labelKey: NavItemKey
   href: string
   /** Optional editor-specific destination (e.g. /editor?tab=news). */
   editorHref?: string
   icon: React.ElementType
   adminOnly: boolean
-  badgeKey?: 'messages' | 'releaseSubmissions' | 'videoSubmissions' | 'fanPageReviews'
+  badgeKey?: 'messages' | 'releaseSubmissions' | 'videoSubmissions' | 'fanPageReviews' | 'portalFeedback'
 }
 
 interface NavGroup {
-  label: string
+  labelKey: NavGroupKey
   items: NavItem[]
 }
 
 const DASHBOARD_ITEM: NavItem = {
-  label: 'Dashboard',
+  labelKey: 'dashboard',
   href: '/admin',
   editorHref: getCmsHomePath('editor'),
   icon: SquaresFour,
@@ -90,81 +134,97 @@ const DASHBOARD_ITEM: NavItem = {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'CONTENT',
+    labelKey: 'group_content',
     items: [
-      { label: 'Artists',  href: '/admin/artists',  editorHref: getCmsTabPath('editor', 'artists'),  icon: Microphone,    adminOnly: false },
-      { label: 'Releases', href: '/admin/releases', editorHref: getCmsTabPath('editor', 'releases'), icon: VinylRecord,   adminOnly: false },
-      { label: 'News',     href: '/admin/news',     editorHref: getCmsTabPath('editor', 'news'),     icon: Newspaper,     adminOnly: false },
-      { label: 'Videos',   href: '/admin/videos',   editorHref: getCmsTabPath('editor', 'videos'),   icon: FilmStrip,     adminOnly: false },
-      { label: 'Events',   href: '/admin/events',   editorHref: getCmsTabPath('editor', 'events'),   icon: CalendarBlank, adminOnly: false },
-      { label: 'Tour Production', href: '/admin/tour-planner', icon: MapTrifold, adminOnly: true },
+      { labelKey: 'artists', href: '/admin/artists', editorHref: getCmsTabPath('editor', 'artists'), icon: Microphone, adminOnly: false },
+      { labelKey: 'releases', href: '/admin/releases', editorHref: getCmsTabPath('editor', 'releases'), icon: VinylRecord, adminOnly: false },
+      { labelKey: 'news', href: '/admin/news', editorHref: getCmsTabPath('editor', 'news'), icon: Newspaper, adminOnly: false },
+      { labelKey: 'videos', href: '/admin/videos', editorHref: getCmsTabPath('editor', 'videos'), icon: FilmStrip, adminOnly: false },
+      { labelKey: 'events', href: '/admin/events', editorHref: getCmsTabPath('editor', 'events'), icon: CalendarBlank, adminOnly: false },
+      { labelKey: 'tourProduction', href: '/admin/tour-planner', icon: MapTrifold, adminOnly: true },
     ],
   },
   {
-    label: 'SUBMISSIONS',
+    labelKey: 'group_submissions',
     items: [
-      { label: 'Release Submissions', href: '/admin/release-submissions', editorHref: getCmsTabPath('editor', 'release-submissions'), icon: UploadSimple, adminOnly: false, badgeKey: 'releaseSubmissions' },
-      { label: 'Video Submissions',   href: '/admin/video-submissions',   editorHref: getCmsTabPath('editor', 'video-submissions'),   icon: VideoCamera,  adminOnly: false, badgeKey: 'videoSubmissions' },
-      { label: 'Fan Page Reviews',    href: '/admin/fan-page-reviews',    editorHref: getCmsTabPath('editor', 'fan-page-reviews'),    icon: Globe,        adminOnly: false, badgeKey: 'fanPageReviews' },
-      { label: 'Submission Form',     href: '/admin/submission-form',     icon: SlidersHorizontal,                              adminOnly: true  },
+      { labelKey: 'releaseSubmissions', href: '/admin/release-submissions', editorHref: getCmsTabPath('editor', 'release-submissions'), icon: UploadSimple, adminOnly: false, badgeKey: 'releaseSubmissions' },
+      { labelKey: 'videoSubmissions', href: '/admin/video-submissions', editorHref: getCmsTabPath('editor', 'video-submissions'), icon: VideoCamera, adminOnly: false, badgeKey: 'videoSubmissions' },
+      { labelKey: 'fanPageReviews', href: '/admin/fan-page-reviews', editorHref: getCmsTabPath('editor', 'fan-page-reviews'), icon: Globe, adminOnly: false, badgeKey: 'fanPageReviews' },
+      { labelKey: 'artistFeedback', href: '/admin/feedback', icon: ChatTeardropDots, adminOnly: false, badgeKey: 'portalFeedback' },
+      { labelKey: 'submissionForm', href: '/admin/submission-form', icon: SlidersHorizontal, adminOnly: true },
     ],
   },
   {
-    label: 'PRESS',
+    labelKey: 'group_press',
     items: [
-      { label: 'Press Accreditations', href: '/admin/accreditations', icon: IdentificationCard, adminOnly: true },
-      { label: 'Press Portal',   href: '/admin/press',          icon: Briefcase,          adminOnly: true },
+      { labelKey: 'pressAccreditations', href: '/admin/accreditations', icon: IdentificationCard, adminOnly: true },
+      { labelKey: 'pressPortal', href: '/admin/press', icon: Briefcase, adminOnly: true },
     ],
   },
   {
-    label: 'MANAGEMENT',
+    labelKey: 'group_management',
     items: [
-      { label: 'Assets',      href: '/admin/assets',      icon: FolderOpen,      adminOnly: true  },
-      { label: 'Genres',      href: '/admin/genres',      icon: Tag,             adminOnly: true  },
-      { label: 'Accounting',  href: '/admin/accounting',  icon: Wallet,          adminOnly: true  },
-      { label: 'Label Intelligence', labelDictKey: 'labelIntelligence', href: '/admin/analytics', icon: ChartLine, adminOnly: true },
-      { label: 'Statements',  href: '/admin/statements',  icon: Receipt,         adminOnly: true  },
-      { label: 'Messages',    href: '/admin/messages',    icon: ChatCircle,      adminOnly: true, badgeKey: 'messages' },
-      { label: 'Promotion Activity',   href: '/admin/promo-log',   editorHref: getCmsPromoLogPath('editor'), icon: MegaphoneSimple, adminOnly: false },
-      { label: 'Users',       href: '/admin/users',       icon: UsersThree,      adminOnly: true  },
+      { labelKey: 'assets', href: '/admin/assets', icon: FolderOpen, adminOnly: true },
+      { labelKey: 'genres', href: '/admin/genres', icon: Tag, adminOnly: true },
+      { labelKey: 'accounting', href: '/admin/accounting', icon: Wallet, adminOnly: true },
+      { labelKey: 'labelIntelligence', href: '/admin/analytics', icon: ChartLine, adminOnly: true },
+      { labelKey: 'statements', href: '/admin/statements', icon: Receipt, adminOnly: true },
+      { labelKey: 'messages', href: '/admin/messages', icon: ChatCircle, adminOnly: true, badgeKey: 'messages' },
+      { labelKey: 'promotionActivity', href: '/admin/promo-log', editorHref: getCmsPromoLogPath('editor'), icon: MegaphoneSimple, adminOnly: false },
+      { labelKey: 'users', href: '/admin/users', icon: UsersThree, adminOnly: true },
     ],
   },
   {
-    label: 'SYSTEM',
+    labelKey: 'group_system',
     items: [
-      { label: 'Portal FAQ', href: '/admin/portal-faq', icon: Question, adminOnly: true },
-      { label: 'Feature Flags', href: '/admin/features', icon: ToggleRight, adminOnly: true },
-      { label: 'Colors',        href: '/admin/colors',   icon: Palette,     adminOnly: true },
-      { label: 'Settings',      href: '/admin/settings', icon: Gear,        adminOnly: true },
-      { label: 'API Keys',      href: '/admin/api-keys', icon: Key,         adminOnly: true },
-      { label: 'Support',       href: '/admin/support',  icon: Lifebuoy,    adminOnly: true },
-      { label: 'System',        href: '/admin/system',   icon: Cpu,         adminOnly: true },
+      { labelKey: 'portalFaq', href: '/admin/portal-faq', icon: Question, adminOnly: true },
+      { labelKey: 'featureFlags', href: '/admin/features', icon: ToggleRight, adminOnly: true },
+      { labelKey: 'colors', href: '/admin/colors', icon: Palette, adminOnly: true },
+      { labelKey: 'settings', href: '/admin/settings', icon: Gear, adminOnly: true },
+      { labelKey: 'apiKeys', href: '/admin/api-keys', icon: Key, adminOnly: true },
+      { labelKey: 'support', href: '/admin/support', icon: Lifebuoy, adminOnly: true },
+      { labelKey: 'system', href: '/admin/system', icon: Cpu, adminOnly: true },
     ],
   },
 ]
 
 export function AdminSidebarNav() {
+  const tToast = useTranslations('admin.toast')
+  const tPwa = useTranslations('pwa')
+
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const tNav = useTranslations('admin.nav')
   const t = useTranslations('admin')
   const { isAdmin, user, profile, signOut } = useAuthContext()
   const isEditorRole = profile?.role === 'editor'
   const brandTitle = isEditorRole ? t('brand_editor') : t('brand_admin')
+  const roleLabel =
+    profile?.role === 'editor'
+      ? tNav('role_editor')
+      : profile?.role === 'admin' || !profile?.role
+        ? tNav('role_admin')
+        : profile.role
   const notificationUserId = user?.id
   const showNotificationBell = Boolean(notificationUserId)
   const badges = useAdminNavBadges(notificationUserId ?? null, isAdmin)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [pwaInstalled, setPwaInstalled] = useState(false)
+
+  useEffect(() => {
+    setPwaInstalled(isStandaloneDisplayMode())
+  }, [])
 
   const handleSignOut = useCallback(async () => {
     const { error } = await signOut()
     if (error) {
-      toast.error('Failed to sign out')
+      toast.error(tToast('failed_sign_out'))
     } else {
-      toast.success('Signed out successfully')
+      toast.success(tToast('signed_out_success'))
       router.push('/login')
     }
-  }, [signOut, router])
+  }, [signOut, router, tToast])
 
   const canSee = (item: NavItem) => {
     if (isAdmin) return true
@@ -174,29 +234,13 @@ export function AdminSidebarNav() {
 
   const resolveHref = (item: NavItem) => (isEditorRole && item.editorHref ? item.editorHref : item.href)
 
-  const isActive = (item: NavItem) => {
-    const href = resolveHref(item)
-    if (href === '/admin' || href === '/editor') {
-      return pathname === href
-    }
-    if (href.startsWith('/editor?tab=')) {
-      return pathname === '/editor'
-    }
-    return pathname.startsWith(href)
-  }
-
-  const resolveNavLabel = (item: NavItem) => {
-    if (item.labelDictKey === 'labelIntelligence') {
-      return tNav('labelIntelligence')
-    }
-    return item.label
-  }
+  const isActive = (item: NavItem) => isAdminNavActive(resolveHref(item), pathname, searchParams)
 
   const renderNavItem = (item: NavItem, onNavigate?: () => void) => {
     const Icon = item.icon
     const href = resolveHref(item)
     const active = isActive(item)
-    const label = resolveNavLabel(item)
+    const label = tNav(item.labelKey)
     return (
       <li key={href}>
         <Link
@@ -219,7 +263,12 @@ export function AdminSidebarNav() {
   }
 
   const renderNavLinks = (onNavigate?: () => void) => (
-    <nav className="flex-1 overflow-y-auto py-3 px-2" style={{ overscrollBehavior: 'contain' }} data-lenis-prevent aria-label="Admin sections">
+    <nav
+      className="flex-1 overflow-y-auto py-3 px-2"
+      style={{ overscrollBehavior: 'contain' }}
+      data-lenis-prevent
+      aria-label={tNav('sectionsAria')}
+    >
       {/* Dashboard — above all groups, no group label */}
       <ul className="space-y-0.5 mb-2">
         {canSee(DASHBOARD_ITEM) && renderNavItem(DASHBOARD_ITEM, onNavigate)}
@@ -230,9 +279,9 @@ export function AdminSidebarNav() {
         const visibleItems = group.items.filter(canSee)
         if (visibleItems.length === 0) return null
         return (
-          <div key={group.label}>
+          <div key={group.labelKey}>
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground/50 px-3 pt-4 pb-1">
-              {group.label}
+              {tNav(group.labelKey)}
             </p>
             <ul className="space-y-0.5">
               {visibleItems.map((item) => renderNavItem(item, onNavigate))}
@@ -245,14 +294,24 @@ export function AdminSidebarNav() {
 
   const renderFooter = () => (
     <div className="border-t border-border px-3 py-3 space-y-2">
+      {/* Language switcher lives only in the brand header — avoid duplicates. */}
       <p className="text-xs text-muted-foreground truncate px-1">{user?.email}</p>
+      {!pwaInstalled ? (
+        <button
+          type="button"
+          onClick={() => requestPwaInstallPrompt()}
+          className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        >
+          {tPwa('install_button')}
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={handleSignOut}
         className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
       >
         <SignOut size={16} weight="bold" aria-hidden="true" />
-        Sign Out
+        {tNav('signOut')}
       </button>
     </div>
   )
@@ -263,21 +322,27 @@ export function AdminSidebarNav() {
       <header className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border bg-card px-4 md:hidden">
         <p className="text-sm font-bold tracking-wide">{brandTitle}</p>
         <div className="flex items-center gap-2">
+          <LocaleFlagSwitcher align="end" />
           {showNotificationBell && notificationUserId && (
             <DashboardNotificationBell userId={notificationUserId} />
           )}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Open admin navigation" className="min-h-[44px] min-w-[44px]">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={tNav('openNavAria')}
+                className="min-h-[44px] min-w-[44px]"
+              >
                 <List size={20} aria-hidden="true" />
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-56 p-0">
-              <SheetTitle className="sr-only">Admin Navigation</SheetTitle>
+              <SheetTitle className="sr-only">{tNav('navigationTitle')}</SheetTitle>
               <div className="flex h-full flex-col bg-card">
                 <div className="px-4 py-5 border-b border-border">
                   <p className="text-sm font-bold tracking-wide">{brandTitle}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{roleLabel}</p>
                 </div>
                 {renderNavLinks(() => setMobileOpen(false))}
                 {renderFooter()}
@@ -290,17 +355,20 @@ export function AdminSidebarNav() {
       {/* Desktop sidebar — hidden below md */}
       <aside
         className="hidden h-full min-h-0 w-56 shrink-0 flex-col border-r border-border bg-card md:flex"
-        aria-label="Admin navigation"
+        aria-label={tNav('navigationAria')}
       >
         {/* Brand header */}
-        <div className="px-4 py-5 border-b border-border flex items-center justify-between">
-          <div>
+        <div className="px-4 py-5 border-b border-border flex items-center justify-between gap-2">
+          <div className="min-w-0">
             <p className="text-sm font-bold tracking-wide">{brandTitle}</p>
-            <p className="text-xs text-muted-foreground mt-0.5 capitalize">{profile?.role ?? 'admin'}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{roleLabel}</p>
           </div>
-          {showNotificationBell && notificationUserId && (
-            <DashboardNotificationBell userId={notificationUserId} />
-          )}
+          <div className="flex items-center gap-1 shrink-0">
+            <LocaleFlagSwitcher align="end" />
+            {showNotificationBell && notificationUserId && (
+              <DashboardNotificationBell userId={notificationUserId} />
+            )}
+          </div>
         </div>
 
         {renderNavLinks()}
