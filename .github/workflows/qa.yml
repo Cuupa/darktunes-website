@@ -25,6 +25,11 @@ jobs:
       - run: npm run test
 
   e2e-tests:
+    # Run E2E only on pushes to long-lived branches (dev/main) — not on
+    # feature branches or PRs. See E2E-SUPPRESSION.md.
+    if: >-
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     env:
       # Cloudflare R2 isn't exercised by any E2E test (no test hits real
