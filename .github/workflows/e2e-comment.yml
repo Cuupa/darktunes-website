@@ -20,9 +20,18 @@ name: E2E on PR comment
 on:
   issue_comment:
     types: [created]
+  # Manual trigger for testing the job's steps before the `/e2e` comment path
+  # is live on the default branch. Pick any branch as the run ref, then supply
+  # the PR number to check out and report against.
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'PR number to run E2E against'
+        required: true
+        type: string
 
 concurrency:
-  group: e2e-comment-${{ github.event.issue.number }}
+  group: e2e-comment-${{ github.event.issue.number || inputs.pr }}
   cancel-in-progress: true
 
 permissions:
@@ -34,13 +43,17 @@ env:
 
 jobs:
   e2e:
-    # Only PR comments, only the `/e2e` command, only from write-access users.
+    # Manual dispatch always runs (already gated to write-access by Actions).
+    # Otherwise: only PR comments, only `/e2e`, only from write-access users.
     if: >-
-      github.event.issue.pull_request &&
-      startsWith(github.event.comment.body, '/e2e') &&
-      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.pull_request &&
+       startsWith(github.event.comment.body, '/e2e') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     env:
+      # PR number for either trigger: the commented PR, or the dispatch input.
+      PR_NUMBER: ${{ github.event.issue.number || inputs.pr }}
       # Cloudflare R2 isn't exercised by any E2E test — static placeholders just
       # satisfy env validation.
       CLOUDFLARE_R2_ACCOUNT_ID: placeholder-r2-account
@@ -55,6 +68,7 @@ jobs:
       E2E_STOP_DB_AFTER_TESTS: '1'
     steps:
       - name: Acknowledge the command (👍)
+        if: github.event_name == 'issue_comment'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -70,7 +84,7 @@ jobs:
       - name: Check out the PR HEAD
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh pr checkout ${{ github.event.issue.number }}
+        run: gh pr checkout ${{ env.PR_NUMBER }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -132,7 +146,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report-pr-${{ github.event.issue.number }}
+          name: playwright-report-pr-${{ env.PR_NUMBER }}
           path: playwright-report/
           retention-days: 14
 
@@ -141,5 +155,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh pr comment ${{ github.event.issue.number }} --body \
+          gh pr comment ${{ env.PR_NUMBER }} --body \
             "**E2E (Desktop Chrome): \`${{ job.status }}\`** — [logs & report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
