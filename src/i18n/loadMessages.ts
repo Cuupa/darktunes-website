@@ -106,6 +106,7 @@ export const ROUTE_BUNDLES: Record<string, readonly Namespace[]> = {
     'pressLanding',
     'pressLogin',
     'apply',
+    'portal',
     'pressContact',
     'pressDashboard',
     'pressReleases',
