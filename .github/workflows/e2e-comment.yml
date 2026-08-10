@@ -102,7 +102,7 @@ jobs:
         run: |
           gh api -X POST "repos/${{ github.repository }}/statuses/${{ steps.sha.outputs.head }}" \
             -f state=pending \
-            -f context="E2E (Desktop Chrome)" \
+            -f context="E2E (full browser matrix)" \
             -f description="Running Playwright suite…" \
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
@@ -189,7 +189,7 @@ jobs:
           esac
           gh api -X POST "repos/${{ github.repository }}/statuses/${{ steps.sha.outputs.head }}" \
             -f state="$state" \
-            -f context="E2E (Desktop Chrome)" \
+            -f context="E2E (full browser matrix)" \
             -f description="$desc" \
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
