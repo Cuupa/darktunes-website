@@ -19,9 +19,15 @@ Defined in `app/globals.css` `@theme {}`. `tailwind.config.js` is IDE-only — r
 
 Single `LenisProvider` in `Providers.tsx`. No second instance; no CSS `scroll-behavior: smooth`. Import `useLenis` from `LenisProvider.tsx`.
 
+**Public feel (desktop):** `LENIS_OPTIONS` — `lerp: 0.075`, `duration: 1.1`, `wheelMultiplier: 1`, `syncTouch: false`. Tuned for buttery document scroll; anchor `scrollTo` uses the longer duration.
+
 **Dashboard routes:** `LenisProvider` does **not mount** Lenis on `/admin/*`, `/portal/*`, or `/editor` (`src/lib/scroll/dashboardRoutes.ts`) so wheel events reach native scroll inside dashboard shells.
 
 **Touch:** Lenis always uses `syncTouch: false` so phones keep native touch scroll (syncTouch caused rubber-band ghosting with VFX GPU layers). Wheel/trackpad still get smooth Lenis on desktop. Do **not** mount/unmount Lenis from media queries — remounting the tree detaches focused nodes and flakes keyboard e2e.
+
+**Scroll VFX budget:** `ScrollFxController` sets `html[data-scrolling="1"]` while Lenis has velocity. CSS pauses CRT pulse, hides grain, drops chromatic/`will-change` on overlays and `.glow-card` during scroll so expensive GPU layers do not fight Lenis. Do **not** paper over jank with blanket `data-lenis-prevent` on carousels/sections.
+
+**Carousels (Swiper coverflow, related-artist strips):** Vertical wheel stays on Lenis. No `data-lenis-prevent` on the wrapper. Use `touch-action: pan-y` (or pan-x pan-y for horizontal strips) and optional axis-aware `onWheel` for horizontal slide changes only.
 
 **Dashboard scroll shell:** Admin and portal layouts use `ScrollableAppShell` (`src/components/layout/ScrollableAppShell.tsx`). Contract: outer `h-dvh overflow-hidden` → inner `flex-1 min-h-0 overflow-y-auto` with `data-lenis-prevent`. List routes set `lockScroll` so only `AdminListShell` scrolls internally.
 
@@ -119,8 +125,9 @@ CI: `npm run check:overlay` (`scripts/check-overlay-stack-contract.mjs`).
 `shouldPreventLenis` (`src/lib/scroll/lenisPrevent.ts`):
 
 1. Explicit `data-lenis-prevent` / scroll-area viewport → yield to native.
-2. Else: ancestors that **actually** overflow (computed `overflow` + `scrollWidth/Height` vs client size).
+2. Else: ancestors that **actually overflow vertically** only (`overflow-y` + `scrollHeight > clientHeight`). Horizontal-only overflow must not block document Lenis.
 3. Never gate only on class substrings (`overflow-x-auto` in a Tailwind string) — homepage Videos used that pattern and dead-zoned vertical scroll on desktop.
+4. `data-lenis-prevent` = “this is a nested vertical scrollport”, not “this widget is expensive”.
 
 **Mailbox UX:** Thread detail uses `MessageChatThread` (chat bubbles). Live arrivals can play `playNewMessageSound()`; users toggle via `MessageSoundToggle` (`localStorage` key `dt-message-sound-enabled`).
 
@@ -129,6 +136,8 @@ CI: `npm run check:overlay` (`scripts/check-overlay-stack-contract.mjs`).
 `VisualEffectsOverlay` in `NavHidingWrapper` — public routes only. Props from CMS `site_settings`. Raw, dark, industrial — no neon. `ThemeEffectsClient` cleans `data-fx-*` on unmount.
 
 **Mobile / coarse pointer:** `vfx-mobile-lite` — static vignette only; no CRT scanline animation, chromatic aberration, or permanent `will-change` (scroll ghosting). `ScrollReveal` clears `will-change` after intro animation.
+
+**While scrolling (desktop):** `html[data-scrolling="1"]` dimms/pauses grain, CRT animation, chromatic, and colour wash; `.glow-card` drops `will-change` (see `ScrollFxController` in `LenisProvider`).
 
 ## Color theme admin
 

@@ -28,9 +28,12 @@ Distilled anti-patterns from project history. **Append session findings before o
 | Anti-pattern | Rule |
 |--------------|------|
 | Permanent `data-lenis-prevent` on a desktop grid that is only a mobile horizontal strip | Prevent only real nested scrollports; desktop page scroll must keep Lenis |
+| Blanket `data-lenis-prevent` on Swiper/coverflow because of jank | Jank ≠ prevent. Vertical stays on Lenis; axis-route horizontal; reduce VFX via `html[data-scrolling]` |
+| Treating horizontal-only overflow as a Lenis prevent target | Metrics fallback is **vertical only** — horizontal strips must not dead-zone page scroll |
 | Matching `[class*="overflow-x-auto"]` for Lenis prevent | Tailwind keeps the token in the class string under responsive overrides — check **computed overflow + scroll metrics** |
-| Lenis `syncTouch: true` on phones with fixed VFX / `will-change` layers | Disable Lenis on `(pointer: coarse)`; native scroll. Ghosting/double-image otherwise |
-| Permanent `will-change: transform` after ScrollReveal | Clear to `auto` on animation complete |
+| Lenis `syncTouch: true` on phones with fixed VFX / `will-change` layers | `syncTouch: false` (native touch). Ghosting/double-image otherwise |
+| Permanent `will-change: transform` after ScrollReveal / on glow-cards during scroll | Clear to `auto` on animation complete; drop promotion while `data-scrolling` |
+| Spotify wheel via `window.scrollY + delta` | Use `lenis.scroll + delta` so virtual and native positions stay aligned |
 
 ## Mobile multi-column editors
 

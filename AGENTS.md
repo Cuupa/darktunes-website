@@ -71,8 +71,8 @@ E2E tests (`tests/e2e/*.spec.ts`, Playwright) are part of the deliverable, not a
 3. **New admin CRUD list** → `AdminPageShell layout="list"` + `AdminListShell`. Register route in `src/lib/scroll/dashboardRoutes.ts` (`isAdminListRoute`).
 4. **Full-bleed tool page** (e.g. file explorer) → `AdminPageShell fill`.
 5. **Wide table** → `horizontalScrollClass` from `scroll-panel.tsx`. Never `overflow-x-auto overscroll-contain` without `overflow-y-clip`.
-6. **Swiper / carousel / any 3rd-party scroll widget** → wrap with `data-lenis-prevent`.
-7. **Modal body** → `overflow-y-auto max-h-[70vh]` + `data-lenis-prevent`.
+6. **Swiper / carousel:** Do **not** blanket `data-lenis-prevent` on the whole widget (kills buttery Lenis). Keep vertical wheel on Lenis; horizontal drag / axis-aware wheel for slides (`touch-action: pan-y`, optional horizontal `onWheel`).
+7. **Modal body / real nested vertical scrollports** → `overflow-y-auto max-h-[70vh]` + `data-lenis-prevent`. Never use prevent for “this component is heavy” — use scroll VFX budget (`html[data-scrolling]`) instead.
 8. **After any scroll change** → run `npm run check:scroll` locally before pushing.
 9. **Multi-column builders (EPK / fan-page):** Never hide `ResizablePanelGroup` with CSS alone — mount only when `useIsLg()`. After changes run `npm run check:mobile-layout`.
 

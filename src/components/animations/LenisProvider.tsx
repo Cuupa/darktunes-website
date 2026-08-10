@@ -12,6 +12,11 @@ interface LenisProviderProps {
   children: ReactNode
 }
 
+/** Absolute velocity above this marks the document as actively scrolling (VFX budget). */
+const SCROLL_VELOCITY_THRESHOLD = 0.4
+/** Clear `data-scrolling` after this idle window (ms). */
+const SCROLL_IDLE_MS = 140
+
 function ScrollLockObserver() {
   const lenis = useLenis()
 
@@ -35,17 +40,59 @@ function ScrollLockObserver() {
 }
 
 /**
- * Public routes only. `syncTouch: false` so phones keep native touch scroll
- * (syncTouch caused rubber-band ghosting with VFX layers). Wheel/trackpad still
- * get smooth Lenis on desktop. Do not conditionally mount Lenis after media
- * queries — remounting the whole tree detaches focused elements and flakes e2e.
+ * Toggles `html[data-scrolling="1"]` while Lenis has velocity so CSS can
+ * pause expensive VFX (grain, CRT pulse, chromatic) without unmounting Lenis.
  */
-const LENIS_OPTIONS = {
-  lerp: 0.08,
-  duration: 0.55,
+function ScrollFxController() {
+  const lenis = useLenis()
+
+  useEffect(() => {
+    if (!lenis) return
+
+    const root = document.documentElement
+    let clearTimer: ReturnType<typeof setTimeout> | null = null
+
+    const setScrolling = (on: boolean) => {
+      if (on) {
+        root.dataset.scrolling = '1'
+      } else {
+        delete root.dataset.scrolling
+      }
+    }
+
+    const onScroll = (e: { velocity: number }) => {
+      if (Math.abs(e.velocity) <= SCROLL_VELOCITY_THRESHOLD) return
+      setScrolling(true)
+      if (clearTimer) clearTimeout(clearTimer)
+      clearTimer = setTimeout(() => setScrolling(false), SCROLL_IDLE_MS)
+    }
+
+    lenis.on('scroll', onScroll)
+    return () => {
+      lenis.off('scroll', onScroll)
+      if (clearTimer) clearTimeout(clearTimer)
+      delete root.dataset.scrolling
+    }
+  }, [lenis])
+
+  return null
+}
+
+/**
+ * Public routes only. Tuned for buttery document scroll (lerp + duration + full
+ * wheel multiplier). `syncTouch: false` so phones keep native touch scroll
+ * (syncTouch caused rubber-band ghosting with VFX layers).
+ *
+ * `prevent` yields only to real nested scrollports — not carousels/grids.
+ * Do not conditionally mount Lenis after media queries — remounting the tree
+ * detaches focused elements and flakes e2e.
+ */
+export const LENIS_OPTIONS = {
+  lerp: 0.075,
+  duration: 1.1,
   easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
   syncTouch: false,
-  wheelMultiplier: 0.9,
+  wheelMultiplier: 1,
   touchMultiplier: 1,
   infinite: false,
   prevent: shouldPreventLenis,
@@ -62,6 +109,7 @@ export function LenisProvider({ children }: LenisProviderProps) {
   return (
     <ReactLenis root options={LENIS_OPTIONS}>
       <ScrollLockObserver />
+      <ScrollFxController />
       {children}
     </ReactLenis>
   )
