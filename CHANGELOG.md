@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Admin realtime crash:** `cannot add postgres_changes callbacks for realtime:admin-nav-portal-messages after subscribe()` — sidebar and push bootstrap both mounted `useAdminNavBadges` on the singleton browser client. One `AdminNavBadgesProvider` owns the subscription; consumers use context. Hook also keeps refresh in a ref and unique channel topics (`useId`).
+
 ### Changed
 - **Public Lenis feel:** Buttery document scroll (`lerp` 0.075, `duration` 1.1, `wheelMultiplier` 1). Coverflow and related-artist strips no longer use blanket `data-lenis-prevent` (vertical wheel stays on Lenis; horizontal drag / axis-aware wheel for slides). `shouldPreventLenis` only yields to real vertical nested scrollports.
 - **Scroll VFX budget:** `html[data-scrolling]` while Lenis has velocity pauses CRT/grain/chromatic and drops permanent `will-change` on glow cards so GPU layers do not fight smooth scroll.
