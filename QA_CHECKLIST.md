@@ -10,6 +10,9 @@
 - [ ] Admin → Releases → New Release: **Release Date** calendar opens above the modal, day selectable, form can save with today’s date
 - [ ] Spot-check other modal date/month fields: Videos publish date, Expense date, Settlement period MonthField
 - [ ] Homepage: wheel/trackpad scroll over **Videos** section continues page scroll (no dead zone on desktop)
+- [ ] Homepage: wheel over **Releases coverflow** keeps buttery Lenis (vertical); horizontal drag/trackpad still changes slides
+- [ ] Homepage: wheel over **Spotify** embed (before click) scrolls the page smoothly; click enables player for ~5s
+- [ ] Homepage desktop scroll feels continuous (no native/Lenis handoff jank over carousels); VFX may dim slightly while scrolling
 - [ ] **Mobile homepage:** Footer Impressum / Datenschutz / AGB / Kontakt are tappable after dismissing consent/PWA banners; links wrap, not clipped
 - [ ] **Mobile homepage scroll:** No vertical double-image / heavy stutter over Releases/Videos (native scroll on phone)
 - [ ] **Portal EPK builder mobile:** Only one of Canvas / Layers / Properties; no side-by-side columns; compact toolbar + Save; canvas usable

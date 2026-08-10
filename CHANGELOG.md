@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Public Lenis feel:** Buttery document scroll (`lerp` 0.075, `duration` 1.1, `wheelMultiplier` 1). Coverflow and related-artist strips no longer use blanket `data-lenis-prevent` (vertical wheel stays on Lenis; horizontal drag / axis-aware wheel for slides). `shouldPreventLenis` only yields to real vertical nested scrollports.
+- **Scroll VFX budget:** `html[data-scrolling]` while Lenis has velocity pauses CRT/grain/chromatic and drops permanent `will-change` on glow cards so GPU layers do not fight smooth scroll.
+- **Spotify embed overlay:** Wheel uses Lenis virtual scroll (`lenis.scroll + delta`) instead of `window.scrollY`.
+
 ### Added
 - **PWA Web Push + app icon badge (portal + admin):** One-tap **Enable** banner (no technical setup for users). Subscriptions in `push_subscriptions`; per-event `notification_preferences.push`; `emitNotification` sends Web Push via VAPID/`web-push` when configured. Service worker handles `push` / `notificationclick` and Badging API. Deployer sets `NEXT_PUBLIC_VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` once (see `DEPLOYMENT.md` / `.env.example`). Preferences include device toggle + Push column.
 - **CI mobile layout contract:** `npm run check:mobile-layout` (`scripts/check-mobile-layout-contract.mjs`) in `ci:contracts` — bans CSS-only hide of ResizablePanelGroup, requires `useIsLg` on builder shells, full-bleed fan-page parity, footer touch targets. Unit tests for shells + footer.
