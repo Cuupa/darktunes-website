@@ -18,6 +18,7 @@
 - [ ] **Portal EPK builder mobile:** Only one of Canvas / Layers / Properties; no side-by-side columns; compact toolbar + Save; canvas usable
 - [ ] **Portal Personal Artist Page builder mobile:** Only one of Sections / Preview / Properties; Publish reachable; no double preview columns
 - [ ] **Desktop builders ≥1024px:** Resizable three-column layout still works for EPK + Personal Artist Page
+- [ ] **Admin shell:** open any `/admin/*` page signed in → DevTools console has **no** `cannot add postgres_changes callbacks … after subscribe()`; sidebar badge counts still update live when a portal message / submission arrives
 - [ ] Admin/Portal messages: open a label thread → original + replies show as chat bubbles (own on the right)
 - [ ] New message while mailbox open → toast + optional chime; toggle Sound off/on persists after reload
 - [ ] Inbox: multiple Re:/Aw: messages on same subject appear as **one** conversation (count badge); opening shows full chat

@@ -43,7 +43,21 @@ Distilled anti-patterns from project history. **Append session findings before o
 | Desktop toolbar `flex-wrap` of 20+ controls on phone | Compact primary row + overflow menu; segment control for panels |
 | Fixed 3-column mailbox (`w-52` + `w-72` + chat) on phones | Messenger pattern: list **or** full-screen thread below `md`; folders in a sheet |
 
+## Supabase Realtime (browser)
+
+| Anti-pattern | Rule |
+|--------------|------|
+| Two components each call `.channel('fixed-name').on(…).subscribe()` on `createBrowserClient` | Singleton client returns the **already subscribed** channel → `.on` after `subscribe` throws. **One owner** (context provider) or unique topics per instance (`useId`) |
+| Putting the refresh `useCallback` in the subscribe effect deps | Callback identity churn re-runs the effect; cleanup `removeChannel` is async → re-attach races. Keep handlers in a **ref**; deps only `enabled` / ids / client |
+| Assuming channel name alone is enough when two consumers need the same data | Prefer **lift subscription** (`AdminNavBadgesProvider`) over two unique topics that double-hit the same tables |
+
 ## Session additions
+
+### 2026-08-10 — Admin nav postgres_changes after subscribe
+
+- **Symptom:** Production console `cannot add postgres_changes callbacks for realtime:admin-nav-portal-messages after subscribe()`.
+- **Cause:** `AdminSidebarNav` + `AdminPushBootstrap` both ran `useAdminNavBadges` with fixed (then later per-instance) topics on the singleton SSR browser client.
+- **Fix:** `AdminNavBadgesProvider` single subscribe; context consumers; `refreshRef` + `useId` topics as defense in depth.
 
 ### 2026-08-08 — Calendar cold load + portal mailbox mobile
 

@@ -163,6 +163,8 @@ Shared primitives in `src/components/notifications/` (`NotificationBellTrigger`,
 
 **Admin:** `DashboardNotificationBell` + unified `notifications` table via `src/lib/api/editorNotifications.ts` / `src/lib/api/notifications.ts`. Realtime on `notifications` filtered by `user_id`.
 
+**Admin nav badges (sidebar counts + push badge):** Single owner `AdminNavBadgesProvider` in `AdminClientLayout` → `useAdminNavBadges` once. Consumers (`AdminSidebarNav`, `AdminPushBootstrap`) read `useAdminNavBadgesContext()` — never mount the subscription hook twice against the singleton browser Supabase client. Realtime rules: all `.on('postgres_changes', …)` **before** `.subscribe()`; unique channel topics per instance (`useId`); keep refresh callbacks in a **ref** so effect re-runs do not re-attach listeners after subscribe. Same dual-mount class of bug hit `EditorNotificationBell` / `DashboardNotificationBell` historically.
+
 **Portal:** `PortalNotificationBell` + composite feed (`portalNotifications`): messages, interviews, statements, plus durable platform rows (`kind: platform`, e.g. fan-page decisions). Badge field `alerts` counts unread platform rows. `PortalNotificationProvider` refreshes on messages, interviews, statements, and `notifications`.
 
 **History + preferences:** Shared `NotificationCenter` and `NotificationPreferencesForm` under `src/components/notifications/`. Routes: `/admin/notifications` (+ `/preferences`), `/portal/notifications` (+ `/preferences`).
