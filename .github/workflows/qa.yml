@@ -2,7 +2,8 @@ name: QA Pipeline
 
 # E2E against a local Supabase stack (Docker). Lint/unit/security/perf live in
 # dedicated workflows (no duplicates).
-# PRs: Desktop Chrome only. main: full browser matrix (Chrome + Mobile Safari + Mobile Chrome).
+# Full browser matrix (Desktop Chrome + Mobile Safari + Mobile Chrome) on every
+# PR to main, on dev/main pushes, and on manual dispatch.
 
 on:
   pull_request:
@@ -41,11 +42,14 @@ jobs:
       - run: npm run test
 
   e2e-tests:
-    # Run E2E only on pushes to long-lived branches (dev/main) — not on
-    # feature branches or PRs. See E2E-SUPPRESSION.md.
+    # Run E2E on PRs to main, on pushes to long-lived branches (dev/main), and
+    # on manual dispatch. The full browser matrix (incl. mobile) runs in every
+    # case (see the run step below).
     if: >-
-      github.event_name == 'push' &&
-      (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main')
+      github.event_name == 'pull_request' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' &&
+       (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
     env:
       # Cloudflare R2 isn't exercised by any E2E test (no test hits real
@@ -105,13 +109,8 @@ jobs:
             playwright-${{ runner.os }}-
 
       - name: Install Playwright browsers
-        run: |
-          # PR + manual branch runs: Chromium only. Full matrix on main pushes only.
-          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            npx playwright install --with-deps
-          else
-            npx playwright install --with-deps chromium
-          fi
+        # Full matrix (incl. WebKit for Mobile Safari) runs on every trigger.
+        run: npx playwright install --with-deps
 
       # Starts local Supabase (Docker), applies reset.sql, seeds fixtures + auth users,
       # writes .env.e2e.local — see scripts/e2e-db-setup.mjs and E2E-TESTS.md.
@@ -126,19 +125,15 @@ jobs:
           set +a
           npm run build
 
-      - name: Run E2E
+      - name: Run E2E (full browser matrix)
         run: |
           set -a
           . ./.env.e2e.local
           set +a
-          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            SKIP_BUILD=1 npx playwright test \
-              --project="Desktop Chrome" \
-              --project="Mobile Safari" \
-              --project="Mobile Chrome"
-          else
-            SKIP_BUILD=1 npx playwright test --project="Desktop Chrome"
-          fi
+          SKIP_BUILD=1 npx playwright test \
+            --project="Desktop Chrome" \
+            --project="Mobile Safari" \
+            --project="Mobile Chrome"
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
