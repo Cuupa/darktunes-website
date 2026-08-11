@@ -35,6 +35,11 @@
 - Push to `main` branch for automatic production deployment
 - Push to any branch for automatic preview deployment
 
+### App version vs deploys
+- Every `main` merge still deploys (CD). **SemVer tags** (`vX.Y.Z`) label product releases; they are not a Vercel deploy gate.
+- Current version: `package.json` → `"version"`. Ritual: [docs/RELEASING.md](docs/RELEASING.md) (`npm run release:check`, `npm run release:tag`).
+- Production identity in Admin → System Health uses `package.json` version + `VERCEL_GIT_COMMIT_SHA` (short). Optional override: `NEXT_PUBLIC_GIT_COMMIT`.
+
 ---
 
 ## 🗄️ Supabase Setup

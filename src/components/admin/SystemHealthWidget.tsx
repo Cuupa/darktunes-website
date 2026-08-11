@@ -452,6 +452,22 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
               {health.statusLabel}
             </Badge>
             <span
+              className="text-xs font-mono text-muted-foreground tabular-nums"
+              title={
+                health.app.commit
+                  ? `App ${health.app.version} · commit ${health.app.commit}`
+                  : `App ${health.app.version}`
+              }
+              aria-label={
+                health.app.commit
+                  ? `Application version ${health.app.version}, commit ${health.app.commit}`
+                  : `Application version ${health.app.version}`
+              }
+            >
+              v{health.app.version}
+              {health.app.commit ? ` · ${health.app.commit}` : ''}
+            </span>
+            <span
               className={cn('text-sm font-semibold tabular-nums', healthScoreClass(health.healthScore))}
               aria-label={`Health score ${health.healthScore} out of 100`}
             >
