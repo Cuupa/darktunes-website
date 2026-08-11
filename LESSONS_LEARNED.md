@@ -227,6 +227,10 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-08-11 — App version SSOT (no more 0.0.0 theater)
+
+**Continuous deploy without a product version creates fake SemVer:** Claiming Keep a Changelog + SemVer while leaving `package.json` at `0.0.0`, never tagging, and dumping everything under `[Unreleased]` is process theater. Rule: version lives in `package.json`; cut CHANGELOG sections on release; annotated tags `vX.Y.Z` for history; show version+commit in Admin System Health (`src/lib/appVersion.ts`). Ritual: `docs/RELEASING.md`. Do not treat Dependabot dependency bumps as app releases.
+
 ### 2026-08-07 — Admin dual-auth must not let stale Bearer block cookies
 
 **Admin UI often sends an in-memory access token that expires while the refresh cookie is still valid.** If `verifyAdminRequest` only tries Bearer and never falls through on 401, dual-auth routes (e.g. Assets storage-stats) return 401 and the storage bar stays empty/wrong. Rule: Bearer 401 → cookie session fallback; only hard-stop on 403. Prefer `credentials: 'include'` and optional retry without Authorization.

@@ -1,7 +1,7 @@
 {
   "name": "darktunes-website",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.6.0",
   "type": "module",
   "scripts": {
     "dev": "next dev",
@@ -19,6 +19,9 @@
     "ci:tests": "npm run test && npm run build",
     "ci": "npm run ci:contracts && npm run ci:typecheck && npm run ci:tests",
     "preview": "next start",
+    "release": "node scripts/release.mjs",
+    "release:check": "node scripts/release.mjs check",
+    "release:tag": "node scripts/release.mjs tag",
     "validate:rbac": "npx tsx scripts/validate-rbac.ts",
     "verify:portal-rls": "node scripts/verify-portal-rls.mjs",
     "verify:schema-columns": "node scripts/verify-schema-columns.mjs",
