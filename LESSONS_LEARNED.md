@@ -227,6 +227,14 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-08-13 — Server Actions + startTransition crash Settlement Center
+
+**Save to Portal used `startTransition` around `persistSosAnalytics` (Server Action) with 1000+ metric rows.** Next.js flight/digest failures there are not a toast — they become the production Server Components overlay or `app/error.tsx`. Draft “Ready for draft” then called the same action after `uploadStatement`. Rule: large SOS persist goes over a regular admin POST; wrap persist in try/catch so the page stays up.
+
+### 2026-08-13 — Bandcamp “FrozenPlasma” is still Frozen Plasma
+
+**Grouping/roster match was `toLowerCase()` only.** Bandcamp omits the space; Believe does not. Collapse whitespace in the artist key or the same act becomes two settlement artists and persist skips unlinked names.
+
 ### 2026-08-13 — Bandsintown lookup is the artist name
 
 **The public events API path is `/artists/{artistname}/events`.** A raw numeric id in the field 404s/returns empty. Label the field **Bandsintown Artist Name**. `id:12345` is a separate optional syntax, not the default.
