@@ -2186,6 +2186,7 @@
   "billing_tax_small_business": "Kleinunternehmer (§ 19 UStG)",
   "billing_tax_reverse_charge": "Reverse Charge (Ausland)",
   "billing_tax_status_hint": "Steuert den USt-Ausweis auf generierten Rechnungen (§ 14 UStG).",
+  "billing_reverse_charge_hint": "Bei Reverse Charge ist deine eigene Steuer-/USt-IdNr. optional – auf der Rechnung wird die USt-IdNr. des Leistungsempfängers (Label) ausgewiesen.",
   "onboarding_step_terms": "AGB",
   "onboarding_terms_title": "Nutzungs- und Abrechnungsbedingungen",
   "onboarding_terms_body": "Bitte lesen und akzeptieren Sie die AGB des Artist Portals, bevor Sie fortfahren.",

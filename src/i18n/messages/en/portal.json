@@ -2186,6 +2186,7 @@
   "billing_tax_small_business": "Small business (§ 19 UStG)",
   "billing_tax_reverse_charge": "Reverse charge (international)",
   "billing_tax_status_hint": "Controls VAT presentation on generated invoices (§ 14 UStG).",
+  "billing_reverse_charge_hint": "Under reverse charge your own tax/VAT number is optional — the recipient's (label) VAT-ID is shown on the invoice.",
   "onboarding_step_terms": "Terms",
   "onboarding_terms_title": "Terms of use and settlement",
   "onboarding_terms_body": "Please read and accept the Artist Portal terms before continuing.",

@@ -26,10 +26,6 @@ import { sendInvoiceEmail } from '@/lib/email/sendInvoiceEmail'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { taxRateForStatus } from '@/lib/legal/taxStatus'
 import { formatEcbRateNote, getEcbRateForCurrency } from '@/lib/legal/serverFx'
-import {
-  checkVatWithVies,
-  isViesValidForReverseCharge,
-} from '@/lib/legal/viesVat'
 import { generateInvoiceNumber } from '@/lib/portal/invoiceNumber'
 import { generateInvoicePdf } from '@/lib/portal/invoicePdf'
 import { resolveLabelClientInfo } from '@/lib/portal/labelBilling'
@@ -100,21 +96,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   )
   if (!billingProfile || !isBillingProfileComplete(billingProfile)) {
     throw new ApiError(422, 'Billing profile is incomplete')
-  }
-
-  // Reverse charge: re-check VAT ID against EU VIES at invoice time.
-  if (billingProfile.taxStatus === 'reverse_charge') {
-    if (!billingProfile.vatId?.trim()) {
-      throw new ApiError(422, 'Reverse charge requires a valid EU VAT ID')
-    }
-    const vies = await checkVatWithVies(billingProfile.vatId)
-    if (!isViesValidForReverseCharge(vies)) {
-      throw new ApiError(
-        vies.status === 'service_unavailable' ? 503 : 422,
-        vies.message ??
-          'VAT ID failed EU VIES validation — reverse-charge invoice blocked',
-      )
-    }
   }
 
   const siteSettings = await write('site_settings', 'select', (db) => getSiteSettings(db))
