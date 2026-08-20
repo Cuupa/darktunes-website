@@ -57,6 +57,8 @@ E2E tests (`tests/e2e/*.spec.ts`, Playwright) are part of the deliverable, not a
 - **`unstable_cache`:** Cookie-free Supabase anon client inside callbacks (never `cookies()`)
 - **DAL:** Queries in `src/lib/api/`; pass `SupabaseClient` as first argument
 - **Route handlers:** `withErrorHandler`; admin routes use `src/lib/adminAuth.ts`
+- **OpenAPI:** Every API endpoint you create or change MUST ship an accompanying OpenAPI `.yaml` spec — an endpoint is not done until its paths, request/response schemas, and status codes are reflected in the spec
+- **REST guidelines (MANDATORY, NO EXCEPTIONS):** Every API endpoint and its OpenAPI spec MUST comply with the REST guidelines in [`skills/rest-guidelines/SKILL.md`](skills/rest-guidelines/SKILL.md) — a self-contained, offline, LLM/tool-agnostic subset of the Zalando RESTful API Guidelines. This is non-negotiable — resource naming (kebab-case paths, plural nouns), HTTP methods/status codes, `problem+json` error bodies, pagination, snake_case JSON properties, versioning, and required headers all follow that standard. Reconcile any existing endpoint that violates it when you touch it
 - **WCAG 2.1 AA** on all public UI
 - **Minimal changes:** Smallest diff that fully solves the task
 - **Docs:** Always update documentation/markdown at session end (see above)
