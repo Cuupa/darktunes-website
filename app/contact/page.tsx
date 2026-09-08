@@ -9,6 +9,7 @@ import { getTranslations } from 'next-intl/server'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { ContactForm } from './_components/ContactForm'
 import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
+import { resolveSubmitHubUrl } from '@/lib/submitHub'
 
 export async function generateMetadata(): Promise<Metadata> {
   const { labelName } = await getMetadataBrand()
@@ -24,7 +25,7 @@ export default async function ContactPage() {
     getTranslations('contact'),
     getCachedSiteSettings().catch(() => null),
   ])
-  const submitHubUrl = settings?.submitHubUrl || ''
+  const submitHubUrl = resolveSubmitHubUrl(settings?.submitHubUrl)
   const submitHubHeading = settings?.submitHubSectionHeading || tContact('submitMusicHeading')
   const submitHubDescription = settings?.submitHubDescription || tContact('submitMusicDescription')
   const submitHubButtonLabel = settings?.submitHubLabel || tContact('submitMusicButton')

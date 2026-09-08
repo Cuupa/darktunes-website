@@ -8,6 +8,7 @@ import type { SiteSettings } from '@/types'
 import { SOCIAL_ICON_MAP } from '@/config/socialIcons'
 import { getOptimizedLogoUrl } from '@/lib/imageUtils'
 import { requestPwaInstallPrompt } from '@/lib/pwa/installPrompt'
+import { resolveSubmitHubUrl } from '@/lib/submitHub'
 
 interface FooterProps {
   siteSettings: SiteSettings
@@ -96,10 +97,9 @@ export function Footer({ siteSettings }: FooterProps) {
                     {t('contactLink')}
                   </Link>
                 </li>
-                {siteSettings.submitHubUrl ? (
                 <li>
                   <a
-                    href={siteSettings.submitHubUrl}
+                    href={resolveSubmitHubUrl(siteSettings.submitHubUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors uppercase"
@@ -107,7 +107,6 @@ export function Footer({ siteSettings }: FooterProps) {
                     {t('submitMusicLink')}
                   </a>
                 </li>
-                ) : null}
                 {siteSettings.shopifyStoreUrl && (
                   <li>
                     <a
