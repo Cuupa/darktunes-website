@@ -518,28 +518,20 @@ export async function recordStatementView(
   id: string,
   artistId: string,
 ): Promise<SalesStatement> {
-  const existing = await getSalesStatementById(db, id, artistId)
-  if (!existing) throw new Error('Statement not found')
+  // Atomic RPC (#622): first view is preserved, the counter is monotonic and
+  // only label_approved/artist_notified may move to 'viewed'. A late view can
+  // no longer downgrade invoiced/paid statements.
+  const { data, error } = await db.rpc('record_statement_view', {
+    p_statement_id: id,
+    p_artist_id: artistId,
+  })
 
-  const now = new Date().toISOString()
-  const nextStatus =
-    existing.status === 'artist_notified' || existing.status === 'label_approved'
-      ? 'viewed'
-      : existing.status
+  if (error) {
+    if ((error.message ?? '').includes('statement_not_found')) {
+      throw new BusinessRuleError('Statement not found', 404, 'NOT_FOUND')
+    }
+    throw new Error(error.message)
+  }
 
-  const { data, error } = await db
-    .from('sales_statements')
-    .update({
-      first_viewed_at: existing.firstViewedAt ?? now,
-      last_viewed_at: now,
-      view_count: (existing.viewCount ?? 0) + 1,
-      status: nextStatus,
-    })
-    .eq('id', id)
-    .eq('artist_id', artistId)
-    .select('*')
-    .single()
-
-  if (error) throw new Error(error.message)
   return rowToSalesStatement(data as SalesStatementRow)
 }

@@ -5229,6 +5229,55 @@ export interface Database {
           zero_size_count: number
         }
       }
+      record_statement_view: {
+        Args: {
+          p_statement_id: string
+          p_artist_id: string
+        }
+        Returns: {
+          id: string
+          artist_id: string
+          filename: string
+          r2_key: string
+          period: string
+          amount_eur: number | null
+          status:
+            | 'draft'
+            | 'label_approved'
+            | 'artist_notified'
+            | 'viewed'
+            | 'invoiced'
+            | 'paid'
+            | 'superseded'
+            | 'cancelled'
+            | 'acknowledged'
+          label_notes: string | null
+          label_approved_at: string | null
+          period_start: string | null
+          period_end: string | null
+          total_streams: number
+          batch_id: string | null
+          first_viewed_at: string | null
+          last_viewed_at: string | null
+          view_count: number
+          document_type: 'original' | 'correction' | 'storno'
+          correction_of_id: string | null
+          superseded_by_id: string | null
+          version: number
+          reporting_currency: string
+          amount_reporting: number | null
+          fx_rate_to_eur: number | null
+          fx_rate_date: string | null
+          fx_source: string | null
+          settlement_period_id: string | null
+          is_archived: boolean
+          rules_fingerprint: string | null
+          fx_snapshot: Record<string, unknown> | null
+          calculation_snapshot: Record<string, unknown> | null
+          revision: number
+          created_at: string
+        }
+      }
       record_invoice_payment: {
         Args: {
           p_invoice_id: string

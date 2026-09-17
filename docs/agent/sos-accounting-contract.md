@@ -62,11 +62,11 @@ MUSS-Regeln:
 
 1. Jeder Statuswechsel läuft über `assertStatementTransition`
    (`src/lib/sos/statementStatusTransitions.ts`). Ausnahme: `recordStatementView`
-   (`src/lib/api/salesStatements.ts:515-532`) schreibt heute direkt; #622 MUSS den Wechsel
-   auf `viewed` durch dieselbe Prüfung führen. `viewed` ist ein Ansichtsereignis und kein
-   Finanzvorgang: Es darf auch in `locked`/`archived` Perioden geschrieben werden, jedoch
-   nur aus `label_approved`/`artist_notified` und nur einmal (Idempotenz über
-   `first_viewed_at`).
+   nutzt die atomare RPC `record_statement_view` (`COALESCE(first_viewed_at)`,
+   monotoner Zähler, `CASE` auf dem aktuellen Status). `viewed` ist ein
+   Ansichtsereignis und kein Finanzvorgang: Es darf auch in `locked`/`archived`
+   Perioden geschrieben werden, jedoch nur aus `label_approved`/`artist_notified`
+   und nur einmal (Idempotenz über `first_viewed_at`).
 2. Optimistische Nebenläufigkeit: `updateSalesStatementStatus` prüft
    `.eq('status', expected)`. Konflikt MUSS als HTTP 409 mit problem+json enden, nicht als
    500 (heute: plain Error → 500, #616).

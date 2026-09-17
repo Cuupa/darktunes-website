@@ -5980,6 +5980,43 @@ CREATE TRIGGER trg_artist_invoices_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ---------------------------------------------------------------------------
+-- FUNCTION: record_statement_view — atomic artist view tracking (#622).
+-- COALESCE keeps the first view, the counter is monotonic and only
+-- label_approved/artist_notified may move to 'viewed' — a late view can never
+-- downgrade invoiced/paid/superseded statements.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.record_statement_view(
+  p_statement_id UUID,
+  p_artist_id UUID
+) RETURNS public.sales_statements
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_statement public.sales_statements;
+BEGIN
+  UPDATE public.sales_statements
+  SET first_viewed_at = COALESCE(first_viewed_at, NOW()),
+      last_viewed_at = NOW(),
+      view_count = view_count + 1,
+      status = CASE
+        WHEN status IN ('label_approved', 'artist_notified') THEN 'viewed'
+        ELSE status
+      END
+  WHERE id = p_statement_id
+    AND artist_id = p_artist_id
+  RETURNING * INTO v_statement;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'statement_not_found' USING ERRCODE = 'P0002';
+  END IF;
+
+  RETURN v_statement;
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- FUNCTION: record_invoice_payment — atomic payment recording (#628).
 -- Locks the invoice row, validates status and the gross cap, and updates
 -- paid/outstanding/status in one statement so two concurrent payments cannot
