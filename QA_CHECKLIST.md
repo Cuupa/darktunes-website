@@ -122,6 +122,9 @@
 - [ ] Guided Publish / Drafts step (`?guidedStep=settle`) does not crash; failed draft create shows a toast
 - [ ] `/admin/accounting` shows Assistant as recommended; 5-step “what happens next” list
 - [ ] Assistant: empty period → Continue disabled with plain reason; set months → Continue works
+- [ ] Set a manual period different from the detected source range → PDF/Excel, Settlement Center, payout, workspace key and carry-forward all use the manual period
+- [ ] Invalid period (end before start, month 13, start without end) → Export/PDF/Excel/Publish blocked with a plain reason; no `Q1-<current year>` upload appears
+- [ ] Source file without any recognizable sales month → bronze card shows “archiving skipped” instead of archiving under the current month
 - [ ] Upload one CSV → coach checklist updates; Continue enabled only after numbers appear
 - [ ] Block/throttle `/api/exchange-rates` → sticky fallback banner + Refresh; no crash on first process
 - [ ] Validate step: blocking errors prevent Continue; warnings allow continue

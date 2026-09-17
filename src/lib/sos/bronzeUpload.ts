@@ -42,12 +42,19 @@ export function isBronzeDirectUploadEnabled(): boolean {
   return process.env.NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD !== 'false'
 }
 
-export function extractPeriodBounds(months: string[]): { periodStart: string; periodEnd: string } {
+/**
+ * Derives the reporting-period bounds of a parsed source file. Returns `null`
+ * when the file exposes no valid `YYYY-MM` month — the caller must skip the
+ * archive instead of inventing the current month.
+ */
+export function extractPeriodBounds(
+  months: string[],
+): { periodStart: string; periodEnd: string } | null {
   const valid = months.filter((m) => MONTH_RE.test(m)).sort()
-  const fallback = new Date().toISOString().slice(0, 7)
+  if (valid.length === 0) return null
   return {
-    periodStart: valid[0] ?? fallback,
-    periodEnd: valid[valid.length - 1] ?? fallback,
+    periodStart: valid[0],
+    periodEnd: valid[valid.length - 1],
   }
 }
 

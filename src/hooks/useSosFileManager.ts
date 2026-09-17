@@ -45,6 +45,8 @@ const FILE_FALLBACK = {
   ingestConverting: 'Converting spreadsheet to CSV…',
   ingestWaitingParser: 'Queued for parser…',
   ingestArchiving: 'Archiving to storage…',
+  ingestArchiveNoPeriod:
+    'No reporting period detected in the file — archiving skipped. Fix the source dates and re-add the file.',
 } as const
 
 export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
@@ -196,6 +198,14 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
       const bounds = extractPeriodBounds(
         [stats.periodStart, stats.periodEnd].filter(Boolean),
       )
+      if (!bounds) {
+        setFileState(id, {
+          bronzeStatus: 'skipped',
+          bronzeError: t.ingestArchiveNoPeriod,
+          phase: 'done',
+        })
+        return
+      }
       void (async () => {
         setFileState(id, {
           bronzeStatus: 'uploading',
@@ -222,7 +232,7 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
         }
       })()
     },
-    [setFileMetas, setFileState, t.ingestArchiving, type],
+    [setFileMetas, setFileState, t.ingestArchiving, t.ingestArchiveNoPeriod, type],
   )
 
   const addFiles = useCallback(

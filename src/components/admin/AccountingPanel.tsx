@@ -12,7 +12,10 @@
 import { lazy, Suspense, useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
+import {
+  formatAccountingPeriodLabel,
+  resolveAccountingPeriod,
+} from '@/lib/sos/accountingPeriod'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { horizontalScrollClass } from '@/components/ui/scroll-panel'
 import { cn } from '@/lib/utils'
@@ -55,7 +58,6 @@ import {
   wizardHasBlockingIssues,
   type WizardValidationIssue,
 } from '@/lib/sos/wizardValidation'
-import { isValidPeriodRange } from '@/lib/sos/accountingInputValidation'
 import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUploadZone'
 import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
 import { AccountingGuidedWizard } from '@/components/admin/sos/AccountingGuidedWizard'
@@ -512,10 +514,33 @@ function SosGeneratorPanel() {
     ingestEvents,
   )
 
+  /**
+   * The binding accounting period for every operation. Manual selection wins;
+   * detected source months are provenance only. An invalid selection yields
+   * `null` and blocks period-dependent actions — no replacement period.
+   */
+  const periodResolution = useMemo(
+    () =>
+      resolveAccountingPeriod({
+        manualStart: manualPeriodStart,
+        manualEnd: manualPeriodEnd,
+        detectedStart: detectedPeriodStart,
+        detectedEnd: detectedPeriodEnd,
+      }),
+    [manualPeriodStart, manualPeriodEnd, detectedPeriodStart, detectedPeriodEnd],
+  )
+  const effectivePeriod = periodResolution.period
+  const effectivePeriodStart = effectivePeriod?.startMonth ?? ''
+  const effectivePeriodEnd = effectivePeriod?.endMonth ?? ''
+  const effectivePeriodStartDate = effectivePeriod?.startDate ?? ''
+  const effectivePeriodEndDate = effectivePeriod?.endDate ?? ''
+  // The setup step requires an explicit manual end month; a start-only manual
+  // selection must not unlock Continue while the step still shows an error.
+  const setupComplete =
+    effectivePeriod != null && (!manualPeriodStart.trim() || manualPeriodEnd.trim() !== '')
+
   useEffect(() => {
-    const periodStartDate = monthToPeriodDate(detectedPeriodStart, false)
-    const periodEndDate = monthToPeriodDate(detectedPeriodEnd || detectedPeriodStart, true)
-    if (!periodStartDate || !periodEndDate) {
+    if (!effectivePeriodStartDate || !effectivePeriodEndDate) {
       setCarryForwardByArtist({})
       return
     }
@@ -529,8 +554,8 @@ function SosGeneratorPanel() {
         if (!token) return
 
         const params = new URLSearchParams({
-          periodStart: periodStartDate,
-          periodEnd: periodEndDate,
+          periodStart: effectivePeriodStartDate,
+          periodEnd: effectivePeriodEndDate,
         })
         const response = await fetch(`/api/admin/settlements/register?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -555,7 +580,7 @@ function SosGeneratorPanel() {
     return () => {
       cancelled = true
     }
-  }, [detectedPeriodStart, detectedPeriodEnd])
+  }, [effectivePeriodStartDate, effectivePeriodEndDate])
 
   // Derive flat list of all release titles across all artists for IgnoredEntriesManager
   const allReleaseTitles = useMemo(() => {
@@ -567,10 +592,6 @@ function SosGeneratorPanel() {
   }, [releaseTitlesByArtistIncFeaturing])
 
   const hasData = revenues.length > 0
-
-  const setupPeriodStart = manualPeriodStart || detectedPeriodStart
-  const setupPeriodEnd = manualPeriodEnd || detectedPeriodEnd || manualPeriodStart || detectedPeriodStart
-  const setupComplete = isValidPeriodRange(setupPeriodStart, setupPeriodEnd)
 
   useEffect(() => {
     if (detectedPeriodStart && !manualPeriodStart) {
@@ -607,8 +628,8 @@ function SosGeneratorPanel() {
         revenues,
         labelArtists,
         splitFees,
-        periodStart: manualPeriodStart || detectedPeriodStart,
-        periodEnd: manualPeriodEnd || detectedPeriodEnd || manualPeriodStart,
+        periodStart: effectivePeriodStart,
+        periodEnd: effectivePeriodEnd,
         hasBelieveFile: believeManager.files.length > 0,
         hasBandcampFile: bandcampManager.files.length > 0,
         hasShopifyFile: shopifyManager.files.length > 0,
@@ -677,10 +698,8 @@ function SosGeneratorPanel() {
     revenues,
     labelArtists,
     splitFees,
-    manualPeriodStart,
-    manualPeriodEnd,
-    detectedPeriodStart,
-    detectedPeriodEnd,
+    effectivePeriodStart,
+    effectivePeriodEnd,
     trackRevenueAssignments,
     believeManager.files,
     bandcampManager.files,
@@ -754,8 +773,8 @@ function SosGeneratorPanel() {
   } = useExports(
       processedData,
       labelInfo,
-      detectedPeriodStart,
-      detectedPeriodEnd,
+      effectivePeriodStart,
+      effectivePeriodEnd,
       pdfSettings,
       appDefaults,
       labelArtists,
@@ -805,10 +824,10 @@ function SosGeneratorPanel() {
 
   const currentPeriodKey = useMemo(
     () =>
-      detectedPeriodStart
-        ? { start: detectedPeriodStart, end: detectedPeriodEnd || detectedPeriodStart }
+      effectivePeriod
+        ? { start: effectivePeriod.startMonth, end: effectivePeriod.endMonth }
         : null,
-    [detectedPeriodStart, detectedPeriodEnd],
+    [effectivePeriod],
   )
 
   const {
@@ -919,10 +938,7 @@ function SosGeneratorPanel() {
     <div className="p-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          {t.uploadPeriodLabel} {manualPeriodStart || detectedPeriodStart || '—'}
-          {(manualPeriodEnd || detectedPeriodEnd) &&
-            (manualPeriodEnd || detectedPeriodEnd) !== (manualPeriodStart || detectedPeriodStart) &&
-            ` – ${manualPeriodEnd || detectedPeriodEnd}`}
+          {t.uploadPeriodLabel} {formatAccountingPeriodLabel(effectivePeriod) || '—'}
         </p>
         <Button type="button" variant="outline" size="sm" onClick={resetSession}>
           {t.resetSessionLabel}
@@ -962,8 +978,8 @@ function SosGeneratorPanel() {
       labelInfo={labelInfo}
       appDefaults={appDefaults}
       emailConfig={emailConfig}
-      periodStart={detectedPeriodStart}
-      periodEnd={detectedPeriodEnd}
+      periodStart={effectivePeriodStart}
+      periodEnd={effectivePeriodEnd}
       onGoToSettlementCenter={() => setGuidedStep('settle')}
       disabled={isProcessing || excelBusy}
     />
@@ -996,8 +1012,8 @@ function SosGeneratorPanel() {
       <SettlementCenterPanel
         revenues={revenues}
         labelArtists={labelArtists}
-        periodStart={detectedPeriodStart}
-        periodEnd={detectedPeriodEnd}
+        periodStart={effectivePeriodStart}
+        periodEnd={effectivePeriodEnd}
         territoryMetrics={territoryMetrics}
         merchOrderRows={merchOrderRows}
         bronzeBatchIds={bronzeBatchIds}
@@ -1033,13 +1049,13 @@ function SosGeneratorPanel() {
     </p>
   ) : null
 
-  const periodBanner = hasData && (detectedPeriodStart || detectedPeriodEnd) ? (
+  const periodBanner = hasData && effectivePeriod ? (
     <Alert className="mx-6 mt-4 border-primary/30 bg-primary/5">
       <FileText size={14} className="text-primary" />
       <AlertDescription className="text-xs">
-        {t.detectedPeriod} <strong>{detectedPeriodStart}</strong>
-        {detectedPeriodEnd && detectedPeriodEnd !== detectedPeriodStart && (
-          <> – <strong>{detectedPeriodEnd}</strong></>
+        {t.uploadPeriodLabel} <strong>{effectivePeriod.startMonth}</strong>
+        {effectivePeriod.endMonth !== effectivePeriod.startMonth && (
+          <> – <strong>{effectivePeriod.endMonth}</strong></>
         )}
         {isProcessing &&
           (pipelineProgress
@@ -1344,8 +1360,8 @@ function SosGeneratorPanel() {
               labelArtists={labelArtists}
               labelInfo={labelInfo}
               appDefaults={appDefaults}
-              periodStart={detectedPeriodStart}
-              periodEnd={detectedPeriodEnd}
+              periodStart={effectivePeriodStart}
+              periodEnd={effectivePeriodEnd}
               onGoToSettlementCenter={() => setActiveSubTab('settlements')}
               disabled={isProcessing || excelBusy}
             />
@@ -1368,8 +1384,8 @@ function SosGeneratorPanel() {
             <SettlementCenterPanel
               revenues={revenues}
               labelArtists={labelArtists}
-              periodStart={detectedPeriodStart}
-              periodEnd={detectedPeriodEnd}
+              periodStart={effectivePeriodStart}
+              periodEnd={effectivePeriodEnd}
               territoryMetrics={territoryMetrics}
               merchOrderRows={merchOrderRows}
               bronzeBatchIds={bronzeBatchIds}
@@ -1470,8 +1486,8 @@ function SosGeneratorPanel() {
               <ApifySpotifySyncPanel />
               {hasData ? (
                 <SosAnalyticsPersistPanel
-                  periodStart={detectedPeriodStart}
-                  periodEnd={detectedPeriodEnd}
+                  periodStart={effectivePeriodStart}
+                  periodEnd={effectivePeriodEnd}
                   territoryMetrics={territoryMetrics}
                   merchOrderRows={merchOrderRows}
                   labelArtists={labelArtists}
@@ -1500,8 +1516,8 @@ function SosGeneratorPanel() {
                 </div>
                 <AdminEnterpriseAnalytics
                   revenues={revenues}
-                  periodStart={detectedPeriodStart}
-                  periodEnd={detectedPeriodEnd}
+                  periodStart={effectivePeriodStart}
+                  periodEnd={effectivePeriodEnd}
                 />
               </section>
             )}
@@ -1518,8 +1534,8 @@ function SosGeneratorPanel() {
             <PayoutManager
               labelArtists={labelArtists}
               labelInfo={labelInfo}
-              periodStart={detectedPeriodStart}
-              periodEnd={detectedPeriodEnd}
+              periodStart={effectivePeriodStart}
+              periodEnd={effectivePeriodEnd}
               onLabelSepaUpdate={handleLabelSepaUpdate}
             />
           ) : (
@@ -1539,8 +1555,8 @@ function SosGeneratorPanel() {
           >
           <TrendsDashboard
             revenues={revenues}
-            periodStart={detectedPeriodStart}
-            periodEnd={detectedPeriodEnd}
+            periodStart={effectivePeriodStart}
+            periodEnd={effectivePeriodEnd}
             bronzeBatchIds={bronzeBatchIds}
           />
           </div>

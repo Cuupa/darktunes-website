@@ -13,12 +13,9 @@ describe('extractPeriodBounds', () => {
     })
   })
 
-  it('falls back to current month when no valid months', () => {
-    const fallback = new Date().toISOString().slice(0, 7)
-    expect(extractPeriodBounds(['Unknown', ''])).toEqual({
-      periodStart: fallback,
-      periodEnd: fallback,
-    })
+  it('returns null instead of inventing the current month when no valid months exist', () => {
+    expect(extractPeriodBounds(['Unknown', ''])).toBeNull()
+    expect(extractPeriodBounds([])).toBeNull()
   })
 })
 
