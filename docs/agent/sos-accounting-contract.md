@@ -356,7 +356,8 @@ Owner issues: #616, #617, #618, #620, #631. Mirror into those issues.
 | Datei-Metadaten (Name, Zeilen, `bronzeBatchId`) | IndexedDB je Quelle | ja |
 | Roh-CSV, Parse-Zustand, Worker-Cache | Speicher | nein (Re-Upload oder Bronze-Load) |
 | Berechnete Ergebnisse | Speicher | nein |
-| Workspace `bronze_batch_ids` | DB | ja, aber heute nie zurückgelesen (#617) |
+| Workspace `bronze_batch_ids` | DB | ja; wird gelesen und als „Archivierte Quellen laden“ angeboten |
+| Workspace `revision` | DB | ja; optimistische Nebenläufigkeit (409 bei veralteter Revision) |
 | Wizard-Schritt, Auswahl, Dialoge | Speicher | nein (bewusst) |
 
 MUSS-Regeln:

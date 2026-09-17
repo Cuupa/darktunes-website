@@ -81,6 +81,7 @@ export interface Database {
           period_end: string
           config: Record<string, unknown>
           bronze_batch_ids: string[]
+          revision: number
           updated_by: string | null
           created_at: string
           updated_at: string
@@ -91,6 +92,7 @@ export interface Database {
           period_end: string
           config?: Record<string, unknown>
           bronze_batch_ids?: string[]
+          revision?: number
           updated_by?: string | null
           created_at?: string
           updated_at?: string
@@ -101,6 +103,7 @@ export interface Database {
           period_end?: string
           config?: Record<string, unknown>
           bronze_batch_ids?: string[]
+          revision?: number
           updated_by?: string | null
           updated_at?: string
         }

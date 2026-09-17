@@ -201,6 +201,7 @@ function SosGeneratorPanel() {
   const [manualPeriodEnd, setManualPeriodEnd] = useState('')
   const [workspaceDeleteOpen, setWorkspaceDeleteOpen] = useState(false)
   const [workspaceDeleting, setWorkspaceDeleting] = useState(false)
+  const [restoringArchives, setRestoringArchives] = useState(false)
 
   useEffect(() => {
     const subTab = searchParams.get('subTab')
@@ -838,6 +839,8 @@ function SosGeneratorPanel() {
     isWorkspaceLoading,
     isWorkspaceSaving,
     isSettingsDirty,
+    workspaceConflict,
+    serverBronzeBatchIds,
     loadFromServer,
     confirmReloadFromServer,
     reloadConfirmOpen,
@@ -877,6 +880,44 @@ function SosGeneratorPanel() {
       setWorkspaceDeleting(false)
     }
   }, [currentPeriodKey, loadFromServer, t])
+
+  /** Load bronze archives referenced by the server workspace back into the session. */
+  const restoreArchivedSources = useCallback(async () => {
+    const missing = serverBronzeBatchIds.filter((id) => !bronzeBatchIds.includes(id))
+    if (missing.length === 0) return
+    setRestoringArchives(true)
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) throw new Error(t.workspaceLoadFailed)
+      for (const batchId of missing) {
+        const res = await fetch(`/api/admin/sos/import-batches/${batchId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) continue
+        const json = (await res.json()) as {
+          batch?: { id: string; distributor?: string; periodStart?: string }
+        }
+        if (!json.batch?.distributor) continue
+        await loadBronzeBatch({
+          id: json.batch.id,
+          distributor: json.batch.distributor,
+          periodStart: json.batch.periodStart ?? '',
+        })
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t.bronzeArchiveLoadError)
+    } finally {
+      setRestoringArchives(false)
+    }
+  }, [
+    serverBronzeBatchIds,
+    bronzeBatchIds,
+    loadBronzeBatch,
+    t.workspaceLoadFailed,
+    t.bronzeArchiveLoadError,
+  ])
 
   const rulesCount =
     artistMappings.length + compilationFilters.length + splitFees.length +
@@ -951,6 +992,22 @@ function SosGeneratorPanel() {
       <p className="text-xs text-muted-foreground">
         {interpolate(t.rosterFromDbHint, { count: labelArtists.length })}
       </p>
+      {serverBronzeBatchIds.some((id) => !bronzeBatchIds.includes(id)) && (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted-foreground">
+            {interpolate(t.uploadArchiveAvailable, { count: serverBronzeBatchIds.length })}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void restoreArchivedSources()}
+            disabled={restoringArchives || isProcessing}
+          >
+            {t.uploadArchiveRestore}
+          </Button>
+        </div>
+      )}
       <UniversalFileUploadZone
         believeManager={believeManager}
         bandcampManager={bandcampManager}
@@ -990,7 +1047,9 @@ function SosGeneratorPanel() {
     </div>
   )
 
-  const settlePanel = hasData ? (
+  // The settlement center opens from the database for a resolved period even
+  // without a CSV upload session (contract §B.2/#617).
+  const settlePanel = effectivePeriod ? (
     <div className="space-y-4">
       <div className="px-6 pt-4 space-y-3">
         <p className="text-sm text-muted-foreground leading-relaxed">{t.settlementDauIntro}</p>
@@ -1039,7 +1098,18 @@ function SosGeneratorPanel() {
 
   const rulesStatusBanner = settingsReady ? (
     <p className="px-6 py-1.5 text-[11px] text-muted-foreground border-b border-border bg-muted/10">
-      {isWorkspaceSaving
+      {workspaceConflict ? (
+        <span className="text-destructive">
+          {t.workspaceConflict}{' '}
+          <button
+            type="button"
+            className="underline underline-offset-2 hover:text-foreground"
+            onClick={() => void confirmReloadFromServer()}
+          >
+            {t.workspaceReload}
+          </button>
+        </span>
+      ) : isWorkspaceSaving
         ? t.rulesWorkspaceSaving
         : isSettingsDirty
           ? t.rulesWorkspaceDirty
@@ -1380,7 +1450,7 @@ function SosGeneratorPanel() {
             role="tabpanel"
             aria-labelledby="accounting-subtab-settlements"
           >
-          {hasData ? (
+          {effectivePeriod ? (
             <SettlementCenterPanel
               revenues={revenues}
               labelArtists={labelArtists}

@@ -6444,11 +6444,15 @@ CREATE TABLE IF NOT EXISTS public.sos_accounting_workspaces (
   period_end       TEXT        NOT NULL,
   config           JSONB       NOT NULL DEFAULT '{}'::JSONB,
   bronze_batch_ids UUID[]      NOT NULL DEFAULT '{}',
+  revision         INTEGER     NOT NULL DEFAULT 1,
   updated_by       UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (period_start, period_end)
 );
+
+ALTER TABLE public.sos_accounting_workspaces
+  ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1;
 
 CREATE INDEX IF NOT EXISTS idx_sos_accounting_workspaces_period ON public.sos_accounting_workspaces (period_start DESC, period_end);
 

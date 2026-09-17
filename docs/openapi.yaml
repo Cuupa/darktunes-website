@@ -88,6 +88,23 @@ components:
           type: string
         code:
           type: string
+    Problem:
+      type: object
+      description: RFC 9457 problem+json body (legacy `error`/`code` kept as extensions).
+      required: [type, title, status, detail, error]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        error:
+          type: string
+        code:
+          type: string
     SuccessResponse:
       type: object
       properties:
@@ -3591,7 +3608,7 @@ paths:
     post:
       operationId: postadmin_sos_workspaces
       tags: [Admin]
-      summary: load workspace for period
+      summary: upsert workspace for period (optimistic concurrency via expected_revision)
       security:
         - AdminBearer: []
       requestBody:
@@ -3601,6 +3618,18 @@ paths:
             schema:
               type: object
               additionalProperties: true
+              properties:
+                period_start: { type: string }
+                period_end: { type: string }
+                config: { type: object }
+                bronze_batch_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+                expected_revision:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+                  description: Revision last read; null inserts a new workspace. Mismatch returns 409.
       responses:
         '200':
           description: Success
@@ -3612,6 +3641,12 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Workspace revision conflict (another session saved a newer revision)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
     delete:
       operationId: deleteadmin_sos_workspaces
       tags: [Admin]
