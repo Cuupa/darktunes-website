@@ -228,6 +228,11 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-09-17 — Silent numeric coercion turns a decimal comma into a factor-100 error
+
+- **Finding:** `parseCurrencyAmount` stripped the comma in its default path (`15,79` → `1579`), the Darkmerch parser replaced only the first comma, and quantities were forced through `Math.max(1, …)`/digit-stripping — turning refunds into sales and `12x` into `12`. Invalid rows silently became `0`.
+- **Rule:** Parse numbers with a typed `valid | empty | invalid(reason)` result and an explicit per-source convention; never coerce invalid required amounts to `0`, never fabricate quantities, and keep `0`/negative values. Ambiguous `1,234` without a known convention is a clarification error, not a guess. `src/lib/sos/ingest/amountParsing.ts`.
+
 ### 2026-09-17 — A period shown on screen is not the period the work uses
 
 - **Finding:** `AccountingPanel` displayed and validated `manualPeriodStart/End` but passed `detectedPeriodStart/End` to exports, Settlement Center, analytics, payout, workspace key and carry-forward. `useSosExports` replaced invalid periods with `Q1-<current year>`, and the bronze archive stamped the current month when a file exposed no period — so documents could carry a period nobody selected.

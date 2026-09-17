@@ -173,6 +173,8 @@ Enterprise SOS + invoice lifecycle. Workflow helpers: `src/lib/sos/statementWork
 
 **Dates:** `normalizeDateToMonth(s, source)` — unambiguous day/month always wins; when both parts ≤ 12, Believe/Printful = DD/MM and Bandcamp/Shopify/Darkmerch = MM/DD. Two-digit years are American only for Bandcamp.
 
+**Amount parsing:** `src/lib/sos/ingest/amountParsing.ts` — typed `valid | empty | invalid(reason)`, convention per source (Believe/Bandcamp/Shopify/Printful `en`, Darkmerch `de`); the UI locale never changes the provider format. Invalid/missing required amounts and malformed quantities become row errors (field/raw value in the reason), never silent `0`; quantities keep `0` and negative refunds (no `Math.max(1, …)`). Ambiguous `1,234` without a known convention is a clarification error. Manual amount/percent fields use `accountingInputValidation` (`parseMoneyAmount` / `parseRequiredPercent`).
+
 **Gold persist:** `row_count` stays the bronze original (do not overwrite with upsert length). Portal gold `revenueEur` is the artist share after the label split (channel-aware via `applyArtistShareToPortalMetrics`); Excel / SOS reporting stay on processor gross. Do not persist or display the split rate in the portal. No gold-vs-statement toast (those amounts are different layers). Reprocess accepts session `exchangeRates` / `historicalRates` / `carryForwardByArtist`.
 
 | Module | Role |

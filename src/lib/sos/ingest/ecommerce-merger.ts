@@ -34,6 +34,7 @@
 import Papa from 'papaparse'
 import type { SalesTransaction } from './csv-parser'
 import { normalizeDateToMonth } from './streaming-csv-parser'
+import { parseAmount, parseIntegerAmount } from './amountParsing'
 
 // ── Domain types ──────────────────────────────────────────────────────────────
 
@@ -395,30 +396,6 @@ export function reconcileMerchTransactions(
   return { transactions, warnings }
 }
 
-// ── parseNumber helper (used by both shopify-parser and printful-parser) ──────
-
-/**
- * Parses a currency string that may include a currency symbol, thousand
- * separators, or European decimal formatting into a plain number.
- *
- * Examples:
- *   `"€15.79"` → `15.79`
- *   `"1.234,56"` → `1234.56`
- *   `"1,234.56"` → `1234.56`
- */
-export function parseCurrencyAmount(raw: string): number {
-  if (!raw) return 0
-  // Strip currency symbols and whitespace
-  const cleaned = raw.replace(/[^\d.,-]/g, '').trim()
-  if (!cleaned) return 0
-  // European format: "1.234,56" — period = thousand separator, comma = decimal
-  if (/\d\.\d{3},/.test(cleaned)) {
-    return parseFloat(cleaned.replace(/\./g, '').replace(',', '.')) || 0
-  }
-  // Comma as thousand separator (US/UK): "1,234.56"
-  return parseFloat(cleaned.replace(/,/g, '')) || 0
-}
-
 // ── Shopify raw parser (re-exported here for use by the worker) ───────────────
 
 /**
@@ -462,8 +439,28 @@ export function parseShopifyRaw(content: string): {
 
       const lineItemName = row['Lineitem name']?.trim() ?? ''
       const sku = row['Lineitem sku']?.trim() ?? ''
-      const quantity = Math.max(1, parseCurrencyAmount(row['Lineitem quantity'] ?? ''))
-      const unitPrice = parseCurrencyAmount(row['Lineitem price'] ?? '')
+      // Quantities are integers per Shopify schema; 0 and negative refunds are
+      // valid. Never fabricate a sale with Math.max(1, …).
+      const quantityResult = parseIntegerAmount(row['Lineitem quantity'] ?? '')
+      if (quantityResult.kind !== 'valid') {
+        errors.push({
+          row: i + 2,
+          reason: `Invalid "Lineitem quantity" value "${row['Lineitem quantity'] ?? ''}" (${quantityResult.kind === 'invalid' ? quantityResult.reason : 'empty'})`,
+          data: JSON.stringify(row),
+        })
+        continue
+      }
+      const priceResult = parseAmount(row['Lineitem price'] ?? '', 'en')
+      if (priceResult.kind !== 'valid') {
+        errors.push({
+          row: i + 2,
+          reason: `Invalid "Lineitem price" value "${row['Lineitem price'] ?? ''}" (${priceResult.kind === 'invalid' ? priceResult.reason : 'empty'})`,
+          data: JSON.stringify(row),
+        })
+        continue
+      }
+      const quantity = quantityResult.value
+      const unitPrice = priceResult.value
 
       const lineItem: ShopifyRawLineItem = { lineItemName, sku, quantity, unitPrice }
 
@@ -471,7 +468,16 @@ export function parseShopifyRaw(content: string): {
         // First row for this order — extract order-level fields
         const rawDate = row['Paid at']?.trim() || row['Created at']?.trim() || ''
         const salesMonth = normalizeDateToMonth(rawDate, 'shopify') || ''
-        const subtotal = parseCurrencyAmount(row['Subtotal'] ?? '')
+        const subtotalResult = parseAmount(row['Subtotal'] ?? '', 'en')
+        if (subtotalResult.kind !== 'valid') {
+          errors.push({
+            row: i + 2,
+            reason: `Invalid "Subtotal" value "${row['Subtotal'] ?? ''}" (${subtotalResult.kind === 'invalid' ? subtotalResult.reason : 'empty'})`,
+            data: JSON.stringify(row),
+          })
+          continue
+        }
+        const subtotal = subtotalResult.value
         const currency = (row['Currency']?.trim() || 'EUR').toUpperCase()
         const country = row['Billing Country']?.trim() || row['Shipping Country']?.trim() || 'Unknown'
 
@@ -489,8 +495,16 @@ export function parseShopifyRaw(content: string): {
 
         // Backfill subtotal if it was zero on the first row but present here
         if (existing.subtotal === 0) {
-          const sub = parseCurrencyAmount(row['Subtotal'] ?? '')
-          if (sub > 0) existing.subtotal = sub
+          const subResult = parseAmount(row['Subtotal'] ?? '', 'en')
+          if (subResult.kind === 'valid' && subResult.value > 0) {
+            existing.subtotal = subResult.value
+          } else if (subResult.kind === 'invalid') {
+            errors.push({
+              row: i + 2,
+              reason: `Invalid "Subtotal" value "${row['Subtotal'] ?? ''}" (${subResult.reason})`,
+              data: JSON.stringify(row),
+            })
+          }
         }
 
         existing.lineItems.push(lineItem)

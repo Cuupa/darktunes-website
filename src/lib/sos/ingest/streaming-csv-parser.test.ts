@@ -105,3 +105,46 @@ describe('parseCSVContentStreaming skips', () => {
     expect(result.transactions[0]?.source_headers).toBe(result.transactions[1]?.source_headers)
   })
 })
+
+describe('parseCSVContentStreaming strict amounts (#632)', () => {
+  it('reports an invalid net_revenue value instead of silently using 0', async () => {
+    const csv = [
+      BELIEVE_HEADER,
+      'Neuroklast,Album,12x,EUR,2024-03',
+      'Neuroklast,EP,12.5,EUR,2024-03',
+    ].join('\n')
+
+    const result = await parseCSVContentStreaming(csv, 'believe')
+    expect(result.transactions).toHaveLength(1)
+    expect(result.errors).toHaveLength(1)
+    expect(result.errors[0]?.reason).toContain('net_revenue')
+    expect(result.errors[0]?.reason).toContain('12x')
+  })
+
+  it('reports a missing required net_revenue value', async () => {
+    const csv = [BELIEVE_HEADER, 'Neuroklast,Album,,EUR,2024-03'].join('\n')
+
+    const result = await parseCSVContentStreaming(csv, 'believe')
+    expect(result.transactions).toHaveLength(0)
+    expect(result.errors[0]?.reason).toContain('net_revenue')
+  })
+
+  it('keeps negative refund quantities instead of taking the absolute value', async () => {
+    const csv = [
+      'Artist,Release,Net Revenue,Currency,Sales Month,Quantity',
+      'Neuroklast,Album,12.5,EUR,2024-03,-2',
+    ].join('\n')
+
+    const result = await parseCSVContentStreaming(csv, 'believe')
+    expect(result.transactions[0]?.quantity).toBe(-2)
+  })
+
+  it('rejects a European decimal comma in an EN source instead of misreading it', async () => {
+    const csv = [BELIEVE_HEADER, 'Neuroklast,Album,"15,79",EUR,2024-03'].join('\n')
+
+    const result = await parseCSVContentStreaming(csv, 'believe')
+    expect(result.transactions).toHaveLength(0)
+    expect(result.errors).toHaveLength(1)
+    expect(result.errors[0]?.reason).toContain('15,79')
+  })
+})

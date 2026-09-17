@@ -2,6 +2,7 @@ import Papa from 'papaparse'
 import type { SalesTransaction } from './csv-parser'
 import { mapCSVHeadersToModel } from './csv-parser'
 import { normalizeDateToMonth } from './normalizeDateToMonth'
+import { parseAmount, parseIntegerAmount, SOURCE_AMOUNT_CONVENTION } from './amountParsing'
 
 export { normalizeDateToMonth } from './normalizeDateToMonth'
 export type { DateParseSource } from './normalizeDateToMonth'
@@ -39,44 +40,6 @@ function isEmptyCsvRow(values: string[]): boolean {
  */
 function stripBOM(text: string): string {
   return text.startsWith('\uFEFF') ? text.slice(1) : text
-}
-
-/**
- * Parses a revenue number that may use European ("1.234,56"), standard
- * ("1,234.56"), or scientific notation ("3.495e-4") decimal formats.
- */
-function parseRevenue(raw: string): number {
-  if (!raw) return 0
-  const cleaned = raw.trim()
-  if (!cleaned) return 0
-
-  // Scientific notation (e.g. "3.495e-4" or "3,495E-4")
-  const sciMatch = cleaned.match(/^([+-]?\d+[.,]\d+)[eE]([+-]?\d+)$/)
-  if (sciMatch) {
-    const mantissa = sciMatch[1].replace(',', '.')
-    return parseFloat(`${mantissa}e${sciMatch[2]}`) || 0
-  }
-  // Plain scientific notation without decimal (e.g. "1e-3")
-  if (/^[+-]?\d+[eE][+-]?\d+$/.test(cleaned)) {
-    return parseFloat(cleaned) || 0
-  }
-
-  const lastComma = cleaned.lastIndexOf(',')
-  const lastDot = cleaned.lastIndexOf('.')
-
-  if (lastComma > lastDot) {
-    // European notation: last separator is comma → "1.234,56"
-    const normalised = cleaned.replace(/\./g, '').replace(',', '.')
-    return parseFloat(normalised.replace(/[^0-9.-]/g, '')) || 0
-  }
-
-  // Standard notation (or plain integer)
-  return parseFloat(cleaned.replace(/[^0-9.eE-]/g, '')) || 0
-}
-
-function parseQuantity(raw: string): number {
-  if (!raw) return 0
-  return parseInt(raw.replace(/[^0-9]/g, ''), 10) || 0
 }
 
 function processChunk(
@@ -149,12 +112,44 @@ function processChunk(
       // "net amount".  Earlier code incorrectly preferred balance_eur, which
       // also suffered from fuzzy-matching contamination by the GBP/PLN/USD
       // balance columns (all four map to balance_eur and the last write wins).
-      const netRevenue = parseRevenue(mappedData.net_revenue ?? '')
+      // Revenue is a required amount: invalid or missing values become visible
+      // row errors instead of a silent 0 (no factor-100 misreads).
+      const convention = SOURCE_AMOUNT_CONVENTION[source]
+      const revenueResult = parseAmount(mappedData.net_revenue ?? '', convention)
+      if (revenueResult.kind === 'invalid') {
+        errors.push({
+          row: rowNumber,
+          reason: `Invalid "net_revenue" value "${mappedData.net_revenue ?? ''}" (${revenueResult.reason})`,
+          data: rowPreview,
+        })
+        continue
+      }
+      if (revenueResult.kind === 'empty') {
+        errors.push({
+          row: rowNumber,
+          reason: 'Missing required "net_revenue" value',
+          data: rowPreview,
+        })
+        continue
+      }
+      const netRevenue = revenueResult.value
+
       const rawCurrency = (mappedData.currency ?? '').trim()
       if (!rawCurrency) emptyCurrencyRows += 1
       const currency = rawCurrency || 'EUR'
 
-      const quantity = parseQuantity(mappedData.quantity ?? '')
+      // Quantity is optional (explicit field rule: empty → 0). Invalid text is
+      // an error; 0 and negative refunds are kept as parsed.
+      const quantityResult = parseIntegerAmount(mappedData.quantity ?? '')
+      if (quantityResult.kind === 'invalid') {
+        errors.push({
+          row: rowNumber,
+          reason: `Invalid "quantity" value "${mappedData.quantity ?? ''}" (${quantityResult.reason})`,
+          data: rowPreview,
+        })
+        continue
+      }
+      const quantity = quantityResult.kind === 'valid' ? quantityResult.value : 0
 
       // ── Physical product detection ─────────────────────────────────────────
       // Bandcamp: use the "package" column — if it contains the word "digital"

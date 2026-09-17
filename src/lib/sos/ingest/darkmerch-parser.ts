@@ -10,7 +10,8 @@
  *   - The header row is consumed and column positions are detected by name.
  *   - Column names are matched with alias lists to handle variant spellings
  *     (e.g. BAND / ARTIST / ARTIST NAME) and different localisations.
- *   - Rows where NET REVENUE is empty or zero are skipped.
+ *   - Rows where NET REVENUE is empty or zero are skipped; invalid values are
+ *     reported as row errors (German decimal comma is parsed correctly).
  *   - Each valid row produces one SalesTransaction with is_physical = true.
  *
  * XLSX support:
@@ -21,6 +22,7 @@
  */
 
 import type { SalesTransaction } from './csv-parser'
+import { parseAmount } from './amountParsing'
 
 export interface DarkmerchParseResult {
   transactions: SalesTransaction[]
@@ -98,10 +100,21 @@ export function parseDarkmerchCSV(content: string): DarkmerchParseResult {
       continue
     }
 
-    // Skip rows where NET REVENUE is empty or zero
+    // Skip rows where NET REVENUE is empty; reject invalid values visibly
+    // instead of silently coercing them (German format: 15,79 → 15.79).
     if (revenueStr === '') continue
-    const netRevenue = parseFloat(revenueStr.replace(',', '.'))
-    if (isNaN(netRevenue) || netRevenue === 0) continue
+    const revenueResult = parseAmount(revenueStr, 'de')
+    if (revenueResult.kind === 'empty') continue
+    if (revenueResult.kind === 'invalid') {
+      errors.push({
+        row: i + 1,
+        reason: `Invalid "NET REVENUE" value "${revenueStr}" (${revenueResult.reason})`,
+        data: line,
+      })
+      continue
+    }
+    const netRevenue = revenueResult.value
+    if (netRevenue === 0) continue
 
     const sourceId = crypto.randomUUID()
     transactions.push({

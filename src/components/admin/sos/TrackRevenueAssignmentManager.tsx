@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { TrackRevenueAssignment, RevenueOwner } from '@/lib/sos/types'
 import { PercentField } from '@/components/admin/sos/fields/AccountingNumberFields'
+import { parseOptionalPercent, parseRequiredPercent } from '@/lib/sos/accountingInputValidation'
 import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -51,8 +52,8 @@ function OwnerRow({
   percentLabel: string
   removeLabel: string
 }) {
-  const pctNum = owner.percentage.trim() === '' ? undefined : Number(owner.percentage.replace(',', '.'))
-  const pctValue = pctNum != null && Number.isFinite(pctNum) ? pctNum : undefined
+  const pctParsed = parseOptionalPercent(owner.percentage)
+  const pctValue = pctParsed.ok ? pctParsed.value : undefined
 
   return (
     <div className="flex gap-2 items-end">
@@ -102,8 +103,8 @@ export function TrackRevenueAssignmentManager({
   const [error, setError] = useState('')
 
   const ownerSum = owners.reduce((s, o) => {
-    const n = parseFloat(o.percentage.replace(',', '.'))
-    return s + (Number.isNaN(n) ? 0 : n)
+    const parsed = parseOptionalPercent(o.percentage)
+    return s + (parsed.ok && parsed.value != null ? parsed.value : 0)
   }, 0)
   const sumOk = Math.abs(ownerSum - 100) < 0.01
 
@@ -129,12 +130,15 @@ export function TrackRevenueAssignmentManager({
       setError(t.trackOwnerRequired)
       return
     }
-    const parsed: RevenueOwner[] = owners
-      .filter(o => o.artist.trim())
-      .map(o => ({
-        artist: o.artist.trim(),
-        percentage: parseFloat(o.percentage.replace(',', '.')) || 0,
-      }))
+    const parsed: RevenueOwner[] = []
+    for (const o of owners.filter((o) => o.artist.trim())) {
+      const pct = parseRequiredPercent(o.percentage)
+      if (!pct.ok) {
+        setError(t.validationPercentRange)
+        return
+      }
+      parsed.push({ artist: o.artist.trim(), percentage: pct.value })
+    }
     const sum = parsed.reduce((s, o) => s + o.percentage, 0)
     if (Math.abs(sum - 100) >= 0.01) {
       setError(`${t.validationPercentRange} (${sum.toFixed(1)}%)`)

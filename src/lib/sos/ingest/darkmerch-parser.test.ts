@@ -22,3 +22,21 @@ describe('parseDarkmerchCSV original cells', () => {
     }
   })
 })
+
+describe('parseDarkmerchCSV number formats (#632)', () => {
+  it('parses German decimal comma without a factor-100 error', () => {
+    const csv = ['DATE;BAND;NET REVENUE', 'Q1 2026;Reaper;15,79', 'Q1 2026;Lamori;1.234,56'].join('\n')
+    const result = parseDarkmerchCSV(csv)
+    expect(result.transactions.map((tx) => tx.net_revenue)).toEqual([15.79, 1234.56])
+    expect(result.errors).toHaveLength(0)
+  })
+
+  it('reports invalid revenue values instead of coercing them to 0', () => {
+    const csv = ['DATE,BAND,NET REVENUE', 'Q1 2026,Reaper,12x', 'Q1 2026,Lamori,15.79'].join('\n')
+    const result = parseDarkmerchCSV(csv)
+    expect(result.transactions).toHaveLength(0)
+    expect(result.errors).toHaveLength(2)
+    expect(result.errors[0]?.reason).toContain('NET REVENUE')
+    expect(result.errors[0]?.reason).toContain('12x')
+  })
+})
