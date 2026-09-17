@@ -22,6 +22,7 @@ import {
   SettlementPeriodNotWritableError,
 } from '@/lib/api/settlementPeriods'
 import { createSalesStatementLineItems } from '@/lib/api/salesStatementLineItems'
+import { canPublishStatement } from '@/lib/sos/statementPublishAccess'
 import { validateStatementUploadPeriod } from '@/lib/sos/statementUploadValidation'
 import {
   buildStatementR2Key,
@@ -85,8 +86,8 @@ export async function uploadStatement(
     }
 
     const role = await getUserRoleWithClient(supabase, user.id)
-    if (!role || !['admin', 'editor'].includes(role)) {
-      return { success: false, error: 'Forbidden: admin or editor role required' }
+    if (!canPublishStatement(role)) {
+      return { success: false, error: 'Forbidden: admin role required' }
     }
 
     // 2. Verify the artist exists

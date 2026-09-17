@@ -84,7 +84,7 @@ MUSS-Regeln:
 
 | Ausgangszustand | Aktion | Voraussetzungen | Ergebnis | Nebenwirkungen |
 |---|---|---|---|---|
-| — | Entwurf anlegen (`uploadStatement`) | Admin (IST: admin/editor — #629 MUSS vereinheitlichen), Artist existiert, Periode schreibbar, kein offener Entwurf je Artist+Periode (Partial-Index) | `draft` + R2-PDF + Line Items | R2-Objekt; bei DB-Fehler R2-Löschung (IST) |
+| — | Entwurf anlegen (`uploadStatement`) | Admin-only (`canPublishStatement`), Artist existiert, Periode schreibbar, kein offener Entwurf je Artist+Periode (Partial-Index) | `draft` + R2-PDF + Line Items | R2-Objekt; bei DB-Fehler R2-Löschung (IST) |
 | `draft` | Freigeben | Admin, Periode schreibbar, Status exakt `draft` | `label_approved` + `label_approved_at` + Notiz | E-Mail-Versuch; bei Erfolg `artist_notified`; `linkApprovedStatementToSettlement` bucht `statement_payout`; Audit |
 | `label_approved` | Benachrichtigung nachholen (#623) | Admin, Status exakt `label_approved` | `artist_notified` | Notification; Audit |
 | `label_approved`/`artist_notified` | Ansicht erfassen | Portal-Mitglied, Statement gehört zum Artist | `viewed` (einmalig) | `first_viewed_at`, `last_viewed_at`, `view_count+1` |
@@ -413,8 +413,8 @@ Zahlungen oder Periodenabschlüsse ausführen.
 
 IST-Abweichungen, die #629 MUSS bereinigen:
 
-1. `uploadStatement` erlaubt `admin` **oder** `editor`, alle übrigen Admin-SOS-Routen sind
-   admin-only (`app/portal/statements/_actions/uploadStatement.ts:72-85`).
+1. Erledigt: `uploadStatement` erzwingt admin-only über `canPublishStatement`
+   (`src/lib/sos/statementPublishAccess.ts`); alle Admin-SOS-Routen sind einheitlich.
 2. `ADMIN_ONLY_PATH_PREFIXES` in `src/lib/rbac/routeRegistry.ts` ist ungenutzt.
 3. Es existiert kein SOS-Finanzrecht (`can_manage_accounting` o. ä.) — entweder bewusst
    admin-only lassen und das testen, oder ein Recht einführen. Kein stiller Sonderweg.

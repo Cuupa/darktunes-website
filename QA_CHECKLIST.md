@@ -134,6 +134,7 @@
 - [ ] Two parallel payments (30 + 20 on a 100 EUR gross invoice) both persist (50 paid / 50 open, two ledger events); a retry after a follow-up failure does not add the amount again; archiving twice creates one carry per artist
 - [ ] Open an approved statement as artist → status becomes `viewed` once (counter +1); open the same statement again after the invoice is created → status stays `invoiced` (no downgrade)
 - [ ] Shopify order with two Printful cost rows → costs are summed (100 − 15 − 5 = 80), not last-wins; a self-fulfilled order without Printful costs stays at full net revenue
+- [ ] Editor account cannot publish a statement (`uploadStatement` → Forbidden: admin role required); admin works unchanged
 - [ ] Invoice with a failing Resend key → status stays `draft`, `delivery_status='failed'` with the provider error visible; successful send → `sent` + `delivery_status='sent'`; no mail requested → `not_sent`
 - [ ] Upload one CSV → coach checklist updates; Continue enabled only after numbers appear
 - [ ] Block/throttle `/api/exchange-rates` → sticky fallback banner + Refresh; no crash on first process
