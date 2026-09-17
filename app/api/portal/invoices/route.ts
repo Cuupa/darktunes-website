@@ -501,9 +501,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   )
 
   const pdfUrl = `${serverEnv.CLOUDFLARE_R2_PUBLIC_URL.replace(/\/$/, '')}/${key}`
-  // Never downgrade a recovered invoice that was already marked sent.
-  const nextStatus =
-    input.send_email || recoveredInvoice?.status === 'sent' ? 'sent' : 'draft'
+  // Financial status and delivery are separate (#623): the status is decided
+  // after the mail result below, never from the send request alone.
   const updatedInvoice = await write('artist_invoices', 'update', (db) =>
     updateInvoice(db, invoice.id, artist.id, {
       pdf_url: pdfUrl,
@@ -513,7 +512,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       fx_rate: fxQuote?.rate ?? null,
       fx_rate_date: fxQuote?.date ?? null,
       fx_rate_source: fxQuote?.source ?? null,
-      status: nextStatus,
+      status: recoveredInvoice?.status ?? 'draft',
+      delivery_status: recoveredInvoice?.deliveryStatus ?? 'not_sent',
+      delivery_attempted_at: recoveredInvoice?.deliveryAttemptedAt ?? null,
+      delivery_error: recoveredInvoice?.deliveryError ?? null,
     }),
   )
 
@@ -643,9 +645,34 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     if (!result.success) warnings.push('label_email_failed')
   }
 
+  // Delivery outcome decides the financial status: a failed mail keeps the
+  // invoice as draft with delivery_status=failed (retryable); a provider-
+  // confirmed send moves it to sent. Never claim "sent" without confirmation.
+  const deliveryStatus: 'not_sent' | 'sent' | 'failed' = !input.send_email
+    ? (updatedInvoice.deliveryStatus ?? 'not_sent')
+    : emailResults.client?.sent
+      ? 'sent'
+      : 'failed'
+  const deliveryError =
+    deliveryStatus === 'failed'
+      ? (emailResults.client?.error ?? 'Email delivery failed')
+      : null
+  const finalStatus: 'draft' | 'sent' =
+    deliveryStatus === 'sent' || updatedInvoice.status === 'sent' ? 'sent' : 'draft'
+  const finalInvoice = await write('artist_invoices', 'update', (db) =>
+    updateInvoice(db, invoice.id, artist.id, {
+      status: finalStatus,
+      delivery_status: deliveryStatus,
+      delivery_attempted_at: input.send_email
+        ? new Date().toISOString()
+        : (updatedInvoice.deliveryAttemptedAt ?? null),
+      delivery_error: deliveryError,
+    }),
+  )
+
   return NextResponse.json(
     {
-      invoice: toPortalInvoiceListItem(updatedInvoice),
+      invoice: toPortalInvoiceListItem(finalInvoice),
       pdf_available: true,
       email: emailResults,
       warnings,

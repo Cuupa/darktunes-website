@@ -116,9 +116,9 @@ Zielmodell (#621/#623): **Dokument-/Finanzstatus** (`status`) und **Zustellung**
 
 MUSS-Regeln:
 
-1. `status='sent'` darf nicht allein aus dem Versandwunsch (`send_email=true`) abgeleitet
-   werden. Heute setzt `app/api/portal/invoices/route.ts:400-414` `sent` vor dem
-   Mailergebnis — #621 MUSS das korrigieren.
+1. `status='sent'` wird erst nach Providerbestätigung gesetzt. Die Erstellung
+   startet mit `delivery_status='not_sent'`; ein Mailfehler führt zu `draft` +
+   `delivery_status='failed'` mit Fehlergrund und bleibt wiederholbar.
 2. Mailfehler rollt weder Rechnung noch PDF zurück. Sie setzt `delivery_status='failed'`
    und ist gezielt wiederholbar.
 3. Das PDF MUSS ausschließlich aus dem persistierten Rechnungsstand erzeugt werden

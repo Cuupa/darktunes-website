@@ -44,6 +44,10 @@ export interface ArtistInvoice {
   paymentMethod: InvoiceRow['payment_method']
   paymentReference: string | undefined
   settlementPeriodId: string | undefined
+  /** Delivery state is separate from the financial status (#623). */
+  deliveryStatus: 'not_sent' | 'sent' | 'failed' | undefined
+  deliveryAttemptedAt: string | undefined
+  deliveryError: string | undefined
   createdAt: string
   updatedAt: string
 }
@@ -101,6 +105,9 @@ function rowToArtistInvoice(row: InvoiceRow): ArtistInvoice {
     paymentMethod: row.payment_method,
     paymentReference: row.payment_reference ?? undefined,
     settlementPeriodId: row.settlement_period_id ?? undefined,
+    deliveryStatus: row.delivery_status ?? undefined,
+    deliveryAttemptedAt: row.delivery_attempted_at ?? undefined,
+    deliveryError: row.delivery_error ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -257,6 +264,9 @@ export async function updateInvoice(
     fx_rate_source: string | null
     notes: string | null
     artist_invoice_number: string | null
+    delivery_status: 'not_sent' | 'sent' | 'failed' | null
+    delivery_attempted_at: string | null
+    delivery_error: string | null
   }>,
 ): Promise<ArtistInvoice> {
   // GoBD write-once: never replace an issued PDF artifact.
