@@ -302,9 +302,12 @@ export function reconcileMerchTransactions(
   printfulCosts: PrintfulRawCost[]
 ): MerchReconciliationResult {
   // ── Build Printful cost index ─────────────────────────────────────────────
+  // Sum all cost entries per order — several fulfilment entries for the same
+  // order must not be lost with a last-wins Map.set (#631).
   const printfulIndex = new Map<string, number>()
   for (const cost of printfulCosts) {
-    printfulIndex.set(normaliseOrderId(cost.orderId), cost.total)
+    const key = normaliseOrderId(cost.orderId)
+    printfulIndex.set(key, (printfulIndex.get(key) ?? 0) + cost.total)
   }
 
   const hasPrintfulData = printfulCosts.length > 0

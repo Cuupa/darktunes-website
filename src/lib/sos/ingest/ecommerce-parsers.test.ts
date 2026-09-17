@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseShopifyRaw } from './ecommerce-merger'
+import { parseShopifyRaw, reconcileMerchTransactions } from './ecommerce-merger'
 import { parsePrintfulCSV } from './printful-parser'
 
 const SHOPIFY_HEADER =
@@ -70,5 +70,37 @@ describe('parsePrintfulCSV strict amounts (#632)', () => {
     expect(result.costs).toHaveLength(0)
     expect(result.errors).toHaveLength(1)
     expect(result.errors[0]?.reason).toContain('Total')
+  })
+})
+
+describe('reconcileMerchTransactions overlap handling (#631)', () => {
+  it('sums multiple Printful costs for the same order instead of last-wins', () => {
+    const shopify = parseShopifyRaw(
+      [
+        SHOPIFY_HEADER,
+        'DM2001,Reaper - Nightfall,SKU1,1,100,100,EUR,2026-01-05,Germany',
+      ].join('\n'),
+    )
+    const printful = parsePrintfulCSV(
+      ['Order,Total,Status', '#DM2001,15,fulfilled', 'DM2001,5,fulfilled'].join('\n'),
+    )
+
+    const { transactions } = reconcileMerchTransactions(shopify.orders, printful.costs)
+
+    expect(transactions).toHaveLength(1)
+    // 100 subtotal − (15 + 5) fulfilment costs
+    expect(transactions[0]?.net_revenue).toBeCloseTo(80, 6)
+  })
+
+  it('keeps self-fulfilled orders without Printful costs at full net revenue', () => {
+    const shopify = parseShopifyRaw(
+      [
+        SHOPIFY_HEADER,
+        'DM2002,Reaper - Nightfall,SKU1,1,50,50,EUR,2026-01-05,Germany',
+      ].join('\n'),
+    )
+
+    const { transactions } = reconcileMerchTransactions(shopify.orders, [])
+    expect(transactions[0]?.net_revenue).toBeCloseTo(50, 6)
   })
 })
