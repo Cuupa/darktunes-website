@@ -12,6 +12,7 @@ import { computeEventImpactForArtist } from '@/lib/analytics/eventImpact'
 import { computePromoImpactForArtist } from '@/lib/analytics/promoImpactCompute'
 import { upsertSosPeriodSummary, type UpsertSosPeriodSummaryInput } from '@/lib/api/sosPeriodSummaries'
 import { upsertMerchOrders } from '@/lib/api/merchOrders'
+import { assertSettlementPeriodWritable } from '@/lib/api/settlementPeriods'
 import type { TerritoryMetricRow } from '@/lib/sos/data-processor'
 import type { MerchOrderRow } from '@/lib/sos/merchOrderRows'
 import { writeAppLog } from '@/lib/appLog'
@@ -77,6 +78,10 @@ export async function persistSosAnalyticsCore(
   serviceSupabase: ServiceClient,
   input: PersistSosAnalyticsInput,
 ): Promise<PersistSosAnalyticsResult> {
+  // Locked/archived periods are immutable (§A.5, §A.8.9); this must throw so the
+  // route maps it to 409 instead of the generic 422 result path.
+  await assertSettlementPeriodWritable(serviceSupabase, input.periodStart, input.periodEnd)
+
   try {
     if (input.territoryMetrics.length === 0) {
       await writeAppLog({

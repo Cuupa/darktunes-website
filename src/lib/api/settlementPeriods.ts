@@ -171,28 +171,42 @@ export async function archiveSettlementPeriod(
 ): Promise<SettlementPeriod> {
   const existing = await getSettlementPeriodById(db, id)
   if (!existing) throw new Error('Settlement period not found')
-  if (existing.status === 'archived') return existing
 
   const now = new Date().toISOString()
-  const { data, error } = await db
-    .from('settlement_periods')
-    .update({
-      status: 'archived',
-      archived_at: now,
-      archived_by: actorId,
-      locked_at: existing.lockedAt ?? now,
-      locked_by: existing.lockedBy ?? actorId,
-    })
-    .eq('id', id)
-    .select('*')
-    .single()
+  let archivedRow: SettlementPeriodRow | null = null
 
-  if (error) throw new Error(error.message)
+  if (existing.status !== 'archived') {
+    const { data, error } = await db
+      .from('settlement_periods')
+      .update({
+        status: 'archived',
+        archived_at: now,
+        archived_by: actorId,
+        locked_at: existing.lockedAt ?? now,
+        locked_by: existing.lockedBy ?? actorId,
+      })
+      .eq('id', id)
+      .select('*')
+      .single()
 
-  await db
+    if (error) throw new Error(error.message)
+    archivedRow = data as SettlementPeriodRow
+  }
+
+  // Always re-assert statement archiving: a retry after a partial failure
+  // (period archived, statements left active) must heal instead of returning early.
+  const { error: statementError } = await db
     .from('sales_statements')
     .update({ is_archived: true })
     .eq('settlement_period_id', id)
+
+  if (statementError) {
+    throw new Error(
+      `Failed to archive statements for settlement period ${id}: ${statementError.message}`,
+    )
+  }
+
+  if (!archivedRow) return existing
 
   await logFinancialEvent(db, {
     entityType: 'settlement_period',
@@ -203,7 +217,7 @@ export async function archiveSettlementPeriod(
     afterData: { status: 'archived', archived_at: now },
   })
 
-  return rowToPeriod(data as SettlementPeriodRow)
+  return rowToPeriod(archivedRow)
 }
 
 export function isPeriodWritable(status: SettlementPeriodStatus): boolean {

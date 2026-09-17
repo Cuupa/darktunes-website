@@ -1575,6 +1575,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
+        '409':
+          description: "Purge blocked: locked or archived settlement periods own data in the selected scope (SETTLEMENT_PERIOD_LOCKED)."
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -3429,7 +3431,7 @@ paths:
     post:
       operationId: postadmin_sos_persist-analytics
       tags: [Admin]
-      summary: Create or submit /api/admin/sos/persist-analytics
+      summary: Persist Statement of Sales gold analytics to the portal database
       security:
         - AdminBearer: []
       requestBody:
@@ -3441,11 +3443,11 @@ paths:
               additionalProperties: true
       responses:
         '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessResponse"
+          description: Gold analytics persisted.
+        '409':
+          description: Settlement period is locked or archived and cannot be modified (SettlementPeriodNotWritableError).
+        '422':
+          description: "Persist rejected by domain rules (no metrics, no linked artists)."
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -3641,16 +3643,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: Workspace revision conflict (another session saved a newer revision)
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/Problem'
+                $ref: "#/components/schemas/Problem"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
     delete:
       operationId: deleteadmin_sos_workspaces
       tags: [Admin]

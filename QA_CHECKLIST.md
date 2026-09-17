@@ -89,6 +89,7 @@
 - [ ] Statement-linked invoice + full payment → open balance / carry-forward ~ 0 (no double negative)
 - [ ] Invoice with 19% USt: payment can record gross PDF total
 - [ ] Portal invoice against locked settlement period returns 422
+- [ ] Save to Portal / persist-analytics against a locked or archived period returns 409 `problem+json` and writes no gold rows
 - [ ] Reporting / PDF / Excel: **Period payout** is this period only; **Opening** is last period’s leftover; **Amount due** = payout + opening (opening is not inside payout)
 - [ ] Archive a period with leftover → next period opening line + `carry_in`; new `amount_eur` does not include that leftover
 - [ ] Track split 70/20 blocks Continue and does not leak 10% to the original artist
@@ -116,6 +117,8 @@
 - [ ] ZIP-of-all with a skipped raw Excel finishes and shows a warning naming the skipped artist count (plus the placeholder file)
 - [ ] Bronze: first upload of a new CSV does **not** 409 `already has archived content`; retry of a completed hash is treated as duplicate.
 - [ ] Admin → System → Maintenance → **Statement of Sales data**: type-confirm `DELETE FAILED` removes only unconfirmed/failed bronze (completed stay); `DELETE BRONZE` / `DELETE GOLD` as labeled. After a purge, Log Manager → Admin Actions shows `purged` / `sos_data`. Statements/invoices remain.
+- [ ] Purge a scope whose data belongs to a locked/archived period → 409 `SETTLEMENT_PERIOD_LOCKED` and nothing is deleted; purging writable-period data still works
+- [ ] Archive a period whose statement archiving failed once → retry archives the period and no statement of that period stays `is_archived = false`
 
 ## Accounting wizard (DAU path)
 - [ ] `/admin/accounting` Statement History tab and `/admin/statements` render without `Something went wrong`

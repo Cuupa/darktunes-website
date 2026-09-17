@@ -148,15 +148,17 @@ MUSS-Regeln:
 
 1. Schreibbar sind exakt `open`, `under_review`, `approved`
    (`isPeriodWritable`, `settlementPeriods.ts:209-211`). Diese Prüfung MUSS für **alle**
-   Finanzmutationen gelten, auch `POST /api/admin/sos/persist-analytics` und
-   `POST /api/admin/maintenance/purge-sos-data` (heute ungeschützt, #628/#630).
+   Finanzmutationen gelten, auch `POST /api/admin/sos/persist-analytics`
+   (`persistSosAnalyticsCore`, wirft `SettlementPeriodNotWritableError` → 409) und
+   `POST /api/admin/maintenance/purge-sos-data` (`assertSosPurgeAllowed` blockiert
+   Sperrperioden-Daten → 409 `SETTLEMENT_PERIOD_LOCKED`).
 2. `archiveSettlementPeriod` MUSS den Fehler der `sales_statements.is_archived`-Aktualisierung
-   auswerten (heute ignoriert, `settlementPeriods.ts:192-195`).
+   auswerten und bei Retry nach Teilerfolg heilen (statt früh zurückzukehren).
 3. Periodenabschluss (Carry-out, `period_carry_forwards`, nächste Periode, Carry-in,
    Archivierung) MUSS atomar und idempotent sein: bei Retry genau ein Carry je
    `(from_period, artist)`; kein halb archivierter Zustand (#628).
 4. `period_carry_forwards.applied_at` MUSS gesetzt werden, sobald der Carry angewendet ist
-   (heute nie geschrieben, `settlementLedger.ts:237-271`).
+   (umgesetzt in #628, `settlementRegister.ts:258-286`).
 5. `recordStatementView` und Downloads bleiben in gesperrten Perioden erlaubt.
 
 ### A.6 Import batch states

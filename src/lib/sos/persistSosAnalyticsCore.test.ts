@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { persistSosAnalyticsCore } from './persistSosAnalyticsCore'
+import { SettlementPeriodNotWritableError } from '@/lib/api/settlementPeriods'
 import { computeEventImpactForArtist } from '@/lib/analytics/eventImpact'
 import { updateImportBatchStatus } from '@/lib/api/distributorImportBatches'
 import { upsertTerritoryMetrics } from '@/lib/api/artistTerritoryMetrics'
@@ -41,11 +42,16 @@ vi.mock('@/lib/appLog', () => ({
   writeAppLog: writeAppLogMock,
 }))
 
-function makeServiceDb(statements: unknown[] = []) {
+function makeServiceDb(statements: unknown[] = [], periodStatus: string | null = null) {
   return {
     from: vi.fn(() => ({
       select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
       neq: vi.fn().mockResolvedValue({ data: statements, error: null }),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: periodStatus ? { status: periodStatus } : null,
+        error: null,
+      }),
     })),
   } as never
 }
@@ -76,6 +82,27 @@ describe('persistSosAnalyticsCore', () => {
 
     expect(result.success).toBe(true)
     expect(result.metricsUpserted).toBeGreaterThan(0)
+  })
+
+  it('rejects persistence into a locked settlement period without writing gold data', async () => {
+    await expect(
+      persistSosAnalyticsCore(makeServiceDb([], 'locked'), {
+        periodStart: '2024-01',
+        periodEnd: '2024-01',
+        territoryMetrics: [{
+          artistName: 'Band A',
+          period: '2024-01',
+          platform: 'Spotify',
+          country: 'DE',
+          streams: 100,
+          revenueEur: 10,
+          quantity: 0,
+        }],
+        labelArtists: [{ name: 'Band A', artistId: 'artist-1' }],
+      }),
+    ).rejects.toBeInstanceOf(SettlementPeriodNotWritableError)
+    expect(vi.mocked(upsertTerritoryMetrics)).not.toHaveBeenCalled()
+    expect(vi.mocked(upsertMerchOrders)).not.toHaveBeenCalled()
   })
 
   it('returns event impact row count on success', async () => {

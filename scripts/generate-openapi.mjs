@@ -258,6 +258,23 @@ lines.push('        error:');
 lines.push('          type: string');
 lines.push('        code:');
 lines.push('          type: string');
+lines.push('    Problem:');
+lines.push('      type: object');
+lines.push('      description: RFC 9457 problem+json body (legacy `error`/`code` kept as extensions).');
+lines.push('      required: [type, title, status, detail, error]');
+lines.push('      properties:');
+lines.push('        type:');
+lines.push('          type: string');
+lines.push('        title:');
+lines.push('          type: string');
+lines.push('        status:');
+lines.push('          type: integer');
+lines.push('        detail:');
+lines.push('          type: string');
+lines.push('        error:');
+lines.push('          type: string');
+lines.push('        code:');
+lines.push('          type: string');
 lines.push('    SuccessResponse:');
 lines.push('      type: object');
 lines.push('      properties:');
@@ -400,6 +417,10 @@ lines.push('        issued_date: { type: string, format: date }');
 lines.push('        notes: { type: string }');
 lines.push('        send_email: { type: boolean, default: true }');
 lines.push('        send_to_label: { type: boolean, default: false }');
+lines.push('        operation_id:');
+lines.push('          type: string');
+lines.push('          format: uuid');
+lines.push('          description: "Stable per submission attempt. Same id + same payload replays the stored invoice; same id + different payload returns 409."');
 lines.push('    PresignedUrlResponse:');
 lines.push('      type: object');
 lines.push('      required: [url]');
@@ -598,6 +619,70 @@ const schemaOverrides = {
   '/api/admin/maintenance/purge-sos-data': {
     POST: {
       summary: 'Audited purge of Statement of Sales bronze archives or portal gold analytics',
+      responses: {
+        409: {
+          description:
+            'Purge blocked: locked or archived settlement periods own data in the selected scope (SETTLEMENT_PERIOD_LOCKED).',
+        },
+      },
+    },
+  },
+  '/api/admin/sos/persist-analytics': {
+    POST: {
+      summary: 'Persist Statement of Sales gold analytics to the portal database',
+      responses: {
+        200: { description: 'Gold analytics persisted.' },
+        409: {
+          description:
+            'Settlement period is locked or archived and cannot be modified (SettlementPeriodNotWritableError).',
+        },
+        422: { description: 'Persist rejected by domain rules (no metrics, no linked artists).' },
+      },
+    },
+  },
+  '/api/admin/sos/import-batches/{id}/multipart/presign-part': {
+    POST: {
+      summary:
+        'presigned UploadPart URL for direct browser → R2 multipart (non-final parts ≥ 5 MiB; requires bucket CORS)',
+    },
+  },
+  '/api/admin/sos/import-batches/{id}/presign-download': {
+    GET: { summary: 'presigned GET URL for browser → R2 download (requires bucket CORS)' },
+  },
+  '/api/admin/sos/import-batches/{id}/presign-upload': {
+    POST: {
+      summary:
+        'presigned PUT URL for direct browser → R2 upload (single object ≤ 100 MB; requires bucket CORS)',
+    },
+  },
+  '/api/admin/sos/import-batches/{id}/upload': {
+    POST: { summary: 'server-proxy single-request upload (≤ 4 MB; no multipart)' },
+  },
+  '/api/admin/sos/workspaces': {
+    POST: {
+      summary: 'upsert workspace for period (optimistic concurrency via expected_revision)',
+      requestBody: {
+        properties: [
+          '                period_start: { type: string }',
+          '                period_end: { type: string }',
+          '                config: { type: object }',
+          '                bronze_batch_ids:',
+          '                  type: array',
+          '                  items: { type: string, format: uuid }',
+          '                expected_revision:',
+          '                  type: integer',
+          '                  minimum: 1',
+          '                  nullable: true',
+          '                  description: Revision last read; null inserts a new workspace. Mismatch returns 409.',
+        ],
+      },
+      responses: {
+        409: {
+          description: 'Workspace revision conflict (another session saved a newer revision)',
+          schema: 'Problem',
+          contentType: 'application/problem+json',
+        },
+      },
     },
   },
   '/api/v1/analytics/export': {
@@ -621,7 +706,10 @@ const schemaOverrides = {
           description: 'Idempotent replay — the statement already has an invoice.',
         },
         201: { schema: 'InvoiceSubmitResponse', description: 'Invoice created.' },
-        409: { description: 'Duplicate statement invoice (concurrent create).' },
+        409: {
+          description:
+            'Duplicate statement invoice (concurrent create) or the same operation_id with a different payload.',
+        },
         422: { description: 'Statement not invoiceable or amount mismatch.' },
       },
     },
@@ -748,6 +836,13 @@ for (const route of sortedPaths) {
         lines.push('            schema:');
         if (schema) {
           lines.push(`              $ref: "#/components/schemas/${schema}"`);
+        } else if (override?.requestBody?.properties) {
+          lines.push('              type: object');
+          lines.push('              additionalProperties: true');
+          lines.push('              properties:');
+          for (const propertyLine of override.requestBody.properties) {
+            lines.push(propertyLine);
+          }
         } else {
           lines.push('              type: object');
           lines.push('              additionalProperties: true');
@@ -812,6 +907,12 @@ for (const route of sortedPaths) {
       if (!responses[code]) continue;
       lines.push(`        '${code}':`);
       lines.push(`          description: ${yamlEscape(responses[code].description ?? 'Error')}`);
+      if (responses[code].schema) {
+        lines.push('          content:');
+        lines.push(`            ${responses[code].contentType ?? 'application/json'}:`);
+        lines.push('              schema:');
+        lines.push(`                $ref: "#/components/schemas/${responses[code].schema}"`);
+      }
     }
 
     lines.push("        '400': { $ref: '#/components/responses/BadRequest' }");

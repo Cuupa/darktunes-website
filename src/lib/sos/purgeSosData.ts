@@ -32,6 +32,8 @@ export interface BronzeBatchRef {
   id: string
   r2Key: string
   status: string
+  periodStart: string
+  periodEnd: string
 }
 
 export interface SosPurgeCounts {
@@ -67,7 +69,9 @@ export async function listBronzeBatchesForPurge(
   db: DbClient,
   scope: Extract<SosPurgeScope, 'failed_bronze' | 'bronze'>,
 ): Promise<BronzeBatchRef[]> {
-  let query = db.from('distributor_import_batches').select('id, r2_key, status')
+  let query = db
+    .from('distributor_import_batches')
+    .select('id, r2_key, status, period_start, period_end')
   if (scope === 'failed_bronze') {
     query = query.in('status', [...INCOMPLETE_BRONZE_STATUSES])
   }
@@ -77,6 +81,8 @@ export async function listBronzeBatchesForPurge(
     id: row.id,
     r2Key: row.r2_key,
     status: row.status,
+    periodStart: row.period_start,
+    periodEnd: row.period_end,
   }))
 }
 

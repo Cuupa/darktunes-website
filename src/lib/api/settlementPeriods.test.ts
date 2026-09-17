@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
+import { logFinancialEvent } from '@/lib/api/financialAudit'
 import {
+  archiveSettlementPeriod,
   assertSettlementPeriodWritable,
   assertSettlementPeriodWritableById,
   buildPeriodLabel,
@@ -11,7 +13,64 @@ import {
   SettlementPeriodNotWritableError,
 } from './settlementPeriods'
 
+vi.mock('@/lib/api/financialAudit', () => ({
+  logFinancialEvent: vi.fn(async () => undefined),
+}))
+
 type DbClient = SupabaseClient<Database>
+
+function makePeriodRow(status: string) {
+  return {
+    id: 'period-1',
+    period_start: '2025-01-01',
+    period_end: '2025-03-31',
+    label: '2025-01-01 – 2025-03-31',
+    status,
+    notes: null,
+    locked_at: null,
+    locked_by: null,
+    archived_at: null,
+    archived_by: null,
+    created_at: '2025-01-01T00:00:00Z',
+    updated_at: '2025-01-01T00:00:00Z',
+  }
+}
+
+function makeArchiveDb(options: {
+  periodStatus: string
+  periodUpdateError?: { message: string } | null
+  statementError?: { message: string } | null
+}) {
+  const periodRow = makePeriodRow(options.periodStatus)
+
+  const periodUpdateBuilder = {
+    eq: vi.fn().mockReturnThis(),
+    select: vi.fn().mockReturnThis(),
+    single: vi.fn(async () => ({
+      data: options.periodUpdateError ? null : { ...periodRow, status: 'archived' },
+      error: options.periodUpdateError ?? null,
+    })),
+  }
+
+  const selectBuilder = {
+    eq: vi.fn().mockReturnThis(),
+    single: vi.fn(async () => ({ data: periodRow, error: null })),
+  }
+
+  const statementEq = vi.fn(async () => ({ error: options.statementError ?? null }))
+
+  const from = vi.fn((table: string) => {
+    if (table === 'sales_statements') {
+      return { update: vi.fn(() => ({ eq: statementEq })) }
+    }
+    return {
+      select: vi.fn(() => selectBuilder),
+      update: vi.fn(() => periodUpdateBuilder),
+    }
+  })
+
+  return { db: { from } as unknown as DbClient, statementEq, from }
+}
 
 describe('settlementPeriods helpers', () => {
   it('builds a single-month label when start equals end', () => {
@@ -104,6 +163,45 @@ describe('assertSettlementPeriodWritable', () => {
     await expect(
       assertSettlementPeriodWritable(db, '2025-01-01', '2025-03-31'),
     ).rejects.toBeInstanceOf(SettlementPeriodNotWritableError)
+  })
+})
+
+describe('archiveSettlementPeriod', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('throws when the statement archiving update fails', async () => {
+    const { db, statementEq } = makeArchiveDb({
+      periodStatus: 'open',
+      statementError: { message: 'permission denied' },
+    })
+
+    await expect(archiveSettlementPeriod(db, 'period-1', 'admin-1')).rejects.toThrow(
+      /Failed to archive statements/,
+    )
+    expect(statementEq).toHaveBeenCalledWith('settlement_period_id', 'period-1')
+    expect(vi.mocked(logFinancialEvent)).not.toHaveBeenCalled()
+  })
+
+  it('heals statements when the period is already archived (retry after partial failure)', async () => {
+    const { db, statementEq } = makeArchiveDb({ periodStatus: 'archived' })
+
+    const period = await archiveSettlementPeriod(db, 'period-1', 'admin-1')
+
+    expect(period.status).toBe('archived')
+    expect(statementEq).toHaveBeenCalledWith('settlement_period_id', 'period-1')
+    expect(vi.mocked(logFinancialEvent)).not.toHaveBeenCalled()
+  })
+
+  it('archives the period, marks statements and writes the audit event', async () => {
+    const { db, statementEq } = makeArchiveDb({ periodStatus: 'open' })
+
+    const period = await archiveSettlementPeriod(db, 'period-1', 'admin-1')
+
+    expect(period.status).toBe('archived')
+    expect(statementEq).toHaveBeenCalledWith('settlement_period_id', 'period-1')
+    expect(vi.mocked(logFinancialEvent)).toHaveBeenCalledTimes(1)
   })
 })
 

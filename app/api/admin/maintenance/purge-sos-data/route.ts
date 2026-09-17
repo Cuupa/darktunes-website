@@ -21,6 +21,7 @@ import {
   purgeSosData,
   SOS_PURGE_CONFIRMATION,
 } from '@/lib/sos/purgeSosData'
+import { assertSosPurgeAllowed } from '@/lib/sos/purgePeriodLock'
 
 const BODY_MAX_BYTES = 512
 
@@ -48,6 +49,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   }
 
   const db = await createServiceRoleSupabaseClient()
+  await assertSosPurgeAllowed(db, body.scope)
   const { serverEnv } = await import('@/lib/env.server')
   const s3 = createR2Client(
     serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,

@@ -4,6 +4,7 @@ import { jsonRequest, readJson } from '../../helpers/api/routeTestkit'
 const requireAdminFromRequestMock = vi.fn()
 const createServiceRoleSupabaseClientMock = vi.fn()
 const purgeSosDataMock = vi.fn()
+const assertSosPurgeAllowedMock = vi.fn()
 const logAdminActionMock = vi.fn()
 const logFinancialEventMock = vi.fn()
 const deleteObjectFromR2Mock = vi.fn()
@@ -24,6 +25,10 @@ vi.mock('@/lib/sos/purgeSosData', async (importOriginal) => {
     purgeSosData: (...args: unknown[]) => purgeSosDataMock(...args),
   }
 })
+
+vi.mock('@/lib/sos/purgePeriodLock', () => ({
+  assertSosPurgeAllowed: (...args: unknown[]) => assertSosPurgeAllowedMock(...args),
+}))
 
 vi.mock('@/lib/adminAuditLog', () => ({
   logAdminAction: (...args: unknown[]) => logAdminActionMock(...args),
@@ -70,6 +75,7 @@ describe('POST /api/admin/maintenance/purge-sos-data', () => {
     })
     logAdminActionMock.mockResolvedValue(undefined)
     logFinancialEventMock.mockResolvedValue(undefined)
+    assertSosPurgeAllowedMock.mockResolvedValue(undefined)
   })
 
   it('rejects the wrong confirmation phrase', async () => {
@@ -82,6 +88,29 @@ describe('POST /api/admin/maintenance/purge-sos-data', () => {
       }),
     )
     expect(res.status).toBe(400)
+    expect(purgeSosDataMock).not.toHaveBeenCalled()
+  })
+
+  it('returns 409 problem+json and purges nothing when a locked period owns the data', async () => {
+    const { POST } = await loadRoute()
+    const { BusinessRuleError } = await import('@/lib/errors')
+    assertSosPurgeAllowedMock.mockRejectedValue(
+      new BusinessRuleError('Purge blocked: locked period 2025-10-01 – 2026-03-31', 409, 'SETTLEMENT_PERIOD_LOCKED'),
+    )
+
+    const res = await POST(
+      jsonRequest('/api/admin/maintenance/purge-sos-data', {
+        method: 'POST',
+        bearer: 'tok',
+        body: { scope: 'gold', confirmation: 'DELETE GOLD' },
+      }),
+    )
+
+    expect(res.headers.get('content-type')).toContain('application/problem+json')
+    const { status, body } = await readJson<{ status?: number; code?: string }>(res)
+    expect(status).toBe(409)
+    expect(body.status).toBe(409)
+    expect(body.code).toBe('SETTLEMENT_PERIOD_LOCKED')
     expect(purgeSosDataMock).not.toHaveBeenCalled()
   })
 
