@@ -59,6 +59,9 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 - **Dependencies (Dependabot #566–#569):** `framer-motion` 12→13, `@tanstack/react-query` 5.101.4, `@tailwindcss/postcss` 4.3.3.
 - **Dependencies (Dependabot #570–#571):** `@vercel/functions` 3.9.1, `vitest` 4.1.10.
 
+### Security
+- **Dependency vulnerabilities patched:** `next` 16.2.11 → 16.3.5 (critical RCE advisories), `sharp` 0.35.3 → 0.35.4 (libheif), Tiptap 3.29.2 → 3.31.3, `vitest` 4.1.11, plus overrides for `browserslist` 4.29.0, `baseline-browser-mapping` 2.11.24, `smol-toml` 1.8.0, `js-yaml` (4.3.2 / 3.15.2), `ajv` 8.20.0, `qs` 6.16.0, `undici` 6.28.1 and `@lhci/cli`’s `uuid` 11.1.1. `npm audit --omit=dev --audit-level=moderate` reports **0 vulnerabilities**. Residual dev-only advisories remain in the Lighthouse toolchain (`lighthouse` → `puppeteer-core` → `@puppeteer/browsers` → `extract-zip`, no patched release upstream) and stay outside the security workflow’s production-dependency gate.
+
 ## [1.6.0] — 2026-08-11
 
 ### Added
