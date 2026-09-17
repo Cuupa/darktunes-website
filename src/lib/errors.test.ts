@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ApiError, withErrorHandler, buildApiError } from './errors'
+import { ApiError, BusinessRuleError, withErrorHandler, buildApiError } from './errors'
 import { InvalidStatementTransitionError } from '@/lib/sos/statementStatusTransitions'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -214,6 +214,34 @@ describe('withErrorHandler', () => {
         status: 500,
       }),
     }))
+  })
+
+  it('returns RFC 9457 problem+json with legacy extensions', async () => {
+    const handler = withErrorHandler(async () => {
+      throw new ApiError(422, 'Statement is not ready', 'VALIDATION_ERROR')
+    })
+    const res = await handler(makeRequest())
+    expect(res.headers.get('content-type')).toContain('application/problem+json')
+    const body = await res.json()
+    expect(body).toEqual({
+      type: 'about:blank',
+      title: 'VALIDATION_ERROR',
+      status: 422,
+      detail: 'Statement is not ready',
+      error: 'Statement is not ready',
+      code: 'VALIDATION_ERROR',
+    })
+  })
+
+  it('maps BusinessRuleError to its 4xx status and code', async () => {
+    const handler = withErrorHandler(async () => {
+      throw new BusinessRuleError('Cannot approve statement in status "paid"')
+    })
+    const res = await handler(makeRequest())
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.detail).toContain('paid')
+    expect(body.code).toBe('BUSINESS_RULE_VIOLATION')
   })
 
   it('catches unknown errors and returns 500 with SERVER_ERROR code (never raw message)', async () => {

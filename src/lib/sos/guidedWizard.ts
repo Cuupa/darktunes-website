@@ -66,16 +66,18 @@ export function canAdvanceGuidedStep(
 
 export function canNavigateToGuidedStep(
   target: GuidedWizardStep,
-  input: { hasData: boolean; isProcessing: boolean },
+  input: GuidedStepGateInput,
   stepIds: readonly GuidedWizardStep[] = QUICK_WIZARD_STEP_IDS,
 ): boolean {
   const targetIndex = guidedStepIndex(target, stepIds)
   if (targetIndex < 0) return false
-  if (target === 'setup' || target === 'upload') return true
-  if (target === 'validate' || target === 'review' || target === 'settle') {
-    return input.hasData && !input.isProcessing
+  if (targetIndex === 0) return true
+  // Direct stepper navigation uses exactly the same gates as the Continue
+  // button for every preceding step — there is no weaker navigation path.
+  for (let index = 0; index < targetIndex; index++) {
+    if (!canAdvanceGuidedStep(stepIds[index], input, stepIds)) return false
   }
-  return false
+  return true
 }
 
 export type GuidedBlockedReasonLabels = {

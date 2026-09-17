@@ -127,6 +127,7 @@
 - [ ] Source file without any recognizable sales month → bronze card shows “archiving skipped” instead of archiving under the current month
 - [ ] Darkmerch CSV with `15,79` (DE) → correct euro basis and artist share; Believe/Bandcamp `15.79` unchanged; `12x` or an empty required amount appears as a row error, never as `0`
 - [ ] Bronze upload >100 MB succeeds via direct multipart (64 MB parts, no `/multipart/part` request); with R2 CORS broken the R2 error is shown (no silent proxy fallback); direct disabled + >4 MB shows the clear “direct upload disabled” message
+- [ ] Publish with a missing or mismatched billing period is rejected server-side; stepper direct navigation cannot skip setup/rates/validation blockers; a rejected status change returns 4xx (problem+json), not 500
 - [ ] Upload one CSV → coach checklist updates; Continue enabled only after numbers appear
 - [ ] Block/throttle `/api/exchange-rates` → sticky fallback banner + Refresh; no crash on first process
 - [ ] Validate step: blocking errors prevent Continue; warnings allow continue

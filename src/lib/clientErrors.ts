@@ -20,7 +20,7 @@
  */
 
 import type { Dictionary } from '@/i18n/types'
-import type { ApiErrorResponse } from './errors'
+import type { ApiErrorBody } from './errors'
 import { ERROR_CODES } from './errorCodes'
 
 /**
@@ -34,7 +34,7 @@ import { ERROR_CODES } from './errorCodes'
  * @param tErrors - `useTranslations('errors')` (or compatible translator).
  */
 export function getErrorMessage(
-  body: ApiErrorResponse,
+  body: ApiErrorBody,
   tErrors: (code: keyof Dictionary['errors']) => string,
 ): string {
   const code = body.code
@@ -56,7 +56,7 @@ export async function getResponseErrorMessage(
   tErrors: (code: keyof Dictionary['errors']) => string,
 ): Promise<string> {
   try {
-    const body = (await res.json()) as ApiErrorResponse
+    const body = (await res.json()) as ApiErrorBody
     return getErrorMessage(body, tErrors)
   } catch {
     return tErrors('SERVER_ERROR')
@@ -65,7 +65,7 @@ export async function getResponseErrorMessage(
 
 /** Like `getErrorMessage` but accepts only the `errors` slice of the dictionary. */
 export function getErrorMessageFromErrors(
-  body: ApiErrorResponse,
+  body: ApiErrorBody,
   errors: Dictionary['errors'],
 ): string {
   const code = body.code

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { invoiceGrossCents } from '@/lib/api/settlementLedger'
+import { BusinessRuleError } from '@/lib/errors'
 
 type DbClient = SupabaseClient<Database>
 type InvoiceRow = Database['public']['Tables']['artist_invoices']['Row']
@@ -263,7 +264,7 @@ export async function updateInvoice(
   if (updates.pdf_url !== undefined || updates.pdf_sha256 !== undefined) {
     const existing = await getArtistInvoice(supabase, id, artistId)
     if (existing?.pdfUrl || existing?.pdfSha256) {
-      throw new Error('Invoice PDF is immutable once issued')
+      throw new BusinessRuleError('Invoice PDF is immutable once issued')
     }
   }
 
@@ -395,9 +396,9 @@ export async function markInvoiceReceived(
   actorId: string,
 ): Promise<ArtistInvoice> {
   const existing = await getAdminInvoiceById(db, id)
-  if (!existing) throw new Error('Invoice not found')
+  if (!existing) throw new BusinessRuleError('Invoice not found', 404, 'NOT_FOUND')
   if (!['sent', 'draft'].includes(existing.status)) {
-    throw new Error(`Cannot mark received from status "${existing.status}"`)
+    throw new BusinessRuleError(`Cannot mark received from status "${existing.status}"`)
   }
 
   const now = new Date().toISOString()
@@ -430,15 +431,17 @@ export async function recordInvoicePayment(
   input: RecordInvoicePaymentInput,
 ): Promise<ArtistInvoice> {
   const existing = await getAdminInvoiceById(db, id)
-  if (!existing) throw new Error('Invoice not found')
+  if (!existing) throw new BusinessRuleError('Invoice not found', 404, 'NOT_FOUND')
   if (!['received', 'partially_paid', 'sent'].includes(existing.status)) {
-    throw new Error(`Cannot record payment from status "${existing.status}"`)
+    throw new BusinessRuleError(`Cannot record payment from status "${existing.status}"`)
   }
 
   // Cap against gross total (net + VAT) so payments match PDF totals.
   const totalCents = invoiceGrossCents(existing.lineItems, existing.taxRatePct)
   const newPaid = existing.paidAmountCents + input.amountCents
-  if (newPaid > totalCents) throw new Error('Payment exceeds invoice total')
+  if (newPaid > totalCents) {
+    throw new BusinessRuleError('Payment exceeds invoice total', 422, 'VALIDATION_ERROR')
+  }
 
   const outstanding = totalCents - newPaid
   const now = new Date().toISOString()

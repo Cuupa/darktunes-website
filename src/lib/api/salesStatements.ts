@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { appendLedgerEntry, hasLedgerEntry } from '@/lib/api/settlementLedger'
 import { getOrCreateSettlementPeriod } from '@/lib/api/settlementPeriods'
+import { BusinessRuleError } from '@/lib/errors'
 import { assertStatementTransition } from '@/lib/sos/statementStatusTransitions'
 import { PUBLIC_QUERY_LIMITS } from './queryLimits'
 
@@ -197,9 +198,9 @@ export async function approveSalesStatement(
     .single()
 
   if (fetchError) throw new Error(fetchError.message)
-  if (!existing) throw new Error('Statement not found')
+  if (!existing) throw new BusinessRuleError('Statement not found', 404, 'NOT_FOUND')
   if (existing.status !== 'draft') {
-    throw new Error(`Cannot approve statement in status "${existing.status}"`)
+    throw new BusinessRuleError(`Cannot approve statement in status "${existing.status}"`)
   }
 
   const { data: row, error } = await db
@@ -215,7 +216,7 @@ export async function approveSalesStatement(
     .single()
 
   if (error) throw new Error(error.message)
-  if (!row) throw new Error('Cannot approve statement in status "draft" (concurrent update)')
+  if (!row) throw new BusinessRuleError('Cannot approve statement in status "draft" (concurrent update)')
   return rowToSalesStatement(row as SalesStatementRow)
 }
 
@@ -252,7 +253,7 @@ export async function updateSalesStatementStatus(
   status: SalesStatementStatus,
 ): Promise<SalesStatement> {
   const existing = await getSalesStatementById(db, id)
-  if (!existing) throw new Error('Statement not found')
+  if (!existing) throw new BusinessRuleError('Statement not found', 404, 'NOT_FOUND')
   if (existing.status === status) return existing
   assertStatementTransition(existing.status, status)
 
@@ -265,7 +266,7 @@ export async function updateSalesStatementStatus(
     .single()
 
   if (error) throw new Error(error.message)
-  if (!row) throw new Error(`Cannot change statement status from "${existing.status}" (concurrent update)`)
+  if (!row) throw new BusinessRuleError(`Cannot change statement status from "${existing.status}" (concurrent update)`)
   return rowToSalesStatement(row as SalesStatementRow)
 }
 
@@ -458,14 +459,14 @@ export async function createCorrectionStatement(
     .single()
 
   if (fetchError) throw new Error(fetchError.message)
-  if (!original) throw new Error('Statement not found')
+  if (!original) throw new BusinessRuleError('Statement not found', 404, 'NOT_FOUND')
 
   const originalRow = original as SalesStatementRow
   if (!CORRECTABLE_STATUSES.includes(originalRow.status)) {
-    throw new Error(`Cannot correct statement in status "${originalRow.status}"`)
+    throw new BusinessRuleError(`Cannot correct statement in status "${originalRow.status}"`)
   }
   if (originalRow.document_type === 'storno') {
-    throw new Error('Cannot correct a storno document')
+    throw new BusinessRuleError('Cannot correct a storno document')
   }
 
   const { data: correctionRow, error: insertError } = await db

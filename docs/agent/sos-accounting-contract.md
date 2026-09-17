@@ -174,9 +174,10 @@ frei; Wiederholungen erzeugen keine doppelten Umsätze (#618/#631).
 | Konflikt (paralleler Statuswechsel, Revision) | 409 | problem+json |
 | Serverfehler | 500 | generisch, Details nur im Log |
 
-Heute werden DAL-Fachfehler überwiegend als 500 ausgegeben (`src/lib/errors.ts:193-220`).
-#616 MUSS eine Fehlerklasse für Fachkonflikte einführen und die Aufrufer migrieren.
-REST-Konvention: `skills/rest-guidelines/SKILL.md`.
+DAL-Fachfehler nutzen `BusinessRuleError` (`src/lib/errors.ts`) mit 404/409/422;
+`withErrorHandler` emittiert `application/problem+json` (`type/title/status/detail`) und
+behält `error`/`code` als Legacy-Extensions. REST-Konvention:
+`skills/rest-guidelines/SKILL.md`.
 
 ### A.8 Invarianten (verbotene Fälle)
 
