@@ -8,21 +8,15 @@
 - Mock external APIs; no network in unit tests
 - Supabase mock: chain methods return `this`; builder is thenable via bound `Promise.resolve`
 
-## E2E (Playwright)
+## E2E (Playwright) — forbidden
 
-- `npm run test:e2e` — specs in `tests/e2e/`
-- Projects: Desktop Chrome, Mobile Safari, Mobile Chrome, Performance Chrome
-- Hide CRT/noise overlays before screenshots (`page.addStyleTag`)
-- `SKIP_BUILD=1` to reuse existing build
-- Skip gracefully when Supabase unconfigured
-- CI workers: 2 by default (`PLAYWRIGHT_WORKERS` override)
+Playwright / E2E is **disabled**: do not add, update, run, or require specs under `tests/e2e/` (`npm run test:e2e`, `npm run db:e2e:*`). The removed `qa.yml` / `e2e-comment.yml` workflows must not be re-enabled. Coverage comes from Vitest unit/route tests (`npm run test`) and `npm run ci`; user-flow evidence goes into `QA_CHECKLIST.md`.
 
 ### GitHub Actions CI layout (speed)
 
 | Workflow | PR | main / other | Notes |
 |----------|----|--------------|--------|
 | `ci.yml` | always | always | Parallel jobs: lint+contracts+tsc · unit · build. Concurrency cancel-in-progress. Next + ESLint caches. |
-| `qa.yml` | Full E2E matrix (Chrome + Mobile Safari + Mobile Chrome), docs paths ignored | Full E2E matrix (same) | No duplicate lint/unit/security. `/e2e` PR comment (`e2e-comment.yml`) runs the same matrix on demand. |
 | `security.yml` | only lockfile/package changes | same + weekly schedule | Sole npm audit owner |
 | `lighthouse-ci.yml` | path-filtered (`app`/`src`/…) | same | Next cache |
 | `performance-budget.yml` | path-filtered | same | Next cache |

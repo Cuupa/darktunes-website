@@ -51,7 +51,7 @@ Update when applicable — pure typo/doc-only sessions with no product change ma
 |------|----------------|
 | `CHANGELOG.md` | User-facing features, API/route changes, security fixes, or breaking changes → add bullets under `[Unreleased]`. Skip internal refactors with no observable change. **Do not leave product waves forever under Unreleased** — cut a SemVer section when releasing (see [RELEASING.md](../RELEASING.md)). |
 | `LESSONS_LEARNED.md` | Session uncovered a recurring anti-pattern, non-obvious failure mode, or process gap → append a dated entry under `## Session additions`. Promote to rule tables only after the pattern recurs. Skip one-off typos. |
-| `QA_CHECKLIST.md` | New/changed user flows, auth guards, consent/i18n/PWA behavior, or E2E-covered features → add or adjust checklist items. Skip internal refactors that don't change testable behavior. |
+| `QA_CHECKLIST.md` | New/changed user flows, auth guards, consent/i18n/PWA behavior → add or adjust checklist items. Skip internal refactors that don't change testable behavior. |
 
 ## App versioning & releases
 

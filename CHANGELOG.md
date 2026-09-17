@@ -10,6 +10,9 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 
 ## [Unreleased]
 
+### Changed
+- **E2E/Playwright is disabled:** the `qa.yml` and `e2e-comment.yml` workflows are removed; no PR, CI gate, or release may require E2E. Coverage comes from Vitest unit/route tests (`npm run test`) and `npm run ci`; user-flow evidence goes into `QA_CHECKLIST.md` (see `AGENTS.md`).
+
 ### Added
 - **SOS financial schema groundwork:** additive `settlement_operations` journal (durable financial idempotency), `artist_invoices.delivery_status`/`delivery_attempted_at`/`delivery_error`, `sales_statements.rules_fingerprint`/`fx_snapshot`/`calculation_snapshot`/`revision`, and `sepa_payment_orders` (versioned orders). Consumed by #620/#621/#623/#628.
 - **SOS accounting contract (SSOT):** `docs/agent/sos-accounting-contract.md` — binding status/action table, screen states, change-consequence/invalidation rules, permission matrix, payment special cases, and performance budgets. GitHub issues #615–#632 mirror their relevant excerpts; when code and contract differ, the contract is the target.

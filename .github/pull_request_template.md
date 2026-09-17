@@ -42,7 +42,7 @@ Update only what applies — see `docs/agent/workflow.md` (do not no-op edit doc
 ## Quality checks
 
 - [ ] `npm run ci` passes (contracts → typecheck → tests+build)
-- [ ] `npm run test:e2e` if user-facing flows changed (or note why skipped)
+- [x] E2E not required — Playwright is disabled in this repository (see `AGENTS.md`)
 - [ ] Public UI: keyboard nav + basic a11y sanity
 - [ ] No `as any` / `@ts-ignore` / `eslint-disable` to silence CI
 

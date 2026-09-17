@@ -41,14 +41,13 @@ No PR with failing checks. No `as any`, `@ts-ignore`, or `eslint-disable` to sil
 
 Skipping docs because “the task was only code” is a process failure.
 
-## E2E coverage (mandatory for feature work)
+## E2E tests are forbidden (disabled)
 
-E2E tests (`tests/e2e/*.spec.ts`, Playwright) are part of the deliverable, not an afterthought. They run against a real seeded Supabase stack — `npm run db:e2e:start` then `npm run test:e2e` (see [testing-performance.md](docs/agent/testing-performance.md)).
+Playwright / E2E (`tests/e2e/*`, `npm run test:e2e`, `npm run db:e2e:*`) is **forbidden** in this repository: the stack hangs and must not gate any work.
 
-- **New feature, route, or user-facing flow → add E2E coverage in the same change.** At minimum the section-spec contract (route mounts, authorizes, renders its heading, no `app/error.tsx` boundary — see `admin-sections.spec.ts` / `portal-sections.spec.ts` / `press-sections.spec.ts`); for anything with real user interaction, also a behavioural test of the happy path. A new route with no spec is an incomplete feature.
-- **Changing an existing feature → challenge the existing E2E tests first.** Find the specs that touch it and update their assertions to the *new intended behaviour*. A test going red on a deliberate change is the signal to reconcile intent — **never weaken, `skip`, or delete a test just to make it green**, and never lower an assertion to match a regression. If a test is genuinely obsolete, delete it with a one-line reason in the diff.
-- **Login/auth in tests:** reuse the helpers in `tests/helpers/auth.ts`; wait on URL **pathname**, never a full-URL substring (a `returnTo=/x` query falsely satisfies a full-URL wait before the session cookie is written).
-- **Before finishing:** run the affected specs locally against the seeded stack and confirm green. Fixing E2E "later in CI" is the same process failure as skipping docs.
+- **Do not add, update, run, or require E2E specs** — not in PRs, not in CI, not as a release gate.
+- **Do not re-enable** the removed `qa.yml` / `e2e-comment.yml` workflows or wire Playwright into any pipeline.
+- Coverage is provided by Vitest unit/route tests (`npm run test`) and `npm run ci` (contracts → typecheck → tests → build). If a change needs user-flow evidence, cover the logic in a unit/route test and document manual QA in `QA_CHECKLIST.md`.
 
 ## Critical rules (always apply)
 
@@ -62,7 +61,7 @@ E2E tests (`tests/e2e/*.spec.ts`, Playwright) are part of the deliverable, not a
 - **WCAG 2.1 AA** on all public UI
 - **Minimal changes:** Smallest diff that fully solves the task
 - **Docs:** Always update documentation/markdown at session end (see above)
-- **E2E:** New feature/route → new E2E test; changed feature → update the E2E assertions to the new behaviour, never weaken/skip to pass (see E2E coverage section)
+- **E2E:** Forbidden — do not add, run, or require Playwright/E2E tests (see “E2E tests are forbidden”); cover logic with Vitest unit/route tests
 - **Bronze CSV (SOS):** Direct browser → R2 presigned upload/download is the supported route (single PUT ≤ 100 MB, multipart 64 MB parts, non-final parts ≥ 5 MiB; requires R2 bucket CORS — see `DEPLOYMENT.md`). Register/confirm/presign go through `/api/admin/sos/import-batches/*`; the server proxy is single-request only (≤ 4 MB) and must never chunk multipart; limits in `src/lib/sos/bronzeUploadLimits.ts`
 - **No infra ops in admin UI:** Label admin must not show R2 / Vercel / Supabase Cron / Edge Function / `CRON_SECRET` setup. Product health + Force Sync only; scheduler docs in `DEPLOYMENT.md`
 
