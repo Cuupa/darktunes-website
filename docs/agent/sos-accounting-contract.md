@@ -338,7 +338,8 @@ Owner issues: #616, #617, #618, #620, #631. Mirror into those issues.
    Begründung und Dateireferenz; Entscheidung wird gespeichert.
 5. Ersatz nur bei nicht freigegebenem Vorgang sofort neu berechnen; danach Korrektur.
 6. Shopify/Printful sind komplementär (Erlös vs. Kosten), keine Duplikate; mehrere
-   Kosteneinträge derselben Bestellung dürfen nicht durch `Map.set(last)` verloren gehen.
+   Kosteneinträge derselben Bestellung werden summiert, nicht per `Map.set(last)`
+   überschrieben.
 7. Source lineage (Datei, Zeilenposition, Provider-ID) bleibt über Alias- und
    Split-Verarbeitung erhalten.
 
