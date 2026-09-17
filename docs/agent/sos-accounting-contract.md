@@ -308,8 +308,9 @@ Owner issues: #616, #617, #618, #620, #631. Mirror into those issues.
 
 1. Jedes freigegebene Statement MUSS seinen Berechnungsstand nachvollziehbar tragen:
    Regeln/Fingerprint, verwendete Kurse, Quellbatch-IDs, `period_id`, Betrag,
-   Line Items, Dokument-Hash. Fehlende Felder sind additiv in `reset.sql` +
-   `database.ts` zu ergänzen (#620).
+   Line Items, Dokument-Hash. Die Felder sind additiv vorhanden
+   (`rules_fingerprint`, `fx_snapshot`, `calculation_snapshot`, `revision`);
+   #620 füllt sie beim Freigeben.
 2. Ein freigegebenes Dokument wird nie still neu berechnet oder überschrieben.
 3. Die Portal-Ansicht liefert das gespeicherte PDF, nie eine Neuberechnung (IST).
 4. Excel/SEPA sind Ableitungen; sie dürfen jederzeit neu erzeugt werden, müssen aber den

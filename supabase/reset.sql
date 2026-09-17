@@ -2429,6 +2429,13 @@ CREATE TABLE IF NOT EXISTS public.sales_statements (
 CREATE INDEX IF NOT EXISTS idx_sales_statements_artist_id  ON public.sales_statements (artist_id);
 CREATE INDEX IF NOT EXISTS idx_sales_statements_created_at ON public.sales_statements (created_at DESC);
 
+-- Calculation snapshot for approved documents (#620): the exact rules/FX/source
+-- stand a released document was computed with. Additive and nullable.
+ALTER TABLE public.sales_statements ADD COLUMN IF NOT EXISTS rules_fingerprint TEXT;
+ALTER TABLE public.sales_statements ADD COLUMN IF NOT EXISTS fx_snapshot JSONB;
+ALTER TABLE public.sales_statements ADD COLUMN IF NOT EXISTS calculation_snapshot JSONB;
+ALTER TABLE public.sales_statements ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 1;
+
 -- ---------------------------------------------------------------------------
 -- TABLE: sos_rules_presets  — named rule-set presets for SOS accounting
 -- Must exist before distributor_import_batches (FK rules_preset_id).
@@ -5955,6 +5962,16 @@ ALTER TABLE public.artist_invoices ADD COLUMN IF NOT EXISTS fx_rate NUMERIC(18, 
 ALTER TABLE public.artist_invoices ADD COLUMN IF NOT EXISTS fx_rate_date DATE;
 ALTER TABLE public.artist_invoices ADD COLUMN IF NOT EXISTS fx_rate_source TEXT;
 
+-- Delivery state is separate from the financial status (#623).
+ALTER TABLE public.artist_invoices ADD COLUMN IF NOT EXISTS delivery_status TEXT;
+ALTER TABLE public.artist_invoices ADD COLUMN IF NOT EXISTS delivery_attempted_at TIMESTAMPTZ;
+ALTER TABLE public.artist_invoices ADD COLUMN IF NOT EXISTS delivery_error TEXT;
+
+DO $$ BEGIN
+  ALTER TABLE public.artist_invoices ADD CONSTRAINT artist_invoices_delivery_status_check
+    CHECK (delivery_status IS NULL OR delivery_status IN ('not_sent', 'sent', 'failed'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 CREATE INDEX IF NOT EXISTS idx_artist_invoices_artist_id ON public.artist_invoices (artist_id);
 
 DROP TRIGGER IF EXISTS trg_artist_invoices_updated_at ON public.artist_invoices;
@@ -6467,6 +6484,73 @@ DROP TRIGGER IF EXISTS sos_accounting_workspaces_updated_at ON public.sos_accoun
 CREATE TRIGGER sos_accounting_workspaces_updated_at
   BEFORE UPDATE ON public.sos_accounting_workspaces
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- TABLE: settlement_operations — durable journal for financial idempotency
+-- (invoice creation, payments, period close, delivery). #621/#623/#628.
+-- Replay: same (operation_type, resource_type, resource_id, payload_hash)
+-- returns the stored result; the same operation id with a different payload
+-- is a conflict. Not tied to the 24h idempotency-key TTL.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.settlement_operations (
+  id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  operation_type TEXT        NOT NULL,
+  resource_type  TEXT        NOT NULL,
+  resource_id    UUID        NOT NULL,
+  actor_id       UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  amount_cents   BIGINT,
+  currency       TEXT,
+  payload_hash   TEXT        NOT NULL,
+  status         TEXT        NOT NULL DEFAULT 'accepted'
+                 CHECK (status IN ('accepted', 'document_pending', 'ready', 'failed')),
+  result         JSONB       NOT NULL DEFAULT '{}'::JSONB,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_settlement_operations_replay
+  ON public.settlement_operations (operation_type, resource_type, resource_id, payload_hash);
+
+CREATE INDEX IF NOT EXISTS idx_settlement_operations_resource
+  ON public.settlement_operations (resource_type, resource_id, created_at DESC);
+
+ALTER TABLE public.settlement_operations ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "settlement_operations: admin all" ON public.settlement_operations;
+CREATE POLICY "settlement_operations: admin all" ON public.settlement_operations
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+DROP TRIGGER IF EXISTS settlement_operations_updated_at ON public.settlement_operations;
+CREATE TRIGGER settlement_operations_updated_at
+  BEFORE UPDATE ON public.settlement_operations
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- TABLE: sepa_payment_orders — persisted SEPA orders. Re-downloading the same
+-- version keeps identical message/end-to-end IDs; a changed selection creates
+-- a new version with a warning (#628). A generated order never means "paid".
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.sepa_payment_orders (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  period_start      TEXT        NOT NULL,
+  period_end        TEXT        NOT NULL,
+  version           INTEGER     NOT NULL DEFAULT 1,
+  message_id        TEXT        NOT NULL,
+  control_sum_cents BIGINT      NOT NULL DEFAULT 0,
+  entry_count       INTEGER     NOT NULL DEFAULT 0,
+  entries           JSONB       NOT NULL DEFAULT '[]'::JSONB,
+  created_by        UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (period_start, period_end, version)
+);
+
+ALTER TABLE public.sepa_payment_orders ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "sepa_payment_orders: admin all" ON public.sepa_payment_orders;
+CREATE POLICY "sepa_payment_orders: admin all" ON public.sepa_payment_orders
+  FOR ALL USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- TABLE: sos_period_summaries  — per-period aggregate revenue figures

@@ -222,8 +222,10 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "sales_statement_line_items: artist read own",
   "sales_statements: admin all",
   "sales_statements: artist read own",
+  "sepa_payment_orders: admin all",
   "settlement_ledger: admin all",
   "settlement_ledger: artist read own",
+  "settlement_operations: admin all",
   "settlement_periods: admin all",
   "site_settings_admin_write",
   "site_settings_public_read",
@@ -374,6 +376,8 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "role_permissions",
   "sales_statement_line_items",
   "sales_statements",
+  "sepa_payment_orders",
+  "settlement_operations",
   "settlement_periods",
   "site_settings",
   "sos_accounting_workspaces",
@@ -794,6 +798,12 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   "sales_statements": [
     "sales_statements: admin all",
     "sales_statements: artist read own",
+  ],
+  "sepa_payment_orders": [
+    "sepa_payment_orders: admin all",
+  ],
+  "settlement_operations": [
+    "settlement_operations: admin all",
   ],
   "settlement_periods": [
     "settlement_periods: admin all",

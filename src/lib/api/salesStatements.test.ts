@@ -98,6 +98,10 @@ const mockStatementRow: SalesStatementRow = {
   fx_source: null,
   settlement_period_id: null,
   is_archived: false,
+  rules_fingerprint: null,
+  fx_snapshot: null,
+  calculation_snapshot: null,
+  revision: 1,
   created_at: '2024-04-01T00:00:00Z',
 }
 

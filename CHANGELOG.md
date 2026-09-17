@@ -11,6 +11,7 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 ## [Unreleased]
 
 ### Added
+- **SOS financial schema groundwork:** additive `settlement_operations` journal (durable financial idempotency), `artist_invoices.delivery_status`/`delivery_attempted_at`/`delivery_error`, `sales_statements.rules_fingerprint`/`fx_snapshot`/`calculation_snapshot`/`revision`, and `sepa_payment_orders` (versioned orders). Consumed by #620/#621/#623/#628.
 - **SOS accounting contract (SSOT):** `docs/agent/sos-accounting-contract.md` — binding status/action table, screen states, change-consequence/invalidation rules, permission matrix, payment special cases, and performance budgets. GitHub issues #615–#632 mirror their relevant excerpts; when code and contract differ, the contract is the target.
 - **Admin invoice inbox (`/admin/invoices`):** Lists every `artist_invoices` row — including free invoices without a statement, which the period-scoped Settlement Center never shows. Filters by artist and status, pagination, presigned PDF download, deep link from notifications (`?id=`).
 - **Staff notification on invoice submit:** New catalog event `invoice_submitted` (admin audience) fires after a successful portal invoice insert with a dedupe key, so the admin bell no longer stays silent when an artist submits an invoice.

@@ -48,6 +48,9 @@ const mockInvoiceRow: InvoiceRow = {
   payment_method: null,
   payment_reference: null,
   settlement_period_id: null,
+  delivery_status: null,
+  delivery_attempted_at: null,
+  delivery_error: null,
   created_at: '2024-04-01T00:00:00Z',
   updated_at: '2024-04-01T00:00:00Z',
 }

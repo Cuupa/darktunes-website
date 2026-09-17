@@ -192,6 +192,90 @@ export interface Database {
         }
         Relationships: []
       }
+      sepa_payment_orders: {
+        Row: {
+          id: string
+          period_start: string
+          period_end: string
+          version: number
+          message_id: string
+          control_sum_cents: number
+          entry_count: number
+          entries: Record<string, unknown>[]
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          period_start: string
+          period_end: string
+          version?: number
+          message_id: string
+          control_sum_cents?: number
+          entry_count?: number
+          entries?: Record<string, unknown>[]
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          period_start?: string
+          period_end?: string
+          version?: number
+          message_id?: string
+          control_sum_cents?: number
+          entry_count?: number
+          entries?: Record<string, unknown>[]
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      settlement_operations: {
+        Row: {
+          id: string
+          operation_type: string
+          resource_type: string
+          resource_id: string
+          actor_id: string | null
+          amount_cents: number | null
+          currency: string | null
+          payload_hash: string
+          status: 'accepted' | 'document_pending' | 'ready' | 'failed'
+          result: Record<string, unknown>
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          operation_type: string
+          resource_type: string
+          resource_id: string
+          actor_id?: string | null
+          amount_cents?: number | null
+          currency?: string | null
+          payload_hash: string
+          status?: 'accepted' | 'document_pending' | 'ready' | 'failed'
+          result?: Record<string, unknown>
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          operation_type?: string
+          resource_type?: string
+          resource_id?: string
+          actor_id?: string | null
+          amount_cents?: number | null
+          currency?: string | null
+          payload_hash?: string
+          status?: 'accepted' | 'document_pending' | 'ready' | 'failed'
+          result?: Record<string, unknown>
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       artist_settlement_ledger: {
         Row: {
           id: string
@@ -1219,6 +1303,9 @@ export interface Database {
           payment_method: 'sepa' | 'paypal' | 'manual' | 'other' | null
           payment_reference: string | null
           settlement_period_id: string | null
+          delivery_status: 'not_sent' | 'sent' | 'failed' | null
+          delivery_attempted_at: string | null
+          delivery_error: string | null
           created_at: string
           updated_at: string
         }
@@ -1254,6 +1341,9 @@ export interface Database {
           payment_method?: 'sepa' | 'paypal' | 'manual' | 'other' | null
           payment_reference?: string | null
           settlement_period_id?: string | null
+          delivery_status?: 'not_sent' | 'sent' | 'failed' | null
+          delivery_attempted_at?: string | null
+          delivery_error?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1289,6 +1379,9 @@ export interface Database {
           payment_method?: 'sepa' | 'paypal' | 'manual' | 'other' | null
           payment_reference?: string | null
           settlement_period_id?: string | null
+          delivery_status?: 'not_sent' | 'sent' | 'failed' | null
+          delivery_attempted_at?: string | null
+          delivery_error?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1460,6 +1553,10 @@ export interface Database {
           fx_source: string | null
           settlement_period_id: string | null
           is_archived: boolean
+          rules_fingerprint: string | null
+          fx_snapshot: Record<string, unknown> | null
+          calculation_snapshot: Record<string, unknown> | null
+          revision: number
           created_at: string
         }
         Insert: {
@@ -1499,6 +1596,10 @@ export interface Database {
           fx_source?: string | null
           settlement_period_id?: string | null
           is_archived?: boolean
+          rules_fingerprint?: string | null
+          fx_snapshot?: Record<string, unknown> | null
+          calculation_snapshot?: Record<string, unknown> | null
+          revision?: number
           created_at?: string
         }
         Update: {
@@ -1538,6 +1639,10 @@ export interface Database {
           fx_source?: string | null
           settlement_period_id?: string | null
           is_archived?: boolean
+          rules_fingerprint?: string | null
+          fx_snapshot?: Record<string, unknown> | null
+          calculation_snapshot?: Record<string, unknown> | null
+          revision?: number
           created_at?: string
         }
         Relationships: [
