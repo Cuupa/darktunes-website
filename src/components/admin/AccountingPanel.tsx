@@ -36,6 +36,7 @@ import type {
 import { DEFAULT_PDF_EXPORT_SETTINGS, DEFAULT_APP_DEFAULTS, DEFAULT_EMAIL_CONFIG, DEFAULT_LABEL_INFO } from '@/lib/sos/defaults'
 import {
   normalizeAccountingConfig,
+  settingsFingerprint,
   type SosAccountingSettings,
 } from '@/lib/sos/sosAccountingSettings'
 import {
@@ -753,15 +754,31 @@ function SosGeneratorPanel() {
 
   const exportPersistContext = useMemo(
     () =>
-      hasData && territoryMetrics.length > 0
+      hasData
         ? {
             territoryMetrics,
             merchOrderRows,
             revenues,
             bronzeBatchIds,
+            rulesFingerprint: settingsFingerprint(settingsBundle),
+            fxSnapshot: {
+              rates: exchangeRates,
+              historical: historicalRates,
+              source: exchangeRatesSource,
+            },
           }
         : undefined,
-    [hasData, territoryMetrics, merchOrderRows, revenues, bronzeBatchIds],
+    [
+      hasData,
+      territoryMetrics,
+      merchOrderRows,
+      revenues,
+      bronzeBatchIds,
+      settingsBundle,
+      exchangeRates,
+      historicalRates,
+      exchangeRatesSource,
+    ],
   )
 
   const {

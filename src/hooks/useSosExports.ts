@@ -45,6 +45,28 @@ export interface SosExportPersistContext {
   merchOrderRows: MerchOrderRow[]
   revenues: ArtistRevenue[]
   bronzeBatchIds: string[]
+  /** Fingerprint of the rules stand used for this calculation (#620). */
+  rulesFingerprint?: string
+  /** Spot + historical FX rates used for this calculation (#620). */
+  fxSnapshot?: Record<string, unknown>
+}
+
+/** Compact, JSON-safe calculation stand stored with a released statement (#620). */
+function buildCalculationSnapshot(
+  artistData: SafeProcessedArtistData,
+  totalStreams: number,
+): Record<string, unknown> {
+  return {
+    finalPayout: artistData.finalPayout,
+    openingBalanceEur: artistData.openingBalanceEur,
+    amountDueEur: artistData.amountDueEur,
+    grossRevenue: artistData.grossRevenue,
+    splitPercentage: artistData.splitPercentage,
+    manualRevenue: artistData.manualRevenue,
+    totalExpenses: artistData.totalExpenses,
+    distributionFeeDeducted: artistData.distributionFeeDeducted,
+    totalStreams,
+  }
 }
 
 /** Converts a Blob to a Base64-encoded string. */
@@ -248,10 +270,21 @@ export function useExports(
             ...analyticsPayload,
             batchId: primaryBatchId,
             pdfBase64,
+            rulesFingerprint: persistContext?.rulesFingerprint,
+            fxSnapshot: persistContext?.fxSnapshot,
+            calculationSnapshot: buildCalculationSnapshot(
+              artistData,
+              analyticsPayload.totalStreams,
+            ),
           })
 
           if (result.success) {
-            if (persistContext && periodStart) {
+            if (
+              persistContext &&
+              periodStart &&
+              (persistContext.territoryMetrics.length > 0 ||
+                persistContext.merchOrderRows.length > 0)
+            ) {
               void persistAnalyticsAfterStatementUpload({
                 artistName: artist,
                 periodStart,
@@ -573,13 +606,24 @@ export function useExports(
           ...analyticsPayload,
           batchId: primaryBatchId,
           pdfBase64,
+          rulesFingerprint: persistContext?.rulesFingerprint,
+          fxSnapshot: persistContext?.fxSnapshot,
+          calculationSnapshot: buildCalculationSnapshot(
+            artistData,
+            analyticsPayload.totalStreams,
+          ),
         })
 
         if (!result.success) {
           throw new Error(result.error ?? 'Failed to publish statement to portal')
         }
 
-        if (persistContext && periodStart) {
+        if (
+          persistContext &&
+          periodStart &&
+          (persistContext.territoryMetrics.length > 0 ||
+            persistContext.merchOrderRows.length > 0)
+        ) {
           await persistAnalyticsAfterStatementUpload({
             artistName: artist,
             periodStart,

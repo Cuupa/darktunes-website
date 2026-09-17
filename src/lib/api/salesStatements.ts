@@ -4,6 +4,7 @@ import { appendLedgerEntry, hasLedgerEntry } from '@/lib/api/settlementLedger'
 import { getOrCreateSettlementPeriod } from '@/lib/api/settlementPeriods'
 import { BusinessRuleError } from '@/lib/errors'
 import { assertStatementTransition } from '@/lib/sos/statementStatusTransitions'
+import { toDbRecord } from '@/lib/types/jsonColumns'
 import { PUBLIC_QUERY_LIMITS } from './queryLimits'
 
 type DbClient = SupabaseClient<Database>
@@ -46,6 +47,10 @@ export interface CreateSalesStatementData {
   periodEnd?: string | null
   totalStreams?: number | null
   batchId?: string | null
+  /** Calculation stand of the released document (#620): rules/FX/result. */
+  rulesFingerprint?: string | null
+  fxSnapshot?: Record<string, unknown> | null
+  calculationSnapshot?: Record<string, unknown> | null
 }
 
 export class DuplicateDraftStatementError extends Error {
@@ -137,6 +142,9 @@ export async function createSalesStatement(
       period_end: data.periodEnd ?? null,
       total_streams: data.totalStreams ?? 0,
       batch_id: data.batchId ?? null,
+      rules_fingerprint: data.rulesFingerprint ?? null,
+      fx_snapshot: data.fxSnapshot ? toDbRecord(data.fxSnapshot) : null,
+      calculation_snapshot: data.calculationSnapshot ? toDbRecord(data.calculationSnapshot) : null,
     })
     .select()
     .single()

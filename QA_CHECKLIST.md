@@ -129,6 +129,7 @@
 - [ ] Bronze upload >100 MB succeeds via direct multipart (64 MB parts, no `/multipart/part` request); with R2 CORS broken the R2 error is shown (no silent proxy fallback); direct disabled + >4 MB shows the clear “direct upload disabled” message
 - [ ] Publish with a missing or mismatched billing period is rejected server-side; stepper direct navigation cannot skip setup/rates/validation blockers; a rejected status change returns 4xx (problem+json), not 500
 - [ ] Two tabs edit the same period workspace: the second save shows the conflict hint and does not overwrite; “Reload from server” restores the server revision. After reload, the Settlement Center opens an existing period from the database without a CSV upload, and archived sources can be loaded from the workspace hint
+- [ ] Publish a statement → the stored row carries `rules_fingerprint`, `fx_snapshot` and `calculation_snapshot` matching the exported payout (spot check one artist); a 0 % split stays 0 and a refund row lowers the payout instead of being clamped
 - [ ] Upload one CSV → coach checklist updates; Continue enabled only after numbers appear
 - [ ] Block/throttle `/api/exchange-rates` → sticky fallback banner + Refresh; no crash on first process
 - [ ] Validate step: blocking errors prevent Continue; warnings allow continue

@@ -308,9 +308,12 @@ Owner issues: #616, #617, #618, #620, #631. Mirror into those issues.
 
 1. Jedes freigegebene Statement MUSS seinen Berechnungsstand nachvollziehbar tragen:
    Regeln/Fingerprint, verwendete Kurse, Quellbatch-IDs, `period_id`, Betrag,
-   Line Items, Dokument-Hash. Die Felder sind additiv vorhanden
-   (`rules_fingerprint`, `fx_snapshot`, `calculation_snapshot`, `revision`);
-   #620 füllt sie beim Freigeben.
+   Line Items, Dokument-Hash. Die Felder (`rules_fingerprint`, `fx_snapshot`,
+   `calculation_snapshot`, `revision`) werden beim Veröffentlichen aus demselben
+   verbindlichen Zeitraum und Ergebnisstand gefüllt, den Export und Buchung nutzen.
+2. Rundung: Beträge werden in voller Gleitkommapräzision aggregiert und genau
+   einmal an der Buchungs-/Formatgrenze (DB `NUMERIC(10,2)`, Anzeige) gerundet —
+   keine zeilenweise Cent-Rundung (100.000 × 0,00001 EUR = 1 EUR).
 2. Ein freigegebenes Dokument wird nie still neu berechnet oder überschrieben.
 3. Die Portal-Ansicht liefert das gespeicherte PDF, nie eine Neuberechnung (IST).
 4. Excel/SEPA sind Ableitungen; sie dürfen jederzeit neu erzeugt werden, müssen aber den

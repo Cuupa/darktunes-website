@@ -192,9 +192,51 @@ describe('useSosExports.handlePublishToPortal', () => {
     )
   })
 
+  it('attaches the calculation stand (rules/FX/snapshot) to the published statement', async () => {
+    mockUploadStatement.mockResolvedValue({ success: true, statementId: 'stmt-123' })
+
+    const labelArtists: LabelArtist[] = [
+      { id: '1', name: 'Artist One', artistId: '123e4567-e89b-12d3-a456-426614174000' },
+    ]
+
+    const { result } = renderHook(() =>
+      useExports(
+        [makeProcessedArtist('Artist One')],
+        labelInfo,
+        '2026-03',
+        '2026-03',
+        {},
+        {},
+        labelArtists,
+        {},
+        [],
+        false,
+        {
+          territoryMetrics: [],
+          merchOrderRows: [],
+          revenues: [],
+          bronzeBatchIds: [],
+          rulesFingerprint: 'rules-fp-1',
+          fxSnapshot: { rates: { USD: 1.1 }, historical: {} },
+        },
+      )
+    )
+
+    await act(async () => {
+      await result.current.handlePublishToPortal('Artist One')
+    })
+
+    expect(mockUploadStatement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rulesFingerprint: 'rules-fp-1',
+        fxSnapshot: { rates: { USD: 1.1 }, historical: {} },
+        calculationSnapshot: expect.objectContaining({ finalPayout: 123.45 }),
+      }),
+    )
+  })
+
   it('shows upload error and does not fall back to local download', async () => {
     mockUploadStatement.mockResolvedValue({ success: false, error: 'Portal unavailable' })
-
     const labelArtists: LabelArtist[] = [
       { id: '1', name: 'Artist One', artistId: '123e4567-e89b-12d3-a456-426614174000' },
     ]

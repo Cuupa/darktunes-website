@@ -48,6 +48,10 @@ export interface UploadStatementInput {
   totalStreams?: number
   batchId?: string
   lineItems?: UploadStatementLineItemInput[]
+  /** Calculation stand of the released document (#620). */
+  rulesFingerprint?: string
+  fxSnapshot?: Record<string, unknown>
+  calculationSnapshot?: Record<string, unknown>
   /** PDF file contents encoded as a Base64 string. */
   pdfBase64: string
   /** When true, sends the artist notification email immediately. Defaults to false. */
@@ -123,6 +127,9 @@ export async function uploadStatement(
         periodEnd,
         totalStreams: input.totalStreams ?? 0,
         batchId: input.batchId ?? null,
+        rulesFingerprint: input.rulesFingerprint ?? null,
+        fxSnapshot: input.fxSnapshot ?? null,
+        calculationSnapshot: input.calculationSnapshot ?? null,
       })
       statementId = statement.id
 
