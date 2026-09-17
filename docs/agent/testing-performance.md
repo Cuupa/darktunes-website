@@ -37,6 +37,8 @@
 - Lighthouse: `lhci collect` + `lhci assert` separately (not `autorun`)
 - Scripts: `npm run analyze`, `perf:lighthouse`, `perf:build`
 
+**SOS import/export budgets and reference workloads:** [sos-accounting-contract.md](sos-accounting-contract.md) §F (operation IDs, phases, runtime/memory targets, cancellation, background-job threshold, table virtualization). Measurements are part of the #626 release gate.
+
 ## Cleanup coverage targets (2026-06 baseline)
 
 Baseline after Phase 0 foundation (main @ 14da8b1):

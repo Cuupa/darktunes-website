@@ -89,6 +89,8 @@ SSOT: `assets` table + `asset_folders`. Upload: `POST /api/upload`. Explorer API
 
 Admin/editor only. **Guided** default: `AccountingGuidedWizard` (Upload → Review → Publish). **Advanced:** SOS upload, reporting, Abrechnungszentrale (`SettlementCenterPanel`), portal persist, SEPA, trends, rules.
 
+**Binding contract:** [sos-accounting-contract.md](sos-accounting-contract.md) §A (status/actions), §D (permissions), §E (payments). Financial mutations are admin-only; DAL precondition violations must surface as 4xx problem+json, never as generic 500 (#616). SOS period writability (`open|under_review|approved`) applies to **every** financial mutation including `persist-analytics` and `purge-sos-data` (#628/#630).
+
 - SOS PDF upload: `uploadStatement` Server Action (same as portal flow)
 - Bronze CSV: server-proxy upload/download — see `features.md`
 - Save to Portal: `POST /api/admin/sos/persist-analytics` → `persistSosAnalyticsCore` (gold tables). Territory/merch `revenueEur` is scaled by the artist share before upsert; Excel stays unscaled. Do **not** send 1000+ metric rows through a Server Action / `startTransition` — that surfaces as a Server Components digest toast or `app/error.tsx`.

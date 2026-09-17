@@ -63,6 +63,8 @@ Bronze limits: SSOT `src/lib/sos/bronzeUploadLimits.ts` only.
 - `artist_invoices_one_per_statement` — `(statement_id)` where `statement_id IS NOT NULL`
 - `distributor_import_batches_file_hash_active` — `(file_hash)` where `file_hash IS NOT NULL` and `status IS DISTINCT FROM 'failed'`
 
+**SOS status values, transition graph, ledger entry types, and required snapshot/revision fields:** see [sos-accounting-contract.md](sos-accounting-contract.md) §A/§C. Schema additions (delivery state, operation records, snapshot columns) follow the checklist below and are additive/idempotent.
+
 ## Schema management
 
 ⛔ **No** `supabase/migrations/`. Only `supabase/reset.sql` + `src/types/database.ts`.
