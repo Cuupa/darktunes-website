@@ -101,9 +101,10 @@ limiter (per serverless instance). Pair public routes with a Vercel WAF for defe
 | `/api/portal/upload-release-cover` | 5 MB |
 | `/api/portal/upload-asset` | 20 MB |
 | `/api/portal/documents/upload` | 20 MB (PDF/DOCX) |
-| `/api/admin/sos/import-batches/[id]/upload` | 45 MB (single server proxy) |
-| `/api/admin/sos/import-batches/[id]/multipart/part` | 21 MB per chunk (20 MB + overhead) |
-| Bronze CSV total (multipart) | 200 MB (`src/lib/sos/bronzeUploadLimits.ts`) |
+| `/api/admin/sos/import-batches/[id]/upload` | 4 MB (single server-proxy request; no multipart) |
+| Bronze CSV direct (presigned single PUT) | 100 MB |
+| Bronze CSV direct (presigned multipart) | 1 GB total, 64 MB parts (non-final parts ≥ 5 MiB) |
+| Bronze CSV with `NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD=false` | ≤ 4 MB only (`src/lib/sos/bronzeUploadLimits.ts`) |
 
 
 - Press inquiries from authenticated journalists are stored as internal app log entries; promo track previews/downloads continue to use short-lived signed R2 URLs and journalist download logging.

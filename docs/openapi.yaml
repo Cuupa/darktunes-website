@@ -3210,42 +3210,11 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-  /api/admin/sos/import-batches/{id}/multipart/part:
-    post:
-      operationId: postadmin_sos_import-batches_ById_multipart_part
-      tags: [Admin]
-      summary: upload one multipart chunk to R2
-      security:
-        - AdminBearer: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessResponse"
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
   /api/admin/sos/import-batches/{id}/multipart/presign-part:
     post:
       operationId: postadmin_sos_import-batches_ById_multipart_presign-part
       tags: [Admin]
-      summary: presigned UploadPart URL (browser → R2)
+      summary: presigned UploadPart URL for direct browser → R2 multipart (non-final parts ≥ 5 MiB; requires bucket CORS)
       security:
         - AdminBearer: []
       parameters:
@@ -3276,7 +3245,7 @@ paths:
     get:
       operationId: getadmin_sos_import-batches_ById_presign-download
       tags: [Admin]
-      summary: presigned GET URL for browser → R2 download
+      summary: presigned GET URL for browser → R2 download (requires bucket CORS)
       security:
         - AdminBearer: []
       parameters:
@@ -3301,7 +3270,7 @@ paths:
     post:
       operationId: postadmin_sos_import-batches_ById_presign-upload
       tags: [Admin]
-      summary: presigned PUT URL for direct browser → R2 upload
+      summary: presigned PUT URL for direct browser → R2 upload (single object ≤ 100 MB; requires bucket CORS)
       security:
         - AdminBearer: []
       parameters:
@@ -3364,7 +3333,7 @@ paths:
     post:
       operationId: postadmin_sos_import-batches_ById_upload
       tags: [Admin]
-      summary: stream bronze CSV to R2 server-side
+      summary: server-proxy single-request upload (≤ 4 MB; no multipart)
       security:
         - AdminBearer: []
       parameters:

@@ -418,7 +418,7 @@ IST-Abweichungen, die #629 MUSS bereinigen:
 | Statement-PDF portal | Server Action, presigned URL | 300 s | Mitglied, Status nicht `draft`/`superseded`/`cancelled` |
 | Statement-PDF admin | kein Pfad vorhanden | — | #622/#624 MUSS einen admin-fähigen, autorisierten Download schaffen oder begründet streichen |
 | Quell-CSV portal | servergestreamt | Session | Mitglied + Status-Allowlist + `file_hash` |
-| Bronze-CSV admin | servergestreamt (`…/download`) | Session | admin-only. Browser→presigned (`presign-download`) widerspricht der AGENTS-Regel und MUSS entfernt oder begründet werden (#618) |
+| Bronze-CSV admin | presigned GET für den Browser (`…/presign-download`) | 300 s | admin-only; R2-Bucket-CORS erforderlich (Architekturentscheidung #618: Direktstrecke Browser → R2) |
 
 ### D.4 Sammelaktionen
 
@@ -523,9 +523,8 @@ bleibt untracked; Ablage und Zugriff werden in #626 dokumentiert).
 
 Bestehende harte Grenzen bleiben: 1,5 Mio. Rohzeilen (Excel-Abbruch), 1 Mio. Zeilen je
 Sheet, 500 Breakdown-Zeilen je PDF, 5-min-Worker-Timeout, 1 GB maximale Bronze-Datei,
-4 MB Server-Proxy-Teile, 100 MB Single-PUT, 64 MB Direkt-Multipart-Teile
-(`src/lib/sos/bronzeUploadLimits.ts`; `docs/agent/features.md` enthält veraltete
-45/200-MB-Angaben und MUSS korrigiert werden).
+100 MB Single-PUT, 64 MB Direkt-Multipart-Teile (Nicht-Endteile ≥ 5 MiB) und ein
+Server-Proxy-Einzelrequest ≤ 4 MB ohne Multipart (`src/lib/sos/bronzeUploadLimits.ts`).
 
 ### F.3 Diagnose und Instrumentierung
 
