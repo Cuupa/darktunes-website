@@ -13,6 +13,7 @@ const ADMIN_LIST_ROUTES = [
   '/admin/submission-form',
   '/admin/feedback',
   '/admin/invoices',
+  '/admin/accounting/data-audit',
 ] as const
 
 /** Admin CRUD list pages: outer shell scroll is locked; AdminListShell scrolls internally. */

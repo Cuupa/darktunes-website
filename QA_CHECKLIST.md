@@ -121,6 +121,8 @@
 - [ ] Archive a period whose statement archiving failed once → retry archives the period and no statement of that period stays `is_archived = false`
 
 ## Accounting wizard (DAU path)
+- [ ] `/admin/accounting/data-audit`: period/category filters, loading skeletons, empty state, retry on read error, truncated banner on huge data, “Mehr laden” pagination, details expander; findings show stable ids, severity, repairability and evidence
+- [ ] Data audit never writes: re-run it twice and compare row counts/values in `sales_statements`, `artist_invoices`, `artist_settlement_ledger`, `period_carry_forwards`, `distributor_import_batches`
 - [ ] `/admin/accounting` Statement History tab and `/admin/statements` render without `Something went wrong`
 - [ ] Guided Publish / Drafts step (`?guidedStep=settle`) does not crash; failed draft create shows a toast
 - [ ] `/admin/accounting` shows Assistant as recommended; 5-step “what happens next” list

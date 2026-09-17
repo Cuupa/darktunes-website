@@ -11,6 +11,8 @@
 
 import { lazy, Suspense, useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import {
   formatAccountingPeriodLabel,
@@ -85,6 +87,7 @@ import { WorkspaceManager } from '@/components/admin/sos/WorkspaceManager'
 import {
   Wallet, ClockCounterClockwise, FileText, Bank, Sliders,
   ChartBar, TrendUp, BookmarkSimple, DownloadSimple, Table, SealCheck, Sparkle,
+  MagnifyingGlass,
 } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -1732,10 +1735,11 @@ function SosGeneratorPanel() {
 
 export function AccountingPanel() {
   const t = useAccountingLabels()
+  const tAudit = useTranslations('admin.accounting.dataAudit')
 
   return (
     <Tabs defaultValue="generate" className="flex flex-col h-full">
-      <div className="border-b border-border px-6 pt-4">
+      <div className="flex items-center justify-between border-b border-border px-6 pt-4">
         <TabsList className="h-9">
           <TabsTrigger value="generate" className="gap-1.5 text-xs">
             <Wallet size={14} />
@@ -1746,6 +1750,13 @@ export function AccountingPanel() {
             {t.tabHistory}
           </TabsTrigger>
         </TabsList>
+        <Link
+          href="/admin/accounting/data-audit"
+          className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <MagnifyingGlass size={14} />
+          {tAudit('title')}
+        </Link>
       </div>
 
       <TabsContent value="generate" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col">

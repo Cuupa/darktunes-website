@@ -95,6 +95,7 @@ Admin/editor only. **Guided** default: `AccountingGuidedWizard` (Upload → Revi
 - Bronze CSV: server-proxy upload/download — see `features.md`
 - Save to Portal: `POST /api/admin/sos/persist-analytics` → `persistSosAnalyticsCore` (gold tables). Territory/merch `revenueEur` is scaled by the artist share before upsert; Excel stays unscaled. Do **not** send 1000+ metric rows through a Server Action / `startTransition` — that surfaces as a Server Components digest toast or `app/error.tsx`.
 - Settlement register, corrections, period lock/archive — see `features.md`
+- **Data audit (read-only, #630):** `GET /api/admin/sos/settlement-audits` (`scanSettlementAudit`, `settlementAuditCore.ts`) scans existing rows for the ten §E.3 categories (period links, artist mismatches, missing/orphan PDFs, unconfirmed batches, artifact hash/size, duplicates, carry-forwards, balances, view/mail evidence). Strictly read-only, bounded per table (`rowLimit`, default 5000, max 20000), sets `truncated` instead of silently dropping rows, cursor pagination (`next_cursor`). UI: `/admin/accounting/data-audit` (link in the Accounting tab bar). Live R2 hash verification is not wired yet — the detector accepts injected `artifactChecks`/`orphanPdfObjectKeys` (needs R2 access; open acceptance in #630).
 
 ## Bronze CSV import
 

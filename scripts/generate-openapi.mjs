@@ -658,6 +658,41 @@ const schemaOverrides = {
   '/api/admin/sos/import-batches/{id}/upload': {
     POST: { summary: 'server-proxy single-request upload (≤ 4 MB; no multipart)' },
   },
+  '/api/admin/sos/settlement-audits': {
+    GET: {
+      summary: 'Read-only audit of existing SOS settlement data (never writes)',
+      parameters: [
+        {
+          name: 'period_id',
+          in: 'query',
+          description: 'Scope the audit to one settlement period (UUID).',
+          schema: { type: 'string', format: 'uuid' },
+        },
+        {
+          name: 'categories',
+          in: 'query',
+          description:
+            'Comma-separated audit categories (period_link, artist_mismatch, invoice_without_pdf, pdf_without_record, unconfirmed_import_batch, artifact_integrity, duplicate_operation, carry_forward_integrity, balance_mismatch, missing_evidence).',
+          schema: { type: 'string' },
+        },
+        {
+          name: 'limit',
+          in: 'query',
+          description: 'Page size (1-200).',
+          schema: { type: 'integer', minimum: 1, maximum: 200, default: 50 },
+        },
+        {
+          name: 'cursor',
+          in: 'query',
+          description: 'Opaque cursor from a previous response next_cursor.',
+          schema: { type: 'string' },
+        },
+      ],
+      responses: {
+        200: { description: 'Audit report with paginated findings and summary counts.' },
+      },
+    },
+  },
   '/api/admin/sos/workspaces': {
     POST: {
       summary: 'upsert workspace for period (optimistic concurrency via expected_revision)',

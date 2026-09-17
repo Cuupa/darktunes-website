@@ -842,7 +842,60 @@
     "settlementDauIntro": "Here you create drafts, approve them for artists, and record invoices and payments. The amounts come from the files you uploaded above.",
     "quickSettleWarningTitle": "Review recommended before publishing",
     "quickSettleWarningBody": "Automatic checks found issues. Open Advanced → Rules or restart with Assistant if you are unsure.",
-    "trackRemoveOwner": "Remove owner"
+    "trackRemoveOwner": "Remove owner",
+    "dataAudit": {
+      "title": "Data audit",
+      "description": "Read-only check of existing accounting data: period links, documents, carry-forwards, balances and evidence. Nothing is modified.",
+      "filterPeriod": "Settlement period",
+      "allPeriods": "All periods",
+      "filterCategory": "Category",
+      "allCategories": "All categories",
+      "refresh": "Re-run audit",
+      "generatedAt": "As of: {value}",
+      "readOnlyHint": "Locked or archived periods are immutable — this audit only reads.",
+      "truncated": "The data volume exceeds the audit limit. The result is incomplete; narrow the period.",
+      "loading": "Checking data…",
+      "loadError": "The audit could not be loaded.",
+      "periodsLoadError": "The period list could not be loaded.",
+      "retry": "Reload",
+      "accessDenied": "No access to the data audit.",
+      "emptyTitle": "No findings",
+      "emptyBody": "No issues were found for the current selection.",
+      "findingsCount": "{count} findings",
+      "columnCategory": "Category",
+      "columnSeverity": "Severity",
+      "columnSummary": "Finding",
+      "columnRepairability": "Repair",
+      "columnAction": "Details",
+      "details": "Show details",
+      "hideDetails": "Hide details",
+      "evidence": "Evidence",
+      "expectedState": "Expected state",
+      "loadMore": "Load more",
+      "loadingMore": "Loading…",
+      "severity": {
+        "error": "Error",
+        "warning": "Warning",
+        "info": "Info"
+      },
+      "repairability": {
+        "unique": "Unambiguous",
+        "ambiguous": "Unclear",
+        "not_repairable": "Manual"
+      },
+      "categories": {
+        "period_link": "Period link",
+        "artist_mismatch": "Artist mismatch",
+        "invoice_without_pdf": "Invoice without PDF",
+        "pdf_without_record": "PDF without record",
+        "unconfirmed_import_batch": "Unconfirmed batch",
+        "artifact_integrity": "Hash/size mismatch",
+        "duplicate_operation": "Duplicate booking",
+        "carry_forward_integrity": "Carry-forward check",
+        "balance_mismatch": "Balance mismatch",
+        "missing_evidence": "Missing evidence"
+      }
+    }
   },
   "features": {
     "globalSectionTitle": "Global site toggles",

@@ -842,7 +842,60 @@
     "settlementDauIntro": "Hier erstellst du Entwürfe, gibst sie für Künstler frei und erfasst Rechnungen und Zahlungen. Die Beträge kommen aus den Dateien oben.",
     "quickSettleWarningTitle": "Prüfung vor dem Veröffentlichen empfohlen",
     "quickSettleWarningBody": "Automatische Checks haben Hinweise gefunden. Öffne Erweitert → Regeln oder starte mit dem Assistenten, wenn du unsicher bist.",
-    "trackRemoveOwner": "Eigentümer entfernen"
+    "trackRemoveOwner": "Eigentümer entfernen",
+    "dataAudit": {
+      "title": "Datenprüfung",
+      "description": "Bestehende Abrechnungsdaten lesend prüfen: Periodenzuordnung, Dokumente, Vorträge, Salden und Nachweise. Es werden keine Daten geändert.",
+      "filterPeriod": "Abrechnungszeitraum",
+      "allPeriods": "Alle Zeiträume",
+      "filterCategory": "Kategorie",
+      "allCategories": "Alle Kategorien",
+      "refresh": "Neu prüfen",
+      "generatedAt": "Stand: {value}",
+      "readOnlyHint": "Gesperrte oder archivierte Zeiträume sind unveränderlich — die Prüfung ist nur lesend.",
+      "truncated": "Die Datenmenge überschreitet das Prüflimit. Das Ergebnis ist unvollständig; grenze den Zeitraum ein.",
+      "loading": "Daten werden geprüft…",
+      "loadError": "Die Prüfung konnte nicht geladen werden.",
+      "periodsLoadError": "Die Zeitraumliste konnte nicht geladen werden.",
+      "retry": "Erneut laden",
+      "accessDenied": "Kein Zugriff auf die Datenprüfung.",
+      "emptyTitle": "Keine Befunde",
+      "emptyBody": "Für die aktuelle Auswahl wurden keine Auffälligkeiten gefunden.",
+      "findingsCount": "{count} Befunde",
+      "columnCategory": "Kategorie",
+      "columnSeverity": "Schweregrad",
+      "columnSummary": "Befund",
+      "columnRepairability": "Reparatur",
+      "columnAction": "Details",
+      "details": "Details anzeigen",
+      "hideDetails": "Details ausblenden",
+      "evidence": "Belege",
+      "expectedState": "Erwarteter Zustand",
+      "loadMore": "Mehr laden",
+      "loadingMore": "Lädt…",
+      "severity": {
+        "error": "Fehler",
+        "warning": "Warnung",
+        "info": "Hinweis"
+      },
+      "repairability": {
+        "unique": "Eindeutig",
+        "ambiguous": "Unklar",
+        "not_repairable": "Manuell"
+      },
+      "categories": {
+        "period_link": "Periodenzuordnung",
+        "artist_mismatch": "Künstlerabweichung",
+        "invoice_without_pdf": "Rechnung ohne PDF",
+        "pdf_without_record": "PDF ohne Datensatz",
+        "unconfirmed_import_batch": "Unbestätigter Batch",
+        "artifact_integrity": "Hash-/Größenabweichung",
+        "duplicate_operation": "Doppelte Buchung",
+        "carry_forward_integrity": "Vortragsprüfung",
+        "balance_mismatch": "Saldoabweichung",
+        "missing_evidence": "Fehlender Nachweis"
+      }
+    }
   },
   "features": {
     "globalSectionTitle": "Globale Site-Schalter",

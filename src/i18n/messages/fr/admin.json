@@ -842,7 +842,60 @@
     "settlementDauIntro": "Ici vous créez des brouillons, les approuvez pour les artistes et enregistrez factures et paiements. Les montants proviennent des fichiers uploadés ci-dessus.",
     "quickSettleWarningTitle": "Relecture recommandée avant publication",
     "quickSettleWarningBody": "Les contrôles automatiques ont trouvé des problèmes. Ouvrez Avancé → Règles ou redémarrez avec l’Assistant en cas de doute.",
-    "trackRemoveOwner": "Retirer le propriétaire"
+    "trackRemoveOwner": "Retirer le propriétaire",
+    "dataAudit": {
+      "title": "Contrôle des données",
+      "description": "Vérification en lecture seule des données comptables existantes : rattachement des périodes, documents, reports, soldes et justificatifs. Aucune donnée n’est modifiée.",
+      "filterPeriod": "Période de règlement",
+      "allPeriods": "Toutes les périodes",
+      "filterCategory": "Catégorie",
+      "allCategories": "Toutes les catégories",
+      "refresh": "Relancer le contrôle",
+      "generatedAt": "État : {value}",
+      "readOnlyHint": "Les périodes verrouillées ou archivées sont immuables — ce contrôle est en lecture seule.",
+      "truncated": "Le volume de données dépasse la limite du contrôle. Le résultat est incomplet ; réduisez la période.",
+      "loading": "Vérification des données…",
+      "loadError": "Le contrôle n’a pas pu être chargé.",
+      "periodsLoadError": "La liste des périodes n’a pas pu être chargée.",
+      "retry": "Recharger",
+      "accessDenied": "Aucun accès au contrôle des données.",
+      "emptyTitle": "Aucun constat",
+      "emptyBody": "Aucune anomalie trouvée pour la sélection actuelle.",
+      "findingsCount": "{count} constats",
+      "columnCategory": "Catégorie",
+      "columnSeverity": "Gravité",
+      "columnSummary": "Constat",
+      "columnRepairability": "Réparation",
+      "columnAction": "Détails",
+      "details": "Afficher les détails",
+      "hideDetails": "Masquer les détails",
+      "evidence": "Justificatifs",
+      "expectedState": "État attendu",
+      "loadMore": "Charger plus",
+      "loadingMore": "Chargement…",
+      "severity": {
+        "error": "Erreur",
+        "warning": "Avertissement",
+        "info": "Information"
+      },
+      "repairability": {
+        "unique": "Sans ambiguïté",
+        "ambiguous": "Incertain",
+        "not_repairable": "Manuel"
+      },
+      "categories": {
+        "period_link": "Rattachement de période",
+        "artist_mismatch": "Écart d’artiste",
+        "invoice_without_pdf": "Facture sans PDF",
+        "pdf_without_record": "PDF sans enregistrement",
+        "unconfirmed_import_batch": "Lot non confirmé",
+        "artifact_integrity": "Écart de hash/taille",
+        "duplicate_operation": "Écriture en double",
+        "carry_forward_integrity": "Contrôle des reports",
+        "balance_mismatch": "Écart de solde",
+        "missing_evidence": "Justificatif manquant"
+      }
+    }
   },
   "features": {
     "globalSectionTitle": "Bascules globales du site",
