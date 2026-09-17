@@ -6,6 +6,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
+import { BusinessRuleError } from '@/lib/errors'
 import {
   normalizeAccountingConfig,
   type SosAccountingSettings,
@@ -17,12 +18,26 @@ type Row = Database['public']['Tables']['sos_accounting_workspaces']['Row']
 
 export type AccountingWorkspaceConfig = SosAccountingSettings
 
+/** Optimistic-concurrency conflict — another session saved a newer revision. */
+export class WorkspaceRevisionConflictError extends BusinessRuleError {
+  constructor() {
+    super(
+      'Workspace was changed by another session — reload before saving',
+      409,
+      'WORKSPACE_REVISION_CONFLICT',
+    )
+    this.name = 'WorkspaceRevisionConflictError'
+  }
+}
+
 export interface SosAccountingWorkspace {
   id: string
   periodStart: string
   periodEnd: string
   config: AccountingWorkspaceConfig
   bronzeBatchIds: string[]
+  /** Monotonic revision for optimistic concurrency (starts at 1). */
+  revision: number
   updatedBy: string | undefined
   createdAt: string
   updatedAt: string
@@ -34,6 +49,12 @@ export interface UpsertAccountingWorkspaceInput {
   config: AccountingWorkspaceConfig
   bronzeBatchIds?: string[]
   updatedBy?: string | null
+  /**
+   * Revision the client last read. `null` means "no workspace existed" and
+   * inserts revision 1. A mismatch throws `WorkspaceRevisionConflictError`
+   * instead of overwriting newer changes (last-write-wins is forbidden).
+   */
+  expectedRevision?: number | null
 }
 
 function rowToWorkspace(row: Row): SosAccountingWorkspace {
@@ -43,6 +64,7 @@ function rowToWorkspace(row: Row): SosAccountingWorkspace {
     periodEnd: row.period_end,
     config: normalizeAccountingConfig(row.config as Partial<SosAccountingSettings>),
     bronzeBatchIds: row.bronze_batch_ids ?? [],
+    revision: row.revision ?? 1,
     updatedBy: row.updated_by ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -70,23 +92,46 @@ export async function upsertWorkspaceForPeriod(
   input: UpsertAccountingWorkspaceInput,
 ): Promise<SosAccountingWorkspace> {
   const config = normalizeAccountingConfig(input.config)
-  const { data, error } = await db
-    .from('sos_accounting_workspaces')
-    .upsert(
-      {
+  const payload = {
+    config: toDbRecord(config),
+    bronze_batch_ids: input.bronzeBatchIds ?? [],
+    updated_by: input.updatedBy ?? null,
+  }
+
+  if (input.expectedRevision == null) {
+    // First save for this period — the client saw no workspace. A concurrent
+    // insert loses on the unique (period_start, period_end) constraint.
+    const { data, error } = await db
+      .from('sos_accounting_workspaces')
+      .insert({
         period_start: input.periodStart,
         period_end: input.periodEnd,
-        config: toDbRecord(config),
-        bronze_batch_ids: input.bronzeBatchIds ?? [],
-        updated_by: input.updatedBy ?? null,
-      },
-      { onConflict: 'period_start,period_end' },
-    )
+        ...payload,
+        revision: 1,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      if ((error as { code?: string }).code === '23505') {
+        throw new WorkspaceRevisionConflictError()
+      }
+      throw new Error(error.message)
+    }
+    return rowToWorkspace(data as Row)
+  }
+
+  const { data, error } = await db
+    .from('sos_accounting_workspaces')
+    .update({ ...payload, revision: input.expectedRevision + 1 })
+    .eq('period_start', input.periodStart)
+    .eq('period_end', input.periodEnd)
+    .eq('revision', input.expectedRevision)
     .select()
-    .single()
 
   if (error) throw new Error(error.message)
-  return rowToWorkspace(data as Row)
+  if (!data || data.length === 0) throw new WorkspaceRevisionConflictError()
+  return rowToWorkspace(data[0] as Row)
 }
 
 export async function listAccountingWorkspaces(db: DbClient): Promise<SosAccountingWorkspace[]> {

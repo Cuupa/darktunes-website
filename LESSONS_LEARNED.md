@@ -228,6 +228,16 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-09-17 — Silent numeric coercion turns a decimal comma into a factor-100 error
+
+- **Finding:** `parseCurrencyAmount` stripped the comma in its default path (`15,79` → `1579`), the Darkmerch parser replaced only the first comma, and quantities were forced through `Math.max(1, …)`/digit-stripping — turning refunds into sales and `12x` into `12`. Invalid rows silently became `0`.
+- **Rule:** Parse numbers with a typed `valid | empty | invalid(reason)` result and an explicit per-source convention; never coerce invalid required amounts to `0`, never fabricate quantities, and keep `0`/negative values. Ambiguous `1,234` without a known convention is a clarification error, not a guess. `src/lib/sos/ingest/amountParsing.ts`.
+
+### 2026-09-17 — A period shown on screen is not the period the work uses
+
+- **Finding:** `AccountingPanel` displayed and validated `manualPeriodStart/End` but passed `detectedPeriodStart/End` to exports, Settlement Center, analytics, payout, workspace key and carry-forward. `useSosExports` replaced invalid periods with `Q1-<current year>`, and the bronze archive stamped the current month when a file exposed no period — so documents could carry a period nobody selected.
+- **Rule:** Resolve one validated `effectiveAccountingPeriod` and feed it to every consumer. Never substitute a replacement period or date for invalid input — block the action with a reason. Archive metadata must come from the file or the user, never from “now”. Contract: [docs/agent/sos-accounting-contract.md](docs/agent/sos-accounting-contract.md) §C.
+
 ### 2026-09-16 — A success toast is a claim about side effects
 
 - **Finding:** `POST /api/portal/invoices` ignored the Resend result (`sendInvoiceEmail` is deliberately non-throwing) and always set `status: 'sent'` + 201, while the portal toasted “Invoice sent to client.” Staff never saw the invoice because the catalog had no submit event, and the Settlement Center only joins statement-linked invoices for the selected period — so free invoices were invisible everywhere.

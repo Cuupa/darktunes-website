@@ -123,31 +123,33 @@ To make this a real access control (not just link hygiene), the `invoices/` pref
 2. Create API token with read/write permissions
 3. Note your Account ID, Access Key ID, and Secret Access Key
 
-### 3. Configure CORS (optional — not required for bronze CSVs)
+### 3. Configure CORS (required for SOS bronze CSVs)
 
-R2 bucket CORS is **not** configured for `www.darktunes.com` in production. That is intentional: admin bronze distributor CSVs (SOS Accounting) upload and download **only** through same-origin Next.js Route Handlers (`/api/admin/sos/import-batches/...`), including chunked multipart for files \> 45 MB.
-
-Only configure CORS if you explicitly need **browser-direct** PUT/GET to `*.r2.cloudflarestorage.com` (e.g. legacy EPK presigned upload). Example:
+Admin bronze distributor CSVs (SOS Accounting) upload and download **directly** between the browser and R2 via presigned URLs (single PUT ≤ 100 MB, or multipart with 64 MB parts). This requires a bucket CORS policy for every origin that runs the admin UI:
 
 ```json
 [
   {
     "AllowedOrigins": ["https://www.darktunes.com", "https://darktunes.com"],
     "AllowedMethods": ["GET", "PUT", "HEAD"],
-    "AllowedHeaders": ["*"],
+    "AllowedHeaders": ["content-type"],
     "ExposeHeaders": ["ETag"],
     "MaxAgeSeconds": 3000
   }
 ]
 ```
 
-**Do not** point admin bronze CSV flows at presigned URLs unless this CORS policy is in place.
+- `ETag` must be exposed — the multipart client reads it from the PUT response.
+- `content-type` must be allowed — the presigned PUT sends the CSV content type.
+- Add Vercel preview origins if bronze uploads are tested on previews.
+- Without this policy the direct upload fails; the client surfaces the R2 error instead of silently falling back.
+- The server proxy (`/api/admin/sos/import-batches/{id}/upload`) accepts **single** requests ≤ 4 MB and is only used when `NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD=false`. There is deliberately no server-proxy multipart path — R2 rejects non-final parts below 5 MiB.
 
 ### 4. File Uploads via Next.js Route Handler
 
-Most uploads are handled server-side at Next.js Route Handlers (`app/api/upload/route.ts` for admin assets, portal routes like `app/api/portal/upload-photo/route.ts`, and SOS bronze CSV routes under `app/api/admin/sos/import-batches/`). This avoids R2 CORS. No Supabase Edge Functions are needed for uploads.
+Most uploads are handled server-side at Next.js Route Handlers (`app/api/upload/route.ts` for admin assets, portal routes like `app/api/portal/upload-photo/route.ts`). This avoids R2 CORS. SOS bronze CSVs are the exception: they use presigned browser → R2 URLs (see section 3). No Supabase Edge Functions are needed for uploads.
 
-**SOS bronze CSV limits** (see `src/lib/sos/bronzeUploadLimits.ts`): single upload ≤ 45 MB; multipart chunked upload up to 200 MB (20 MB per chunk).
+**SOS bronze CSV limits** (see `src/lib/sos/bronzeUploadLimits.ts`): presigned single PUT ≤ 100 MB; presigned multipart up to 1 GB with 64 MB parts (non-final parts ≥ 5 MiB); server-proxy fallback ≤ 4 MB.
 
 The Route Handler:
 1. Verifies the Bearer token and requires an `admin` or `editor` role

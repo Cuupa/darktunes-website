@@ -2,7 +2,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { appendLedgerEntry, hasLedgerEntry } from '@/lib/api/settlementLedger'
 import { getOrCreateSettlementPeriod } from '@/lib/api/settlementPeriods'
+import { BusinessRuleError } from '@/lib/errors'
 import { assertStatementTransition } from '@/lib/sos/statementStatusTransitions'
+import { toDbRecord } from '@/lib/types/jsonColumns'
 import { PUBLIC_QUERY_LIMITS } from './queryLimits'
 
 type DbClient = SupabaseClient<Database>
@@ -45,6 +47,10 @@ export interface CreateSalesStatementData {
   periodEnd?: string | null
   totalStreams?: number | null
   batchId?: string | null
+  /** Calculation stand of the released document (#620): rules/FX/result. */
+  rulesFingerprint?: string | null
+  fxSnapshot?: Record<string, unknown> | null
+  calculationSnapshot?: Record<string, unknown> | null
 }
 
 export class DuplicateDraftStatementError extends Error {
@@ -136,6 +142,9 @@ export async function createSalesStatement(
       period_end: data.periodEnd ?? null,
       total_streams: data.totalStreams ?? 0,
       batch_id: data.batchId ?? null,
+      rules_fingerprint: data.rulesFingerprint ?? null,
+      fx_snapshot: data.fxSnapshot ? toDbRecord(data.fxSnapshot) : null,
+      calculation_snapshot: data.calculationSnapshot ? toDbRecord(data.calculationSnapshot) : null,
     })
     .select()
     .single()
@@ -197,9 +206,9 @@ export async function approveSalesStatement(
     .single()
 
   if (fetchError) throw new Error(fetchError.message)
-  if (!existing) throw new Error('Statement not found')
+  if (!existing) throw new BusinessRuleError('Statement not found', 404, 'NOT_FOUND')
   if (existing.status !== 'draft') {
-    throw new Error(`Cannot approve statement in status "${existing.status}"`)
+    throw new BusinessRuleError(`Cannot approve statement in status "${existing.status}"`)
   }
 
   const { data: row, error } = await db
@@ -215,7 +224,7 @@ export async function approveSalesStatement(
     .single()
 
   if (error) throw new Error(error.message)
-  if (!row) throw new Error('Cannot approve statement in status "draft" (concurrent update)')
+  if (!row) throw new BusinessRuleError('Cannot approve statement in status "draft" (concurrent update)')
   return rowToSalesStatement(row as SalesStatementRow)
 }
 
@@ -252,7 +261,7 @@ export async function updateSalesStatementStatus(
   status: SalesStatementStatus,
 ): Promise<SalesStatement> {
   const existing = await getSalesStatementById(db, id)
-  if (!existing) throw new Error('Statement not found')
+  if (!existing) throw new BusinessRuleError('Statement not found', 404, 'NOT_FOUND')
   if (existing.status === status) return existing
   assertStatementTransition(existing.status, status)
 
@@ -265,7 +274,7 @@ export async function updateSalesStatementStatus(
     .single()
 
   if (error) throw new Error(error.message)
-  if (!row) throw new Error(`Cannot change statement status from "${existing.status}" (concurrent update)`)
+  if (!row) throw new BusinessRuleError(`Cannot change statement status from "${existing.status}" (concurrent update)`)
   return rowToSalesStatement(row as SalesStatementRow)
 }
 
@@ -458,14 +467,14 @@ export async function createCorrectionStatement(
     .single()
 
   if (fetchError) throw new Error(fetchError.message)
-  if (!original) throw new Error('Statement not found')
+  if (!original) throw new BusinessRuleError('Statement not found', 404, 'NOT_FOUND')
 
   const originalRow = original as SalesStatementRow
   if (!CORRECTABLE_STATUSES.includes(originalRow.status)) {
-    throw new Error(`Cannot correct statement in status "${originalRow.status}"`)
+    throw new BusinessRuleError(`Cannot correct statement in status "${originalRow.status}"`)
   }
   if (originalRow.document_type === 'storno') {
-    throw new Error('Cannot correct a storno document')
+    throw new BusinessRuleError('Cannot correct a storno document')
   }
 
   const { data: correctionRow, error: insertError } = await db
@@ -509,28 +518,20 @@ export async function recordStatementView(
   id: string,
   artistId: string,
 ): Promise<SalesStatement> {
-  const existing = await getSalesStatementById(db, id, artistId)
-  if (!existing) throw new Error('Statement not found')
+  // Atomic RPC (#622): first view is preserved, the counter is monotonic and
+  // only label_approved/artist_notified may move to 'viewed'. A late view can
+  // no longer downgrade invoiced/paid statements.
+  const { data, error } = await db.rpc('record_statement_view', {
+    p_statement_id: id,
+    p_artist_id: artistId,
+  })
 
-  const now = new Date().toISOString()
-  const nextStatus =
-    existing.status === 'artist_notified' || existing.status === 'label_approved'
-      ? 'viewed'
-      : existing.status
+  if (error) {
+    if ((error.message ?? '').includes('statement_not_found')) {
+      throw new BusinessRuleError('Statement not found', 404, 'NOT_FOUND')
+    }
+    throw new Error(error.message)
+  }
 
-  const { data, error } = await db
-    .from('sales_statements')
-    .update({
-      first_viewed_at: existing.firstViewedAt ?? now,
-      last_viewed_at: now,
-      view_count: (existing.viewCount ?? 0) + 1,
-      status: nextStatus,
-    })
-    .eq('id', id)
-    .eq('artist_id', artistId)
-    .select('*')
-    .single()
-
-  if (error) throw new Error(error.message)
   return rowToSalesStatement(data as SalesStatementRow)
 }

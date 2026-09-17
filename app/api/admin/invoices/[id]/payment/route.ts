@@ -8,13 +8,16 @@ import {
   hasLedgerEntry,
   resolvePaymentLedgerEntryType,
 } from '@/lib/api/settlementLedger'
+import {
+  completeSettlementOperation,
+  getSettlementOperationById,
+  insertSettlementOperation,
+} from '@/lib/api/settlementOperations'
 import { logFinancialEvent } from '@/lib/api/financialAudit'
 import {
-  checkAndClaimIdempotencyKey,
-  getIdempotencyKeyRecord,
-  releaseIdempotencyKey,
-  updateIdempotencyKeyResourceId,
-} from '@/lib/api/idempotency'
+  decideInvoiceOperationReplay,
+  hashInvoicePayload,
+} from '@/lib/portal/invoiceOperation'
 import { updateSalesStatementStatus } from '@/lib/api/salesStatements'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
@@ -42,36 +45,72 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
   const supabase = await createServerSupabaseClient()
   const serviceSupabase = await createServiceRoleSupabaseClient()
 
-  const claimed = await checkAndClaimIdempotencyKey(
-    serviceSupabase,
-    parsed.data.idempotencyKey,
-    'invoice-payment',
+  // Durable operation identity (#628): the client key is the operation id.
+  // Same key + same payload replays the stored result; a different payload is
+  // a conflict. Unlike idempotency_keys this record has no 24h TTL.
+  const operationId = parsed.data.idempotencyKey
+  const payloadHash = hashInvoicePayload({
+    invoice_id: id,
+    amount_cents: parsed.data.amountCents,
+    payment_method: parsed.data.paymentMethod,
+    payment_reference: parsed.data.paymentReference ?? null,
+    actor_id: userId,
+  })
+
+  const existingOperation = await getSettlementOperationById(serviceSupabase, operationId)
+  const storedInvoiceId =
+    existingOperation && typeof existingOperation.result.invoice_id === 'string'
+      ? existingOperation.result.invoice_id
+      : undefined
+  const replay = decideInvoiceOperationReplay(
+    existingOperation
+      ? { payloadHash: existingOperation.payloadHash, invoiceId: storedInvoiceId }
+      : null,
+    payloadHash,
   )
-  if (!claimed) {
-    const existingKey = await getIdempotencyKeyRecord(serviceSupabase, parsed.data.idempotencyKey)
-    if (existingKey?.resourceId) {
-      const replayed = await getAdminInvoiceById(supabase, existingKey.resourceId)
-      if (replayed) {
-        return NextResponse.json({ invoice: replayed, duplicate: true })
-      }
-    }
-    throw new ApiError(409, 'Duplicate payment request')
+
+  if (replay === 'conflict') {
+    throw new ApiError(409, 'Operation already used with a different payload')
   }
 
-  try {
-    const existing = await getAdminInvoiceById(supabase, id)
-    if (!existing) throw new ApiError(404, 'Invoice not found')
-    if (existing.settlementPeriodId) {
-      await assertSettlementPeriodWritableById(supabase, existing.settlementPeriodId)
+  if (replay === 'replay' && storedInvoiceId) {
+    const replayed = await getAdminInvoiceById(supabase, storedInvoiceId)
+    if (replayed) {
+      return NextResponse.json({ invoice: replayed, duplicate: true })
     }
+  }
 
-    const invoice = await recordInvoicePayment(supabase, id, {
-      amountCents: parsed.data.amountCents,
-      paymentMethod: parsed.data.paymentMethod,
-      paymentReference: parsed.data.paymentReference,
+  if (!existingOperation) {
+    await insertSettlementOperation(serviceSupabase, {
+      id: operationId,
+      operationType: 'invoice_payment',
+      resourceType: 'artist_invoice',
+      resourceId: id,
       actorId: userId,
+      amountCents: parsed.data.amountCents,
+      payloadHash,
     })
+  }
 
+  const existing = await getAdminInvoiceById(supabase, id)
+  if (!existing) throw new ApiError(404, 'Invoice not found')
+  if (existing.settlementPeriodId) {
+    await assertSettlementPeriodWritableById(supabase, existing.settlementPeriodId)
+  }
+
+  const invoice = await recordInvoicePayment(supabase, id, {
+    amountCents: parsed.data.amountCents,
+    paymentMethod: parsed.data.paymentMethod,
+    paymentReference: parsed.data.paymentReference,
+    actorId: userId,
+  })
+
+  // The payment is persisted at this point. Follow-ups must never trigger a
+  // re-payment on retry — they are surfaced as warnings and the operation is
+  // completed with the invoice id.
+  const warnings: string[] = []
+
+  try {
     // Statement-linked invoices already book invoice_liability (−amount) when created.
     // A second payment ledger row would double-count and leave open balance negative.
     // Free invoices without liability still post payment/partial_payment to the ledger.
@@ -95,11 +134,21 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
         createdBy: userId,
       })
     }
+  } catch (err) {
+    console.error('[invoice payment] ledger entry failed:', err)
+    warnings.push('ledger_entry_failed')
+  }
 
-    if (invoice.statementId && invoice.status === 'paid') {
+  if (invoice.statementId && invoice.status === 'paid') {
+    try {
       await updateSalesStatementStatus(supabase, invoice.statementId, 'paid')
+    } catch (err) {
+      console.error('[invoice payment] statement status update failed:', err)
+      warnings.push('statement_status_failed')
     }
+  }
 
+  try {
     await logFinancialEvent(supabase, {
       entityType: 'artist_invoice',
       entityId: id,
@@ -109,34 +158,40 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
         status: invoice.status,
         paid_amount_cents: invoice.paidAmountCents,
         payment_reference: parsed.data.paymentReference,
-        idempotency_key: parsed.data.idempotencyKey,
+        operation_id: operationId,
       },
     })
-
-    await updateIdempotencyKeyResourceId(serviceSupabase, parsed.data.idempotencyKey, invoice.id)
-
-    if (invoice.status === 'paid' || invoice.status === 'partially_paid') {
-      try {
-        await emitNotification(serviceSupabase, {
-          type: 'invoice_payment_received',
-          entityId: invoice.id,
-          entityName: `Payment on invoice ${invoice.invoiceNumber}`,
-          artistId: invoice.artistId,
-          senderId: userId,
-          payload: {
-            status: invoice.status,
-            amountCents: parsed.data.amountCents,
-          },
-          dedupeKey: `invoice_payment_received:${invoice.id}:${invoice.paidAmountCents ?? parsed.data.amountCents}`,
-        })
-      } catch (notifErr) {
-        console.error('[invoice payment] artist notify failed:', notifErr)
-      }
-    }
-
-    return NextResponse.json({ invoice })
   } catch (err) {
-    await releaseIdempotencyKey(serviceSupabase, parsed.data.idempotencyKey)
-    throw err
+    console.error('[invoice payment] audit failed:', err)
+    warnings.push('audit_failed')
   }
+
+  try {
+    await completeSettlementOperation(serviceSupabase, operationId, { invoice_id: invoice.id })
+  } catch (err) {
+    console.error('[invoice payment] operation completion failed:', err)
+    warnings.push('operation_record_failed')
+  }
+
+  if (invoice.status === 'paid' || invoice.status === 'partially_paid') {
+    try {
+      await emitNotification(serviceSupabase, {
+        type: 'invoice_payment_received',
+        entityId: invoice.id,
+        entityName: `Payment on invoice ${invoice.invoiceNumber}`,
+        artistId: invoice.artistId,
+        senderId: userId,
+        payload: {
+          status: invoice.status,
+          amountCents: parsed.data.amountCents,
+        },
+        dedupeKey: `invoice_payment_received:${invoice.id}:${invoice.paidAmountCents ?? parsed.data.amountCents}`,
+      })
+    } catch (notifErr) {
+      console.error('[invoice payment] artist notify failed:', notifErr)
+      warnings.push('notify_failed')
+    }
+  }
+
+  return NextResponse.json({ invoice, warnings })
 })

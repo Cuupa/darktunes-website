@@ -45,11 +45,13 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     period_end,
     config,
     bronze_batch_ids,
+    expected_revision,
   } = body as {
     period_start?: string
     period_end?: string
     config?: AccountingWorkspaceConfig
     bronze_batch_ids?: string[]
+    expected_revision?: number | null
   }
 
   if (!period_start || !period_end) {
@@ -57,6 +59,13 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   }
   if (!config || typeof config !== 'object') {
     throw new ApiError(400, 'config (rules bundle) is required')
+  }
+  if (
+    expected_revision !== undefined &&
+    expected_revision !== null &&
+    (!Number.isInteger(expected_revision) || expected_revision < 1)
+  ) {
+    throw new ApiError(400, 'expected_revision must be a positive integer or null')
   }
 
   const serviceSupabase = await createServiceRoleSupabaseClient()
@@ -70,6 +79,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     config,
     bronzeBatchIds: bronze_batch_ids ?? [],
     updatedBy: user.id,
+    expectedRevision: expected_revision ?? null,
   })
 
   return NextResponse.json({ workspace }, { status: 200 })

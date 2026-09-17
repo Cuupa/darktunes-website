@@ -13,7 +13,7 @@ const {
   mockDownloadBlob,
   mockUploadStatement,
   mockIsValidArtistId,
-  mockIsValidPeriod,
+  mockIsValidPeriodRange,
 } = vi.hoisted(() => ({
   mockToastSuccess: vi.fn(),
   mockToastError: vi.fn(),
@@ -21,7 +21,7 @@ const {
   mockDownloadBlob: vi.fn(),
   mockUploadStatement: vi.fn(),
   mockIsValidArtistId: vi.fn(),
-  mockIsValidPeriod: vi.fn(),
+  mockIsValidPeriodRange: vi.fn(),
 }))
 
 vi.mock('next-intl', () => ({
@@ -47,7 +47,10 @@ vi.mock('@/lib/sos/export-utils', () => ({
 
 vi.mock('@/lib/sos/validation', () => ({
   isValidArtistId: mockIsValidArtistId,
-  isValidPeriod: mockIsValidPeriod,
+}))
+
+vi.mock('@/lib/sos/accountingInputValidation', () => ({
+  isValidPeriodRange: mockIsValidPeriodRange,
 }))
 
 vi.mock('../../app/portal/statements/_actions/uploadStatement', () => ({
@@ -74,7 +77,7 @@ describe('useSosExports.handleDownloadPDF', () => {
     vi.clearAllMocks()
     mockGeneratePDF.mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' }))
     mockIsValidArtistId.mockReturnValue(true)
-    mockIsValidPeriod.mockReturnValue(true)
+    mockIsValidPeriodRange.mockReturnValue(true)
   })
 
   it('downloads PDF locally without portal upload when autoUploadToPortal is false', async () => {
@@ -112,10 +115,11 @@ describe('useSosExports.handlePublishToPortal', () => {
     vi.clearAllMocks()
     mockGeneratePDF.mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' }))
     mockIsValidArtistId.mockReturnValue(true)
-    mockIsValidPeriod.mockReturnValue(false)
+    mockIsValidPeriodRange.mockReturnValue(true)
   })
 
-  it('uploads statement PDF to portal with fallback quarter period', async () => {
+  it('refuses to publish without a valid period and never invents a fallback quarter', async () => {
+    mockIsValidPeriodRange.mockReturnValue(false)
     mockUploadStatement.mockResolvedValue({ success: true, statementId: 'stmt-123' })
 
     const labelArtists: LabelArtist[] = [
@@ -140,12 +144,45 @@ describe('useSosExports.handlePublishToPortal', () => {
       await result.current.handlePublishToPortal('Artist One')
     })
 
+    expect(mockGeneratePDF).not.toHaveBeenCalled()
+    expect(mockUploadStatement).not.toHaveBeenCalled()
+    expect(mockDownloadBlob).not.toHaveBeenCalled()
+    expect(mockToastError).toHaveBeenCalledWith(
+      'Set a valid billing period (YYYY-MM) before exporting or publishing. Nothing was changed.',
+    )
+  })
+
+  it('publishes with the resolved accounting period', async () => {
+    mockUploadStatement.mockResolvedValue({ success: true, statementId: 'stmt-123' })
+
+    const labelArtists: LabelArtist[] = [
+      { id: '1', name: 'Artist One', artistId: '123e4567-e89b-12d3-a456-426614174000' },
+    ]
+
+    const { result } = renderHook(() =>
+      useExports(
+        [makeProcessedArtist('Artist One')],
+        labelInfo,
+        '2026-03',
+        '2026-03',
+        {},
+        {},
+        labelArtists,
+        {},
+        []
+      )
+    )
+
+    await act(async () => {
+      await result.current.handlePublishToPortal('Artist One')
+    })
+
     expect(mockGeneratePDF).toHaveBeenCalledOnce()
     expect(mockUploadStatement).toHaveBeenCalledWith(
       expect.objectContaining({
         artistId: '123e4567-e89b-12d3-a456-426614174000',
         filename: 'Artist_One_statement.pdf',
-        period: `Q1-${new Date().getFullYear()}`,
+        period: '2026-03',
         amountEur: 123.45,
         pdfBase64: expect.any(String),
       })
@@ -155,10 +192,51 @@ describe('useSosExports.handlePublishToPortal', () => {
     )
   })
 
-  it('shows upload error and does not fall back to local download', async () => {
-    mockIsValidPeriod.mockReturnValue(true)
-    mockUploadStatement.mockResolvedValue({ success: false, error: 'Portal unavailable' })
+  it('attaches the calculation stand (rules/FX/snapshot) to the published statement', async () => {
+    mockUploadStatement.mockResolvedValue({ success: true, statementId: 'stmt-123' })
 
+    const labelArtists: LabelArtist[] = [
+      { id: '1', name: 'Artist One', artistId: '123e4567-e89b-12d3-a456-426614174000' },
+    ]
+
+    const { result } = renderHook(() =>
+      useExports(
+        [makeProcessedArtist('Artist One')],
+        labelInfo,
+        '2026-03',
+        '2026-03',
+        {},
+        {},
+        labelArtists,
+        {},
+        [],
+        false,
+        {
+          territoryMetrics: [],
+          merchOrderRows: [],
+          revenues: [],
+          bronzeBatchIds: [],
+          rulesFingerprint: 'rules-fp-1',
+          fxSnapshot: { rates: { USD: 1.1 }, historical: {} },
+        },
+      )
+    )
+
+    await act(async () => {
+      await result.current.handlePublishToPortal('Artist One')
+    })
+
+    expect(mockUploadStatement).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rulesFingerprint: 'rules-fp-1',
+        fxSnapshot: { rates: { USD: 1.1 }, historical: {} },
+        calculationSnapshot: expect.objectContaining({ finalPayout: 123.45 }),
+      }),
+    )
+  })
+
+  it('shows upload error and does not fall back to local download', async () => {
+    mockUploadStatement.mockResolvedValue({ success: false, error: 'Portal unavailable' })
     const labelArtists: LabelArtist[] = [
       { id: '1', name: 'Artist One', artistId: '123e4567-e89b-12d3-a456-426614174000' },
     ]
@@ -190,6 +268,7 @@ describe('useSosExports.buildCorrectionPdfBase64', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockGeneratePDF.mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' }))
+    mockIsValidPeriodRange.mockReturnValue(true)
   })
 
   it('returns base64 PDF with overridden payout amount', async () => {
@@ -243,6 +322,7 @@ describe('useSosExports.buildCorrectionPdfBase64', () => {
 describe('useSosExports.handleDownloadExcel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockIsValidPeriodRange.mockReturnValue(true)
   })
 
   it('downloads the worker-built workbook when Raw is on', async () => {

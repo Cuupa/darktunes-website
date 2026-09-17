@@ -11,7 +11,8 @@ import {
   generateZipOfAllStatements,
 } from '@/lib/sos/export-utils'
 import { createSafeFilename } from '@/lib/sos/utils'
-import { isValidArtistId, isValidPeriod } from '@/lib/sos/validation'
+import { isValidArtistId } from '@/lib/sos/validation'
+import { isValidPeriodRange } from '@/lib/sos/accountingInputValidation'
 import { ExcelExportWorkerError } from '@/lib/sos/excelExportError'
 import {
   DEFAULT_EXCEL_EXPORT_SETTINGS,
@@ -44,6 +45,28 @@ export interface SosExportPersistContext {
   merchOrderRows: MerchOrderRow[]
   revenues: ArtistRevenue[]
   bronzeBatchIds: string[]
+  /** Fingerprint of the rules stand used for this calculation (#620). */
+  rulesFingerprint?: string
+  /** Spot + historical FX rates used for this calculation (#620). */
+  fxSnapshot?: Record<string, unknown>
+}
+
+/** Compact, JSON-safe calculation stand stored with a released statement (#620). */
+function buildCalculationSnapshot(
+  artistData: SafeProcessedArtistData,
+  totalStreams: number,
+): Record<string, unknown> {
+  return {
+    finalPayout: artistData.finalPayout,
+    openingBalanceEur: artistData.openingBalanceEur,
+    amountDueEur: artistData.amountDueEur,
+    grossRevenue: artistData.grossRevenue,
+    splitPercentage: artistData.splitPercentage,
+    manualRevenue: artistData.manualRevenue,
+    totalExpenses: artistData.totalExpenses,
+    distributionFeeDeducted: artistData.distributionFeeDeducted,
+    totalStreams,
+  }
 }
 
 /** Converts a Blob to a Base64-encoded string. */
@@ -94,6 +117,8 @@ const exportFallback = {
     'Draft statement saved to portal. Approve in Settlement Center to notify the artist.',
   exportPortalUploadFailed: 'Upload failed: {error}. PDF saved locally instead.',
   exportPortalUploading: 'Uploading statement to portal…',
+  exportPeriodRequired:
+    'Set a valid billing period (YYYY-MM) before exporting or publishing. Nothing was changed.',
 } as const
 
 function buildUploadPayload(
@@ -142,6 +167,19 @@ export function useExports(
 ) {
   const t = useMergedAccountingLabels(exportFallback)
 
+  /**
+   * The binding accounting period is required for every export and portal
+   * write. An invalid period blocks the action with a visible reason — there
+   * is no replacement quarter/year fallback.
+   */
+  const requirePeriod = useCallback((): boolean => {
+    if (!isValidPeriodRange(periodStart, periodEnd)) {
+      toast.error(t.exportPeriodRequired)
+      return false
+    }
+    return true
+  }, [periodStart, periodEnd, t.exportPeriodRequired])
+
   /** Maps typed Excel worker failures to a specific toast message. */
   const excelWorkerErrorMessage = useCallback(
     (err: unknown): string | null => {
@@ -186,6 +224,7 @@ export function useExports(
         toast.error(interpolate(t.exportNoArtistData, { artist }))
         return
       }
+      if (!requirePeriod()) return
 
       const currentYear = new Date().getFullYear()
       const prefix = labelInfo.invoiceNumberPrefix ?? 'SOS'
@@ -214,10 +253,7 @@ export function useExports(
           isValidArtistId(artistInfo.artistId)
 
         if (shouldUpload && artistInfo?.artistId) {
-          const period = periodStart || String(new Date().getFullYear())
           const filename = `${createSafeFilename(artist)}_statement.pdf`
-          // If period doesn't match expected format (YYYY-MM or Q{N}-YYYY), fall back to current year
-          const validPeriod = isValidPeriod(period) ? period : `Q1-${new Date().getFullYear()}`
 
           toast.loading(t.exportPortalUploading, { id: 'sos-upload' })
 
@@ -229,15 +265,26 @@ export function useExports(
           const result = await uploadStatement({
             artistId: artistInfo.artistId,
             filename,
-            period: validPeriod,
+            period: periodStart,
             amountEur: artistData.finalPayout,
             ...analyticsPayload,
             batchId: primaryBatchId,
             pdfBase64,
+            rulesFingerprint: persistContext?.rulesFingerprint,
+            fxSnapshot: persistContext?.fxSnapshot,
+            calculationSnapshot: buildCalculationSnapshot(
+              artistData,
+              analyticsPayload.totalStreams,
+            ),
           })
 
           if (result.success) {
-            if (persistContext && periodStart) {
+            if (
+              persistContext &&
+              periodStart &&
+              (persistContext.territoryMetrics.length > 0 ||
+                persistContext.merchOrderRows.length > 0)
+            ) {
               void persistAnalyticsAfterStatementUpload({
                 artistName: artist,
                 periodStart,
@@ -272,7 +319,7 @@ export function useExports(
         console.error('PDF export error:', err)
       }
     },
-    [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, artistInfoMap, compilationFilters, autoUploadToPortal, persistContext, labelArtists, t]
+    [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, artistInfoMap, compilationFilters, autoUploadToPortal, persistContext, labelArtists, t, requirePeriod]
   )
 
   const handleDownloadExcel = useCallback(
@@ -282,6 +329,7 @@ export function useExports(
         toast.error(interpolate(t.exportNoArtistData, { artist }))
         return
       }
+      if (!requirePeriod()) return
 
       const toastId = toast.loading(interpolate(t.exportExcelPreparing, { artist }))
       try {
@@ -345,7 +393,7 @@ export function useExports(
         console.error('Excel export error:', err)
       }
     },
-    [processedData, labelInfo, periodStart, periodEnd, compilationFilters, pdfSettings, requestExcelBlob, t, excelWorkerErrorMessage]
+    [processedData, labelInfo, periodStart, periodEnd, compilationFilters, pdfSettings, requestExcelBlob, t, excelWorkerErrorMessage, requirePeriod]
   )
 
   /**
@@ -359,6 +407,7 @@ export function useExports(
       toast.info('No revenue data to export')
       return
     }
+    if (!requirePeriod()) return
 
     const total = processedData.length
     const toastId = toast.loading(`Preparing 1 / ${total} statements…`)
@@ -423,7 +472,7 @@ export function useExports(
       toast.error(t.exportZipFailed, { id: toastId, description: message })
       console.error('ZIP export error:', err)
     }
-  }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters, requestExcelBlob, t, excelWorkerErrorMessage])
+  }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters, requestExcelBlob, t, excelWorkerErrorMessage, requirePeriod])
 
   /**
    * Queued batch export for a specific subset of artists — same async queue
@@ -437,6 +486,7 @@ export function useExports(
       toast.info('No artists selected for export')
       return
     }
+    if (!requirePeriod()) return
 
     const subset = processedData.filter(d => selectedArtistNames.includes(d.artist))
     if (subset.length === 0) {
@@ -507,7 +557,7 @@ export function useExports(
       toast.error(t.exportZipFailed, { id: toastId, description: message })
       console.error('ZIP export error:', err)
     }
-  }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters, requestExcelBlob, t, excelWorkerErrorMessage])
+  }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters, requestExcelBlob, t, excelWorkerErrorMessage, requirePeriod])
 
   const handlePublishToPortal = useCallback(
     async (artist: string) => {
@@ -516,6 +566,7 @@ export function useExports(
         toast.error(interpolate(t.exportNoArtistData, { artist }))
         return
       }
+      if (!requirePeriod()) return
 
       const artistInfo = artistInfoMap.get(artist.toLowerCase())
 
@@ -542,7 +593,6 @@ export function useExports(
         )
 
         const filename = `${createSafeFilename(artist)}_statement.pdf`
-        const validPeriod = isValidPeriod(periodStart) ? periodStart : `Q1-${currentYear}`
         const pdfBase64 = await blobToBase64(blob)
         const analyticsPayload = buildUploadPayload(artistData, periodStart, periodEnd)
         const { batchIds, primaryBatchId } = resolveBronzeBatchLineage(
@@ -551,18 +601,29 @@ export function useExports(
         const result = await uploadStatement({
           artistId: artistInfo.artistId,
           filename,
-          period: validPeriod,
+          period: periodStart,
           amountEur: artistData.finalPayout,
           ...analyticsPayload,
           batchId: primaryBatchId,
           pdfBase64,
+          rulesFingerprint: persistContext?.rulesFingerprint,
+          fxSnapshot: persistContext?.fxSnapshot,
+          calculationSnapshot: buildCalculationSnapshot(
+            artistData,
+            analyticsPayload.totalStreams,
+          ),
         })
 
         if (!result.success) {
           throw new Error(result.error ?? 'Failed to publish statement to portal')
         }
 
-        if (persistContext && periodStart) {
+        if (
+          persistContext &&
+          periodStart &&
+          (persistContext.territoryMetrics.length > 0 ||
+            persistContext.merchOrderRows.length > 0)
+        ) {
           await persistAnalyticsAfterStatementUpload({
             artistName: artist,
             periodStart,
@@ -582,13 +643,14 @@ export function useExports(
         toast.error(message)
       }
     },
-    [processedData, artistInfoMap, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters, persistContext, labelArtists, t]
+    [processedData, artistInfoMap, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters, persistContext, labelArtists, t, requirePeriod]
   )
 
   const buildCorrectionPdfBase64 = useCallback(
     async (artist: string, amountEur: number): Promise<string | null> => {
       const artistData = processedData.find((d) => d.artist === artist)
       if (!artistData) return null
+      if (!isValidPeriodRange(periodStart, periodEnd)) return null
 
       const artistInfo = artistInfoMap.get(artist.toLowerCase())
 

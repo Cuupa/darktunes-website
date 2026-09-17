@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { getAdminAccessToken } from '@/lib/admin/getAccessToken'
 import type { SettlementRegister } from '@/lib/api/settlementRegister'
@@ -146,12 +146,16 @@ export function useSettlementCenter({
     return map
   }, [labelArtists])
 
+  const refreshSeqRef = useRef(0)
+
   const refreshRegister = useCallback(async () => {
     if (!periodStartDate || !periodEndDate) {
       setLoading(false)
       return
     }
 
+    const seq = refreshSeqRef.current + 1
+    refreshSeqRef.current = seq
     setLoading(true)
     try {
       const token = await getAdminAccessToken()
@@ -163,11 +167,14 @@ export function useSettlementCenter({
         periodEndDate,
         t.settlementRegisterLoadFailed,
       )
+      // A late response for the previous period must not overwrite newer data.
+      if (seq !== refreshSeqRef.current) return
       setRegister(registerData)
     } catch (err) {
+      if (seq !== refreshSeqRef.current) return
       toast.error(err instanceof Error ? err.message : t.settlementRegisterLoadFailed)
     } finally {
-      setLoading(false)
+      if (seq === refreshSeqRef.current) setLoading(false)
     }
   }, [periodStartDate, periodEndDate, t.settlementRegisterLoadFailed, t.settlementSessionExpired])
 

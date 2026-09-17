@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { invoiceGrossCents } from '@/lib/api/settlementLedger'
+import { BusinessRuleError } from '@/lib/errors'
 
 type DbClient = SupabaseClient<Database>
 type InvoiceRow = Database['public']['Tables']['artist_invoices']['Row']
@@ -44,6 +44,10 @@ export interface ArtistInvoice {
   paymentMethod: InvoiceRow['payment_method']
   paymentReference: string | undefined
   settlementPeriodId: string | undefined
+  /** Delivery state is separate from the financial status (#623). */
+  deliveryStatus: 'not_sent' | 'sent' | 'failed' | undefined
+  deliveryAttemptedAt: string | undefined
+  deliveryError: string | undefined
   createdAt: string
   updatedAt: string
 }
@@ -101,6 +105,9 @@ function rowToArtistInvoice(row: InvoiceRow): ArtistInvoice {
     paymentMethod: row.payment_method,
     paymentReference: row.payment_reference ?? undefined,
     settlementPeriodId: row.settlement_period_id ?? undefined,
+    deliveryStatus: row.delivery_status ?? undefined,
+    deliveryAttemptedAt: row.delivery_attempted_at ?? undefined,
+    deliveryError: row.delivery_error ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -257,13 +264,16 @@ export async function updateInvoice(
     fx_rate_source: string | null
     notes: string | null
     artist_invoice_number: string | null
+    delivery_status: 'not_sent' | 'sent' | 'failed' | null
+    delivery_attempted_at: string | null
+    delivery_error: string | null
   }>,
 ): Promise<ArtistInvoice> {
   // GoBD write-once: never replace an issued PDF artifact.
   if (updates.pdf_url !== undefined || updates.pdf_sha256 !== undefined) {
     const existing = await getArtistInvoice(supabase, id, artistId)
     if (existing?.pdfUrl || existing?.pdfSha256) {
-      throw new Error('Invoice PDF is immutable once issued')
+      throw new BusinessRuleError('Invoice PDF is immutable once issued')
     }
   }
 
@@ -395,9 +405,9 @@ export async function markInvoiceReceived(
   actorId: string,
 ): Promise<ArtistInvoice> {
   const existing = await getAdminInvoiceById(db, id)
-  if (!existing) throw new Error('Invoice not found')
+  if (!existing) throw new BusinessRuleError('Invoice not found', 404, 'NOT_FOUND')
   if (!['sent', 'draft'].includes(existing.status)) {
-    throw new Error(`Cannot mark received from status "${existing.status}"`)
+    throw new BusinessRuleError(`Cannot mark received from status "${existing.status}"`)
   }
 
   const now = new Date().toISOString()
@@ -429,39 +439,31 @@ export async function recordInvoicePayment(
   id: string,
   input: RecordInvoicePaymentInput,
 ): Promise<ArtistInvoice> {
-  const existing = await getAdminInvoiceById(db, id)
-  if (!existing) throw new Error('Invoice not found')
-  if (!['received', 'partially_paid', 'sent'].includes(existing.status)) {
-    throw new Error(`Cannot record payment from status "${existing.status}"`)
+  // Atomic RPC (#628): the row is locked, status and the gross cap are checked
+  // and paid/outstanding/status are updated in one statement, so concurrent
+  // payments cannot lose an update.
+  const { data, error } = await db.rpc('record_invoice_payment', {
+    p_invoice_id: id,
+    p_actor_id: input.actorId,
+    p_amount_cents: input.amountCents,
+    p_method: input.paymentMethod,
+    p_reference: input.paymentReference?.trim() || null,
+  })
+
+  if (error) {
+    const message = error.message ?? 'Payment failed'
+    if (message.includes('invoice_not_found')) {
+      throw new BusinessRuleError('Invoice not found', 404, 'NOT_FOUND')
+    }
+    if (message.includes('payment_exceeds_total')) {
+      throw new BusinessRuleError('Payment exceeds invoice total', 422, 'VALIDATION_ERROR')
+    }
+    if (message.includes('invalid_status')) {
+      const status = message.split('invalid_status:')[1]?.trim() ?? 'unknown'
+      throw new BusinessRuleError(`Cannot record payment from status "${status}"`)
+    }
+    throw new Error(message)
   }
 
-  // Cap against gross total (net + VAT) so payments match PDF totals.
-  const totalCents = invoiceGrossCents(existing.lineItems, existing.taxRatePct)
-  const newPaid = existing.paidAmountCents + input.amountCents
-  if (newPaid > totalCents) throw new Error('Payment exceeds invoice total')
-
-  const outstanding = totalCents - newPaid
-  const now = new Date().toISOString()
-  const nextStatus = outstanding === 0 ? 'paid' : 'partially_paid'
-
-  const { data, error } = await db
-    .from('artist_invoices')
-    .update({
-      status: nextStatus,
-      paid_amount_cents: newPaid,
-      outstanding_amount_cents: outstanding,
-      paid_at: outstanding === 0 ? now : existing.paidAt ?? null,
-      paid_by: input.actorId,
-      payment_method: input.paymentMethod,
-      payment_reference: input.paymentReference?.trim() || null,
-      received_at: existing.receivedAt ?? now,
-      received_by: existing.receivedBy ?? input.actorId,
-      updated_at: now,
-    })
-    .eq('id', id)
-    .select('*')
-    .single()
-
-  if (error) throw new Error(error.message)
   return rowToArtistInvoice(data as InvoiceRow)
 }

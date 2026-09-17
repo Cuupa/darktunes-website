@@ -59,6 +59,7 @@ export const ACCOUNTING_FALLBACK = {
   subTabListLabel: 'Accounting workflow sections',
   rulesWorkspaceSynced: 'Rules synced to server workspace',
   rulesWorkspaceDirty: 'Unsaved rule changes — saving to server…',
+  workspaceConflict: 'Workspace was changed in another session — reload before saving.',
   rulesWorkspaceDefaultSynced: 'Settings synced to server (Default preset)',
   workspaceDefaultSaved: 'Default preset saved',
   workspaceDefaultNotSaved: 'Default preset not saved yet',
@@ -327,6 +328,9 @@ export const ACCOUNTING_FALLBACK = {
   setupPeriodOrderError: 'End month must be on or after start month',
   rosterFromDbHint:
     'Artist roster comes from the portal database ({count} artists). Manage artists under Admin → Artists; SEPA details from billing profiles.',
+  uploadArchiveAvailable:
+    '{count} archived source file(s) are stored for this period. Load them to restore the workflow.',
+  uploadArchiveRestore: 'Load archived sources',
 } as const
 
 export const SETTLEMENT_FALLBACK = {

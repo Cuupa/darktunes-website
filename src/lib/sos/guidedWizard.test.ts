@@ -89,6 +89,47 @@ describe('guidedWizard', () => {
     expect(canNavigateToGuidedStep('settle', ready)).toBe(true)
   })
 
+  it('uses the same gates for stepper navigation as for Continue (#616)', () => {
+    const ready = { hasData: true, isProcessing: false }
+
+    // Assistant: no jump to review while the setup period is incomplete.
+    expect(
+      canNavigateToGuidedStep(
+        'review',
+        { ...ready, setupComplete: false },
+        ASSISTANT_WIZARD_STEP_IDS,
+      ),
+    ).toBe(false)
+    expect(
+      canNavigateToGuidedStep(
+        'review',
+        { ...ready, setupComplete: true, ratesReady: true, hasBlockingValidation: true },
+        ASSISTANT_WIZARD_STEP_IDS,
+      ),
+    ).toBe(false)
+    expect(
+      canNavigateToGuidedStep(
+        'review',
+        { ...ready, setupComplete: true, ratesReady: true, hasBlockingValidation: false },
+        ASSISTANT_WIZARD_STEP_IDS,
+      ),
+    ).toBe(true)
+
+    // Upload is not reachable before the setup period in assistant mode.
+    expect(
+      canNavigateToGuidedStep(
+        'upload',
+        { ...ready, setupComplete: false },
+        ASSISTANT_WIZARD_STEP_IDS,
+      ),
+    ).toBe(false)
+
+    // The rates gate applies to direct navigation too.
+    expect(
+      canNavigateToGuidedStep('review', { ...ready, ratesReady: false }),
+    ).toBe(false)
+  })
+
   it('blocks upload advance when rates are not ready', () => {
     expect(
       canAdvanceGuidedStep('upload', {

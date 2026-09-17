@@ -5,12 +5,12 @@
  * Keeps XHR/fetch calls out of the UI component (SRP).
  */
 
-import type { ApiErrorResponse } from '@/lib/errors'
+import type { ApiErrorBody } from '@/lib/errors'
 import type { Database } from '@/types/database'
 
 /** Thrown when /api/portal/profile returns a non-2xx response. */
 export class PortalProfileSaveError extends Error {
-  constructor(public readonly body: ApiErrorResponse) {
+  constructor(public readonly body: ApiErrorBody) {
     super(body.error)
     this.name = 'PortalProfileSaveError'
   }
@@ -172,7 +172,7 @@ export async function saveArtistProfile(
   })
 
   if (!res.ok) {
-    const errBody = await res.json().catch(() => ({ error: 'Save failed', status: res.status })) as ApiErrorResponse
+    const errBody = await res.json().catch(() => ({ error: 'Save failed', status: res.status })) as ApiErrorBody
     throw new PortalProfileSaveError({
       error: errBody.error ?? 'Save failed',
       code: errBody.code,

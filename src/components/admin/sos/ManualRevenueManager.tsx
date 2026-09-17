@@ -22,6 +22,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import type { ManualRevenue } from '@/lib/sos/types'
 import { MoneyField, isMoneyInputValid } from '@/components/admin/sos/fields/AccountingNumberFields'
+import { parseMoneyAmount } from '@/lib/sos/accountingInputValidation'
 import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 
 export interface ManualRevenueManagerProps {
@@ -143,8 +144,9 @@ function RevenueForm({
         <Button
           onClick={() => {
             if (!canSave) return
-            const parsed = Number(amount.replace(',', '.'))
-            onSave(effectiveArtist.trim(), description.trim(), Math.round(parsed * 100) / 100)
+            const parsed = parseMoneyAmount(amount, { allowZero: false })
+            if (!parsed.ok) return
+            onSave(effectiveArtist.trim(), description.trim(), parsed.value)
           }}
           disabled={!canSave}
         >

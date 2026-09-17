@@ -460,4 +460,76 @@ describe('buildProcessedArtistData', () => {
     expect(result.openingBalanceEur).toBeCloseTo(20, 2)
     expect(result.amountDueEur).toBeCloseTo(65, 2)
   })
+
+  it('aggregates micro amounts in full precision before any cent rounding', () => {
+    const transactions = Array.from({ length: 100_000 }, (_, i) =>
+      makeTx({ id: `micro-${i}`, net_revenue: 0.00001, source: 'believe' }),
+    )
+
+    const result = buildProcessedArtistData({
+      lowerKey: 'neuroklast',
+      artist: 'Neuroklast',
+      artistTransactions: transactions,
+      config: {
+        ...baseConfig(),
+        distributionFeePercentage: 0,
+        distributionFeeDigital: 0,
+        distributionFeePhysical: 0,
+        splitFees: [{ artist: 'Neuroklast', percentage: 100 }],
+      },
+    })
+
+    // 100,000 × 0.00001 EUR = 1 EUR — per-row cent rounding would lose it all.
+    expect(result.finalPayout).toBeCloseTo(1, 6)
+  })
+
+  it('honours 0% and 100% splits without truthy fallbacks', () => {
+    const zero = buildProcessedArtistData({
+      lowerKey: 'neuroklast',
+      artist: 'Neuroklast',
+      artistTransactions: [makeTx({ net_revenue: 100, source: 'believe' })],
+      config: {
+        ...baseConfig(),
+        distributionFeePercentage: 0,
+        distributionFeeDigital: 0,
+        distributionFeePhysical: 0,
+        splitFees: [{ artist: 'Neuroklast', percentage: 0 }],
+      },
+    })
+    expect(zero.finalPayout).toBe(0)
+
+    const full = buildProcessedArtistData({
+      lowerKey: 'neuroklast',
+      artist: 'Neuroklast',
+      artistTransactions: [makeTx({ net_revenue: 100, source: 'believe' })],
+      config: {
+        ...baseConfig(),
+        distributionFeePercentage: 0,
+        distributionFeeDigital: 0,
+        distributionFeePhysical: 0,
+        splitFees: [{ artist: 'Neuroklast', percentage: 100 }],
+      },
+    })
+    expect(full.finalPayout).toBeCloseTo(100, 6)
+  })
+
+  it('keeps negative refunds negative instead of clamping them', () => {
+    const result = buildProcessedArtistData({
+      lowerKey: 'neuroklast',
+      artist: 'Neuroklast',
+      artistTransactions: [
+        makeTx({ id: 'sale', net_revenue: 100, source: 'believe' }),
+        makeTx({ id: 'refund', net_revenue: -30, source: 'believe' }),
+      ],
+      config: {
+        ...baseConfig(),
+        distributionFeePercentage: 0,
+        distributionFeeDigital: 0,
+        distributionFeePhysical: 0,
+        splitFees: [{ artist: 'Neuroklast', percentage: 100 }],
+      },
+    })
+
+    expect(result.finalPayout).toBeCloseTo(70, 6)
+  })
 })

@@ -14,7 +14,7 @@
 
 import Papa from 'papaparse'
 import type { PrintfulRawCost } from './ecommerce-merger'
-import { parseCurrencyAmount } from './ecommerce-merger'
+import { parseAmount } from './amountParsing'
 
 export interface PrintfulParseResult {
   costs: PrintfulRawCost[]
@@ -51,9 +51,17 @@ export function parsePrintfulCSV(content: string): PrintfulParseResult {
       const orderId = row['Order']?.trim()
       if (!orderId) continue
 
-      const total = parseCurrencyAmount(row['Total'] ?? '')
+      const totalResult = parseAmount(row['Total'] ?? '', 'en')
+      if (totalResult.kind !== 'valid') {
+        errors.push({
+          row: i + 2,
+          reason: `Invalid "Total" value "${row['Total'] ?? ''}" (${totalResult.kind === 'invalid' ? totalResult.reason : 'empty'})`,
+          data: JSON.stringify(row),
+        })
+        continue
+      }
 
-      costs.push({ orderId, total })
+      costs.push({ orderId, total: totalResult.value })
     } catch (err) {
       errors.push({
         row: i + 2,

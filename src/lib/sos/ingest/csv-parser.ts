@@ -1,5 +1,6 @@
 export { normalizeDateToMonth } from './normalizeDateToMonth'
 import { normalizeDateToMonth } from './normalizeDateToMonth'
+import { parseAmount, parseIntegerAmount, SOURCE_AMOUNT_CONVENTION } from './amountParsing'
 
 export interface SalesTransaction {
   id: string
@@ -155,6 +156,11 @@ export function mapCSVHeadersToModel(
   return mapping
 }
 
+/**
+ * @deprecated Legacy synchronous parser. The worker uses
+ * `parseCSVContentStreaming` (chunked, progress, same amount parsing).
+ * Kept for backwards-compatible imports; do not add new callers.
+ */
 export function parseCSVContent(
   csvContent: string,
   source: 'believe' | 'bandcamp',
@@ -226,13 +232,30 @@ export function parseCSVContent(
       // Note for Bandcamp: "balance of revenue share (EUR)" is the collection-
       // society running balance, NOT the per-transaction net revenue, and must
       // not be used here — the correct column is "net amount".
-      const finalRevenueStr = mappedData.net_revenue || '0'
+      const finalRevenueStr = mappedData.net_revenue ?? ''
       const finalCurrency = mappedData.currency || 'EUR'
-      const netRevenue = parseFloat(finalRevenueStr.replace(/[^0-9.-]/g, '')) || 0
+      const revenueResult = parseAmount(finalRevenueStr, SOURCE_AMOUNT_CONVENTION[source])
+      if (revenueResult.kind !== 'valid') {
+        errors.push({
+          row: i + 1,
+          reason: `Invalid "net_revenue" value "${finalRevenueStr}" (${revenueResult.kind === 'invalid' ? revenueResult.reason : 'empty'})`,
+          data: lines[i].substring(0, 120),
+        })
+        continue
+      }
+      const netRevenue = revenueResult.value
 
       const originalArtist = mappedData.original_artist || ''
-      const quantityStr = mappedData.quantity || '0'
-      const quantity = parseInt(quantityStr.replace(/[^0-9]/g, '')) || 0
+      const quantityResult = parseIntegerAmount(mappedData.quantity ?? '')
+      if (quantityResult.kind === 'invalid') {
+        errors.push({
+          row: i + 1,
+          reason: `Invalid "quantity" value "${mappedData.quantity ?? ''}" (${quantityResult.reason})`,
+          data: lines[i].substring(0, 120),
+        })
+        continue
+      }
+      const quantity = quantityResult.kind === 'valid' ? quantityResult.value : 0
 
       if (originalArtist) {
         uniqueArtistsSet.add(originalArtist)

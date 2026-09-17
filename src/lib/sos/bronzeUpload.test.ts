@@ -13,12 +13,9 @@ describe('extractPeriodBounds', () => {
     })
   })
 
-  it('falls back to current month when no valid months', () => {
-    const fallback = new Date().toISOString().slice(0, 7)
-    expect(extractPeriodBounds(['Unknown', ''])).toEqual({
-      periodStart: fallback,
-      periodEnd: fallback,
-    })
+  it('returns null instead of inventing the current month when no valid months exist', () => {
+    expect(extractPeriodBounds(['Unknown', ''])).toBeNull()
+    expect(extractPeriodBounds([])).toBeNull()
   })
 })
 
@@ -99,7 +96,7 @@ describe('uploadBronzeDistributorCsv', () => {
     expect(confirmCalls).toHaveLength(2)
   })
 
-  it('uses chunked multipart upload when CSV exceeds the server proxy limit', async () => {
+  it('reports a clear error when direct upload is disabled and the file exceeds the proxy limit', async () => {
     vi.resetModules()
     vi.doMock('./bronzeUploadLimits', async (importOriginal) => {
       const actual = await importOriginal<typeof import('./bronzeUploadLimits')>()
@@ -107,7 +104,6 @@ describe('uploadBronzeDistributorCsv', () => {
         ...actual,
         MAX_BRONZE_CSV_SERVER_BYTES: 4,
         MAX_BRONZE_CSV_BYTES: 200,
-        BRONZE_UPLOAD_CHUNK_BYTES: 3,
       }
     })
     const { uploadBronzeDistributorCsv: uploadLargeCsv } = await import('./bronzeUpload')
@@ -120,18 +116,62 @@ describe('uploadBronzeDistributorCsv', () => {
           r2Key: 'sos-imports/batch-large/file.csv',
         }),
       })
+      .mockResolvedValueOnce({ ok: true })
+
+    const result = await uploadLargeCsv({
+      distributor: 'believe',
+      filename: 'large.csv',
+      uploadBody: 'abcdef',
+      rowCount: 1,
+      periodStart: '2024-04',
+      periodEnd: '2024-04',
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toContain('Direct R2 upload is disabled')
+    }
+    const urls = fetchMock.mock.calls.map((call) => call[0])
+    expect(urls.some((url) => typeof url === 'string' && url.includes('/multipart/'))).toBe(false)
+
+    vi.doUnmock('./bronzeUploadLimits')
+    vi.resetModules()
+  })
+
+  it('uses direct multipart above the single-PUT limit and never the proxy part route', async () => {
+    vi.stubEnv('NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD', 'true')
+    vi.resetModules()
+    vi.doMock('./bronzeUploadLimits', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('./bronzeUploadLimits')>()
+      return {
+        ...actual,
+        BRONZE_SINGLE_PUT_MAX_BYTES: 4,
+        BRONZE_DIRECT_UPLOAD_PART_BYTES: 3,
+        BRONZE_R2_MIN_PART_BYTES: 3,
+        MAX_BRONZE_CSV_BYTES: 200,
+      }
+    })
+    const { uploadBronzeDistributorCsv: uploadLargeCsv } = await import('./bronzeUpload')
+
+    fetchMock
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ uploadId: 'upload-1' }),
+        json: async () => ({
+          batch: { id: 'batch-multi' },
+          r2Key: 'sos-imports/batch-multi/file.csv',
+        }),
       })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ uploadId: 'upload-1' }) })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ etag: 'etag-1', partNumber: 1 }),
+        json: async () => ({ uploadUrl: 'https://r2.example/part-1' }),
       })
+      .mockResolvedValueOnce({ ok: true, headers: { get: () => '"etag-1"' } })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ etag: 'etag-2', partNumber: 2 }),
+        json: async () => ({ uploadUrl: 'https://r2.example/part-2' }),
       })
+      .mockResolvedValueOnce({ ok: true, headers: { get: () => '"etag-2"' } })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) })
       .mockResolvedValueOnce({ ok: true })
 
@@ -144,11 +184,74 @@ describe('uploadBronzeDistributorCsv', () => {
       periodEnd: '2024-04',
     })
 
-    expect(result).toEqual({ ok: true, batchId: 'batch-large', r2Key: 'sos-imports/batch-large/file.csv' })
-    expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/admin/sos/import-batches/batch-large/multipart/init')
-    expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/admin/sos/import-batches/batch-large/multipart/part')
-    expect(fetchMock.mock.calls[3]?.[0]).toBe('/api/admin/sos/import-batches/batch-large/multipart/part')
-    expect(fetchMock.mock.calls[4]?.[0]).toBe('/api/admin/sos/import-batches/batch-large/multipart/complete')
+    expect(result).toEqual({
+      ok: true,
+      batchId: 'batch-multi',
+      r2Key: 'sos-imports/batch-multi/file.csv',
+    })
+    const urls = fetchMock.mock.calls.map((call) => call[0])
+    expect(urls[1]).toBe('/api/admin/sos/import-batches/batch-multi/multipart/init')
+    expect(urls[2]).toBe('/api/admin/sos/import-batches/batch-multi/multipart/presign-part')
+    expect(urls[3]).toBe('https://r2.example/part-1')
+    expect(urls[4]).toBe('/api/admin/sos/import-batches/batch-multi/multipart/presign-part')
+    expect(urls[5]).toBe('https://r2.example/part-2')
+    expect(urls[6]).toBe('/api/admin/sos/import-batches/batch-multi/multipart/complete')
+    expect(urls.some((url) => typeof url === 'string' && url.includes('/multipart/part'))).toBe(false)
+
+    vi.doUnmock('./bronzeUploadLimits')
+    vi.resetModules()
+  })
+
+  it('aborts the direct multipart session when a part request fails', async () => {
+    vi.stubEnv('NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD', 'true')
+    vi.resetModules()
+    vi.doMock('./bronzeUploadLimits', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('./bronzeUploadLimits')>()
+      return {
+        ...actual,
+        BRONZE_SINGLE_PUT_MAX_BYTES: 4,
+        BRONZE_DIRECT_UPLOAD_PART_BYTES: 3,
+        BRONZE_R2_MIN_PART_BYTES: 3,
+        MAX_BRONZE_CSV_BYTES: 200,
+      }
+    })
+    const { uploadBronzeDistributorCsv: uploadLargeCsv } = await import('./bronzeUpload')
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          batch: { id: 'batch-abort' },
+          r2Key: 'sos-imports/batch-abort/file.csv',
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ uploadId: 'upload-2' }) })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: 'Error',
+        json: async () => ({ error: 'presign failed' }),
+      })
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: true })
+
+    const result = await uploadLargeCsv({
+      distributor: 'believe',
+      filename: 'large.csv',
+      uploadBody: 'abcdef',
+      rowCount: 1,
+      periodStart: '2024-04',
+      periodEnd: '2024-04',
+    })
+
+    expect(result).toEqual({ ok: false, message: 'presign failed' })
+    const abortCall = fetchMock.mock.calls.find(
+      (call) =>
+        typeof call[0] === 'string' &&
+        call[0] === '/api/admin/sos/import-batches/batch-abort/multipart/abort',
+    )
+    expect(abortCall).toBeTruthy()
+    expect(abortCall?.[1]?.body).toBe(JSON.stringify({ upload_id: 'upload-2' }))
 
     vi.doUnmock('./bronzeUploadLimits')
     vi.resetModules()

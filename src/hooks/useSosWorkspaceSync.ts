@@ -28,6 +28,8 @@ export interface PeriodKey {
 interface WorkspaceApiResponse {
   workspace?: {
     config?: AccountingWorkspaceConfig
+    bronzeBatchIds?: string[]
+    revision?: number
     updated_at?: string
     updated_by?: string | null
   } | null
@@ -65,6 +67,8 @@ export function useSosWorkspaceSync({
   const [isPeriodWorkspaceReady, setIsPeriodWorkspaceReady] = useState(false)
   const [isDefaultPresetReady, setIsDefaultPresetReady] = useState(false)
   const [reloadConfirmOpen, setReloadConfirmOpen] = useState(false)
+  const [workspaceConflict, setWorkspaceConflict] = useState(false)
+  const [serverBronzeBatchIds, setServerBronzeBatchIds] = useState<string[]>([])
 
   const t = useAccountingLabels()
   const lastSavedFingerprintRef = useRef<string | null>(null)
@@ -73,6 +77,17 @@ export function useSosWorkspaceSync({
   const bootstrapStartedRef = useRef(false)
   const settingsRef = useRef(settings)
   settingsRef.current = settings
+  /** Revision of the server workspace this session last read/saved. */
+  const workspaceRevisionRef = useRef<number | null>(null)
+  /** Sequence guard so a late load response cannot overwrite a newer period. */
+  const periodLoadSeqRef = useRef(0)
+  /** Blocks further saves until the user reloads after a revision conflict. */
+  const workspaceConflictRef = useRef(false)
+
+  const setConflict = useCallback((value: boolean) => {
+    workspaceConflictRef.current = value
+    setWorkspaceConflict(value)
+  }, [])
 
   const clearSavedFingerprint = useCallback(() => {
     lastSavedFingerprintRef.current = null
@@ -103,6 +118,7 @@ export function useSosWorkspaceSync({
 
   const saveWorkspace = useCallback(
     async (nextSettings: SosAccountingSettings, periodKey: PeriodKey): Promise<boolean> => {
+      if (workspaceConflictRef.current) return false
       setIsWorkspaceSaving(true)
       try {
         const res = await fetch('/api/admin/sos/workspaces', {
@@ -113,8 +129,22 @@ export function useSosWorkspaceSync({
             period_end: periodKey.end,
             config: nextSettings,
             bronze_batch_ids: bronzeBatchIds,
+            expected_revision: workspaceRevisionRef.current,
           }),
         })
+
+        if (res.status === 409) {
+          // Another session saved a newer revision. Keep local changes dirty
+          // and stop autosaving until the user reloads.
+          setConflict(true)
+          toast.error(t.workspaceConflict)
+          void logClientAppEvent('useSosWorkspaceSync', 'workspace revision conflict', 'warn', {
+            action: 'saveWorkspace',
+            periodStart: periodKey.start,
+            periodEnd: periodKey.end,
+          })
+          return false
+        }
 
         if (!res.ok) {
           const err = (await res.json().catch(() => ({}))) as { error?: string }
@@ -123,6 +153,7 @@ export function useSosWorkspaceSync({
 
         const json = (await res.json()) as WorkspaceApiResponse
         const ws = json.workspace
+        workspaceRevisionRef.current = ws?.revision ?? workspaceRevisionRef.current
         markSynced(
           nextSettings,
           ws?.updated_at ?? new Date().toISOString(),
@@ -142,7 +173,7 @@ export function useSosWorkspaceSync({
         setIsWorkspaceSaving(false)
       }
     },
-    [bronzeBatchIds, markSynced, t.workspaceSaveError, t.workspaceSaveFailed],
+    [bronzeBatchIds, markSynced, setConflict, t.workspaceConflict, t.workspaceSaveError, t.workspaceSaveFailed],
   )
 
   const saveDefaultPreset = useCallback(
@@ -209,6 +240,8 @@ export function useSosWorkspaceSync({
 
   const loadPeriodWorkspace = useCallback(
     async (periodKey: PeriodKey): Promise<void> => {
+      const seq = periodLoadSeqRef.current + 1
+      periodLoadSeqRef.current = seq
       setIsWorkspaceLoading(true)
       try {
         const params = new URLSearchParams({
@@ -216,15 +249,23 @@ export function useSosWorkspaceSync({
           periodEnd: periodKey.end,
         })
         const res = await fetch(`/api/admin/sos/workspaces?${params}`)
+        // A late response for period A must not overwrite period B.
+        if (seq !== periodLoadSeqRef.current) return
         if (!res.ok) {
           setWorkspaceLoadedAt(null)
           setWorkspaceUpdatedBy(null)
+          workspaceRevisionRef.current = null
+          setServerBronzeBatchIds([])
           clearSavedFingerprint()
           return
         }
 
         const json = (await res.json()) as WorkspaceApiResponse
+        if (seq !== periodLoadSeqRef.current) return
         const ws = json.workspace
+        setConflict(false)
+        workspaceRevisionRef.current = ws?.revision ?? null
+        setServerBronzeBatchIds(ws?.bronzeBatchIds ?? [])
         if (ws?.config) {
           const incomingHasRules =
             (ws.config.splitFees?.length ?? 0) > 0 ||
@@ -254,6 +295,7 @@ export function useSosWorkspaceSync({
           clearSavedFingerprint()
         }
       } catch (e) {
+        if (seq !== periodLoadSeqRef.current) return
         const msg = e instanceof Error ? e.message : t.workspaceLoadFailed
         console.warn('[useSosWorkspaceSync] period load failed', e)
         void logClientAppEvent('useSosWorkspaceSync', msg, 'warn', {
@@ -263,14 +305,16 @@ export function useSosWorkspaceSync({
         })
         clearSavedFingerprint()
       } finally {
-        setIsWorkspaceLoading(false)
-        setIsPeriodWorkspaceReady(true)
-        window.setTimeout(() => {
-          suppressAutoSaveRef.current = false
-        }, 0)
+        if (seq === periodLoadSeqRef.current) {
+          setIsWorkspaceLoading(false)
+          setIsPeriodWorkspaceReady(true)
+          window.setTimeout(() => {
+            suppressAutoSaveRef.current = false
+          }, 0)
+        }
       }
     },
-    [applySettings, clearSavedFingerprint, markSynced, t.workspaceLoadFailed],
+    [applySettings, clearSavedFingerprint, markSynced, setConflict, t.workspaceLoadFailed],
   )
 
   const performLoadFromServer = useCallback(async (): Promise<void> => {
@@ -402,7 +446,7 @@ export function useSosWorkspaceSync({
       }
     }
 
-    if (!isPeriodWorkspaceReady || suppressAutoSaveRef.current) return
+    if (!isPeriodWorkspaceReady || suppressAutoSaveRef.current || workspaceConflictRef.current) return
 
     if (saved !== null && fingerprint === saved) {
       setIsSettingsDirty(false)
@@ -438,6 +482,10 @@ export function useSosWorkspaceSync({
     isWorkspaceLoading,
     isWorkspaceSaving,
     isSettingsDirty,
+    /** True after a 409: local changes stay dirty, autosave paused until reload. */
+    workspaceConflict,
+    /** Bronze batch IDs stored on the server workspace for this period. */
+    serverBronzeBatchIds,
     loadFromServer,
     confirmReloadFromServer,
     reloadConfirmOpen,

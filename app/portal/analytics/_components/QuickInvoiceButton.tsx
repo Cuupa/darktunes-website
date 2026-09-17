@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { PaperPlaneTilt, Spinner, MagicWand } from '@phosphor-icons/react'
@@ -54,6 +54,9 @@ export function QuickInvoiceButton({
 }: QuickInvoiceButtonProps) {
   const t = useTranslations('portal')
   const [submitting, setSubmitting] = useState(false)
+  // Stable per submission attempt — reused on retry so a lost response cannot
+  // create a second invoice (#621).
+  const operationIdRef = useRef<string | null>(null)
 
   const assistantHref = `/portal/invoices?statement=${encodeURIComponent(statement.id)}`
   const amountLabel = new Intl.NumberFormat('de-DE', {
@@ -71,6 +74,7 @@ export function QuickInvoiceButton({
       if (!session) throw new Error(t('profile_error'))
 
       const amountCents = Math.round((statement.amountEur ?? 0) * 100)
+      operationIdRef.current = operationIdRef.current ?? crypto.randomUUID()
       const response = await fetch('/api/portal/invoices', {
         method: 'POST',
         headers: {
@@ -95,6 +99,7 @@ export function QuickInvoiceButton({
           due_date: dueDateFromNow(DEFAULT_INVOICE_DUE_DAYS),
           send_email: true,
           send_to_label: true,
+          operation_id: operationIdRef.current,
         }),
       })
 
@@ -110,6 +115,7 @@ export function QuickInvoiceButton({
         throw new Error(payload?.error ?? payload?.message ?? t('invoice_error'))
       }
 
+      operationIdRef.current = null
       const meta = invoiceSubmitMeta(payload)
       if (meta.warnings.includes('already_exists')) {
         toast.info(t('invoice_already_exists'))

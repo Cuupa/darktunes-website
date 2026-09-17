@@ -41,6 +41,22 @@ export class ApiError extends Error {
 }
 
 /**
+ * Domain precondition violation (wrong status, locked period, overpayment,
+ * concurrent update, immutable document). Maps to 409/422 instead of 500 —
+ * see `docs/agent/sos-accounting-contract.md` §A.7.
+ */
+export class BusinessRuleError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number = 409,
+    public readonly code: string = 'BUSINESS_RULE_VIOLATION',
+  ) {
+    super(message)
+    this.name = 'BusinessRuleError'
+  }
+}
+
+/**
  * Factory that creates an ApiError from a typed ErrorCode.
  * The human-readable message is drawn from ERROR_MESSAGES so it is always
  * safe (no internal details) and consistent with the i18n dictionary.
@@ -75,10 +91,21 @@ export function getPostgresErrorMessage(err: PostgresErrorLike): string {
 // Standard JSON error shape
 // ---------------------------------------------------------------------------
 
-export interface ApiErrorResponse {
+/** Minimal legacy error-body shape kept for clients that read `error`/`code`. */
+export interface ApiErrorBody {
   error: string
   code?: string
+  status?: number
+}
+
+export interface ApiErrorResponse extends ApiErrorBody {
+  /** RFC 9457 problem type URI (`about:blank` when no registry entry exists). */
+  type: string
+  /** Short human-readable summary. */
+  title: string
   status: number
+  /** Human-readable explanation (the safe message). */
+  detail: string
 }
 
 function buildErrorResponse(
@@ -86,7 +113,18 @@ function buildErrorResponse(
   status: number,
   code?: string,
 ): NextResponse<ApiErrorResponse> {
-  return NextResponse.json({ error: message, code, status }, { status })
+  const body: ApiErrorResponse = {
+    type: 'about:blank',
+    title: code ?? (status >= 500 ? 'Server error' : 'Request failed'),
+    status,
+    detail: message,
+    error: message,
+    ...(code ? { code } : {}),
+  }
+  return new NextResponse(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/problem+json' },
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -165,6 +203,10 @@ export function withErrorHandler(handler: RouteHandler): RouteHandler {
 
       if (err instanceof InvalidStatementTransitionError) {
         return buildErrorResponse(err.message, 422, 'VALIDATION_ERROR')
+      }
+
+      if (err instanceof BusinessRuleError) {
+        return buildErrorResponse(err.message, err.status, err.code)
       }
 
       if (err instanceof ApiError) {

@@ -1,14 +1,18 @@
 /**
  * Client-side Bronze layer upload: raw distributor CSV → R2.
- * Primary: presigned direct browser → R2 (requires bucket CORS).
- * Fallback: server-proxy upload in 4 MB chunks (Vercel body limit).
+ *
+ * Primary (supported) route: presigned direct browser → R2 (single PUT or
+ * multipart with 64 MB parts). Requires R2 bucket CORS — see DEPLOYMENT.md.
+ * Small-file fallback when direct is disabled: server proxy single request
+ * (≤ 4 MB). There is deliberately no server-proxy multipart path: R2 rejects
+ * non-final parts below 5 MiB.
  */
 
 import { logClientAppEvent } from '@/lib/sos/clientAppLog'
 import {
   BRONZE_DIRECT_UPLOAD_PART_BYTES,
+  BRONZE_R2_MIN_PART_BYTES,
   BRONZE_SINGLE_PUT_MAX_BYTES,
-  BRONZE_UPLOAD_CHUNK_BYTES,
   MAX_BRONZE_CSV_BYTES,
   MAX_BRONZE_CSV_SERVER_BYTES,
 } from '@/lib/sos/bronzeUploadLimits'
@@ -42,12 +46,19 @@ export function isBronzeDirectUploadEnabled(): boolean {
   return process.env.NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD !== 'false'
 }
 
-export function extractPeriodBounds(months: string[]): { periodStart: string; periodEnd: string } {
+/**
+ * Derives the reporting-period bounds of a parsed source file. Returns `null`
+ * when the file exposes no valid `YYYY-MM` month — the caller must skip the
+ * archive instead of inventing the current month.
+ */
+export function extractPeriodBounds(
+  months: string[],
+): { periodStart: string; periodEnd: string } | null {
   const valid = months.filter((m) => MONTH_RE.test(m)).sort()
-  const fallback = new Date().toISOString().slice(0, 7)
+  if (valid.length === 0) return null
   return {
-    periodStart: valid[0] ?? fallback,
-    periodEnd: valid[valid.length - 1] ?? fallback,
+    periodStart: valid[0],
+    periodEnd: valid[valid.length - 1],
   }
 }
 
@@ -189,6 +200,12 @@ async function uploadBronzeCsvDirectMultipart(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   let uploadId: string | undefined
 
+  /** Abort the multipart session on every failure path — no orphaned UploadId. */
+  const fail = async (message: string): Promise<{ ok: false; message: string }> => {
+    if (uploadId) await abortBronzeMultipartUpload(batchId, uploadId)
+    return { ok: false, message }
+  }
+
   try {
     const initRes = await fetch(`/api/admin/sos/import-batches/${batchId}/multipart/init`, {
       method: 'POST',
@@ -196,12 +213,12 @@ async function uploadBronzeCsvDirectMultipart(
       body: JSON.stringify({ content_type: contentType, file_size: uploadBlob.size }),
     })
     if (!initRes.ok) {
-      return { ok: false, message: await readApiErrorMessage(initRes) }
+      return fail(await readApiErrorMessage(initRes))
     }
 
     const initJson = (await initRes.json()) as { uploadId?: string }
     uploadId = initJson.uploadId
-    if (!uploadId) return { ok: false, message: 'Missing multipart upload ID' }
+    if (!uploadId) return fail('Missing multipart upload ID')
 
     const parts: { partNumber: number; etag: string }[] = []
     const totalParts = Math.ceil(uploadBlob.size / BRONZE_DIRECT_UPLOAD_PART_BYTES)
@@ -210,6 +227,14 @@ async function uploadBronzeCsvDirectMultipart(
       const start = (partNumber - 1) * BRONZE_DIRECT_UPLOAD_PART_BYTES
       const end = Math.min(start + BRONZE_DIRECT_UPLOAD_PART_BYTES, uploadBlob.size)
       const chunk = uploadBlob.slice(start, end)
+
+      // R2 rejects non-final parts below 5 MiB; fail loudly instead of letting
+      // the provider reject the complete request.
+      if (partNumber < totalParts && chunk.size < BRONZE_R2_MIN_PART_BYTES) {
+        return fail(
+          `Multipart part ${partNumber} is below the R2 minimum of ${BRONZE_R2_MIN_PART_BYTES} bytes`,
+        )
+      }
 
       const presignRes = await fetch(
         `/api/admin/sos/import-batches/${batchId}/multipart/presign-part`,
@@ -220,12 +245,12 @@ async function uploadBronzeCsvDirectMultipart(
         },
       )
       if (!presignRes.ok) {
-        return { ok: false, message: await readApiErrorMessage(presignRes) }
+        return fail(await readApiErrorMessage(presignRes))
       }
 
       const presignJson = (await presignRes.json()) as { uploadUrl?: string }
       if (!presignJson.uploadUrl) {
-        return { ok: false, message: 'Missing presigned part URL' }
+        return fail('Missing presigned part URL')
       }
 
       const etag = await putToPresignedUrl(presignJson.uploadUrl, chunk, contentType)
@@ -238,73 +263,7 @@ async function uploadBronzeCsvDirectMultipart(
       body: JSON.stringify({ upload_id: uploadId, parts }),
     })
     if (!completeRes.ok) {
-      return { ok: false, message: await readApiErrorMessage(completeRes) }
-    }
-
-    return { ok: true }
-  } catch (err) {
-    if (uploadId) await abortBronzeMultipartUpload(batchId, uploadId)
-    throw err
-  }
-}
-
-async function uploadBronzeCsvProxyMultipart(
-  batchId: string,
-  uploadBlob: Blob,
-  uploadFilename: string,
-  contentType: string,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  let uploadId: string | undefined
-
-  try {
-    const initRes = await fetch(`/api/admin/sos/import-batches/${batchId}/multipart/init`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content_type: contentType, file_size: uploadBlob.size }),
-    })
-    if (!initRes.ok) {
-      return { ok: false, message: await readApiErrorMessage(initRes) }
-    }
-
-    const initJson = (await initRes.json()) as { uploadId?: string }
-    uploadId = initJson.uploadId
-    if (!uploadId) return { ok: false, message: 'Missing multipart upload ID' }
-
-    const parts: { partNumber: number; etag: string }[] = []
-    const totalParts = Math.ceil(uploadBlob.size / BRONZE_UPLOAD_CHUNK_BYTES)
-
-    for (let partNumber = 1; partNumber <= totalParts; partNumber++) {
-      const start = (partNumber - 1) * BRONZE_UPLOAD_CHUNK_BYTES
-      const end = Math.min(start + BRONZE_UPLOAD_CHUNK_BYTES, uploadBlob.size)
-      const chunk = uploadBlob.slice(start, end)
-
-      const partForm = new FormData()
-      partForm.append('file', chunk, uploadFilename)
-      partForm.append('upload_id', uploadId)
-      partForm.append('part_number', String(partNumber))
-
-      const partRes = await fetch(`/api/admin/sos/import-batches/${batchId}/multipart/part`, {
-        method: 'POST',
-        body: partForm,
-      })
-      if (!partRes.ok) {
-        return { ok: false, message: await readApiErrorMessage(partRes) }
-      }
-
-      const partJson = (await partRes.json()) as { etag?: string; partNumber?: number }
-      if (!partJson.etag || partJson.partNumber !== partNumber) {
-        return { ok: false, message: 'Invalid multipart part response' }
-      }
-      parts.push({ partNumber, etag: partJson.etag })
-    }
-
-    const completeRes = await fetch(`/api/admin/sos/import-batches/${batchId}/multipart/complete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ upload_id: uploadId, parts }),
-    })
-    if (!completeRes.ok) {
-      return { ok: false, message: await readApiErrorMessage(completeRes) }
+      return fail(await readApiErrorMessage(completeRes))
     }
 
     return { ok: true }
@@ -325,16 +284,12 @@ async function uploadBronzeCsvDirect(
   return uploadBronzeCsvDirectMultipart(batchId, uploadBlob, contentType)
 }
 
-async function uploadBronzeCsvProxy(
+/** Server proxy fallback: one request, only for small files. */
+async function uploadBronzeCsvProxySingle(
   batchId: string,
   uploadBlob: Blob,
   uploadFilename: string,
-  contentType: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (uploadBlob.size > MAX_BRONZE_CSV_SERVER_BYTES) {
-    return uploadBronzeCsvProxyMultipart(batchId, uploadBlob, uploadFilename, contentType)
-  }
-
   const uploadForm = new FormData()
   uploadForm.append('file', uploadBlob, uploadFilename)
   const uploadRes = await fetch(`/api/admin/sos/import-batches/${batchId}/upload`, {
@@ -354,11 +309,21 @@ async function uploadBronzeCsvToR2(
   contentType: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   if (isBronzeDirectUploadEnabled()) {
-    const direct = await uploadBronzeCsvDirect(batchId, uploadBlob, contentType)
-    if (direct.ok) return direct
-    console.warn('[bronzeUpload] direct upload failed, trying server proxy:', direct.message)
+    // No silent proxy fallback: a failing direct route (usually missing R2
+    // CORS) must surface its error instead of hiding behind a broken path.
+    return uploadBronzeCsvDirect(batchId, uploadBlob, contentType)
   }
-  return uploadBronzeCsvProxy(batchId, uploadBlob, uploadFilename, contentType)
+
+  if (uploadBlob.size > MAX_BRONZE_CSV_SERVER_BYTES) {
+    return {
+      ok: false,
+      message: `Direct R2 upload is disabled. Files above ${Math.round(
+        MAX_BRONZE_CSV_SERVER_BYTES / (1024 * 1024),
+      )} MB require the presigned route (R2 bucket CORS).`,
+    }
+  }
+
+  return uploadBronzeCsvProxySingle(batchId, uploadBlob, uploadFilename)
 }
 
 async function confirmBronzeUpload(batchId: string, fileHash: string): Promise<boolean> {

@@ -12,7 +12,10 @@
 import { lazy, Suspense, useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
-import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
+import {
+  formatAccountingPeriodLabel,
+  resolveAccountingPeriod,
+} from '@/lib/sos/accountingPeriod'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { horizontalScrollClass } from '@/components/ui/scroll-panel'
 import { cn } from '@/lib/utils'
@@ -33,6 +36,7 @@ import type {
 import { DEFAULT_PDF_EXPORT_SETTINGS, DEFAULT_APP_DEFAULTS, DEFAULT_EMAIL_CONFIG, DEFAULT_LABEL_INFO } from '@/lib/sos/defaults'
 import {
   normalizeAccountingConfig,
+  settingsFingerprint,
   type SosAccountingSettings,
 } from '@/lib/sos/sosAccountingSettings'
 import {
@@ -55,7 +59,6 @@ import {
   wizardHasBlockingIssues,
   type WizardValidationIssue,
 } from '@/lib/sos/wizardValidation'
-import { isValidPeriodRange } from '@/lib/sos/accountingInputValidation'
 import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUploadZone'
 import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
 import { AccountingGuidedWizard } from '@/components/admin/sos/AccountingGuidedWizard'
@@ -199,6 +202,7 @@ function SosGeneratorPanel() {
   const [manualPeriodEnd, setManualPeriodEnd] = useState('')
   const [workspaceDeleteOpen, setWorkspaceDeleteOpen] = useState(false)
   const [workspaceDeleting, setWorkspaceDeleting] = useState(false)
+  const [restoringArchives, setRestoringArchives] = useState(false)
 
   useEffect(() => {
     const subTab = searchParams.get('subTab')
@@ -512,10 +516,33 @@ function SosGeneratorPanel() {
     ingestEvents,
   )
 
+  /**
+   * The binding accounting period for every operation. Manual selection wins;
+   * detected source months are provenance only. An invalid selection yields
+   * `null` and blocks period-dependent actions — no replacement period.
+   */
+  const periodResolution = useMemo(
+    () =>
+      resolveAccountingPeriod({
+        manualStart: manualPeriodStart,
+        manualEnd: manualPeriodEnd,
+        detectedStart: detectedPeriodStart,
+        detectedEnd: detectedPeriodEnd,
+      }),
+    [manualPeriodStart, manualPeriodEnd, detectedPeriodStart, detectedPeriodEnd],
+  )
+  const effectivePeriod = periodResolution.period
+  const effectivePeriodStart = effectivePeriod?.startMonth ?? ''
+  const effectivePeriodEnd = effectivePeriod?.endMonth ?? ''
+  const effectivePeriodStartDate = effectivePeriod?.startDate ?? ''
+  const effectivePeriodEndDate = effectivePeriod?.endDate ?? ''
+  // The setup step requires an explicit manual end month; a start-only manual
+  // selection must not unlock Continue while the step still shows an error.
+  const setupComplete =
+    effectivePeriod != null && (!manualPeriodStart.trim() || manualPeriodEnd.trim() !== '')
+
   useEffect(() => {
-    const periodStartDate = monthToPeriodDate(detectedPeriodStart, false)
-    const periodEndDate = monthToPeriodDate(detectedPeriodEnd || detectedPeriodStart, true)
-    if (!periodStartDate || !periodEndDate) {
+    if (!effectivePeriodStartDate || !effectivePeriodEndDate) {
       setCarryForwardByArtist({})
       return
     }
@@ -529,8 +556,8 @@ function SosGeneratorPanel() {
         if (!token) return
 
         const params = new URLSearchParams({
-          periodStart: periodStartDate,
-          periodEnd: periodEndDate,
+          periodStart: effectivePeriodStartDate,
+          periodEnd: effectivePeriodEndDate,
         })
         const response = await fetch(`/api/admin/settlements/register?${params}`, {
           headers: { Authorization: `Bearer ${token}` },
@@ -555,7 +582,7 @@ function SosGeneratorPanel() {
     return () => {
       cancelled = true
     }
-  }, [detectedPeriodStart, detectedPeriodEnd])
+  }, [effectivePeriodStartDate, effectivePeriodEndDate])
 
   // Derive flat list of all release titles across all artists for IgnoredEntriesManager
   const allReleaseTitles = useMemo(() => {
@@ -567,10 +594,6 @@ function SosGeneratorPanel() {
   }, [releaseTitlesByArtistIncFeaturing])
 
   const hasData = revenues.length > 0
-
-  const setupPeriodStart = manualPeriodStart || detectedPeriodStart
-  const setupPeriodEnd = manualPeriodEnd || detectedPeriodEnd || manualPeriodStart || detectedPeriodStart
-  const setupComplete = isValidPeriodRange(setupPeriodStart, setupPeriodEnd)
 
   useEffect(() => {
     if (detectedPeriodStart && !manualPeriodStart) {
@@ -607,8 +630,8 @@ function SosGeneratorPanel() {
         revenues,
         labelArtists,
         splitFees,
-        periodStart: manualPeriodStart || detectedPeriodStart,
-        periodEnd: manualPeriodEnd || detectedPeriodEnd || manualPeriodStart,
+        periodStart: effectivePeriodStart,
+        periodEnd: effectivePeriodEnd,
         hasBelieveFile: believeManager.files.length > 0,
         hasBandcampFile: bandcampManager.files.length > 0,
         hasShopifyFile: shopifyManager.files.length > 0,
@@ -677,10 +700,8 @@ function SosGeneratorPanel() {
     revenues,
     labelArtists,
     splitFees,
-    manualPeriodStart,
-    manualPeriodEnd,
-    detectedPeriodStart,
-    detectedPeriodEnd,
+    effectivePeriodStart,
+    effectivePeriodEnd,
     trackRevenueAssignments,
     believeManager.files,
     bandcampManager.files,
@@ -733,15 +754,31 @@ function SosGeneratorPanel() {
 
   const exportPersistContext = useMemo(
     () =>
-      hasData && territoryMetrics.length > 0
+      hasData
         ? {
             territoryMetrics,
             merchOrderRows,
             revenues,
             bronzeBatchIds,
+            rulesFingerprint: settingsFingerprint(settingsBundle),
+            fxSnapshot: {
+              rates: exchangeRates,
+              historical: historicalRates,
+              source: exchangeRatesSource,
+            },
           }
         : undefined,
-    [hasData, territoryMetrics, merchOrderRows, revenues, bronzeBatchIds],
+    [
+      hasData,
+      territoryMetrics,
+      merchOrderRows,
+      revenues,
+      bronzeBatchIds,
+      settingsBundle,
+      exchangeRates,
+      historicalRates,
+      exchangeRatesSource,
+    ],
   )
 
   const {
@@ -754,8 +791,8 @@ function SosGeneratorPanel() {
   } = useExports(
       processedData,
       labelInfo,
-      detectedPeriodStart,
-      detectedPeriodEnd,
+      effectivePeriodStart,
+      effectivePeriodEnd,
       pdfSettings,
       appDefaults,
       labelArtists,
@@ -805,10 +842,10 @@ function SosGeneratorPanel() {
 
   const currentPeriodKey = useMemo(
     () =>
-      detectedPeriodStart
-        ? { start: detectedPeriodStart, end: detectedPeriodEnd || detectedPeriodStart }
+      effectivePeriod
+        ? { start: effectivePeriod.startMonth, end: effectivePeriod.endMonth }
         : null,
-    [detectedPeriodStart, detectedPeriodEnd],
+    [effectivePeriod],
   )
 
   const {
@@ -819,6 +856,8 @@ function SosGeneratorPanel() {
     isWorkspaceLoading,
     isWorkspaceSaving,
     isSettingsDirty,
+    workspaceConflict,
+    serverBronzeBatchIds,
     loadFromServer,
     confirmReloadFromServer,
     reloadConfirmOpen,
@@ -858,6 +897,44 @@ function SosGeneratorPanel() {
       setWorkspaceDeleting(false)
     }
   }, [currentPeriodKey, loadFromServer, t])
+
+  /** Load bronze archives referenced by the server workspace back into the session. */
+  const restoreArchivedSources = useCallback(async () => {
+    const missing = serverBronzeBatchIds.filter((id) => !bronzeBatchIds.includes(id))
+    if (missing.length === 0) return
+    setRestoringArchives(true)
+    try {
+      const supabase = createBrowserSupabaseClient()
+      const { data } = await supabase.auth.getSession()
+      const token = data.session?.access_token
+      if (!token) throw new Error(t.workspaceLoadFailed)
+      for (const batchId of missing) {
+        const res = await fetch(`/api/admin/sos/import-batches/${batchId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) continue
+        const json = (await res.json()) as {
+          batch?: { id: string; distributor?: string; periodStart?: string }
+        }
+        if (!json.batch?.distributor) continue
+        await loadBronzeBatch({
+          id: json.batch.id,
+          distributor: json.batch.distributor,
+          periodStart: json.batch.periodStart ?? '',
+        })
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t.bronzeArchiveLoadError)
+    } finally {
+      setRestoringArchives(false)
+    }
+  }, [
+    serverBronzeBatchIds,
+    bronzeBatchIds,
+    loadBronzeBatch,
+    t.workspaceLoadFailed,
+    t.bronzeArchiveLoadError,
+  ])
 
   const rulesCount =
     artistMappings.length + compilationFilters.length + splitFees.length +
@@ -919,10 +996,7 @@ function SosGeneratorPanel() {
     <div className="p-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          {t.uploadPeriodLabel} {manualPeriodStart || detectedPeriodStart || '—'}
-          {(manualPeriodEnd || detectedPeriodEnd) &&
-            (manualPeriodEnd || detectedPeriodEnd) !== (manualPeriodStart || detectedPeriodStart) &&
-            ` – ${manualPeriodEnd || detectedPeriodEnd}`}
+          {t.uploadPeriodLabel} {formatAccountingPeriodLabel(effectivePeriod) || '—'}
         </p>
         <Button type="button" variant="outline" size="sm" onClick={resetSession}>
           {t.resetSessionLabel}
@@ -935,6 +1009,22 @@ function SosGeneratorPanel() {
       <p className="text-xs text-muted-foreground">
         {interpolate(t.rosterFromDbHint, { count: labelArtists.length })}
       </p>
+      {serverBronzeBatchIds.some((id) => !bronzeBatchIds.includes(id)) && (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted-foreground">
+            {interpolate(t.uploadArchiveAvailable, { count: serverBronzeBatchIds.length })}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void restoreArchivedSources()}
+            disabled={restoringArchives || isProcessing}
+          >
+            {t.uploadArchiveRestore}
+          </Button>
+        </div>
+      )}
       <UniversalFileUploadZone
         believeManager={believeManager}
         bandcampManager={bandcampManager}
@@ -962,8 +1052,8 @@ function SosGeneratorPanel() {
       labelInfo={labelInfo}
       appDefaults={appDefaults}
       emailConfig={emailConfig}
-      periodStart={detectedPeriodStart}
-      periodEnd={detectedPeriodEnd}
+      periodStart={effectivePeriodStart}
+      periodEnd={effectivePeriodEnd}
       onGoToSettlementCenter={() => setGuidedStep('settle')}
       disabled={isProcessing || excelBusy}
     />
@@ -974,7 +1064,9 @@ function SosGeneratorPanel() {
     </div>
   )
 
-  const settlePanel = hasData ? (
+  // The settlement center opens from the database for a resolved period even
+  // without a CSV upload session (contract §B.2/#617).
+  const settlePanel = effectivePeriod ? (
     <div className="space-y-4">
       <div className="px-6 pt-4 space-y-3">
         <p className="text-sm text-muted-foreground leading-relaxed">{t.settlementDauIntro}</p>
@@ -996,8 +1088,8 @@ function SosGeneratorPanel() {
       <SettlementCenterPanel
         revenues={revenues}
         labelArtists={labelArtists}
-        periodStart={detectedPeriodStart}
-        periodEnd={detectedPeriodEnd}
+        periodStart={effectivePeriodStart}
+        periodEnd={effectivePeriodEnd}
         territoryMetrics={territoryMetrics}
         merchOrderRows={merchOrderRows}
         bronzeBatchIds={bronzeBatchIds}
@@ -1023,7 +1115,18 @@ function SosGeneratorPanel() {
 
   const rulesStatusBanner = settingsReady ? (
     <p className="px-6 py-1.5 text-[11px] text-muted-foreground border-b border-border bg-muted/10">
-      {isWorkspaceSaving
+      {workspaceConflict ? (
+        <span className="text-destructive">
+          {t.workspaceConflict}{' '}
+          <button
+            type="button"
+            className="underline underline-offset-2 hover:text-foreground"
+            onClick={() => void confirmReloadFromServer()}
+          >
+            {t.workspaceReload}
+          </button>
+        </span>
+      ) : isWorkspaceSaving
         ? t.rulesWorkspaceSaving
         : isSettingsDirty
           ? t.rulesWorkspaceDirty
@@ -1033,13 +1136,13 @@ function SosGeneratorPanel() {
     </p>
   ) : null
 
-  const periodBanner = hasData && (detectedPeriodStart || detectedPeriodEnd) ? (
+  const periodBanner = hasData && effectivePeriod ? (
     <Alert className="mx-6 mt-4 border-primary/30 bg-primary/5">
       <FileText size={14} className="text-primary" />
       <AlertDescription className="text-xs">
-        {t.detectedPeriod} <strong>{detectedPeriodStart}</strong>
-        {detectedPeriodEnd && detectedPeriodEnd !== detectedPeriodStart && (
-          <> – <strong>{detectedPeriodEnd}</strong></>
+        {t.uploadPeriodLabel} <strong>{effectivePeriod.startMonth}</strong>
+        {effectivePeriod.endMonth !== effectivePeriod.startMonth && (
+          <> – <strong>{effectivePeriod.endMonth}</strong></>
         )}
         {isProcessing &&
           (pipelineProgress
@@ -1344,8 +1447,8 @@ function SosGeneratorPanel() {
               labelArtists={labelArtists}
               labelInfo={labelInfo}
               appDefaults={appDefaults}
-              periodStart={detectedPeriodStart}
-              periodEnd={detectedPeriodEnd}
+              periodStart={effectivePeriodStart}
+              periodEnd={effectivePeriodEnd}
               onGoToSettlementCenter={() => setActiveSubTab('settlements')}
               disabled={isProcessing || excelBusy}
             />
@@ -1364,12 +1467,12 @@ function SosGeneratorPanel() {
             role="tabpanel"
             aria-labelledby="accounting-subtab-settlements"
           >
-          {hasData ? (
+          {effectivePeriod ? (
             <SettlementCenterPanel
               revenues={revenues}
               labelArtists={labelArtists}
-              periodStart={detectedPeriodStart}
-              periodEnd={detectedPeriodEnd}
+              periodStart={effectivePeriodStart}
+              periodEnd={effectivePeriodEnd}
               territoryMetrics={territoryMetrics}
               merchOrderRows={merchOrderRows}
               bronzeBatchIds={bronzeBatchIds}
@@ -1470,8 +1573,8 @@ function SosGeneratorPanel() {
               <ApifySpotifySyncPanel />
               {hasData ? (
                 <SosAnalyticsPersistPanel
-                  periodStart={detectedPeriodStart}
-                  periodEnd={detectedPeriodEnd}
+                  periodStart={effectivePeriodStart}
+                  periodEnd={effectivePeriodEnd}
                   territoryMetrics={territoryMetrics}
                   merchOrderRows={merchOrderRows}
                   labelArtists={labelArtists}
@@ -1500,8 +1603,8 @@ function SosGeneratorPanel() {
                 </div>
                 <AdminEnterpriseAnalytics
                   revenues={revenues}
-                  periodStart={detectedPeriodStart}
-                  periodEnd={detectedPeriodEnd}
+                  periodStart={effectivePeriodStart}
+                  periodEnd={effectivePeriodEnd}
                 />
               </section>
             )}
@@ -1518,8 +1621,8 @@ function SosGeneratorPanel() {
             <PayoutManager
               labelArtists={labelArtists}
               labelInfo={labelInfo}
-              periodStart={detectedPeriodStart}
-              periodEnd={detectedPeriodEnd}
+              periodStart={effectivePeriodStart}
+              periodEnd={effectivePeriodEnd}
               onLabelSepaUpdate={handleLabelSepaUpdate}
             />
           ) : (
@@ -1539,8 +1642,8 @@ function SosGeneratorPanel() {
           >
           <TrendsDashboard
             revenues={revenues}
-            periodStart={detectedPeriodStart}
-            periodEnd={detectedPeriodEnd}
+            periodStart={effectivePeriodStart}
+            periodEnd={effectivePeriodEnd}
             bronzeBatchIds={bronzeBatchIds}
           />
           </div>

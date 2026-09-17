@@ -81,6 +81,7 @@ export interface Database {
           period_end: string
           config: Record<string, unknown>
           bronze_batch_ids: string[]
+          revision: number
           updated_by: string | null
           created_at: string
           updated_at: string
@@ -91,6 +92,7 @@ export interface Database {
           period_end: string
           config?: Record<string, unknown>
           bronze_batch_ids?: string[]
+          revision?: number
           updated_by?: string | null
           created_at?: string
           updated_at?: string
@@ -101,6 +103,7 @@ export interface Database {
           period_end?: string
           config?: Record<string, unknown>
           bronze_batch_ids?: string[]
+          revision?: number
           updated_by?: string | null
           updated_at?: string
         }
@@ -184,6 +187,90 @@ export interface Database {
           locked_by?: string | null
           archived_at?: string | null
           archived_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sepa_payment_orders: {
+        Row: {
+          id: string
+          period_start: string
+          period_end: string
+          version: number
+          message_id: string
+          control_sum_cents: number
+          entry_count: number
+          entries: Record<string, unknown>[]
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          period_start: string
+          period_end: string
+          version?: number
+          message_id: string
+          control_sum_cents?: number
+          entry_count?: number
+          entries?: Record<string, unknown>[]
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          period_start?: string
+          period_end?: string
+          version?: number
+          message_id?: string
+          control_sum_cents?: number
+          entry_count?: number
+          entries?: Record<string, unknown>[]
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      settlement_operations: {
+        Row: {
+          id: string
+          operation_type: string
+          resource_type: string
+          resource_id: string
+          actor_id: string | null
+          amount_cents: number | null
+          currency: string | null
+          payload_hash: string
+          status: 'accepted' | 'document_pending' | 'ready' | 'failed'
+          result: Record<string, unknown>
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          operation_type: string
+          resource_type: string
+          resource_id: string
+          actor_id?: string | null
+          amount_cents?: number | null
+          currency?: string | null
+          payload_hash: string
+          status?: 'accepted' | 'document_pending' | 'ready' | 'failed'
+          result?: Record<string, unknown>
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          operation_type?: string
+          resource_type?: string
+          resource_id?: string
+          actor_id?: string | null
+          amount_cents?: number | null
+          currency?: string | null
+          payload_hash?: string
+          status?: 'accepted' | 'document_pending' | 'ready' | 'failed'
+          result?: Record<string, unknown>
           created_at?: string
           updated_at?: string
         }
@@ -1216,6 +1303,9 @@ export interface Database {
           payment_method: 'sepa' | 'paypal' | 'manual' | 'other' | null
           payment_reference: string | null
           settlement_period_id: string | null
+          delivery_status: 'not_sent' | 'sent' | 'failed' | null
+          delivery_attempted_at: string | null
+          delivery_error: string | null
           created_at: string
           updated_at: string
         }
@@ -1251,6 +1341,9 @@ export interface Database {
           payment_method?: 'sepa' | 'paypal' | 'manual' | 'other' | null
           payment_reference?: string | null
           settlement_period_id?: string | null
+          delivery_status?: 'not_sent' | 'sent' | 'failed' | null
+          delivery_attempted_at?: string | null
+          delivery_error?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1286,6 +1379,9 @@ export interface Database {
           payment_method?: 'sepa' | 'paypal' | 'manual' | 'other' | null
           payment_reference?: string | null
           settlement_period_id?: string | null
+          delivery_status?: 'not_sent' | 'sent' | 'failed' | null
+          delivery_attempted_at?: string | null
+          delivery_error?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1457,6 +1553,10 @@ export interface Database {
           fx_source: string | null
           settlement_period_id: string | null
           is_archived: boolean
+          rules_fingerprint: string | null
+          fx_snapshot: Record<string, unknown> | null
+          calculation_snapshot: Record<string, unknown> | null
+          revision: number
           created_at: string
         }
         Insert: {
@@ -1496,6 +1596,10 @@ export interface Database {
           fx_source?: string | null
           settlement_period_id?: string | null
           is_archived?: boolean
+          rules_fingerprint?: string | null
+          fx_snapshot?: Record<string, unknown> | null
+          calculation_snapshot?: Record<string, unknown> | null
+          revision?: number
           created_at?: string
         }
         Update: {
@@ -1535,6 +1639,10 @@ export interface Database {
           fx_source?: string | null
           settlement_period_id?: string | null
           is_archived?: boolean
+          rules_fingerprint?: string | null
+          fx_snapshot?: Record<string, unknown> | null
+          calculation_snapshot?: Record<string, unknown> | null
+          revision?: number
           created_at?: string
         }
         Relationships: [
@@ -5119,6 +5227,102 @@ export interface Database {
           used_bytes: number
           asset_count: number
           zero_size_count: number
+        }
+      }
+      record_statement_view: {
+        Args: {
+          p_statement_id: string
+          p_artist_id: string
+        }
+        Returns: {
+          id: string
+          artist_id: string
+          filename: string
+          r2_key: string
+          period: string
+          amount_eur: number | null
+          status:
+            | 'draft'
+            | 'label_approved'
+            | 'artist_notified'
+            | 'viewed'
+            | 'invoiced'
+            | 'paid'
+            | 'superseded'
+            | 'cancelled'
+            | 'acknowledged'
+          label_notes: string | null
+          label_approved_at: string | null
+          period_start: string | null
+          period_end: string | null
+          total_streams: number
+          batch_id: string | null
+          first_viewed_at: string | null
+          last_viewed_at: string | null
+          view_count: number
+          document_type: 'original' | 'correction' | 'storno'
+          correction_of_id: string | null
+          superseded_by_id: string | null
+          version: number
+          reporting_currency: string
+          amount_reporting: number | null
+          fx_rate_to_eur: number | null
+          fx_rate_date: string | null
+          fx_source: string | null
+          settlement_period_id: string | null
+          is_archived: boolean
+          rules_fingerprint: string | null
+          fx_snapshot: Record<string, unknown> | null
+          calculation_snapshot: Record<string, unknown> | null
+          revision: number
+          created_at: string
+        }
+      }
+      record_invoice_payment: {
+        Args: {
+          p_invoice_id: string
+          p_actor_id: string
+          p_amount_cents: number
+          p_method: string
+          p_reference?: string | null
+        }
+        Returns: {
+          id: string
+          artist_id: string
+          invoice_number: string
+          artist_invoice_number: string | null
+          statement_id: string | null
+          client_name: string
+          client_email: string
+          client_address: string | null
+          line_items: { description: string; qty: number; unit_price_cents: number }[]
+          currency: string
+          tax_rate_pct: number
+          status: 'draft' | 'sent' | 'received' | 'partially_paid' | 'paid' | 'cancelled'
+          due_date: string | null
+          issued_date: string
+          notes: string | null
+          pdf_url: string | null
+          pdf_sha256: string | null
+          service_period_start: string | null
+          service_period_end: string | null
+          fx_rate: number | null
+          fx_rate_date: string | null
+          fx_rate_source: string | null
+          received_at: string | null
+          received_by: string | null
+          paid_at: string | null
+          paid_by: string | null
+          paid_amount_cents: number
+          outstanding_amount_cents: number | null
+          payment_method: 'sepa' | 'paypal' | 'manual' | 'other' | null
+          payment_reference: string | null
+          settlement_period_id: string | null
+          delivery_status: 'not_sent' | 'sent' | 'failed' | null
+          delivery_attempted_at: string | null
+          delivery_error: string | null
+          created_at: string
+          updated_at: string
         }
       }
     }

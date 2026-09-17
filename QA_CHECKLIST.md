@@ -122,6 +122,18 @@
 - [ ] Guided Publish / Drafts step (`?guidedStep=settle`) does not crash; failed draft create shows a toast
 - [ ] `/admin/accounting` shows Assistant as recommended; 5-step “what happens next” list
 - [ ] Assistant: empty period → Continue disabled with plain reason; set months → Continue works
+- [ ] Set a manual period different from the detected source range → PDF/Excel, Settlement Center, payout, workspace key and carry-forward all use the manual period
+- [ ] Invalid period (end before start, month 13, start without end) → Export/PDF/Excel/Publish blocked with a plain reason; no `Q1-<current year>` upload appears
+- [ ] Source file without any recognizable sales month → bronze card shows “archiving skipped” instead of archiving under the current month
+- [ ] Darkmerch CSV with `15,79` (DE) → correct euro basis and artist share; Believe/Bandcamp `15.79` unchanged; `12x` or an empty required amount appears as a row error, never as `0`
+- [ ] Bronze upload >100 MB succeeds via direct multipart (64 MB parts, no `/multipart/part` request); with R2 CORS broken the R2 error is shown (no silent proxy fallback); direct disabled + >4 MB shows the clear “direct upload disabled” message
+- [ ] Publish with a missing or mismatched billing period is rejected server-side; stepper direct navigation cannot skip setup/rates/validation blockers; a rejected status change returns 4xx (problem+json), not 500
+- [ ] Two tabs edit the same period workspace: the second save shows the conflict hint and does not overwrite; “Reload from server” restores the server revision. After reload, the Settlement Center opens an existing period from the database without a CSV upload, and archived sources can be loaded from the workspace hint
+- [ ] Publish a statement → the stored row carries `rules_fingerprint`, `fx_snapshot` and `calculation_snapshot` matching the exported payout (spot check one artist); a 0 % split stays 0 and a refund row lowers the payout instead of being clamped
+- [ ] Invoice submit retry (slow response/reload) with the same operation id returns the existing invoice; changing the payload with the same id returns 409; after a recovered partial create the PDF matches the stored row (no retry-payload values)
+- [ ] Two parallel payments (30 + 20 on a 100 EUR gross invoice) both persist (50 paid / 50 open, two ledger events); a retry after a follow-up failure does not add the amount again; archiving twice creates one carry per artist
+- [ ] Open an approved statement as artist → status becomes `viewed` once (counter +1); open the same statement again after the invoice is created → status stays `invoiced` (no downgrade)
+- [ ] Invoice with a failing Resend key → status stays `draft`, `delivery_status='failed'` with the provider error visible; successful send → `sent` + `delivery_status='sent'`; no mail requested → `not_sent`
 - [ ] Upload one CSV → coach checklist updates; Continue enabled only after numbers appear
 - [ ] Block/throttle `/api/exchange-rates` → sticky fallback banner + Refresh; no crash on first process
 - [ ] Validate step: blocking errors prevent Continue; warnings allow continue

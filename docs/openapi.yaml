@@ -88,6 +88,23 @@ components:
           type: string
         code:
           type: string
+    Problem:
+      type: object
+      description: RFC 9457 problem+json body (legacy `error`/`code` kept as extensions).
+      required: [type, title, status, detail, error]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        error:
+          type: string
+        code:
+          type: string
     SuccessResponse:
       type: object
       properties:
@@ -229,6 +246,10 @@ components:
         notes: { type: string }
         send_email: { type: boolean, default: true }
         send_to_label: { type: boolean, default: false }
+        operation_id:
+          type: string
+          format: uuid
+          description: "Stable per submission attempt. Same id + same payload replays the stored invoice; same id + different payload returns 409."
     PresignedUrlResponse:
       type: object
       required: [url]
@@ -3210,42 +3231,11 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-  /api/admin/sos/import-batches/{id}/multipart/part:
-    post:
-      operationId: postadmin_sos_import-batches_ById_multipart_part
-      tags: [Admin]
-      summary: upload one multipart chunk to R2
-      security:
-        - AdminBearer: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessResponse"
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
   /api/admin/sos/import-batches/{id}/multipart/presign-part:
     post:
       operationId: postadmin_sos_import-batches_ById_multipart_presign-part
       tags: [Admin]
-      summary: presigned UploadPart URL (browser → R2)
+      summary: presigned UploadPart URL for direct browser → R2 multipart (non-final parts ≥ 5 MiB; requires bucket CORS)
       security:
         - AdminBearer: []
       parameters:
@@ -3276,7 +3266,7 @@ paths:
     get:
       operationId: getadmin_sos_import-batches_ById_presign-download
       tags: [Admin]
-      summary: presigned GET URL for browser → R2 download
+      summary: presigned GET URL for browser → R2 download (requires bucket CORS)
       security:
         - AdminBearer: []
       parameters:
@@ -3301,7 +3291,7 @@ paths:
     post:
       operationId: postadmin_sos_import-batches_ById_presign-upload
       tags: [Admin]
-      summary: presigned PUT URL for direct browser → R2 upload
+      summary: presigned PUT URL for direct browser → R2 upload (single object ≤ 100 MB; requires bucket CORS)
       security:
         - AdminBearer: []
       parameters:
@@ -3364,7 +3354,7 @@ paths:
     post:
       operationId: postadmin_sos_import-batches_ById_upload
       tags: [Admin]
-      summary: stream bronze CSV to R2 server-side
+      summary: server-proxy single-request upload (≤ 4 MB; no multipart)
       security:
         - AdminBearer: []
       parameters:
@@ -3622,7 +3612,7 @@ paths:
     post:
       operationId: postadmin_sos_workspaces
       tags: [Admin]
-      summary: load workspace for period
+      summary: upsert workspace for period (optimistic concurrency via expected_revision)
       security:
         - AdminBearer: []
       requestBody:
@@ -3632,6 +3622,18 @@ paths:
             schema:
               type: object
               additionalProperties: true
+              properties:
+                period_start: { type: string }
+                period_end: { type: string }
+                config: { type: object }
+                bronze_batch_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+                expected_revision:
+                  type: integer
+                  minimum: 1
+                  nullable: true
+                  description: Revision last read; null inserts a new workspace. Mismatch returns 409.
       responses:
         '200':
           description: Success
@@ -3643,6 +3645,12 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Workspace revision conflict (another session saved a newer revision)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
     delete:
       operationId: deleteadmin_sos_workspaces
       tags: [Admin]
@@ -5575,7 +5583,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/InvoiceSubmitResponse"
         '409':
-          description: Duplicate statement invoice (concurrent create).
+          description: Duplicate statement invoice (concurrent create) or the same operation_id with a different payload.
         '422':
           description: Statement not invoiceable or amount mismatch.
         '400': { $ref: '#/components/responses/BadRequest' }

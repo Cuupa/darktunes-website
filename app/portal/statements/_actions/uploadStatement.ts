@@ -22,6 +22,7 @@ import {
   SettlementPeriodNotWritableError,
 } from '@/lib/api/settlementPeriods'
 import { createSalesStatementLineItems } from '@/lib/api/salesStatementLineItems'
+import { validateStatementUploadPeriod } from '@/lib/sos/statementUploadValidation'
 import {
   buildStatementR2Key,
   deleteStatementPdfFromR2,
@@ -47,6 +48,10 @@ export interface UploadStatementInput {
   totalStreams?: number
   batchId?: string
   lineItems?: UploadStatementLineItemInput[]
+  /** Calculation stand of the released document (#620). */
+  rulesFingerprint?: string
+  fxSnapshot?: Record<string, unknown>
+  calculationSnapshot?: Record<string, unknown>
   /** PDF file contents encoded as a Base64 string. */
   pdfBase64: string
   /** When true, sends the artist notification email immediately. Defaults to false. */
@@ -91,11 +96,13 @@ export async function uploadStatement(
       return { success: false, error: `Artist ${input.artistId} not found` }
     }
 
-    const periodStart = input.periodStart ?? null
-    const periodEnd = input.periodEnd ?? null
-    if (periodStart && periodEnd) {
-      await assertSettlementPeriodWritable(serviceSupabase, periodStart, periodEnd)
+    const periodValidation = validateStatementUploadPeriod(input)
+    if (!periodValidation.ok) {
+      return { success: false, error: periodValidation.message }
     }
+    const { periodStart, periodEnd, period } = periodValidation
+
+    await assertSettlementPeriodWritable(serviceSupabase, periodStart, periodEnd)
 
     // 3. Build the R2 key and upload the PDF
     const r2Key = buildStatementR2Key(input.artistId, input.filename)
@@ -104,21 +111,25 @@ export async function uploadStatement(
     let statementId: string | undefined
     try {
       // 4. Persist the DB record via service-role client (bypasses RLS)
-      const settlementPeriod =
-        periodStart && periodEnd
-          ? await getOrCreateSettlementPeriod(serviceSupabase, periodStart, periodEnd)
-          : null
+      const settlementPeriod = await getOrCreateSettlementPeriod(
+        serviceSupabase,
+        periodStart,
+        periodEnd,
+      )
 
       const statement = await createSalesStatement(serviceSupabase, {
         artistId: input.artistId,
         filename: input.filename,
         r2Key,
-        period: input.period,
+        period,
         amountEur: input.amountEur,
         periodStart,
         periodEnd,
         totalStreams: input.totalStreams ?? 0,
         batchId: input.batchId ?? null,
+        rulesFingerprint: input.rulesFingerprint ?? null,
+        fxSnapshot: input.fxSnapshot ?? null,
+        calculationSnapshot: input.calculationSnapshot ?? null,
       })
       statementId = statement.id
 

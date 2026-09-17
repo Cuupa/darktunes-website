@@ -63,7 +63,7 @@ E2E tests (`tests/e2e/*.spec.ts`, Playwright) are part of the deliverable, not a
 - **Minimal changes:** Smallest diff that fully solves the task
 - **Docs:** Always update documentation/markdown at session end (see above)
 - **E2E:** New feature/route → new E2E test; changed feature → update the E2E assertions to the new behaviour, never weaken/skip to pass (see E2E coverage section)
-- **Bronze CSV (SOS):** Never browser `fetch()` to presigned R2 URLs — use `/api/admin/sos/import-batches/*` routes; limits in `src/lib/sos/bronzeUploadLimits.ts`
+- **Bronze CSV (SOS):** Direct browser → R2 presigned upload/download is the supported route (single PUT ≤ 100 MB, multipart 64 MB parts, non-final parts ≥ 5 MiB; requires R2 bucket CORS — see `DEPLOYMENT.md`). Register/confirm/presign go through `/api/admin/sos/import-batches/*`; the server proxy is single-request only (≤ 4 MB) and must never chunk multipart; limits in `src/lib/sos/bronzeUploadLimits.ts`
 - **No infra ops in admin UI:** Label admin must not show R2 / Vercel / Supabase Cron / Edge Function / `CRON_SECRET` setup. Product health + Force Sync only; scheduler docs in `DEPLOYMENT.md`
 
 ## Scroll — decision tree (read before touching any layout)

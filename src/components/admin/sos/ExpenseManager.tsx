@@ -23,7 +23,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { ExpenseEntry } from '@/lib/sos/types'
 import { DateField } from '@/components/ui/date-field'
 import { MoneyField, isMoneyInputValid } from '@/components/admin/sos/fields/AccountingNumberFields'
-import { isValidIsoDate } from '@/lib/sos/accountingInputValidation'
+import { isValidIsoDate, parseMoneyAmount } from '@/lib/sos/accountingInputValidation'
 import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 
 export interface ExpenseManagerProps {
@@ -168,11 +168,12 @@ function ExpenseForm({
         <Button
           onClick={() => {
             if (!canSave) return
-            const parsed = Number(amount.replace(',', '.'))
+            const parsed = parseMoneyAmount(amount, { allowZero: false })
+            if (!parsed.ok) return
             onSave({
               artist: effectiveArtist.trim(),
               description: description.trim(),
-              amount: Math.round(parsed * 100) / 100,
+              amount: parsed.value,
               date,
             })
           }}
