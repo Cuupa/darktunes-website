@@ -18,13 +18,14 @@ Playwright / E2E is **disabled**: do not add, update, run, or require specs unde
 |----------|----|--------------|--------|
 | `ci.yml` | always | always | Parallel jobs: lint+contracts+tsc · unit · build. Concurrency cancel-in-progress. Next + ESLint caches. |
 | `security.yml` | only lockfile/package changes | same + weekly schedule | Sole npm audit owner |
-| `lighthouse-ci.yml` | path-filtered (`app`/`src`/…) | same | Next cache |
-| `performance-budget.yml` | path-filtered | same | Next cache |
-| `performance-tests.yml` | **not on PR** | path-filtered push + weekly + `workflow_dispatch` | Avoids double Playwright perf on every PR |
+| `lighthouse-ci.yml` | **manual dispatch only** | **manual dispatch only** | Run on request via `workflow_dispatch`; no automatic PR/push runs |
+| `performance-budget.yml` | **manual dispatch only** | **manual dispatch only** | Run on request via `workflow_dispatch`; no automatic PR/push runs |
+| `performance-tests.yml` | **manual dispatch only** | **manual dispatch only** | Run on request via `workflow_dispatch`; no schedule/push runs |
 
 ## Performance
 
 - `npm run perf:test` — `tests/performance/`
+- **Lighthouse / performance CI runs only on explicit request:** `lighthouse-ci.yml`, `performance-budget.yml` and `performance-tests.yml` are `workflow_dispatch`-only — they must not run automatically on PRs, pushes or a schedule.
 - Use `budget(production, ci)` for timing assertions (CI needs higher thresholds)
 - LCP: `waitForLoadState('networkidle')` before reading PerformanceObserver
 - Bundle budget: `scripts/check-bundle-budget.js` — route keys from `app-build-manifest.json` (hash chunk names, not dependency names)

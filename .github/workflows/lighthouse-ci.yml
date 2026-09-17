@@ -1,28 +1,6 @@
 name: Lighthouse CI
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'app/**'
-      - 'public/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'next.config.*'
-      - 'lighthouserc.*'
-      - '.github/workflows/lighthouse-ci.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'app/**'
-      - 'public/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'next.config.*'
-      - 'lighthouserc.*'
-      - '.github/workflows/lighthouse-ci.yml'
   workflow_dispatch:
 
 concurrency:

@@ -11,6 +11,7 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 ## [Unreleased]
 
 ### Changed
+- **Lighthouse/Performance-CI nur auf Anforderung:** `lighthouse-ci.yml`, `performance-budget.yml` und `performance-tests.yml` starten nicht mehr automatisch (PR/Push/Zeitplan), sondern nur per `workflow_dispatch`.
 - **E2E/Playwright is disabled:** the `qa.yml` and `e2e-comment.yml` workflows are removed; no PR, CI gate, or release may require E2E. Coverage comes from Vitest unit/route tests (`npm run test`) and `npm run ci`; user-flow evidence goes into `QA_CHECKLIST.md` (see `AGENTS.md`).
 
 ### Added

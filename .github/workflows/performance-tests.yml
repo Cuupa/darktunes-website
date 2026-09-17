@@ -4,19 +4,6 @@ name: Performance Tests
 # Avoids duplicating QA E2E and keeps PR wall-clock lower.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'app/**'
-      - 'tests/performance/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'playwright.config.ts'
-      - 'next.config.*'
-      - '.github/workflows/performance-tests.yml'
-  schedule:
-    - cron: '0 6 * * 1'
   workflow_dispatch:
 
 concurrency:

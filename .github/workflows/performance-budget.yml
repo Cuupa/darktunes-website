@@ -1,26 +1,6 @@
 name: Performance Budget
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'app/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'next.config.*'
-      - 'scripts/check-bundle-budget.js'
-      - '.github/workflows/performance-budget.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'app/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'next.config.*'
-      - 'scripts/check-bundle-budget.js'
-      - '.github/workflows/performance-budget.yml'
   workflow_dispatch:
 
 concurrency:

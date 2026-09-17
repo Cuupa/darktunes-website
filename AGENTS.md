@@ -28,6 +28,8 @@ Or by phase when debugging a failure:
 2. `npm run ci:typecheck` — `tsc --noEmit`
 3. `npm run ci:tests` — unit tests + production build
 
+Lighthouse/Performance workflows (`lighthouse-ci.yml`, `performance-budget.yml`, `performance-tests.yml`) run **only on explicit `workflow_dispatch`** — never automatically on PRs, pushes or a schedule.
+
 No PR with failing checks. No `as any`, `@ts-ignore`, or `eslint-disable` to silence errors.
 
 ## Mandatory docs update (end of every agent session)
