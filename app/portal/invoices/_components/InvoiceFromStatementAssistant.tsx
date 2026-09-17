@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -73,6 +73,9 @@ export function InvoiceFromStatementAssistant({
   const [dueDate, setDueDate] = useState(dueDateFromNow(DEFAULT_INVOICE_DUE_DAYS))
   const [sendEmail, setSendEmail] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  // Stable per submission attempt — reused on retry so a lost response cannot
+  // create a second invoice (#621).
+  const operationIdRef = useRef<string | null>(null)
 
   const amountEur = statement.amountEur ?? 0
   const amountCents = Math.round(amountEur * 100)
@@ -142,6 +145,8 @@ export function InvoiceFromStatementAssistant({
       } = await supabase.auth.getSession()
       if (!session) throw new Error(t('profile_error'))
 
+      operationIdRef.current = operationIdRef.current ?? crypto.randomUUID()
+
       const response = await fetch('/api/portal/invoices', {
         method: 'POST',
         headers: {
@@ -166,6 +171,7 @@ export function InvoiceFromStatementAssistant({
           tax_rate_pct: taxRate,
           due_date: dueDate,
           send_email: sendEmail,
+          operation_id: operationIdRef.current,
         }),
       })
       const json = (await response.json().catch(() => null)) as {
@@ -178,6 +184,7 @@ export function InvoiceFromStatementAssistant({
       if (!response.ok || !json?.invoice) {
         throw new Error(json?.error ?? json?.message ?? t('invoice_error'))
       }
+      operationIdRef.current = null
       onSuccess(json.invoice, invoiceSubmitMeta(json))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('invoice_error'))

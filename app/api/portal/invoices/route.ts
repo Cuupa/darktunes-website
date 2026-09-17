@@ -7,11 +7,21 @@ import {
   createArtistInvoice,
   createSosLinkedInvoice,
   DuplicateStatementInvoiceError,
+  getAdminInvoiceById,
   getArtistInvoiceByStatementId,
   listArtistInvoices,
   updateInvoice,
   type ArtistInvoice,
 } from '@/lib/api/artistInvoices'
+import {
+  completeSettlementOperation,
+  getSettlementOperationById,
+  insertSettlementOperation,
+} from '@/lib/api/settlementOperations'
+import {
+  decideInvoiceOperationReplay,
+  hashInvoicePayload,
+} from '@/lib/portal/invoiceOperation'
 import { appendLedgerEntry, hasLedgerEntry } from '@/lib/api/settlementLedger'
 import {
   assertSettlementPeriodWritableById,
@@ -57,6 +67,7 @@ const createInvoiceSchema = z.object({
   notes: z.string().max(4000).optional(),
   send_email: z.boolean().default(true),
   send_to_label: z.boolean().default(false),
+  operation_id: z.string().uuid().optional(),
 })
 
 function getLineItemSubtotal(lineItems: Array<{ qty: number; unit_price_cents: number }>): number {
@@ -138,6 +149,77 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   if (input.statement_id && !statement) {
     throw new ApiError(404, 'Statement not found')
+  }
+
+  // Durable operation identity (#621): the client sends one operation id per
+  // submission attempt and reuses it on retries. A matching payload with a
+  // stored invoice replays that invoice; a different payload is a conflict.
+  const operationId = input.operation_id ?? null
+  if (operationId) {
+    const payloadHash = hashInvoicePayload({
+      artist_id: input.artist_id,
+      artist_invoice_number: input.artist_invoice_number,
+      client_name: input.client_name,
+      client_email: input.client_email,
+      client_address: input.client_address,
+      statement_id: input.statement_id,
+      line_items: input.line_items,
+      currency: input.currency,
+      tax_rate_pct: input.tax_rate_pct,
+      due_date: input.due_date,
+      issued_date: input.issued_date,
+      notes: input.notes,
+      send_email: input.send_email,
+      send_to_label: input.send_to_label,
+    })
+
+    const existingOperation = await write('settlement_operations', 'select', (db) =>
+      getSettlementOperationById(db, operationId),
+    )
+    const storedInvoiceId =
+      existingOperation && typeof existingOperation.result.invoice_id === 'string'
+        ? existingOperation.result.invoice_id
+        : undefined
+    const replay = decideInvoiceOperationReplay(
+      existingOperation
+        ? { payloadHash: existingOperation.payloadHash, invoiceId: storedInvoiceId }
+        : null,
+      payloadHash,
+    )
+
+    if (replay === 'conflict') {
+      throw new ApiError(409, 'Operation already used with a different payload')
+    }
+
+    if (replay === 'replay' && storedInvoiceId) {
+      const replayInvoice = await write('artist_invoices', 'select', (db) =>
+        getAdminInvoiceById(db, storedInvoiceId),
+      )
+      if (replayInvoice) {
+        return NextResponse.json(
+          {
+            invoice: toPortalInvoiceListItem(replayInvoice),
+            pdf_available: Boolean(replayInvoice.pdfUrl),
+            email: {},
+            warnings: ['already_exists'],
+          },
+          { status: 200 },
+        )
+      }
+    }
+
+    if (!existingOperation) {
+      await write('settlement_operations', 'insert', (db) =>
+        insertSettlementOperation(db, {
+          id: operationId,
+          operationType: 'invoice_create',
+          resourceType: 'artist',
+          resourceId: artist.id,
+          payloadHash,
+          currency,
+        }),
+      )
+    }
   }
 
   const warnings: string[] = []
@@ -304,10 +386,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     )
     settlementPeriodId = period.id
     await write('sales_statements', 'update', async (db) => {
-      await db
+      const { error } = await db
         .from('sales_statements')
         .update({ settlement_period_id: period.id })
         .eq('id', statement.id)
+      if (error) throw new Error(error.message)
     })
   }
 
@@ -346,10 +429,31 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }
   }
 
+  // A recovered invoice keeps its persisted stand: the PDF must never mix the
+  // stored document with values from the retry request (#621).
+  const pdfLineItems = recoveredInvoice?.lineItems ?? input.line_items
+  const pdfIssuedDate = recoveredInvoice?.issuedDate ?? issuedDate
+  const pdfDueDate = recoveredInvoice?.dueDate ?? input.due_date
+  const pdfNotes = recoveredInvoice?.notes ?? input.notes
+  const pdfCurrency = recoveredInvoice?.currency ?? currency
+  const pdfTaxRatePct = recoveredInvoice?.taxRatePct ?? effectiveTaxRate
+  const pdfArtistInvoiceNumber =
+    recoveredInvoice?.artistInvoiceNumber ?? artistInvoiceNumber
+  const pdfFxNote =
+    recoveredInvoice?.fxRate != null
+      ? formatEcbRateNote({
+          base: 'EUR',
+          currency: pdfCurrency,
+          rate: recoveredInvoice.fxRate,
+          date: recoveredInvoice.fxRateDate ?? pdfIssuedDate,
+          source: recoveredInvoice.fxRateSource === 'fallback' ? 'fallback' : 'ecb',
+        })
+      : fxNote
+
   const pdfBytes = await generateInvoicePdf({
-    invoiceNumber: artistInvoiceNumber,
-    issuedDate,
-    dueDate: input.due_date,
+    invoiceNumber: pdfArtistInvoiceNumber,
+    issuedDate: pdfIssuedDate,
+    dueDate: pdfDueDate,
     artist: {
       name: billingProfile.legalName,
       street: billingProfile.street,
@@ -364,17 +468,17 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     labelDisplayName: labelClient.name,
     sosReference: statement ? statement.period : undefined,
     sosPeriod: statement?.period,
-    lineItems: input.line_items.map((lineItem) => ({
+    lineItems: pdfLineItems.map((lineItem) => ({
       description: lineItem.description,
       qty: lineItem.qty,
       unitPriceCents: lineItem.unit_price_cents,
     })),
-    currency,
-    taxRatePct: effectiveTaxRate,
+    currency: pdfCurrency,
+    taxRatePct: pdfTaxRatePct,
     taxStatus,
     isSmallBusiness: taxStatus === 'small_business',
-    notes: input.notes,
-    fxNote,
+    notes: pdfNotes,
+    fxNote: pdfFxNote,
   })
 
   const pdfSha256 = createHash('sha256').update(pdfBytes).digest('hex')
@@ -413,6 +517,17 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }),
   )
 
+  if (operationId) {
+    try {
+      await write('settlement_operations', 'update', (db) =>
+        completeSettlementOperation(db, operationId, { invoice_id: updatedInvoice.id }),
+      )
+    } catch (err) {
+      console.error('[portal invoices] operation completion failed:', err)
+      warnings.push('operation_record_failed')
+    }
+  }
+
   if (
     statement &&
     ['label_approved', 'artist_notified', 'viewed'].includes(statement.status)
@@ -430,7 +545,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   if (statement && settlementPeriodId) {
     // Net liability zeros statement_payout; cash still owed is tracked via unpaid invoice gross.
-    const invoiceTotalEur = getLineItemSubtotal(input.line_items) / 100
+    // Recovered invoices book the persisted line items, never the retry payload.
+    const invoiceTotalEur = getLineItemSubtotal(pdfLineItems) / 100
     const alreadyBooked = await write('settlement_ledger', 'select', (db) =>
       hasLedgerEntry(db, 'artist_invoice', invoice.id, 'invoice_liability'),
     )
@@ -445,7 +561,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
             currency,
             referenceType: 'artist_invoice',
             referenceId: invoice.id,
-            description: `Invoice liability ${artistInvoiceNumber}`,
+            description: `Invoice liability ${pdfArtistInvoiceNumber}`,
           }),
         )
       } catch (err) {
@@ -459,11 +575,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     await emitNotification(serviceDb, {
       type: 'invoice_submitted',
       entityId: invoice.id,
-      entityName: `Invoice ${artistInvoiceNumber} — ${artist.name}`,
+      entityName: `Invoice ${pdfArtistInvoiceNumber} — ${artist.name}`,
       artistId: artist.id,
       payload: {
-        invoice_number: artistInvoiceNumber,
-        amount_cents: getLineItemSubtotal(input.line_items),
+        invoice_number: pdfArtistInvoiceNumber,
+        amount_cents: getLineItemSubtotal(pdfLineItems),
         currency,
         statement_id: statement?.id ?? null,
         client_email: clientEmail,

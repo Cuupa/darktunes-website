@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Info, Plus, Trash } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -75,6 +75,9 @@ export function InvoiceForm({
         : 19,
   )
   const [notes, setNotes] = useState('')
+  // Stable per submission attempt — reused on retry so a lost response cannot
+  // create a second invoice (#621).
+  const operationIdRef = useRef<string | null>(null)
   const [sendEmail, setSendEmail] = useState(true)
   const [sendToLabel, setSendToLabel] = useState(true)
   const [lineItems, setLineItems] = useState<LineItem[]>(buildStatementLineItem(statement))
@@ -124,6 +127,8 @@ export function InvoiceForm({
 
       if (!session) throw new Error(t('profile_error'))
 
+      operationIdRef.current = operationIdRef.current ?? crypto.randomUUID()
+
       const response = await fetch('/api/portal/invoices', {
         method: 'POST',
         headers: {
@@ -144,6 +149,7 @@ export function InvoiceForm({
           notes,
           send_email: sendEmail,
           send_to_label: sendToLabel,
+          operation_id: operationIdRef.current,
         }),
       })
 
@@ -160,6 +166,7 @@ export function InvoiceForm({
         throw new Error(json?.error ?? t('invoice_error'))
       }
 
+      operationIdRef.current = null
       onSuccess(json.invoice, invoiceSubmitMeta(json))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t('invoice_error'))

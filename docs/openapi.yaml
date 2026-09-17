@@ -246,6 +246,10 @@ components:
         notes: { type: string }
         send_email: { type: boolean, default: true }
         send_to_label: { type: boolean, default: false }
+        operation_id:
+          type: string
+          format: uuid
+          description: "Stable per submission attempt. Same id + same payload replays the stored invoice; same id + different payload returns 409."
     PresignedUrlResponse:
       type: object
       required: [url]
@@ -5579,7 +5583,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/InvoiceSubmitResponse"
         '409':
-          description: Duplicate statement invoice (concurrent create).
+          description: Duplicate statement invoice (concurrent create) or the same operation_id with a different payload.
         '422':
           description: Statement not invoiceable or amount mismatch.
         '400': { $ref: '#/components/responses/BadRequest' }

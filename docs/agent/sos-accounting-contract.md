@@ -122,12 +122,16 @@ MUSS-Regeln:
 2. Mailfehler rollt weder Rechnung noch PDF zurück. Sie setzt `delivery_status='failed'`
    und ist gezielt wiederholbar.
 3. Das PDF MUSS ausschließlich aus dem persistierten Rechnungsstand erzeugt werden
-   (Zeilensummen, Empfänger, Nummer, Steuersatz, Fälligkeit aus der DB-Zeile). Der
-   heutige Recovery-Pfad (`portal/invoices/route.ts:328-378`) verwendet `input` aus dem
-   neuen Request — #621 MUSS auf die gespeicherte Zeile umstellen.
-4. `received` ist ein Eingangsnachweis. Eine Zahlung darf `received_at`/`received_by`
+   (Zeilensummen, Empfänger, Nummer, Steuersatz, Fälligkeit, FX-Hinweis aus der
+   DB-Zeile). Der Recovery-Pfad nutzt denselben Stand; Werte aus dem
+   Wiederholungs-Request dürfen das Dokument nicht verändern.
+4. Jede Einreichung führt einen clientseitigen `operation_id` (einmal je Versuch
+   erzeugt, bei Retry wiederverwendet) in `settlement_operations`: gleiche ID +
+   gleicher Payload = Replay der bestehenden Rechnung; gleiche ID + anderer
+   Payload = 409; nach Teilfehler wird der Vorgang fortgesetzt statt dupliziert.
+5. `received` ist ein Eingangsnachweis. Eine Zahlung darf `received_at`/`received_by`
    einmalig nachtragen (IST, dokumentiert), aber `received` nie zurücknehmen.
-5. Artist-PATCH auf `paid` ohne Ledger, `paid_at` und Statement-Folge ist unzulässig.
+6. Artist-PATCH auf `paid` ohne Ledger, `paid_at` und Statement-Folge ist unzulässig.
    `app/api/portal/invoices/[id]/route.ts:33-44` MUSS auf reine Lese-/Downloadpfade
    reduziert oder mit den vollständigen Zahlungsregeln aus §E ausgestattet werden (#629).
 
