@@ -123,6 +123,10 @@
 ## Accounting wizard (DAU path)
 - [ ] `/admin/accounting/data-audit`: period/category filters, loading skeletons, empty state, retry on read error, truncated banner on huge data, “Mehr laden” pagination, details expander; findings show stable ids, severity, repairability and evidence
 - [ ] Data audit never writes: re-run it twice and compare row counts/values in `sales_statements`, `artist_invoices`, `artist_settlement_ledger`, `period_carry_forwards`, `distributor_import_batches`
+- [ ] Data audit → **Trockenlauf** shows only `unique` steps with expected/new values; **Anwenden** asks for confirmation, reports per-step status and offers the restore JSON download
+- [ ] Apply the same plan twice with the same `operation_id` → the second run replays the stored result (no second audit event, no double booking)
+- [ ] Change a precondition between dry run and apply (edit the row) → the run stops with `Voraussetzung geändert`, writes nothing further and keeps prior successful steps visible
+- [ ] Repair plan on a locked/archived period → 409 `SETTLEMENT_PERIOD_LOCKED`; only `is_archived` alignment of statements in archived periods is allowed
 - [ ] `/admin/accounting` Statement History tab and `/admin/statements` render without `Something went wrong`
 - [ ] Guided Publish / Drafts step (`?guidedStep=settle`) does not crash; failed draft create shows a toast
 - [ ] `/admin/accounting` shows Assistant as recommended; 5-step “what happens next” list

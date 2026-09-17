@@ -262,6 +262,7 @@ function auditPeriodLink(
           entityId: statement.id,
           summary: 'Statement has no settlement period link',
           evidence: {
+            settlement_period_id: statement.settlementPeriodId,
             period_start: statement.periodStart,
             period_end: statement.periodEnd,
             status: statement.status,
@@ -324,6 +325,26 @@ function auditPeriodLink(
         }),
       )
     }
+
+    if (period.status === 'archived' && !statement.isArchived) {
+      findings.push(
+        finding({
+          category: 'period_link',
+          severity: 'warning',
+          entityType: 'sales_statement',
+          entityId: statement.id,
+          summary: 'Statement is not marked archived although its settlement period is archived',
+          evidence: {
+            is_archived: statement.isArchived,
+            period_status: period.status,
+            settlement_period_id: period.id,
+          },
+          expectedState: { is_archived: true },
+          suggestedAction: 'Mark the statement archived to match its archived settlement period',
+          repairability: 'unique',
+        }),
+      )
+    }
   }
 
   for (const invoice of input.invoices) {
@@ -341,6 +362,7 @@ function auditPeriodLink(
           entityId: invoice.id,
           summary: 'Invoice has no settlement period link',
           evidence: {
+            settlement_period_id: invoice.settlementPeriodId,
             service_period_start: invoice.servicePeriodStart,
             service_period_end: invoice.servicePeriodEnd,
             status: invoice.status,

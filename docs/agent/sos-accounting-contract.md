@@ -502,12 +502,14 @@ Owner issues: #628, #630. Mirror into #628/#630.
    einer getrennten Testumgebung erproben; Restore-Nachweis (Referenzen, Summen,
    Dokument-Hashes) im PR.
 
-Umsetzungsstand (#630): Read-only-Auditor und Panel sind umgesetzt
-(`settlementAuditCore.ts`, `GET /api/admin/sos/settlement-audits`,
-`/admin/accounting/data-audit`); Dry-run-Reparaturplan und Anwendung folgen in #630.
-Live-R2-Prüfungen (Hash/Größe, PDF ohne Datensatz) benötigen R2-Zugriff und werden als
-ausstehender Betriebsnachweis geführt; die Detektoren nehmen die Prüfergebnisse injiziert
-entgegen.
+Umsetzungsstand (#630): Read-only-Auditor, Dry-run-Reparaturplan und idempotente Anwendung
+sind umgesetzt (`settlementAuditCore.ts`, `settlementRepair.ts`,
+`GET /api/admin/sos/settlement-audits`, `POST /api/admin/sos/settlement-repairs`,
+`/admin/accounting/data-audit`); jeder Schritt wird auditiert, ein Restore-Artefakt wird
+im `settlement_operations`-Journal gespeichert. Ausstehender Betriebsnachweis: Live-R2-
+Prüfungen (Hash/Größe, PDF ohne Datensatz — Detektoren nehmen Ergebnisse injiziert
+entgegen) sowie die Restore-Übung in einer getrennten Testumgebung mit Produktionsdaten
+(Runbook in `ADMIN.md`).
 
 ---
 

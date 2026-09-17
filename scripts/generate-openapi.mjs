@@ -658,6 +658,29 @@ const schemaOverrides = {
   '/api/admin/sos/import-batches/{id}/upload': {
     POST: { summary: 'server-proxy single-request upload (≤ 4 MB; no multipart)' },
   },
+  '/api/admin/sos/settlement-repairs': {
+    POST: {
+      summary:
+        'Build a dry-run repair plan for uniquely repairable audit findings, or apply it idempotently',
+      responses: {
+        200: { description: 'Dry-run plan with precondition results (no writes).' },
+        201: { description: 'Applied repair run; Location points at the stored run.' },
+        409: {
+          description:
+            'Steps would modify a locked/archived settlement period (SETTLEMENT_PERIOD_LOCKED) or the operation_id was used with a different plan.',
+        },
+      },
+    },
+  },
+  '/api/admin/sos/settlement-repairs/{operation_id}': {
+    GET: {
+      summary: 'Read a stored repair run including its restore artifact',
+      responses: {
+        200: { description: 'Stored repair run from the settlement_operations journal.' },
+        404: { description: 'Repair run not found.' },
+      },
+    },
+  },
   '/api/admin/sos/settlement-audits': {
     GET: {
       summary: 'Read-only audit of existing SOS settlement data (never writes)',

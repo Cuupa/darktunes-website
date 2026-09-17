@@ -3631,6 +3631,51 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/sos/settlement-repairs:
+    post:
+      operationId: postadmin_sos_settlement-repairs
+      tags: [Admin]
+      summary: "Build a dry-run repair plan for uniquely repairable audit findings, or apply it idempotently"
+      security:
+        - AdminBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Dry-run plan with precondition results (no writes).
+        '201':
+          description: Applied repair run; Location points at the stored run.
+        '409':
+          description: Steps would modify a locked/archived settlement period (SETTLEMENT_PERIOD_LOCKED) or the operation_id was used with a different plan.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/sos/settlement-repairs/{operation_id}:
+    get:
+      operationId: getadmin_sos_settlement-repairs_ById
+      tags: [Admin]
+      summary: Read a stored repair run including its restore artifact
+      security:
+        - AdminBearer: []
+      parameters:
+        - name: operation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Stored repair run from the settlement_operations journal.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/admin/sos/workspaces:
     get:
       operationId: getadmin_sos_workspaces

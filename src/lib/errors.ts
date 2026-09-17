@@ -180,6 +180,81 @@ function persistRouteError(
 type RouteHandler = (req: NextRequest) => Promise<NextResponse>
 
 /**
+ * Maps a thrown route error to the shared problem+json response. Exposed so
+ * dynamic route handlers (which need the Next.js context argument) can reuse
+ * the exact same mapping without wrapping through `withErrorHandler`.
+ */
+export function handleRouteError(req: NextRequest, err: unknown): NextResponse {
+  const routePath = (() => {
+    try { return new URL(req.url).pathname } catch { return req.url }
+  })()
+
+  if (err instanceof SettlementPeriodNotWritableError) {
+    return buildErrorResponse(err.message, 409)
+  }
+
+  if (err instanceof InvalidStatementTransitionError) {
+    return buildErrorResponse(err.message, 422, 'VALIDATION_ERROR')
+  }
+
+  if (err instanceof BusinessRuleError) {
+    return buildErrorResponse(err.message, err.status, err.code)
+  }
+
+  if (err instanceof ApiError) {
+    const logLevel = resolveApiErrorLogLevel(err)
+    if (logLevel) {
+      persistRouteError(req, err.message, {
+        path: routePath,
+        method: req.method,
+        code: err.code ?? null,
+        status: err.status,
+      }, logLevel)
+    }
+    return buildErrorResponse(err.message, err.status, err.code)
+  }
+
+  if (err instanceof ZodError) {
+    const message = err.issues.map((e) => e.message).join('; ')
+    persistRouteError(req, `Validation error: ${message}`, {
+      path: routePath,
+      method: req.method,
+      issues: err.issues,
+    }, 'warn')
+    return buildErrorResponse(message, 400, 'VALIDATION_ERROR')
+  }
+
+  if (isPostgresError(err)) {
+    const message = getPostgresErrorMessage(err)
+    console.error('[withErrorHandler] Database error:', {
+      code: err.code,
+      message,
+      details: err.details ?? null,
+      path: routePath,
+    })
+    persistRouteError(req, message, {
+      path: routePath,
+      method: req.method,
+      code: err.code ?? null,
+      details: err.details ?? null,
+      hint: err.hint ?? null,
+    }, 'error')
+    return buildErrorResponse(ERROR_MESSAGES.SERVER_ERROR, 500, 'SERVER_ERROR')
+  }
+
+  // Unknown error — log server-side and persist to app_logs
+  console.error('[withErrorHandler] Unhandled route error:', err)
+  const errMessage = err instanceof Error ? err.message : String(err)
+  persistRouteError(req, errMessage, {
+    path: routePath,
+    method: req.method,
+    stack: err instanceof Error ? (err.stack ?? null) : null,
+  }, 'error')
+  // Never expose internal error details — always return a safe generic message
+  return buildErrorResponse(ERROR_MESSAGES.SERVER_ERROR, 500, 'SERVER_ERROR')
+}
+
+/**
  * Wraps a Next.js Route Handler with centralised error handling.
  *
  * Handles:
@@ -187,79 +262,15 @@ type RouteHandler = (req: NextRequest) => Promise<NextResponse>
  *   - `ZodError`   → returns 400 with a human-readable validation message
  *   - Unknown errors → returns 500 Internal Server Error (sanitised message)
  *                      and persists the error to the `app_logs` DB table
+ *
+ * Dynamic routes that need Next.js' context argument use `handleRouteError`.
  */
 export function withErrorHandler(handler: RouteHandler): RouteHandler {
   return async (req) => {
     try {
       return await handler(req)
     } catch (err) {
-      const routePath = (() => {
-        try { return new URL(req.url).pathname } catch { return req.url }
-      })()
-
-      if (err instanceof SettlementPeriodNotWritableError) {
-        return buildErrorResponse(err.message, 409)
-      }
-
-      if (err instanceof InvalidStatementTransitionError) {
-        return buildErrorResponse(err.message, 422, 'VALIDATION_ERROR')
-      }
-
-      if (err instanceof BusinessRuleError) {
-        return buildErrorResponse(err.message, err.status, err.code)
-      }
-
-      if (err instanceof ApiError) {
-        const logLevel = resolveApiErrorLogLevel(err)
-        if (logLevel) {
-          persistRouteError(req, err.message, {
-            path: routePath,
-            method: req.method,
-            code: err.code ?? null,
-            status: err.status,
-          }, logLevel)
-        }
-        return buildErrorResponse(err.message, err.status, err.code)
-      }
-
-      if (err instanceof ZodError) {
-        const message = err.issues.map((e) => e.message).join('; ')
-        persistRouteError(req, `Validation error: ${message}`, {
-          path: routePath,
-          method: req.method,
-          issues: err.issues,
-        }, 'warn')
-        return buildErrorResponse(message, 400, 'VALIDATION_ERROR')
-      }
-
-      if (isPostgresError(err)) {
-        const message = getPostgresErrorMessage(err)
-        console.error('[withErrorHandler] Database error:', {
-          code: err.code,
-          message,
-          details: err.details ?? null,
-          path: routePath,
-        })
-        persistRouteError(req, message, {
-          path: routePath,
-          method: req.method,
-          code: err.code ?? null,
-          details: err.details ?? null,
-          hint: err.hint ?? null,
-        }, 'error')
-        return buildErrorResponse(ERROR_MESSAGES.SERVER_ERROR, 500, 'SERVER_ERROR')
-      }
-
-      // Unknown error — log server-side and persist to app_logs
-      console.error('[withErrorHandler] Unhandled route error:', err)
-      const errMessage = err instanceof Error ? err.message : String(err)
-      persistRouteError(req, errMessage, {
-        path: routePath,
-        method: req.method,
-        stack: err instanceof Error ? (err.stack ?? null) : null,
-      }, 'error')
-      // Never expose internal error details — always return a safe generic message
-      return buildErrorResponse(ERROR_MESSAGES.SERVER_ERROR, 500, 'SERVER_ERROR')
+      return handleRouteError(req, err)
     }
   }
 }

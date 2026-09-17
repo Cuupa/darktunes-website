@@ -224,6 +224,21 @@ The **Invoice Inbox** lists every `artist_invoices` row — including free invoi
 
 Invoice mails to the label resolve the SOS accounting **finance email** (Accounting → Default preset) before the Impressum/contact address. Delivery failures and follow-up problems (statement status, ledger, notification) are surfaced as warnings to the artist — the invoice is still created so bookkeeping can act, and it shows up in the inbox.
 
+## Settlement Data Audit & Repair (Admin-only — `/admin/accounting/data-audit`)
+
+The **Data audit** view (link in the Accounting tab bar) scans existing settlement data read-only across the ten contract categories (period links, artist mismatches, missing/orphan invoice PDFs, unconfirmed import batches, artifact hash/size, duplicate bookings, carry-forwards, balances, view/mail evidence). Filters: settlement period and category. Findings carry evidence, a suggested action and a repairability class (`unique` / `ambiguous` / `manual`).
+
+Repair workflow:
+
+1. **Start dry run** — builds a plan from `unique` findings only; it reads preconditions and writes nothing (`GET`-equivalent behavior, `POST /api/admin/sos/settlement-repairs` with `dry_run: true`).
+2. **Review the plan** — each step shows the expected prior state and the new value. Ambiguous/manual cases are never guessed and stay in the audit list.
+3. **Apply** — confirmation dialog; the server re-checks every precondition and stops at the first change (no partial blind writes), audits each step in `financial_audit_events` and journals the run durably in `settlement_operations` (same `operation_id` + same plan replays without double booking). A **restore artifact** (full before-rows for updates, inserted ids for new ledger rows) is captured and downloadable as JSON.
+4. **Verify** — re-run the audit; a conflict status means a precondition changed, so re-run the dry run instead of forcing the old plan.
+
+Locked or archived settlement periods stay immutable: repair steps targeting them are refused with 409 `SETTLEMENT_PERIOD_LOCKED`. Only aligning `sales_statements.is_archived` with an already archived period is allowed.
+
+**Restore drill (operator runbook):** before applying a plan in production, restore the downloaded restore artifact in a separate test environment (Supabase branch/local) and verify references, sums and document hashes. Production audit and the restore drill require production/R2 access and are tracked as open acceptance in issue #630 until executed there.
+
 ## Monitoring Sync (label admin)
 
 Label admins do **not** configure hosting, R2, Vercel, Supabase Cron, Edge Functions, or secrets from the dashboard. That stays in operator docs (`DEPLOYMENT.md`).
