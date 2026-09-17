@@ -131,6 +131,7 @@
 - [ ] Two tabs edit the same period workspace: the second save shows the conflict hint and does not overwrite; “Reload from server” restores the server revision. After reload, the Settlement Center opens an existing period from the database without a CSV upload, and archived sources can be loaded from the workspace hint
 - [ ] Publish a statement → the stored row carries `rules_fingerprint`, `fx_snapshot` and `calculation_snapshot` matching the exported payout (spot check one artist); a 0 % split stays 0 and a refund row lowers the payout instead of being clamped
 - [ ] Invoice submit retry (slow response/reload) with the same operation id returns the existing invoice; changing the payload with the same id returns 409; after a recovered partial create the PDF matches the stored row (no retry-payload values)
+- [ ] Two parallel payments (30 + 20 on a 100 EUR gross invoice) both persist (50 paid / 50 open, two ledger events); a retry after a follow-up failure does not add the amount again; archiving twice creates one carry per artist
 - [ ] Upload one CSV → coach checklist updates; Continue enabled only after numbers appear
 - [ ] Block/throttle `/api/exchange-rates` → sticky fallback banner + Refresh; no crash on first process
 - [ ] Validate step: blocking errors prevent Continue; warnings allow continue

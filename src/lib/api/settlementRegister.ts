@@ -242,11 +242,30 @@ export async function archivePeriodWithCarryForward(
   const nextPeriod = await getOrCreateSettlementPeriod(db, nextPeriodStart, nextPeriodEnd)
 
   for (const row of balances) {
-    await db
-      .from('period_carry_forwards')
-      .update({ to_period_id: nextPeriod.id })
-      .eq('from_period_id', periodId)
+    // Idempotent retry: an existing carry_in ledger row for this artist means
+    // the carry was already applied. Repair the metadata instead of posting a
+    // second opening balance.
+    const { data: existingEntry, error: entryError } = await db
+      .from('artist_settlement_ledger')
+      .select('id')
+      .eq('reference_type', 'settlement_period')
+      .eq('reference_id', periodId)
+      .eq('entry_type', 'carry_in')
       .eq('artist_id', row.artistId)
+      .limit(1)
+    if (entryError) throw new Error(entryError.message)
+
+    const appliedAt = new Date().toISOString()
+
+    if ((existingEntry?.length ?? 0) > 0) {
+      const { error: repairError } = await db
+        .from('period_carry_forwards')
+        .update({ to_period_id: nextPeriod.id, applied_at: appliedAt })
+        .eq('from_period_id', periodId)
+        .eq('artist_id', row.artistId)
+      if (repairError) throw new Error(repairError.message)
+      continue
+    }
 
     await appendLedgerEntry(db, {
       artistId: row.artistId,
@@ -258,6 +277,13 @@ export async function archivePeriodWithCarryForward(
       description: 'Opening balance from previous period',
       createdBy: actorId,
     })
+
+    const { error: linkError } = await db
+      .from('period_carry_forwards')
+      .update({ to_period_id: nextPeriod.id, applied_at: appliedAt })
+      .eq('from_period_id', periodId)
+      .eq('artist_id', row.artistId)
+    if (linkError) throw new Error(linkError.message)
   }
 
   await archiveSettlementPeriod(db, periodId, actorId)

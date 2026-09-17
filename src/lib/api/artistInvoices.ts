@@ -1,6 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { invoiceGrossCents } from '@/lib/api/settlementLedger'
 import { BusinessRuleError } from '@/lib/errors'
 
 type DbClient = SupabaseClient<Database>
@@ -430,41 +429,31 @@ export async function recordInvoicePayment(
   id: string,
   input: RecordInvoicePaymentInput,
 ): Promise<ArtistInvoice> {
-  const existing = await getAdminInvoiceById(db, id)
-  if (!existing) throw new BusinessRuleError('Invoice not found', 404, 'NOT_FOUND')
-  if (!['received', 'partially_paid', 'sent'].includes(existing.status)) {
-    throw new BusinessRuleError(`Cannot record payment from status "${existing.status}"`)
+  // Atomic RPC (#628): the row is locked, status and the gross cap are checked
+  // and paid/outstanding/status are updated in one statement, so concurrent
+  // payments cannot lose an update.
+  const { data, error } = await db.rpc('record_invoice_payment', {
+    p_invoice_id: id,
+    p_actor_id: input.actorId,
+    p_amount_cents: input.amountCents,
+    p_method: input.paymentMethod,
+    p_reference: input.paymentReference?.trim() || null,
+  })
+
+  if (error) {
+    const message = error.message ?? 'Payment failed'
+    if (message.includes('invoice_not_found')) {
+      throw new BusinessRuleError('Invoice not found', 404, 'NOT_FOUND')
+    }
+    if (message.includes('payment_exceeds_total')) {
+      throw new BusinessRuleError('Payment exceeds invoice total', 422, 'VALIDATION_ERROR')
+    }
+    if (message.includes('invalid_status')) {
+      const status = message.split('invalid_status:')[1]?.trim() ?? 'unknown'
+      throw new BusinessRuleError(`Cannot record payment from status "${status}"`)
+    }
+    throw new Error(message)
   }
 
-  // Cap against gross total (net + VAT) so payments match PDF totals.
-  const totalCents = invoiceGrossCents(existing.lineItems, existing.taxRatePct)
-  const newPaid = existing.paidAmountCents + input.amountCents
-  if (newPaid > totalCents) {
-    throw new BusinessRuleError('Payment exceeds invoice total', 422, 'VALIDATION_ERROR')
-  }
-
-  const outstanding = totalCents - newPaid
-  const now = new Date().toISOString()
-  const nextStatus = outstanding === 0 ? 'paid' : 'partially_paid'
-
-  const { data, error } = await db
-    .from('artist_invoices')
-    .update({
-      status: nextStatus,
-      paid_amount_cents: newPaid,
-      outstanding_amount_cents: outstanding,
-      paid_at: outstanding === 0 ? now : existing.paidAt ?? null,
-      paid_by: input.actorId,
-      payment_method: input.paymentMethod,
-      payment_reference: input.paymentReference?.trim() || null,
-      received_at: existing.receivedAt ?? now,
-      received_by: existing.receivedBy ?? input.actorId,
-      updated_at: now,
-    })
-    .eq('id', id)
-    .select('*')
-    .single()
-
-  if (error) throw new Error(error.message)
   return rowToArtistInvoice(data as InvoiceRow)
 }

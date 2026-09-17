@@ -448,16 +448,17 @@ Owner issues: #628, #630. Mirror into #628/#630.
    `invoiceGrossCents`).
 2. Teilzahlungen sind erlaubt; Überzahlung wird abgewiesen (422/409 mit konkretem Grund).
 3. `paid` nur bei `paid_amount_cents >= gross`; dann `paid_at`/`paid_by` setzen.
-4. Zahlungen sind read-modify-write-frei: Sperre/RPC auf Rechnungszeile und
-   Periodenstand; zwei parallele Zahlungen 30 + 20 auf 100 ergeben 50 bezahlt / 50 offen
-   und zwei Ereignisse (#628).
-5. Jede Finanzoperation erhält eine dauerhafte `operation_id` mit `actor_id`,
-   `invoice_id`, `amount_cents`, `currency`, `method`, `reference`, `payload_hash` und
-   Ergebnis. Gleiche ID + gleicher Payload = Replay; gleiche ID + anderes Ziel/Betrag =
-   Konflikt. Der Schutz darf nicht an einer 24h-TTL hängen (#628).
-6. Ein fehlgeschlagener Folgeschritt (Ledger, Statement, Audit) darf den
-   Idempotenzschlüssel nicht freigeben, bevor die Rechnung unverändert ist; Retry darf die
-   Zahlung nicht erneut addieren (heute: `payment/route.ts:138-141` — #628).
+4. Zahlungen sind read-modify-write-frei: die RPC `record_invoice_payment`
+   sperrt die Rechnungszeile (`FOR UPDATE`), prüft Status und Bruttogrenze und
+   schreibt Bezahlt/Offen/Status in einer Anweisung; zwei parallele Zahlungen
+   30 + 20 auf 100 ergeben 50 bezahlt / 50 offen und zwei Ereignisse.
+5. Jede Finanzoperation erhält eine dauerhafte `operation_id` in
+   `settlement_operations` (Client-Key, kein 24h-TTL). Gleiche ID + gleicher
+   Payload = Replay; gleiche ID + anderes Ziel/Betrag = 409.
+6. Ein fehlgeschlagener Folgeschritt (Ledger, Statement, Audit, Notification)
+   wird als Warnung geführt und darf die Zahlung weder zurückrollen noch den
+   Idempotenzschlüssel freigeben; der Vorgang wird mit der Rechnungs-ID
+   abgeschlossen, ein Retry addiert die Zahlung nicht erneut.
 7. Ledger: `payment`/`partial_payment` nur, wenn keine `invoice_liability` besteht (IST);
    bei verknüpften Rechnungen wird die Verbindlichkeit netto gebucht, Zahlungen werden
    gegen brutto geprüft. Die Differenzbehandlung (VAT) MUSS in #628 dokumentiert und

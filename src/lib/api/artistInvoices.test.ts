@@ -278,83 +278,66 @@ describe('createSosLinkedInvoice', () => {
   })
 })
 
-function makePaymentDb(existing: InvoiceRow, updated: InvoiceRow) {
-  let singleCalls = 0
-  const update = vi.fn().mockReturnThis()
-  const builder = {
-    select: vi.fn().mockReturnThis(),
-    update,
-    eq: vi.fn().mockReturnThis(),
-    single: vi.fn().mockImplementation(async () => {
-      singleCalls += 1
-      return singleCalls === 1
-        ? { data: existing, error: null }
-        : { data: updated, error: null }
-    }),
-  }
-  return {
-    db: { from: vi.fn().mockReturnValue(builder) } as unknown as DbClient,
-    update,
-  }
-}
-
 describe('recordInvoicePayment', () => {
-  it('sets received_at when paying a sent invoice that was never marked received', async () => {
-    const existing: InvoiceRow = {
-      ...mockInvoiceRow,
-      status: 'sent',
-      received_at: null,
-      received_by: null,
-      outstanding_amount_cents: 146913,
-    }
+  function makeRpcDb(result: { data: unknown; error: unknown }) {
+    const rpc = vi.fn().mockResolvedValue(result)
+    const db = { rpc } as unknown as DbClient
+    return { db, rpc }
+  }
+
+  it('calls the atomic payment RPC with the payment arguments', async () => {
     const updated: InvoiceRow = {
-      ...existing,
+      ...mockInvoiceRow,
       status: 'paid',
       paid_amount_cents: 146913,
       outstanding_amount_cents: 0,
-      received_at: '2024-04-02T00:00:00Z',
-      received_by: 'actor-1',
-      paid_at: '2024-04-02T00:00:00Z',
-      paid_by: 'actor-1',
     }
-    const { db, update } = makePaymentDb(existing, updated)
+    const { db, rpc } = makeRpcDb({ data: updated, error: null })
 
     const result = await recordInvoicePayment(db, 'inv-uuid-1', {
       amountCents: 146913,
       paymentMethod: 'sepa',
+      paymentReference: 'SEPA-1',
       actorId: 'actor-1',
     })
 
     expect(result.status).toBe('paid')
-    const patch = update.mock.calls[0]?.[0] as { received_at?: string; received_by?: string }
-    expect(patch.received_at).toEqual(expect.any(String))
-    expect(patch.received_by).toBe('actor-1')
+    expect(rpc).toHaveBeenCalledWith('record_invoice_payment', {
+      p_invoice_id: 'inv-uuid-1',
+      p_actor_id: 'actor-1',
+      p_amount_cents: 146913,
+      p_method: 'sepa',
+      p_reference: 'SEPA-1',
+    })
   })
 
-  it('keeps an existing received_at when recording payment', async () => {
-    const existing: InvoiceRow = {
-      ...mockInvoiceRow,
-      status: 'received',
-      received_at: '2024-04-01T12:00:00Z',
-      received_by: 'receiver-1',
-      outstanding_amount_cents: 146913,
-    }
-    const updated: InvoiceRow = {
-      ...existing,
-      status: 'paid',
-      paid_amount_cents: 146913,
-      outstanding_amount_cents: 0,
-    }
-    const { db, update } = makePaymentDb(existing, updated)
-
-    await recordInvoicePayment(db, 'inv-uuid-1', {
-      amountCents: 146913,
-      paymentMethod: 'sepa',
-      actorId: 'payer-1',
+  it('maps an overpayment RPC error to a 422 validation error', async () => {
+    const { db } = makeRpcDb({
+      data: null,
+      error: { message: 'payment_exceeds_total:146913' },
     })
 
-    const patch = update.mock.calls[0]?.[0] as { received_at?: string; received_by?: string }
-    expect(patch.received_at).toBe('2024-04-01T12:00:00Z')
-    expect(patch.received_by).toBe('receiver-1')
+    await expect(
+      recordInvoicePayment(db, 'inv-uuid-1', {
+        amountCents: 200000,
+        paymentMethod: 'manual',
+        actorId: 'actor-1',
+      }),
+    ).rejects.toMatchObject({ status: 422, code: 'VALIDATION_ERROR' })
+  })
+
+  it('maps an invalid-status RPC error to a 409 business rule error', async () => {
+    const { db } = makeRpcDb({
+      data: null,
+      error: { message: 'invalid_status:paid' },
+    })
+
+    await expect(
+      recordInvoicePayment(db, 'inv-uuid-1', {
+        amountCents: 100,
+        paymentMethod: 'manual',
+        actorId: 'actor-1',
+      }),
+    ).rejects.toMatchObject({ status: 409, message: 'Cannot record payment from status "paid"' })
   })
 })

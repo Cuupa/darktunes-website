@@ -5979,6 +5979,75 @@ CREATE TRIGGER trg_artist_invoices_updated_at
   BEFORE UPDATE ON public.artist_invoices
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+-- ---------------------------------------------------------------------------
+-- FUNCTION: record_invoice_payment — atomic payment recording (#628).
+-- Locks the invoice row, validates status and the gross cap, and updates
+-- paid/outstanding/status in one statement so two concurrent payments cannot
+-- lose an update. Follow-ups (ledger, statement, audit) stay in the route.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.record_invoice_payment(
+  p_invoice_id UUID,
+  p_actor_id UUID,
+  p_amount_cents BIGINT,
+  p_method TEXT,
+  p_reference TEXT DEFAULT NULL
+) RETURNS public.artist_invoices
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_invoice public.artist_invoices;
+  v_net BIGINT;
+  v_gross BIGINT;
+  v_new_paid BIGINT;
+BEGIN
+  SELECT * INTO v_invoice
+  FROM public.artist_invoices
+  WHERE id = p_invoice_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'invoice_not_found' USING ERRCODE = 'P0002';
+  END IF;
+
+  IF v_invoice.status NOT IN ('received', 'partially_paid', 'sent') THEN
+    RAISE EXCEPTION 'invalid_status:%', v_invoice.status USING ERRCODE = 'P0001';
+  END IF;
+
+  SELECT COALESCE(SUM(
+    (item ->> 'qty')::BIGINT * (item ->> 'unit_price_cents')::BIGINT
+  ), 0) INTO v_net
+  FROM jsonb_array_elements(v_invoice.line_items) AS item;
+
+  v_gross := v_net + CASE
+    WHEN v_invoice.tax_rate_pct > 0 THEN ROUND(v_net * (v_invoice.tax_rate_pct / 100.0))
+    ELSE 0
+  END;
+
+  v_new_paid := v_invoice.paid_amount_cents + p_amount_cents;
+  IF v_new_paid > v_gross THEN
+    RAISE EXCEPTION 'payment_exceeds_total:%', v_gross USING ERRCODE = 'P0001';
+  END IF;
+
+  UPDATE public.artist_invoices
+  SET paid_amount_cents = v_new_paid,
+      outstanding_amount_cents = v_gross - v_new_paid,
+      status = CASE WHEN v_new_paid >= v_gross THEN 'paid' ELSE 'partially_paid' END,
+      paid_at = CASE WHEN v_new_paid >= v_gross THEN NOW() ELSE paid_at END,
+      paid_by = CASE WHEN v_new_paid >= v_gross THEN p_actor_id ELSE paid_by END,
+      received_at = COALESCE(received_at, NOW()),
+      received_by = COALESCE(received_by, p_actor_id),
+      payment_method = p_method,
+      payment_reference = p_reference,
+      updated_at = NOW()
+  WHERE id = p_invoice_id
+  RETURNING * INTO v_invoice;
+
+  RETURN v_invoice;
+END;
+$$;
+
 ALTER TABLE public.artist_invoices ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "artist_invoices: artist read own"   ON public.artist_invoices;

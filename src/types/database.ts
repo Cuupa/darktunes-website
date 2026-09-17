@@ -5229,6 +5229,53 @@ export interface Database {
           zero_size_count: number
         }
       }
+      record_invoice_payment: {
+        Args: {
+          p_invoice_id: string
+          p_actor_id: string
+          p_amount_cents: number
+          p_method: string
+          p_reference?: string | null
+        }
+        Returns: {
+          id: string
+          artist_id: string
+          invoice_number: string
+          artist_invoice_number: string | null
+          statement_id: string | null
+          client_name: string
+          client_email: string
+          client_address: string | null
+          line_items: { description: string; qty: number; unit_price_cents: number }[]
+          currency: string
+          tax_rate_pct: number
+          status: 'draft' | 'sent' | 'received' | 'partially_paid' | 'paid' | 'cancelled'
+          due_date: string | null
+          issued_date: string
+          notes: string | null
+          pdf_url: string | null
+          pdf_sha256: string | null
+          service_period_start: string | null
+          service_period_end: string | null
+          fx_rate: number | null
+          fx_rate_date: string | null
+          fx_rate_source: string | null
+          received_at: string | null
+          received_by: string | null
+          paid_at: string | null
+          paid_by: string | null
+          paid_amount_cents: number
+          outstanding_amount_cents: number | null
+          payment_method: 'sepa' | 'paypal' | 'manual' | 'other' | null
+          payment_reference: string | null
+          settlement_period_id: string | null
+          delivery_status: 'not_sent' | 'sent' | 'failed' | null
+          delivery_attempted_at: string | null
+          delivery_error: string | null
+          created_at: string
+          updated_at: string
+        }
+      }
     }
     Enums: {
       sync_status: 'success' | 'partial' | 'error'
