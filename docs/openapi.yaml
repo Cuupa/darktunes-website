@@ -110,6 +110,19 @@ components:
       properties:
         success:
           type: boolean
+    SyncAcceptedResponse:
+      type: object
+      required: [accepted, alreadyRunning]
+      properties:
+        accepted:
+          type: boolean
+          description: The worker accepted the kick (it may still have found no due jobs).
+        alreadyRunning:
+          type: boolean
+          description: True when another worker already holds the single-flight lease.
+        processed:
+          type: integer
+          description: Present (0) when alreadyRunning is true.
     ContactRequest:
       type: object
       required: [name, email, topic, message, gdprConsent]
@@ -7379,17 +7392,21 @@ paths:
     get:
       operationId: getsync
       tags: [Sync]
-      summary: Retrieve /api/sync
+      summary: Run the sync worker (claims and processes queued jobs)
+      description: >-
+        Cron-authenticated worker tick. Atomically claims due `sync_queue` jobs
+        (`FOR UPDATE SKIP LOCKED`), processes a bounded batch, writes a `sync_runs`
+        ledger row and a `cron_ticks` worker tick, then returns. Returns
+        `alreadyRunning: true` when another worker holds the lease.
       security:
         - CronSecret: []
       responses:
         '200':
-          description: Success
+          description: Worker accepted (drain runs in the background)
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: true
+                $ref: '#/components/schemas/SyncAcceptedResponse'
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -7397,11 +7414,16 @@ paths:
     post:
       operationId: postsync
       tags: [Sync]
-      summary: Create or submit /api/sync
+      summary: Run the sync worker (claims and processes queued jobs)
+      description: >-
+        Cron-authenticated worker tick. Atomically claims due `sync_queue` jobs
+        (`FOR UPDATE SKIP LOCKED`), processes a bounded batch, writes a `sync_runs`
+        ledger row and a `cron_ticks` worker tick, then returns. Returns
+        `alreadyRunning: true` when another worker holds the lease.
       security:
         - CronSecret: []
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -7409,11 +7431,11 @@ paths:
               additionalProperties: true
       responses:
         '200':
-          description: Success
+          description: Worker accepted (drain runs in the background)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessResponse"
+                $ref: '#/components/schemas/SyncAcceptedResponse'
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }

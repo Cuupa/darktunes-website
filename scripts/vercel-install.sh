@@ -91,7 +91,7 @@ optional_env "CONTACT_EMAIL" "Email recipient for POST /api/contact form submiss
 echo ""
 
 echo "  — Cron / infra (optional) —"
-optional_env "CRON_SECRET"        "Shared secret for cron & admin sync endpoints (/api/sync, /api/sync/queue, /api/sync/requeue, /api/sync-youtube, /api/sync-api, /api/health/alert) + trigger-sync Edge Function"
+optional_env "CRON_SECRET"        "Shared secret for scheduled sync endpoints (/api/sync, /api/sync/queue, /api/sync/requeue, /api/sync-youtube, /api/sync-api, /api/health/alert); mirrored into Supabase Vault as cron_secret for pg_cron"
 echo "  (YouTube, Spotify, Resend, etc. → Admin → API Keys, not env vars)"
 optional_env "SUPABASE_REPLICA_URL"      "Supabase read-replica connection URL (Pro plan — for analytics queries)"
 optional_env "SUPABASE_REPLICA_ANON_KEY" "Anon key for the read replica"

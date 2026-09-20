@@ -183,7 +183,7 @@ Set these in your Vercel project settings (Dashboard → Project → Settings �
 ### API Credentials Encryption (required)
 - `API_CREDENTIALS_ENCRYPTION_KEY`: 64-character hex string (32 bytes). Generate with `openssl rand -hex 32`. Encrypts external integration keys before they are stored in Supabase `api_credentials`. **Never** store this key in Supabase or commit it to git.
 
-External integration API keys (Spotify, Discogs, Resend, YouTube, MailerLite, etc.) are **not** Vercel env vars anymore. Configure them in **Admin → API Keys** (`/admin/api-keys`). Values are encrypted with AES-256-GCM and persisted in `api_credentials` (admin-only RLS). iTunes and Odesli sync work without keys.
+External integration API keys (Spotify, Discogs, Resend, YouTube, MailerLite, Odesli, etc.) are **not** Vercel env vars anymore. Configure them in **Admin → API Keys** (`/admin/api-keys`). Values are encrypted with AES-256-GCM and persisted in `api_credentials` (admin-only RLS). iTunes sync works without keys.
 
 **Migrating from env vars:** After deploying, log in as admin → API Keys → **Import from environment variables** (one-time). Then remove the legacy `SPOTIFY_*`, `DISCOGS_*`, `RESEND_*`, etc. from Vercel.
 
@@ -191,7 +191,7 @@ External integration API keys (Spotify, Discogs, Resend, YouTube, MailerLite, et
 - `CONTACT_EMAIL`: The email address that receives contact form submissions from `POST /api/contact`. Defaults to `info@darktunes.com` if not set. Use a monitored inbox.
 
 ### Cron & infra secrets (optional — remain in Vercel env)
-- `CRON_SECRET`: Shared secret for cron and external trigger calls. Accepted by `/api/sync`, `/api/sync/queue`, `/api/sync-youtube`, and `/api/sync-api`. Also required by the `trigger-sync` Supabase Edge Function (see below).
+- `CRON_SECRET`: Shared secret for scheduled calls. Accepted by `/api/sync`, `/api/sync/queue`, `/api/sync/requeue`, `/api/sync-youtube`, `/api/sync-api`, and `/api/health/alert`. The deploy pipeline mirrors it into Supabase Vault as `cron_secret` so `pg_cron` can authenticate (see [Sync Scheduler](#sync-scheduler-supabase-pg_cron--nextjs-worker)).
 - `NEXT_PUBLIC_SITE_URL`: Public site URL without trailing slash (e.g. `https://darktunes.com`).
 - `LABEL_NOTIFICATION_EMAIL`: Label inbox for portal submission and health-alert emails. Leave blank to disable.
 - `HEALTH_ALERT_WEBHOOK_URL`: Configure in Admin → API Keys (encrypted in DB), not env.
@@ -285,69 +285,63 @@ Set these in **Supabase Dashboard → Project → Edge Functions → Secrets**:
 Without these secrets, the `newsletter-confirm` Edge Function will fail silently
 and DOI confirmation emails will never be delivered.
 
-### `trigger-sync` Edge Function (API Sync Trigger)
+### Auto-apply schema on deploy
 
-The `trigger-sync` Edge Function lets all data sync operations be triggered from
-Supabase (scheduled Supabase Cron, Database Webhooks, or manual HTTP calls)
-**independently of Vercel Cron Jobs**.
+`supabase/reset.sql` (schema **and** the `pg_cron` scheduler jobs) is applied to
+production automatically by [`.github/workflows/deploy-supabase.yml`](../.github/workflows/deploy-supabase.yml)
+after the CI workflow succeeds on `main` (or via manual `workflow_dispatch`).
+
+Required GitHub Actions secrets:
+
+| Secret | Purpose |
+|--------|---------|
+| `SUPABASE_DB_URL` | Postgres connection string (direct connection or **session** pooler — not the transaction pooler) |
+| `CRON_SECRET` | Mirrored into Vault as `cron_secret` |
+| `NEXT_PUBLIC_SITE_URL` | Mirrored into Vault as `site_url` |
+
+The workflow runs `npm run check:destructive-sql` first — `reset.sql` must stay
+additive (idempotent `ADD COLUMN IF NOT EXISTS`, guarded `DROP … IF EXISTS`); new
+destructive statements fail the guard until explicitly reviewed.
+
+Local dry run (requires `psql`):
 
 ```bash
-# Deploy the trigger-sync Edge Function
-supabase functions deploy trigger-sync --project-ref <your-project-ref>
+SUPABASE_DB_URL='postgres://…' CRON_SECRET='…' NEXT_PUBLIC_SITE_URL='https://darktunes.com' npm run db:apply
 ```
 
-Set these in **Supabase Dashboard → Project → Edge Functions → Secrets**:
-- `SITE_URL` — your production Next.js URL (e.g. `https://darktunes.com`)
-- `CRON_SECRET` — same value as your Vercel `CRON_SECRET` env var
+### Sync Scheduler (Supabase pg_cron → Next.js worker)
 
-#### Supported sync types
+Sync is scheduled **inside the database** with `pg_cron` + `pg_net`, defined in
+`supabase/reset.sql` — the schedule is version-controlled (no dashboard setup, no
+Vercel Cron). Each job calls a `SECURITY DEFINER` function that reads the site URL
+and cron secret from **Supabase Vault** and POSTs to the Next.js worker. Secrets
+never appear in the cron job command.
 
-| `type` value  | Next.js route called   | What it does                          |
-|---------------|------------------------|---------------------------------------|
-| `all`         | `POST /api/sync`       | Enqueue full sync for all artists     |
-| `youtube`     | `POST /api/sync-youtube` | Sync YouTube channel videos         |
-| `itunes`      | `POST /api/sync-api`   | Sync iTunes releases for all artists  |
-| `spotify`     | `POST /api/sync-api`   | Sync Spotify releases                 |
-| `discogs`     | `POST /api/sync-api`   | Sync Discogs releases                 |
-| `songkick`    | `POST /api/sync-api`   | Enqueue Songkick concert jobs + kick `/api/sync` |
-| `bandsintown` | `POST /api/sync-api`   | Enqueue Bandsintown concert jobs + kick `/api/sync` |
-| `odesli`      | `POST /api/sync-api`   | Enqueue Odesli smart-link job + kick `/api/sync` |
+The deploy pipeline applies `reset.sql` and upserts the Vault secrets
+(`site_url`, `cron_secret`) from GitHub secrets — see
+[Auto-apply schema on deploy](#auto-apply-schema-on-deploy).
 
-#### Usage examples
+Registered jobs (end of `reset.sql`):
 
-**Manual HTTP call:**
-```bash
-curl -X POST \
-  'https://<project>.supabase.co/functions/v1/trigger-sync?type=bandsintown' \
-  -H 'Authorization: ****** <SUPABASE_ANON_KEY>'
-```
+| Job name | Schedule | Action |
+|----------|----------|--------|
+| `scheduler-heartbeat` | `* * * * *` | Inserts a `cron_ticks` row (proves pg_cron itself is alive) |
+| `sync-worker` | `* * * * *` | `POST /api/sync` — drains a bounded batch of `sync_queue` jobs |
+| `sync-enqueue-daily` | `0 3 * * *` | `POST /api/sync/queue` — enqueue a full sync for every artist |
+| `sync-youtube-daily` | `0 6 * * *` | `POST /api/sync-youtube` |
+| `sync-telemetry-cleanup` | `15 4 * * *` | Prunes `cron_ticks` (14d) and `sync_runs` (30d) |
 
-**Supabase Cron (Dashboard → Database → Cron Jobs):**
-```
-Path:     /trigger-sync?type=all
-Schedule: 0 3 * * *   # daily at 03:00 UTC
-```
+Required Vault secrets (upserted by CI, never committed):
 
-**Supabase Database Webhook (triggers after specific DB events):**
-```
-URL:     https://<project>.supabase.co/functions/v1/trigger-sync
-Method:  POST
-Headers: Authorization: ****** <SUPABASE_ANON_KEY>
-Body:    { "type": "bandsintown" }
-```
+- `site_url` — public Next.js URL (e.g. `https://darktunes.com`)
+- `cron_secret` — must match the Vercel `CRON_SECRET` env var
 
-> **Bandsintown sync note:** The `bandsintown` sync type iterates through every
-> artist that has `bandsintown_id` **and** a usable API key. That column holds the
-> **artist name as registered on Bandsintown** (UI label: Bandsintown Artist Name),
-> not a numeric artist id. Per-artist keys live in
-> `artist_private_data.bandsintown_api_key` (the public `artists` column is
-> nulled after dual-write). A global `bandsintown_api_key` in Admin → API Keys is
-> optional fallback. Artists without a name or any key are skipped.
->
-> **Queue kick:** `type=spotify`, `odesli`, `songkick`, and `bandsintown` enqueue
-> `sync_queue` jobs and `/api/sync-api` immediately kicks `/api/sync`. YouTube
-> stays a separate channel route (`/api/sync-youtube`). `process-queue` every
-> 5 minutes remains the safety net if a kick or self-chain is missed.
+Re-running `reset.sql` is idempotent and re-arms/updates every job by name.
+
+> **Odesli note:** The Odesli / song.link `v1-alpha.1` public API was sunset on
+> 2026-07-31 (it now returns `401 PUBLIC_API_ACCESS_DEPRECATED`). Add an
+> `odesli_api_key` in Admin → API Keys to authenticate; without a key the Odesli
+> queue job completes as a no-op instead of failing.
 
 ---
 
@@ -362,15 +356,24 @@ Body:    { "type": "bandsintown" }
 
 ## ✅ Supabase Cron Validation (sync scheduling)
 
-Sync is scheduled via **Supabase Cron** calling the `trigger-sync` Edge Function (not Vercel Cron). After deployment, configure in Supabase Dashboard → **Integrations → Cron** (or Database → Cron Jobs):
+Scheduling is **not** configured in the Supabase dashboard — it lives in
+`supabase/reset.sql` and is applied by the deploy pipeline. To verify:
 
-| Schedule | `trigger-sync` type | Action |
-|----------|---------------------|--------|
-| `0 3 * * *` | `all` | Enqueue full artist sync |
-| `*/5 * * * *` | `process-queue` | Process `sync_queue` jobs |
-| `0 6 * * *` | `youtube` | YouTube channel sync |
+```sql
+-- List the sync jobs
+SELECT jobid, jobname, schedule, active FROM cron.job ORDER BY jobname;
 
-Optional daily: `requeue-failed` → `POST /api/sync/requeue`.
+-- Recent runs (look for failures)
+SELECT jobid, status, return_message, start_time
+FROM cron.job_run_details ORDER BY start_time DESC LIMIT 20;
+
+-- Dead-man's switch: scheduler (pg_cron) vs worker (HTTP hop)
+SELECT kind, MAX(created_at) AS last_tick FROM cron_ticks GROUP BY kind;
+```
+
+If `scheduler` ticks are fresh but `worker` ticks are stale, the HTTP hop is
+broken (Vault `site_url`/`cron_secret` or the deployed site). If both are stale,
+`pg_cron` itself is not running.
 
 Before applying `releases_spotify_id_key` / `releases_discogs_id_key` UNIQUE constraints from `reset.sql`, dedupe existing rows:
 

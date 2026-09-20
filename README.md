@@ -16,8 +16,8 @@ Built with **Next.js 15 (App Router)**, React, Supabase, Cloudflare R2, and Tail
 - **CRT scanline aesthetic** – immersive dark atmosphere with animated overlays
 - **Smooth scrolling** – powered by Lenis
 - **Admin panel** – full CMS at `/admin` (sidebar navigation with dedicated pages for artists, releases, news, videos, assets, events, messages, accreditations, promo log, release submissions, video submissions, **artist feedback inbox**, **accounting** with guided SOS workflow + Abrechnungszentrale, **invoice inbox** (`/admin/invoices`, includes free invoices; tokenized/presigned PDF access), **label analytics hub** at `/admin/analytics`, system/health/logs, color theme, features, settings, users)
-- **Artist Auto-Sync** – "Sync Now" per artist triggers multi-API release import (iTunes, Spotify, Discogs, Odesli), R2 cover art caching, and Supabase upsert via async sync queue (`sync_queue` table, processed every 5 min by Vercel cron)
-- **YouTube Sync** – `POST /api/sync-youtube` upserts latest channel videos and links them to visible artists by title match; Vercel cron can trigger daily sync
+- **Artist Auto-Sync** – "Sync Now" per artist triggers multi-API release import (iTunes, Spotify, Discogs, Odesli), R2 cover art caching, and Supabase upsert via an async sync queue (`sync_queue` table, drained by a pg_cron-driven worker every minute)
+- **YouTube Sync** – `POST /api/sync-youtube` upserts latest channel videos and links them to visible artists by title match; pg_cron triggers a daily sync
 - **Image proxy** – all images served via wsrv.nl (WebP conversion, on-the-fly resize)
 - **Rate limiter** – exponential backoff for all external API calls (`src/lib/rateLimiter.ts`)
 - **Authentication** – Supabase Auth with role-based access, protected by Next.js Edge Middleware for `/admin/*` and `/portal/*`
@@ -168,7 +168,7 @@ External integration keys (Spotify, Discogs, Resend, YouTube, MailerLite, etc.) 
 
 | Variable | Description |
 |---|---|
-| `CRON_SECRET` | Optional secret for Vercel cron / `trigger-sync` (Bearer token) |
+| `CRON_SECRET` | Optional secret for scheduled sync calls; mirrored into Supabase Vault as `cron_secret` (Bearer token) |
 | `CONTACT_EMAIL` | Contact form recipient (defaults to `info@darktunes.com`) |
 | `LABEL_NOTIFICATION_EMAIL` | Label inbox for portal submissions and health alerts |
 
@@ -309,11 +309,11 @@ app/                          # Next.js App Router entry points
 └── api/
     ├── upload/route.ts                    # Admin asset upload (R2 + SHA-256 dedupe)
     ├── sync-artist/route.ts               # Single-artist full multi-API sync (admin JWT)
-    ├── sync/route.ts                      # Enqueue async sync jobs for all artists (daily cron)
+    ├── sync/route.ts                      # Claim + process sync_queue jobs (pg_cron worker)
     ├── sync/queue/route.ts                # Enqueue per-artist sync_queue jobs (bulk/admin)
-    ├── sync/execute/route.ts              # Claim + process sync_queue jobs (Vercel cron)
+    ├── sync/execute/route.ts              # Alias of /api/sync
     ├── sync-api/route.ts                  # Per-API sync trigger (iTunes, Spotify, Discogs, etc.)
-    ├── sync-youtube/route.ts              # YouTube channel video sync (Vercel cron)
+    ├── sync-youtube/route.ts              # YouTube channel video sync (pg_cron daily)
     ├── revalidate/route.ts                # ISR cache busting (Supabase webhook)
     ├── revalidate-content/route.ts        # Targeted entity revalidation
     ├── revalidate-site-settings/route.ts  # Site-settings ISR revalidation
