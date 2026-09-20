@@ -10,12 +10,16 @@ import {
   countStuckSyncJobs,
   conflictingArtistJobTypes,
   getSyncQueueStats,
-  tryAcquireSyncExecutorLease,
-  releaseSyncExecutorLease,
+  acquireSyncWorkerLease,
+  renewSyncWorkerLease,
+  releaseSyncWorkerLease,
+  claimSyncJobs,
+  recordCronTick,
+  startSyncRun,
+  finishSyncRun,
   cancelSyncJob,
   retrySyncJob,
   listSyncJobs,
-  SYNC_EXECUTOR_LEASE_KEY,
   MAX_ATTEMPTS,
 } from './syncQueue'
 
@@ -55,45 +59,122 @@ function makeSequentialMockDb(calls: Array<{ data: unknown; error?: unknown }>):
   } as unknown as DbClient
 }
 
-describe('tryAcquireSyncExecutorLease', () => {
-  it('acquires when no lease row exists', async () => {
-    const db = makeSequentialMockDb([{ data: null }, { data: null }])
-    const token = await tryAcquireSyncExecutorLease(db, 60_000)
-    expect(token).toEqual(expect.any(String))
-    expect(token!.length).toBeGreaterThan(4)
-    expect(db.from).toHaveBeenCalledWith('site_settings')
+function makeRpcMockDb(data: unknown = null, error: unknown = null): DbClient {
+  return { rpc: vi.fn().mockResolvedValue({ data, error }) } as unknown as DbClient
+}
+
+describe('acquireSyncWorkerLease', () => {
+  it('returns true when the RPC grants the lease', async () => {
+    const db = makeRpcMockDb(true)
+    await expect(acquireSyncWorkerLease(db, 'token-a', 60_000)).resolves.toBe(true)
+    expect(db.rpc).toHaveBeenCalledWith('acquire_sync_worker_lease', {
+      p_token: 'token-a',
+      p_ttl_ms: 60_000,
+    })
   })
 
-  it('returns null when lease is still valid', async () => {
-    const future = new Date(Date.now() + 60_000).toISOString()
-    const db = makeSequentialMockDb([{ data: { value: `${future}|other-token` } }])
-    await expect(tryAcquireSyncExecutorLease(db, 60_000)).resolves.toBeNull()
+  it('returns false when another worker holds the lease', async () => {
+    const db = makeRpcMockDb(false)
+    await expect(acquireSyncWorkerLease(db, 'token-b')).resolves.toBe(false)
   })
 
-  it('acquires when lease is expired via optimistic update', async () => {
-    const past = new Date(Date.now() - 60_000).toISOString()
-    const db = makeSequentialMockDb([
-      { data: { value: `${past}|old` } },
-      { data: [{ key: SYNC_EXECUTOR_LEASE_KEY }] },
-    ])
-    const token = await tryAcquireSyncExecutorLease(db, 60_000)
-    expect(token).toEqual(expect.any(String))
+  it('throws when the RPC errors', async () => {
+    const db = makeRpcMockDb(null, { message: 'boom' })
+    await expect(acquireSyncWorkerLease(db, 'token-c')).rejects.toThrow(
+      'Failed to acquire sync worker lease',
+    )
   })
 })
 
-describe('releaseSyncExecutorLease', () => {
-  it('upserts expired lease value without token', async () => {
-    const db = makeSequentialMockDb([{ data: null }])
-    await expect(releaseSyncExecutorLease(db)).resolves.toBeUndefined()
-    expect(db.from).toHaveBeenCalledWith('site_settings')
+describe('renewSyncWorkerLease', () => {
+  it('returns true when ownership is retained', async () => {
+    const db = makeRpcMockDb(true)
+    await expect(renewSyncWorkerLease(db, 'token-a')).resolves.toBe(true)
   })
 
-  it('no-ops when token does not own the lease', async () => {
-    const future = new Date(Date.now() + 60_000).toISOString()
-    const db = makeSequentialMockDb([{ data: { value: `${future}|owner-a` } }])
-    await expect(releaseSyncExecutorLease(db, 'owner-b')).resolves.toBeUndefined()
-    // Only the read path — no update when ownership mismatches
-    expect(db.from).toHaveBeenCalledTimes(1)
+  it('returns false when ownership was lost', async () => {
+    const db = makeRpcMockDb(false)
+    await expect(renewSyncWorkerLease(db, 'token-a')).resolves.toBe(false)
+  })
+})
+
+describe('releaseSyncWorkerLease', () => {
+  it('resolves without error on success', async () => {
+    const db = makeRpcMockDb(null)
+    await expect(releaseSyncWorkerLease(db, 'token-a')).resolves.toBeUndefined()
+    expect(db.rpc).toHaveBeenCalledWith('release_sync_worker_lease', { p_token: 'token-a' })
+  })
+
+  it('throws when the RPC errors', async () => {
+    const db = makeRpcMockDb(null, { message: 'boom' })
+    await expect(releaseSyncWorkerLease(db, 'token-a')).rejects.toThrow(
+      'Failed to release sync worker lease',
+    )
+  })
+})
+
+describe('claimSyncJobs', () => {
+  it('maps claimed rows to SyncJob shape', async () => {
+    const db = makeRpcMockDb([
+      {
+        id: 'job-1',
+        artist_id: 'artist-1',
+        job_type: 'full',
+        status: 'running',
+        scheduled_at: '2026-07-29T00:00:00.000Z',
+        started_at: '2026-07-29T00:01:00.000Z',
+        finished_at: null,
+        locked_until: '2026-07-29T00:07:00.000Z',
+        cancel_requested_at: null,
+        cancelled_at: null,
+        error_message: null,
+        attempt_count: 1,
+        created_at: '2026-07-29T00:00:00.000Z',
+      },
+    ])
+    const jobs = await claimSyncJobs(db, 1)
+    expect(jobs).toHaveLength(1)
+    expect(jobs[0]?.id).toBe('job-1')
+    expect(jobs[0]?.jobType).toBe('full')
+    expect(jobs[0]?.attemptCount).toBe(1)
+    expect(db.rpc).toHaveBeenCalledWith('claim_sync_jobs', { p_qty: 1 })
+  })
+
+  it('returns an empty array when nothing is due', async () => {
+    const db = makeRpcMockDb([])
+    await expect(claimSyncJobs(db, 5)).resolves.toEqual([])
+  })
+
+  it('throws when the RPC errors', async () => {
+    const db = makeRpcMockDb(null, { message: 'boom' })
+    await expect(claimSyncJobs(db, 1)).rejects.toThrow('Failed to claim sync jobs')
+  })
+})
+
+describe('run ledger + ticks', () => {
+  it('recordCronTick inserts a tick row', async () => {
+    const db = makeSequentialMockDb([{ data: null }])
+    await expect(recordCronTick(db, 'worker', 'ok')).resolves.toBeUndefined()
+    expect(db.from).toHaveBeenCalledWith('cron_ticks')
+  })
+
+  it('recordCronTick never throws on insert failure', async () => {
+    const db = makeSequentialMockDb([{ data: null, error: { message: 'nope' } }])
+    await expect(recordCronTick(db, 'scheduler', 'ok')).resolves.toBeUndefined()
+  })
+
+  it('startSyncRun returns the new run id', async () => {
+    const db = makeSequentialMockDb([{ data: { id: 'run-1' } }])
+    await expect(startSyncRun(db, 'cron')).resolves.toBe('run-1')
+    expect(db.from).toHaveBeenCalledWith('sync_runs')
+  })
+
+  it('finishSyncRun no-ops without a run id', async () => {
+    const db = makeSequentialMockDb([])
+    await expect(
+      finishSyncRun(db, null, { status: 'ok', claimed: 1 }),
+    ).resolves.toBeUndefined()
+    expect(db.from).not.toHaveBeenCalled()
   })
 })
 

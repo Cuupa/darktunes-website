@@ -2,16 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import {
-  claimNextSyncJob,
-  countDuePendingSyncJobs,
+  acquireSyncWorkerLease,
+  claimSyncJobs,
+  finishSyncRun,
   isSyncJobCancelRequested,
   markSyncJobCancelled,
   markSyncJobDone,
   markSyncJobFailed,
-  releaseSyncExecutorLease,
+  newWorkerLeaseToken,
+  recordCronTick,
+  releaseSyncWorkerLease,
+  renewSyncWorkerLease,
   rescheduleSyncJob,
-  tryAcquireSyncExecutorLease,
+  startSyncRun,
+  WORKER_LEASE_TTL_MS,
+  type SyncJob,
   type SyncJobType,
+  type SyncRunTrigger,
 } from '@/lib/api/syncQueue'
 import { createSyncUploadFn } from '@/lib/r2Utils'
 import { isValidCronSecret } from '@/lib/cronAuth'
@@ -20,7 +27,6 @@ import { syncOdesliBatch, syncSingleArtist } from '@/lib/sync/syncAll'
 import { RATE_LIMIT_JOB_COOLDOWN_MS, isRateLimitedSyncError } from '@/lib/sync/retryPolicy'
 import { extractBearerToken, verifySyncTrigger } from '@/lib/adminAuth'
 import { withErrorHandler } from '@/lib/errors'
-import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
 import { getSyncCredentials } from '@/lib/secrets/getExternalCredentials'
 import {
   revalidatePublicContent,
@@ -29,15 +35,14 @@ import {
 } from '@/lib/sync/revalidatePublicContent'
 import {
   EXECUTOR_INTER_JOB_DELAY_MS,
-  EXECUTOR_LEASE_MS,
   canClaimAnotherJob,
-  resolveExecutorSiteOrigin,
-  selfChainSyncExecutor,
-  shouldSelfChainContinuation,
   sleepMs,
 } from '@/lib/sync/queueExecutor'
 
 export const maxDuration = 300
+
+/** Renew the worker lease at most every 30s (TTL is 90s). */
+const LEASE_RENEW_INTERVAL_MS = 30_000
 
 function tagsForJobType(jobType: SyncJobType): PublicContentTag[] {
   // YouTube channel sync is a separate route; artist-scoped "youtube" jobs fall
@@ -49,7 +54,7 @@ function tagsForJobType(jobType: SyncJobType): PublicContentTag[] {
 
 async function processSyncJob(
   db: ReturnType<typeof createClient<Database>>,
-  job: NonNullable<Awaited<ReturnType<typeof claimNextSyncJob>>>,
+  job: SyncJob,
   uploadFn: ReturnType<typeof createSyncUploadFn>,
   syncCredentials: Awaited<ReturnType<typeof getSyncCredentials>>,
 ): Promise<PublicContentTag[]> {
@@ -61,9 +66,17 @@ async function processSyncJob(
     discogsToken: syncCredentials.discogsToken,
     songkickApiKey: syncCredentials.songkickApiKey,
     bandsintownApiKey: syncCredentials.bandsintownApiKey,
+    odesliApiKey: syncCredentials.odesliApiKey,
   }
 
   if (job.jobType === 'odesli') {
+    if (!syncCredentials.odesliApiKey) {
+      // Odesli's public v1-alpha.1 API was sunset (2026-07-31). Without an API
+      // key every call 401s, so complete the job instead of failing it.
+      await markSyncJobDone(db, job.id)
+      return []
+    }
+
     const result = await syncOdesliBatch(deps)
     const odesliResult = result.results.find((r) => r.api === 'odesli')
     const hasMoreWork = odesliResult?.hasMoreWork ?? false
@@ -109,9 +122,15 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const { CRON_SECRET: cronSecret } = serverEnv
   const isCronAuthorized = Boolean(cronSecret && isValidCronSecret(authHeader, cronSecret))
 
-  if (!isCronAuthorized) {
+  let trigger: SyncRunTrigger = 'admin'
+  if (isCronAuthorized) {
+    trigger = 'cron'
+  } else {
     const token = extractBearerToken(authHeader)
     await verifySyncTrigger(token)
+  }
+  if (request.headers.get('x-sync-self-chain') === '1') {
+    trigger = 'self-chain'
   }
 
   const db = createClient<Database>(
@@ -122,15 +141,20 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
 
   const syncCredentials = await getSyncCredentials(db)
 
-  // Await so health UI never loses the kick (void + early alreadyRunning return
-  // previously dropped heartbeats when the isolate froze after the response).
-  await recordHealthHeartbeat(db, 'sync_execute')
+  // Dead-man's switch: proves the HTTP hop reached Next.js (written before any
+  // lease/claim so a 401 or crash upstream is distinguishable from a dead worker).
+  await recordCronTick(db, 'worker', 'ok')
 
-  // Single-flight: overlapping admin poll kicks must not spawn parallel workers.
-  const leaseToken = await tryAcquireSyncExecutorLease(db, EXECUTOR_LEASE_MS)
-  if (!leaseToken) {
-    return NextResponse.json({ accepted: true, alreadyRunning: true, continued: false })
+  // Single-flight: overlapping cron ticks / admin kicks must not spawn parallel
+  // workers. Atomic in Postgres with a TTL, so a hard-killed worker recovers.
+  const leaseToken = newWorkerLeaseToken()
+  const acquired = await acquireSyncWorkerLease(db, leaseToken, WORKER_LEASE_TTL_MS)
+  if (!acquired) {
+    await recordCronTick(db, 'worker', 'already_running')
+    return NextResponse.json({ accepted: true, alreadyRunning: true, processed: 0 })
   }
+
+  const runId = await startSyncRun(db, trigger)
 
   const uploadFn = createSyncUploadFn(
     serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
@@ -140,35 +164,38 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     serverEnv.CLOUDFLARE_R2_PUBLIC_URL,
   )
 
-  const siteOrigin = resolveExecutorSiteOrigin(request.url)
-  const canSelfChain = Boolean(siteOrigin && authHeader.startsWith('Bearer '))
-
   waitUntil(
     (async () => {
       const startTime = Date.now()
       const tagsToRevalidate = new Set<PublicContentTag>()
-      let jobsProcessed = 0
-      let lastHeartbeatAt = startTime
-      let shouldChain = false
+      let lastLeaseRenewAt = startTime
+      let claimed = 0
+      let completed = 0
+      let failed = 0
+      let runError: string | null = null
 
       try {
         // Drain until budget headroom is gone or the due queue is empty.
-        // Never start a job we cannot finish (hard kill leaves `running` zombies).
+        // One job at a time so we never start work we cannot finish.
         while (canClaimAnotherJob(startTime)) {
-          // Keep cron health "active" during long drains (miss window is 15m).
-          if (Date.now() - lastHeartbeatAt >= 4 * 60_000) {
-            await recordHealthHeartbeat(db, 'sync_execute')
-            lastHeartbeatAt = Date.now()
+          if (Date.now() - lastLeaseRenewAt >= LEASE_RENEW_INTERVAL_MS) {
+            const renewed = await renewSyncWorkerLease(db, leaseToken, WORKER_LEASE_TTL_MS)
+            if (!renewed) {
+              runError = 'Worker lease lost mid-drain'
+              break
+            }
+            lastLeaseRenewAt = Date.now()
           }
 
-          const job = await claimNextSyncJob(db)
+          const [job] = await claimSyncJobs(db, 1)
           if (!job) break
+
+          claimed += 1
 
           // Cooperative cancel: admin sets cancel_requested_at on running jobs
           // (pending jobs are cancelled before claim). Checked between jobs only.
           if (await isSyncJobCancelRequested(db, job.id)) {
             await markSyncJobCancelled(db, job.id)
-            jobsProcessed += 1
             continue
           }
 
@@ -181,11 +208,11 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
               await markSyncJobCancelled(db, job.id)
             }
             for (const tag of tags) tagsToRevalidate.add(tag)
-            jobsProcessed += 1
+            completed += 1
           } catch (err) {
             if (await isSyncJobCancelRequested(db, job.id)) {
               await markSyncJobCancelled(db, job.id)
-              jobsProcessed += 1
+              completed += 1
               continue
             }
             const message = err instanceof Error ? err.message : String(err)
@@ -194,7 +221,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
             })
             // Still bust caches — partial writes may have landed before the throw.
             for (const tag of tagsForJobType(job.jobType)) tagsToRevalidate.add(tag)
-            jobsProcessed += 1
+            failed += 1
           }
 
           // Pace between artists (rate limiting) without pausing the whole drain.
@@ -203,47 +230,33 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
           }
         }
 
-        // Single end-of-batch revalidation is more reliable inside waitUntil than
-        // revalidateTag calls scattered mid-loop (and covers path-level ISR).
-        if (jobsProcessed > 0 && tagsToRevalidate.size > 0) {
+        // Single end-of-batch revalidation is more reliable than revalidateTag
+        // calls scattered mid-loop (and covers path-level ISR).
+        if (claimed > 0 && tagsToRevalidate.size > 0) {
           revalidatePublicContent([...tagsToRevalidate])
         }
-
-        if (canSelfChain) {
-          const duePending = await countDuePendingSyncJobs(db)
-          shouldChain = shouldSelfChainContinuation({ jobsProcessed, duePending })
-        }
+      } catch (err) {
+        runError = err instanceof Error ? err.message : String(err)
+        console.error('[sync] worker drain failed:', err)
       } finally {
+        await finishSyncRun(db, runId, {
+          status: runError ? 'error' : 'ok',
+          claimed,
+          completed,
+          failed,
+          error: runError,
+        })
+        await recordCronTick(db, 'worker', runError ? 'error' : 'ok', runError ?? undefined)
         try {
-          await recordHealthHeartbeat(db, 'sync_execute')
-        } catch (hbErr) {
-          console.error('[sync] failed to refresh executor heartbeat:', hbErr)
-        }
-        try {
-          await releaseSyncExecutorLease(db, leaseToken)
+          await releaseSyncWorkerLease(db, leaseToken)
         } catch (leaseErr) {
-          console.error('[sync] failed to release executor lease:', leaseErr)
-        }
-      }
-
-      // Self-chain only after the lease is free so the next isolate can acquire it.
-      // Continues the same logical "run" across Vercel duration slices until the
-      // due queue is empty (rate-limited jobs stay out of the due window).
-      if (shouldChain && siteOrigin) {
-        try {
-          await sleepMs(250)
-          await selfChainSyncExecutor({
-            origin: siteOrigin,
-            authorizationHeader: authHeader,
-          })
-        } catch (chainErr) {
-          console.error('[sync] self-chain kick failed (cron will retry):', chainErr)
+          console.error('[sync] failed to release worker lease:', leaseErr)
         }
       }
     })(),
   )
 
-  return NextResponse.json({ accepted: true, alreadyRunning: false, continued: false })
+  return NextResponse.json({ accepted: true, alreadyRunning: false })
 })
 
 export const GET = POST

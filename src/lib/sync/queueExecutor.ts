@@ -1,27 +1,22 @@
 /**
- * Queue executor budget + self-chain helpers.
+ * Queue executor budget + batching.
  *
- * Vercel caps a single waitUntil drain at ~maxDuration. We process as many
- * artist jobs as fit in the budget (with inter-job pacing for rate limits),
- * then immediately self-chain another `/api/sync` so the backlog keeps draining
- * without waiting for the next external cron tick or manual Force Sync.
+ * pg_cron drives `/api/sync` once per minute. Each invocation drains a bounded
+ * batch within a soft wall (Hobby-safe), writes a run ledger row, then returns.
+ * The next tick continues — no 280s waitUntil drain and no self-chain required.
  */
 
-/** Soft wall for one waitUntil drain — leave headroom under maxDuration 300s. */
-export const EXECUTOR_TIME_BUDGET_MS = 280_000
+/** Soft wall for one worker invocation — leave headroom under maxDuration. */
+export const EXECUTOR_TIME_BUDGET_MS = 50_000
 
 /**
- * Do not claim a new job unless this much wall time remains.
- * Prevents starting an artist mid-budget that Vercel will hard-kill, leaving
- * the job stuck in `running` until lock recovery.
+ * Do not claim another batch unless this much wall time remains.
+ * Prevents starting work that the platform will hard-kill.
  */
-export const EXECUTOR_MIN_JOB_HEADROOM_MS = 50_000
+export const EXECUTOR_MIN_JOB_HEADROOM_MS = 15_000
 
-/** Pace between artists so external APIs are not hammered in a tight loop. */
+/** Pace between jobs so external APIs are not hammered in a tight loop. */
 export const EXECUTOR_INTER_JOB_DELAY_MS = 400
-
-/** Lease slightly longer than budget so the owner can finish + release cleanly. */
-export const EXECUTOR_LEASE_MS = EXECUTOR_TIME_BUDGET_MS + 25_000
 
 export function remainingExecutorBudgetMs(
   startedAtMs: number,
@@ -114,7 +109,7 @@ export async function selfChainSyncExecutor(options: {
 
 /**
  * After enqueue-only APIs (Spotify / Odesli) write jobs, kick `/api/sync`
- * so cron does not wait up to 5 minutes for the next process-queue tick.
+ * so the worker does not wait for the next pg_cron tick.
  * No-ops when nothing was queued, origin cannot be resolved, or auth is missing.
  */
 export async function kickSyncExecutorAfterEnqueue(options: {

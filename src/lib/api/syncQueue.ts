@@ -55,33 +55,14 @@ export const MAX_ATTEMPTS = 3
  */
 export const LOCK_DURATION_MS = 6 * 60 * 1000
 
-/** site_settings key for the single-flight queue executor lease. */
-export const SYNC_EXECUTOR_LEASE_KEY = 'sync_executor_lease'
-/** Default lease length; should cover one Vercel maxDuration budget. */
-export const EXECUTOR_LEASE_MS = 5 * 60 * 1000
+/**
+ * Default worker lease TTL (ms). Must exceed the worker tick budget so the
+ * owner always finishes (and releases) before another worker can take over.
+ */
+export const WORKER_LEASE_TTL_MS = 90_000
 
-/** Lease payload: `ISO_EXPIRES|token` so only the owner can release. */
-function encodeExecutorLease(expiresIso: string, token: string): string {
-  return `${expiresIso}|${token}`
-}
-
-function parseExecutorLease(
-  raw: string | null | undefined,
-): { expiresAt: number; token: string | null } | null {
-  if (!raw) return null
-  const pipe = raw.indexOf('|')
-  if (pipe === -1) {
-    const expiresAt = Date.parse(raw)
-    if (Number.isNaN(expiresAt)) return null
-    // Legacy ISO-only values (pre-token) — treat as owned by nobody for release matching.
-    return { expiresAt, token: null }
-  }
-  const expiresAt = Date.parse(raw.slice(0, pipe))
-  if (Number.isNaN(expiresAt)) return null
-  return { expiresAt, token: raw.slice(pipe + 1) || null }
-}
-
-function newExecutorLeaseToken(): string {
+/** Owner token so a stale worker cannot release a newer worker's lease. */
+export function newWorkerLeaseToken(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
 }
 
@@ -137,111 +118,133 @@ function rowToSyncJob(
 }
 
 /**
- * Tries to acquire a single-flight lease so only one `/api/sync` waitUntil
- * worker drains the queue at a time (avoids parallel R2/DNS storms).
- * Returns a lease token when this caller holds the lease, otherwise null.
+ * Tries to acquire the single-flight worker lease so only one `/api/sync`
+ * worker drains the queue at a time. Atomic in Postgres (`FOR UPDATE`), with a
+ * TTL so a hard-killed worker is recovered automatically. Returns true when
+ * this caller holds the lease.
  */
-export async function tryAcquireSyncExecutorLease(
+export async function acquireSyncWorkerLease(
   db: DbClient,
-  leaseMs = EXECUTOR_LEASE_MS,
-): Promise<string | null> {
-  const now = Date.now()
-  const { data: existing, error: readError } = await db
-    .from('site_settings')
-    .select('value')
-    .eq('key', SYNC_EXECUTOR_LEASE_KEY)
-    .maybeSingle()
-
-  if (readError) {
-    throw new Error(`Failed to read sync executor lease: ${readError.message}`)
-  }
-
-  if (existing?.value) {
-    const parsed = parseExecutorLease(existing.value)
-    if (parsed && parsed.expiresAt > now) {
-      return null
-    }
-  }
-
-  const token = newExecutorLeaseToken()
-  const expires = new Date(now + leaseMs).toISOString()
-  const value = encodeExecutorLease(expires, token)
-
-  if (existing) {
-    const { data, error } = await db
-      .from('site_settings')
-      .update({ value })
-      .eq('key', SYNC_EXECUTOR_LEASE_KEY)
-      .eq('value', existing.value)
-      .select('key')
-
-    if (error) {
-      throw new Error(`Failed to acquire sync executor lease: ${error.message}`)
-    }
-    return (data?.length ?? 0) > 0 ? token : null
-  }
-
-  const { error: insertError } = await db.from('site_settings').insert({
-    key: SYNC_EXECUTOR_LEASE_KEY,
-    value,
+  token: string,
+  ttlMs = WORKER_LEASE_TTL_MS,
+): Promise<boolean> {
+  const { data, error } = await db.rpc('acquire_sync_worker_lease', {
+    p_token: token,
+    p_ttl_ms: ttlMs,
   })
 
-  if (insertError) {
-    // Concurrent insert lost the race — another executor holds the lease.
-    if (insertError.code === '23505') return null
-    throw new Error(`Failed to create sync executor lease: ${insertError.message}`)
+  if (error) {
+    throw new Error(`Failed to acquire sync worker lease: ${error.message}`)
   }
+  return data === true
+}
 
-  return token
+/** Extends the lease for the current owner. Returns false if ownership was lost. */
+export async function renewSyncWorkerLease(
+  db: DbClient,
+  token: string,
+  ttlMs = WORKER_LEASE_TTL_MS,
+): Promise<boolean> {
+  const { data, error } = await db.rpc('renew_sync_worker_lease', {
+    p_token: token,
+    p_ttl_ms: ttlMs,
+  })
+
+  if (error) {
+    throw new Error(`Failed to renew sync worker lease: ${error.message}`)
+  }
+  return data === true
+}
+
+/** Releases the lease; only the owner token may clear it. */
+export async function releaseSyncWorkerLease(db: DbClient, token: string): Promise<void> {
+  const { error } = await db.rpc('release_sync_worker_lease', { p_token: token })
+  if (error) {
+    throw new Error(`Failed to release sync worker lease: ${error.message}`)
+  }
 }
 
 /**
- * Clears the executor lease so the next kick (or self-chain) can start a worker.
- * When `token` is provided, only the owner may release (prevents a late finally
- * from clearing a newer worker's lease after hard timeout races).
+ * Atomically claim up to `qty` due jobs. Uses the `claim_sync_jobs` Postgres
+ * function (`FOR UPDATE SKIP LOCKED`), so concurrent workers never double-claim.
  */
-export async function releaseSyncExecutorLease(
-  db: DbClient,
-  token?: string | null,
-): Promise<void> {
-  if (token) {
-    const { data: existing, error: readError } = await db
-      .from('site_settings')
-      .select('value')
-      .eq('key', SYNC_EXECUTOR_LEASE_KEY)
-      .maybeSingle()
+export async function claimSyncJobs(db: DbClient, qty = 1): Promise<SyncJob[]> {
+  const { data, error } = await db.rpc('claim_sync_jobs', { p_qty: qty })
 
-    if (readError) {
-      throw new Error(`Failed to read sync executor lease: ${readError.message}`)
-    }
-
-    const parsed = parseExecutorLease(existing?.value)
-    if (!parsed || parsed.token !== token) {
-      // Lost ownership (expired + re-acquired by another worker) — do not clear.
-      return
-    }
-
-    const { error } = await db
-      .from('site_settings')
-      .update({ value: encodeExecutorLease(new Date(0).toISOString(), 'released') })
-      .eq('key', SYNC_EXECUTOR_LEASE_KEY)
-      .eq('value', existing!.value)
-
-    if (error) {
-      throw new Error(`Failed to release sync executor lease: ${error.message}`)
-    }
-    return
-  }
-
-  const { error } = await db.from('site_settings').upsert(
-    {
-      key: SYNC_EXECUTOR_LEASE_KEY,
-      value: encodeExecutorLease(new Date(0).toISOString(), 'released'),
-    },
-    { onConflict: 'key' },
-  )
   if (error) {
-    throw new Error(`Failed to release sync executor lease: ${error.message}`)
+    throw new Error(`Failed to claim sync jobs: ${error.message}`)
+  }
+  return (data ?? []).map((row) => rowToSyncJob(row as SyncQueueRow))
+}
+
+// ---------------------------------------------------------------------------
+// Run ledger + dead-man's-switch ticks
+// ---------------------------------------------------------------------------
+
+export type CronTickKind = 'scheduler' | 'worker'
+export type SyncRunTrigger = 'cron' | 'admin' | 'self-chain' | 'enqueue-kick'
+
+/** Records a liveness tick. Non-fatal — telemetry must never break the worker. */
+export async function recordCronTick(
+  db: DbClient,
+  kind: CronTickKind,
+  status: string,
+  detail?: string,
+): Promise<void> {
+  const { error } = await db
+    .from('cron_ticks')
+    .insert({ kind, status, detail: detail ?? null })
+
+  if (error) {
+    console.warn(`[syncQueue] recordCronTick(${kind}) failed:`, error.message)
+  }
+}
+
+/** Opens a run ledger row. Returns the run id, or null when telemetry fails. */
+export async function startSyncRun(
+  db: DbClient,
+  trigger: SyncRunTrigger,
+): Promise<string | null> {
+  const { data, error } = await db
+    .from('sync_runs')
+    .insert({ trigger, status: 'ok' })
+    .select('id')
+    .maybeSingle()
+
+  if (error) {
+    console.warn('[syncQueue] startSyncRun failed:', error.message)
+    return null
+  }
+  return data?.id ?? null
+}
+
+/** Finalises a run ledger row. Non-fatal. */
+export async function finishSyncRun(
+  db: DbClient,
+  runId: string | null,
+  patch: {
+    status: string
+    claimed?: number
+    completed?: number
+    failed?: number
+    error?: string | null
+  },
+): Promise<void> {
+  if (!runId) return
+  const { error } = await db
+    .from('sync_runs')
+    .update({
+      status: patch.status,
+      claimed: patch.claimed ?? 0,
+      completed: patch.completed ?? 0,
+      failed: patch.failed ?? 0,
+      error: patch.error ?? null,
+      finished_at: new Date().toISOString(),
+    })
+    .eq('id', runId)
+
+  if (error) {
+    console.warn('[syncQueue] finishSyncRun failed:', error.message)
   }
 }
 
@@ -427,60 +430,6 @@ export async function rescheduleSyncJob(
     .eq('id', jobId)
 
   if (error) throw new Error(`Failed to reschedule sync job: ${error.message}`)
-}
-
-/**
- * Claim the oldest pending job by setting it to 'running'.
- * Returns null if no pending jobs are available.
- *
- * Uses a single UPDATE with RETURNING to atomically claim the job — avoids
- * race conditions when multiple cron instances run concurrently.
- */
-export async function claimNextSyncJob(db: DbClient): Promise<SyncJob | null> {
-  await recoverStuckSyncJobs(db)
-
-  const now = new Date().toISOString()
-  const lockedUntil = new Date(Date.now() + LOCK_DURATION_MS).toISOString()
-
-  // Find the oldest pending job that hasn't exceeded max attempts and is due
-  const { data: candidates } = await db
-    .from('sync_queue')
-    .select('id')
-    .eq('status', 'pending')
-    .lt('attempt_count', MAX_ATTEMPTS)
-    .lte('scheduled_at', now)
-    .order('scheduled_at', { ascending: true })
-    .limit(1)
-
-  if (!candidates || candidates.length === 0) return null
-
-  const jobId = candidates[0].id
-
-  const { data, error } = await db
-    .from('sync_queue')
-    .update({
-      status: 'running',
-      started_at: now,
-      locked_until: lockedUntil,
-    })
-    .eq('id', jobId)
-    .eq('status', 'pending') // optimistic lock — prevent double-claim
-    .select()
-    .single()
-
-  if (error || !data) return null
-
-  // Increment attempt_count separately (Supabase PostgREST doesn't support col + 1 in update)
-  await db
-    .from('sync_queue')
-    .update({ attempt_count: (data.attempt_count ?? 0) + 1 })
-    .eq('id', jobId)
-
-  return rowToSyncJob({
-    ...data,
-    attempt_count: (data.attempt_count ?? 0) + 1,
-    locked_until: lockedUntil,
-  })
 }
 
 /**
