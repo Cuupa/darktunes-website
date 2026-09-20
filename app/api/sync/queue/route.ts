@@ -60,7 +60,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const artistIds = (artists ?? []).map((a) => a.id)
 
   const queued = await enqueueArtistSyncJobs(db, artistIds, 'full')
-  await recordHealthHeartbeat(db, 'sync_queue')
+  await recordHealthHeartbeat(db, 'queue')
 
   return NextResponse.json({
     queued,

@@ -424,13 +424,14 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
     (health.syncQueue?.pending ?? 0) +
     (health.syncQueue?.running ?? 0) +
     (health.syncQueue?.stuckRunning ?? 0)
-  const executeJob = health.cronHealth?.jobs.find((j) => j.key === 'sync_execute')
-  const youtubeJob = health.cronHealth?.jobs.find((j) => j.key === 'sync_youtube')
+  const executeJob = health.cronHealth?.jobs.find((j) => j.key === 'worker')
+  const youtubeJob = health.cronHealth?.jobs.find((j) => j.key === 'youtube')
   const speakingIssues = describeSyncQueueIssue({
     executorNeverRan: executeJob?.statusLabel === 'Executor never ran',
     executorOffline:
       executeJob?.statusLabel === 'Executor offline' ||
-      executeJob?.statusLabel === 'Executor overdue',
+      executeJob?.statusLabel === 'Executor overdue' ||
+      executeJob?.statusLabel === 'Executor unreachable',
     backlog: queueBacklog,
     youtubeUnconfigured:
       youtubeJob?.operationalState === 'unconfigured' ||

@@ -5,13 +5,13 @@
  * Auth:
  *   - Bearer <supabase-access-token>
  *   - OR Vercel cron request (x-vercel-cron: 1) — CRON_SECRET required
- *   - OR CRON_SECRET Bearer (Supabase Edge trigger-sync type=youtube)
+ *   - OR CRON_SECRET Bearer (pg_cron `sync-youtube-daily` job)
  *
  * Fetches the latest videos from the configured YouTube channel and upserts
  * them into the `videos` table.
  *
- * Not part of the artist sync_queue / process-queue cron — needs its own
- * Supabase Cron job: trigger-sync?type=youtube (daily).
+ * Not part of the artist sync_queue — needs its own Supabase pg_cron job
+ * (`sync-youtube-daily` in supabase/reset.sql).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -84,7 +84,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const db = createClient<Database>(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 
   // Heartbeat first so cron health shows "ran" even when credentials/API fail later.
-  await recordHealthHeartbeat(db, 'sync_youtube')
+  await recordHealthHeartbeat(db, 'youtube')
 
   const { apiKey: youtubeApiKey, channelId: youtubeChannelId } = await getYouTubeCredentials(db)
 

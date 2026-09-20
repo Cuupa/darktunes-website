@@ -83,7 +83,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   // 4. YouTube — channel sync (not artist queue). Prefer /api/sync-youtube for cron.
   if (apiSource === 'youtube') {
     // Same heartbeat key as /api/sync-youtube so Health → Cron reflects this path too.
-    await recordHealthHeartbeat(db, 'sync_youtube')
+    await recordHealthHeartbeat(db, 'youtube')
 
     const { apiKey: youtubeApiKey, channelId: youtubeChannelId } =
       await getYouTubeCredentials(db)
