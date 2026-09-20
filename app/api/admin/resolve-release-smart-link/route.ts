@@ -9,8 +9,8 @@
  * it to releases.smart_url so it can be displayed on the public release detail
  * page.
  *
- * The Odesli API is free for up to ~10 req/s with no API key required.
- * See: https://odesli.co/
+ * Odesli's public v1-alpha.1 API was sunset on 2026-07-31 and now requires an
+ * API key (`odesli_api_key` in Admin → API Keys). Without a key this returns 409.
  *
  * Returns:
  *   { smartUrl: string }
@@ -23,6 +23,7 @@ import { HttpError, withExponentialBackoff } from '@/lib/rateLimiter'
 import { pickOdesliMusicUrl, resolveOdesliSmartLink } from '@/lib/sync/odesliApi'
 import { withErrorHandler, ApiError } from '@/lib/errors'
 import { extractBearerToken, verifyPermission } from '@/lib/adminAuth'
+import { getSyncCredentials } from '@/lib/secrets/getExternalCredentials'
 // ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
@@ -75,10 +76,18 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     )
   }
 
+  const { odesliApiKey } = await getSyncCredentials(db)
+  if (!odesliApiKey) {
+    throw new ApiError(
+      409,
+      'Odesli API key is not configured. Add it in Admin → API Keys.',
+    )
+  }
+
   // 4. Resolve smart link via Odesli
   try {
     const result = await withExponentialBackoff(() =>
-      resolveOdesliSmartLink(musicUrl, globalThis.fetch),
+      resolveOdesliSmartLink(musicUrl, globalThis.fetch, odesliApiKey),
     )
 
     // 5. Persist smart_url and all per-platform links back to the release

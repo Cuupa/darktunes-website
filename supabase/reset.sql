@@ -3246,12 +3246,13 @@ AS $$
 DECLARE
   v_row public.sync_worker_lease;
 BEGIN
+  -- Guarantee the single lease row exists (also seeded below). ON CONFLICT
+  -- makes a concurrent first-time insert race-safe instead of erroring.
+  INSERT INTO public.sync_worker_lease (id, token, expires_at)
+  VALUES (1, NULL, to_timestamp(0))
+  ON CONFLICT (id) DO NOTHING;
+
   SELECT * INTO v_row FROM public.sync_worker_lease WHERE id = 1 FOR UPDATE;
-  IF NOT FOUND THEN
-    INSERT INTO public.sync_worker_lease (id, token, expires_at)
-    VALUES (1, p_token, NOW() + make_interval(secs => (p_ttl_ms::DOUBLE PRECISION / 1000.0)));
-    RETURN TRUE;
-  END IF;
   IF v_row.expires_at > NOW() AND v_row.token IS DISTINCT FROM p_token THEN
     RETURN FALSE;
   END IF;

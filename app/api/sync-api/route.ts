@@ -4,9 +4,9 @@
  * POST /api/sync-api
  * Body: { apiSource: string }
  * Auth (any one of the following is accepted):
- *   - ******  (admin UI, user session)
- *   - ******            (Supabase Edge Functions, external schedulers)
- *   - x-vercel-cron: 1               (Vercel Cron — CRON_SECRET must match if set)
+ *   - Bearer <supabase-access-token>  (admin UI, user session)
+ *   - Bearer <CRON_SECRET>            (pg_cron jobs, external schedulers)
+ *   - x-vercel-cron: 1               (legacy — CRON_SECRET must match if set)
  *
  * Runs a targeted sync for a single API source (itunes, spotify, discogs,
  * songkick, bandsintown, odesli, or youtube).
@@ -211,6 +211,11 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   }
 
   if (apiSource === 'odesli') {
+    // Odesli's public v1-alpha.1 API was sunset (2026-07-31). Without a key the
+    // job would only no-op, so fail fast with an actionable message.
+    if (!syncCredentials.odesliApiKey) {
+      throw new ApiError(409, 'Odesli API key is not configured. Add it in Admin → API Keys.')
+    }
     const queued = await enqueueOdesliSyncJob(db)
     return enqueueAndKick(
       queued,
@@ -258,6 +263,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     discogsToken: syncCredentials.discogsToken,
     songkickApiKey: syncCredentials.songkickApiKey,
     bandsintownApiKey: syncCredentials.bandsintownApiKey,
+    odesliApiKey: syncCredentials.odesliApiKey,
     onlyApi: apiSource,
   })
 

@@ -65,6 +65,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     discogsToken: syncCredentials.discogsToken,
     songkickApiKey: syncCredentials.songkickApiKey,
     bandsintownApiKey: syncCredentials.bandsintownApiKey,
+    odesliApiKey: syncCredentials.odesliApiKey,
   })
 
   revalidatePublicContent(RELEASE_SYNC_TAGS)

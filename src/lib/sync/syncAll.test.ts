@@ -393,6 +393,7 @@ describe('syncSingleArtist', () => {
       fetch: odesliFetch as typeof fetch,
       uploadToR2: vi.fn(),
       onlyApi: 'odesli',
+      odesliApiKey: 'test-odesli-key',
     }
 
     const result = await syncAll(deps)
@@ -503,6 +504,7 @@ describe('syncSingleArtist', () => {
       fetch: fetchFn as typeof fetch,
       uploadToR2: vi.fn(),
       onlyApi: 'odesli',
+      odesliApiKey: 'test-odesli-key',
     })
 
     const odesli = result.results.find((r) => r.api === 'odesli')
@@ -556,6 +558,7 @@ describe('syncSingleArtist', () => {
       uploadToR2: vi.fn(),
       onlyApi: 'odesli',
       odesliBatchLimit: 2,
+      odesliApiKey: 'test-odesli-key',
     })
 
     const odesli = result.results.find((r) => r.api === 'odesli')
@@ -599,10 +602,31 @@ describe('syncSingleArtist', () => {
       fetch: vi.fn() as typeof fetch,
       uploadToR2: vi.fn(),
       onlyApi: 'odesli',
+      odesliApiKey: 'test-odesli-key',
     })
 
     const fallback = updated.find((row) => row.id === 'rel-artist-url')
     expect(fallback?.payload.smart_url).toBe('https://open.spotify.com/artist/abc')
     expect(result.results.find((r) => r.api === 'odesli')?.hasMoreWork).toBeFalsy()
+  })
+
+  it('skips Odesli without an API key instead of calling the API', async () => {
+    const odesliFetch = vi.fn()
+    const db = makeMockDb((table) => {
+      if (table === 'artists') return { data: [mockArtist], error: null }
+      return { data: [], error: null }
+    })
+
+    const result = await syncAll({
+      db,
+      fetch: odesliFetch as typeof fetch,
+      uploadToR2: vi.fn(),
+      onlyApi: 'odesli',
+    })
+
+    const odesli = result.results.find((r) => r.api === 'odesli')
+    expect(odesli?.errors.join(' ')).toContain('no API key')
+    expect(odesli?.hasMoreWork).toBeFalsy()
+    expect(odesliFetch).not.toHaveBeenCalled()
   })
 })

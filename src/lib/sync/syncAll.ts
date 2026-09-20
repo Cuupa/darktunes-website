@@ -589,7 +589,23 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
   // one through Odesli so they always get a working link.
   let odesliStartedAt: number | null = null
 
-  if (!onlyApi || onlyApi === 'odesli') {
+  // Odesli's public v1-alpha.1 API was sunset (2026-07-31): unauthenticated
+  // calls return 401 PUBLIC_API_ACCESS_DEPRECATED. Without an API key there is
+  // nothing to resolve, so skip instead of burning the batch on retries. Only
+  // surface an explicit result for a dedicated Odesli run (full syncs stay quiet).
+  if (onlyApi === 'odesli' && !odesliApiKey) {
+    results.push({
+      api: 'odesli',
+      artistsProcessed: 0,
+      releasesUpserted: 0,
+      concertsUpserted: 0,
+      rateLimited: false,
+      hasMoreWork: false,
+      errors: ['Odesli skipped: no API key configured'],
+    })
+  }
+
+  if ((!onlyApi || onlyApi === 'odesli') && odesliApiKey) {
     odesliStartedAt = Date.now()
     const odesliResult: ApiSyncResult = {
       api: 'odesli',
@@ -695,7 +711,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
   // resolvable release URL as proxy (artist profile URLs are not supported).
   // Batched like releases so free-tier rate limits do not thrash a single job.
   // Results are merged into the existing odesliResult (same api_source).
-  if (!onlyApi || onlyApi === 'odesli') {
+  if ((!onlyApi || onlyApi === 'odesli') && odesliApiKey) {
     const existingOdesli = results.find((r) => r.api === 'odesli')
 
     if (existingOdesli) {

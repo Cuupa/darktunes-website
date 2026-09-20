@@ -48,18 +48,26 @@ export async function getHealthHeartbeats(
 ): Promise<HealthHeartbeats> {
   const entries = await Promise.all(
     HEARTBEAT_KINDS.map(async (kind) => {
-      const { data, error } = await db
-        .from('cron_ticks')
-        .select('created_at')
-        .eq('kind', kind)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      try {
+        const { data, error } = await db
+          .from('cron_ticks')
+          .select('created_at')
+          .eq('kind', kind)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
 
-      if (error) {
-        throw new Error(`Failed to read ${kind} heartbeat: ${error.message}`)
+        if (error) throw new Error(error.message)
+        return [kind, data?.created_at ?? null] as const
+      } catch (err) {
+        // Telemetry must never take down the health snapshot (e.g. before the
+        // cron_ticks table is applied). Treat an unreadable kind as "no tick".
+        console.warn(
+          `[getHealthHeartbeats] ${kind} read failed:`,
+          err instanceof Error ? err.message : err,
+        )
+        return [kind, null] as const
       }
-      return [kind, data?.created_at ?? null] as const
     }),
   )
 

@@ -39,7 +39,7 @@ All admin routes wrap `withErrorHandler`.
 
 ## Rate limiting
 
-External API calls: `withApiRetry()` + per-API profiles in `src/lib/sync/retryPolicy.ts`. Base `HttpError` in `src/lib/rateLimiter.ts`. Rate-limited (429) errors are **not** retried inside `withApiRetry` — the queue reschedules with cooldown. Transient DNS/network I/O uses `withTransientIoRetry()` (e.g. R2 `getaddrinfo EBUSY`). Odesli uses `resolveOdesliSmartLinkThrottled()` (~4 req/s).
+External API calls: `withApiRetry()` + per-API profiles in `src/lib/sync/retryPolicy.ts`. Base `HttpError` in `src/lib/rateLimiter.ts`. Rate-limited (429) errors are **not** retried inside `withApiRetry` — the queue reschedules with cooldown. Transient DNS/network I/O uses `withTransientIoRetry()` (e.g. R2 `getaddrinfo EBUSY`). Odesli uses `resolveOdesliSmartLinkThrottled()` (~4 req/s) and **requires `odesli_api_key`** (the public v1-alpha.1 API was sunset 2026-07-31); without it Odesli is skipped instead of erroring.
 
 ## Sync service
 
