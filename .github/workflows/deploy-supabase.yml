@@ -1,0 +1,51 @@
+name: Deploy Supabase
+
+# Applies supabase/reset.sql (schema + pg_cron scheduler) to the production
+# database and upserts the Vault secrets the scheduler reads. Runs after the
+# CI workflow succeeds on main, or manually via workflow_dispatch.
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-supabase-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Apply schema + scheduler
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Guard destructive SQL
+        run: npm run check:destructive-sql
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Apply schema + Vault secrets
+        run: npm run db:apply
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SUPABASE_SITE_URL: ${{ secrets.SUPABASE_SITE_URL }}
+          NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
