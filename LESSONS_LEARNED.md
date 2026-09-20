@@ -228,6 +228,16 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-09-20 — A scheduler configured in a dashboard is not observable
+
+- **Finding:** Sync stopped for ~5 days while the admin Health UI could only say “Executor offline”. Scheduling lived in a manually-configured Supabase Cron → `trigger-sync` Edge Function relay (not in `reset.sql`, not in CI), the KV lease TTL (305s) exceeded the cron interval (300s), and the heartbeat was a read-modify-write JSON blob. The actual break — no HTTP request ever reached `/api/sync` — was invisible.
+- **Rule:** Scheduling is infrastructure: define it in `supabase/reset.sql` (`pg_cron` + `pg_net`, secrets from Vault), apply it on deploy, and prove each hop with an append-only tick (`cron_ticks`: `scheduler` from pure SQL, `worker` from the HTTP hop). Claim work atomically in Postgres (`FOR UPDATE SKIP LOCKED`), keep the worker lease TTL below the tick interval, and never rely on a dashboard for the trigger path.
+
+### 2026-09-20 — Sunset third-party APIs need a key gate, not retries
+
+- **Finding:** Odesli's public `v1-alpha.1` API was sunset 2026-07-31 and returned `401 PUBLIC_API_ACCESS_DEPRECATED`; the code had no API-key support and `getKnownApiConfiguration` hard-coded `odesli: true`, so every run burned 30 retries and Health showed Odesli as operational.
+- **Rule:** Model optional credentials explicitly (`odesli_api_key`), gate the job on the credential (no-op when absent), classify 401/403/410/deprecation as permanent, and make “configured” reflect the real credential.
+
 ### 2026-09-17 — Silent numeric coercion turns a decimal comma into a factor-100 error
 
 - **Finding:** `parseCurrencyAmount` stripped the comma in its default path (`15,79` → `1579`), the Darkmerch parser replaced only the first comma, and quantities were forced through `Math.max(1, …)`/digit-stripping — turning refunds into sales and `12x` into `12`. Invalid rows silently became `0`.
@@ -457,4 +467,4 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ---
 
-*Last updated: 2026-09-03*
+*Last updated: 2026-09-20*

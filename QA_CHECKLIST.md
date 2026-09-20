@@ -41,7 +41,7 @@
 - [ ] Confirm `GET /api/health?mode=full` without auth returns 401; admin System Health widget still loads with Bearer token
 - [ ] Admin System Health shows app version `vX.Y.Z` (matches `package.json`); on Vercel also shows short commit SHA next to status
 - [ ] Admin System Health: a chatty API (many recent logs) does not force quieter configured APIs to “Awaiting first sync” / Never when they have older successful `sync_logs`
-- [ ] After YouTube cron (or manual `/api/sync-youtube`), Health shows a youtube last-run + `sync_youtube` heartbeat; large channels do not OOM (cap 500)
+- [ ] After YouTube cron (or manual `/api/sync-youtube`), Health shows a youtube last-run + `youtube` tick; large channels do not OOM (cap 500)
 - [ ] Confirm press-only news is absent from public `/news` and `/news/[slug]` but visible in press dashboard when published
 - [ ] Confirm theme custom CSS cannot inject `</style><script>` breakout (sanitized to empty)
 - [ ] Confirm `SUPABASE_SERVICE_ROLE_KEY` is never exposed in client HTML
@@ -221,14 +221,15 @@
 - [ ] Full artist sync does **not** claim to update videos (YouTube is a separate action)
 - [ ] `GET /api/sync/queue` with admin Bearer returns `{ pending, running, done, failed }` and does **not** enqueue jobs
 - [ ] Admin → System → **Advanced**: job table lists pending/running; cancel pending removes work; cancel running sets cancel-requested then job ends cancelled; retry failed re-queues
-- [ ] Force Sync / Sync All: many artists drain continuously (executor self-chains); no manual re-kick every ~5 min while due jobs remain; rate-limited artists pause with cooldown while others proceed
-- [ ] Cron/Admin `apiSource: spotify`, `odesli`, `songkick`, or `bandsintown` via `/api/sync-api` starts the executor immediately (jobs do not wait for the next 5-minute process-queue tick)
+- [ ] Force Sync / Sync All: many artists drain continuously (pg_cron re-invokes the worker every minute); no manual re-kick while due jobs remain; rate-limited artists pause with cooldown while others proceed
+- [ ] Cron/Admin `apiSource: spotify`, `odesli`, `songkick`, or `bandsintown` via `/api/sync-api` starts the executor immediately (jobs do not wait for the next worker tick)
 - [ ] Odesli 429 does not stop remaining smart-link resolves or skip artist `platform_links`; leftover rows continue on the next batch without a 15-minute park
 - [ ] Artists with >200 iTunes collections get further pages (not truncated at 200)
 - [ ] Failed Spotify/Discogs cover uploads appear in sync errors (remote URL may remain)
-- [ ] YouTube remains a separate channel action (Force Sync YouTube / cron `type=youtube`); artist queue jobs do not write videos
-- [ ] Stuck `running` jobs recover within ~6 minutes and stats GET unblocks re-kick
-- [ ] Admin → System → Health: **no** infra setup (no CRON_SECRET / Supabase Cron / Edge Function / Vercel / R2 operator docs); speaking issues stay product-facing (Force Sync / technical operator), never expose secrets or cron schedules
+- [ ] YouTube remains a separate channel action (Force Sync YouTube / pg_cron `sync-youtube-daily`); artist queue jobs do not write videos
+- [ ] Stuck `running` jobs recover within ~6 minutes (claim RPC visibility timeout) and stats GET unblocks re-kick
+- [ ] Admin → System → Health distinguishes a live scheduler with an unreachable worker (“Executor unreachable”) from a dead scheduler (“Scheduler offline”) using `cron_ticks`
+- [ ] Admin → System → Health: **no** infra setup (no CRON_SECRET / Supabase Cron / Vault / Vercel / R2 operator docs); speaking issues stay product-facing (Force Sync / technical operator), never expose secrets or cron schedules
 - [ ] `vercel.json` has no `crons` key
 
 ## Documentation
@@ -238,8 +239,7 @@
 
 ## Test Execution
 - [ ] Run unit tests (`npm run test`)
-- [ ] Run E2E tests (`npm run test:e2e`)
-- [ ] Run performance tests (`npm run perf:test`)
+- [ ] Run the full local pipeline (`npm run ci`)
 - [ ] Review visual regression outputs when relevant
 
 ## GDPR & Consent
