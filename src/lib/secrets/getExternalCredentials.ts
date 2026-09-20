@@ -71,16 +71,18 @@ export interface SyncCredentials {
   discogsToken?: string
   songkickApiKey?: string
   bandsintownApiKey?: string
+  odesliApiKey?: string
 }
 
 export async function getSyncCredentials(db: DbClient): Promise<SyncCredentials> {
-  const [clientId, clientSecret, discogsToken, songkickApiKey, bandsintownApiKey] =
+  const [clientId, clientSecret, discogsToken, songkickApiKey, bandsintownApiKey, odesliApiKey] =
     await Promise.all([
       getApiCredential(db, 'spotify_client_id'),
       getApiCredential(db, 'spotify_client_secret'),
       getApiCredential(db, 'discogs_token'),
       getApiCredential(db, 'songkick_api_key'),
       getApiCredential(db, 'bandsintown_api_key'),
+      getApiCredential(db, 'odesli_api_key'),
     ])
 
   return {
@@ -89,6 +91,7 @@ export async function getSyncCredentials(db: DbClient): Promise<SyncCredentials>
     discogsToken: discogsToken ?? undefined,
     songkickApiKey: songkickApiKey ?? undefined,
     bandsintownApiKey: bandsintownApiKey ?? undefined,
+    odesliApiKey: odesliApiKey ?? undefined,
   }
 }
 
@@ -183,6 +186,7 @@ export async function getKnownApiConfiguration(
     spotifyClientId,
     spotifyClientSecret,
     discogsToken,
+    odesliApiKey,
     songkickApiKey,
     bandsintownApiKey,
     lastfmApiKey,
@@ -196,6 +200,7 @@ export async function getKnownApiConfiguration(
     getApiCredential(db, 'spotify_client_id'),
     getApiCredential(db, 'spotify_client_secret'),
     getApiCredential(db, 'discogs_token'),
+    getApiCredential(db, 'odesli_api_key'),
     getApiCredential(db, 'songkick_api_key'),
     getApiCredential(db, 'bandsintown_api_key'),
     getApiCredential(db, 'lastfm_api_key'),
@@ -218,7 +223,7 @@ export async function getKnownApiConfiguration(
     discogs: Boolean(discogsToken),
     songkick: Boolean(songkickApiKey),
     bandsintown: hasBandsintown,
-    odesli: true,
+    odesli: Boolean(odesliApiKey),
     lastfm: Boolean(lastfmApiKey),
     soundcharts: Boolean(soundchartsApiKey),
     apify: Boolean(apifyToken),

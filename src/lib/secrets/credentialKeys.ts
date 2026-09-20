@@ -7,6 +7,7 @@ export type CredentialCategory = 'sync' | 'email' | 'newsletter' | 'monitoring'
 export type CredentialGroup =
   | 'spotify'
   | 'discogs'
+  | 'odesli'
   | 'songkick'
   | 'bandsintown'
   | 'lastfm'
@@ -55,6 +56,16 @@ export const CREDENTIAL_KEY_DEFINITIONS: readonly CredentialKeyDefinition[] = [
     group: 'discogs',
     isSecret: true,
     docsUrl: 'https://www.discogs.com/settings/developers',
+  },
+  {
+    key: 'odesli_api_key',
+    label: 'API Key',
+    description:
+      'Odesli / song.link API key. Required since the public API was deprecated (unauthenticated calls return 401 PUBLIC_API_ACCESS_DEPRECATED).',
+    category: 'sync',
+    group: 'odesli',
+    isSecret: true,
+    docsUrl: 'https://linktree.notion.site/API-d0ebe08a5e304a55928405eb682f6741',
   },
   {
     key: 'songkick_api_key',
@@ -194,6 +205,7 @@ export const CATEGORY_LABELS: Record<CredentialCategory, string> = {
 export const GROUP_LABELS: Record<CredentialGroup, string> = {
   spotify: 'Spotify',
   discogs: 'Discogs',
+  odesli: 'Odesli',
   songkick: 'Songkick',
   bandsintown: 'Bandsintown',
   lastfm: 'Last.fm',
@@ -210,6 +222,7 @@ export const GROUP_ORDER_BY_CATEGORY: Record<CredentialCategory, readonly Creden
   sync: [
     'spotify',
     'discogs',
+    'odesli',
     'songkick',
     'bandsintown',
     'lastfm',

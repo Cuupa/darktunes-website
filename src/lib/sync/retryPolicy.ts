@@ -58,6 +58,10 @@ export function classifySyncError(err: unknown): SyncErrorClass {
   if (msg.includes('429') || msg.includes('TOO_MANY_REQUESTS')) return 'rate_limited'
   if (msg.includes('502') || msg.includes('503') || msg.includes('504')) return 'transient'
   if (isTransientNetworkError(err)) return 'transient'
+  // Deprecation failures never recover by retrying (e.g. Odesli's
+  // PUBLIC_API_ACCESS_DEPRECATED after the v1-alpha.1 sunset). HTTP status
+  // errors are already classified as permanent via the HttpError branch above.
+  if (msg.includes('PUBLIC_API_ACCESS_DEPRECATED')) return 'permanent'
   if (
     msg.includes('404') ||
     msg.includes('405') ||

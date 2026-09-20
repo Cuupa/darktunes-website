@@ -38,10 +38,11 @@ export function resetOdesliThrottleForTests(): void {
 export async function resolveOdesliSmartLinkThrottled(
   musicUrl: string,
   fetchFn: typeof fetch,
+  apiKey?: string | null,
 ): Promise<Awaited<ReturnType<typeof resolveOdesliSmartLink>>> {
   const run = chain.then(async () => {
     await scheduleGap()
-    return withApiRetry('odesli', () => resolveOdesliSmartLink(musicUrl, fetchFn))
+    return withApiRetry('odesli', () => resolveOdesliSmartLink(musicUrl, fetchFn, apiKey))
   })
   chain = run.then(
     () => undefined,

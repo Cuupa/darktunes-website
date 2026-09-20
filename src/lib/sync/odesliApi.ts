@@ -113,10 +113,15 @@ export function isSkippableOdesliError(err: string): boolean {
  *
  * @param musicUrl  - Album or track URL (Spotify, Apple Music, etc.)
  * @param fetchFn   - Injectable fetch (real in prod, mocked in tests)
+ * @param apiKey    - Optional Odesli/song.link API key. Sent as
+ *                    `Authorization: Bearer <key>`. The public (unauthenticated)
+ *                    v1-alpha.1 API was sunset on 2026-07-31 and now returns
+ *                    401 PUBLIC_API_ACCESS_DEPRECATED.
  */
 export async function resolveOdesliSmartLink(
   musicUrl: string,
   fetchFn: typeof fetch,
+  apiKey?: string | null,
 ): Promise<OdesliSmartLink> {
   if (!isOdesliResolvableUrl(musicUrl)) {
     throw new HttpError(422, 'URL type not supported by Odesli')
@@ -125,7 +130,10 @@ export async function resolveOdesliSmartLink(
   const url = new URL('https://api.song.link/v1-alpha.1/links')
   url.searchParams.set('url', musicUrl)
 
-  const response = await fetchFn(url.toString())
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`
+
+  const response = await fetchFn(url.toString(), { headers })
 
   // Read the body as text first so we can provide a meaningful error even when
   // the server returns a non-JSON body (e.g. "An error occurred …").

@@ -149,4 +149,18 @@ describe('resolveOdesliSmartLink', () => {
     expect(result.smartUrl).toBe('https://song.link/s/only')
     expect(result.platforms).toEqual({})
   })
+
+  it('sends a Bearer Authorization header when an API key is provided', async () => {
+    const fetch = makeFetch(200, VALID_RESPONSE)
+    await resolveOdesliSmartLink('https://open.spotify.com/track/abc123', fetch, 'odesli-key')
+    const init = fetch.mock.calls[0]?.[1] as { headers?: Record<string, string> } | undefined
+    expect(init?.headers?.Authorization).toBe('Bearer odesli-key')
+  })
+
+  it('omits the Authorization header without an API key', async () => {
+    const fetch = makeFetch(200, VALID_RESPONSE)
+    await resolveOdesliSmartLink('https://open.spotify.com/track/abc123', fetch)
+    const init = fetch.mock.calls[0]?.[1] as { headers?: Record<string, string> } | undefined
+    expect(init?.headers?.Authorization).toBeUndefined()
+  })
 })

@@ -51,6 +51,8 @@ export interface SyncAllDeps extends SyncDeps {
   songkickApiKey?: string
   /** Bandsintown API key — undefined means Bandsintown sync is skipped */
   bandsintownApiKey?: string
+  /** Odesli / song.link API key — undefined means Odesli calls are unauthenticated */
+  odesliApiKey?: string
   /**
    * When set, only the sync step for this API source is executed.
    * Useful for per-API force-sync from the admin health widget.
@@ -178,6 +180,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
     discogsToken,
     songkickApiKey,
     bandsintownApiKey,
+    odesliApiKey,
     onlyApi,
     onlyArtistId,
     odesliBatchLimit = ODESLI_BATCH_SIZE,
@@ -634,7 +637,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
         odesliResult.artistsProcessed++
 
         try {
-          const odesli = await resolveOdesliSmartLinkThrottled(musicUrl, fetchFn)
+          const odesli = await resolveOdesliSmartLinkThrottled(musicUrl, fetchFn, odesliApiKey)
           const appleMusicUrl =
             odesli.platforms['appleMusic'] ?? odesli.platforms['itunes'] ?? null
 
@@ -756,7 +759,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
             if (existingOdesli) existingOdesli.artistsProcessed++
 
             try {
-              const odesli = await resolveOdesliSmartLinkThrottled(musicUrl, fetchFn)
+              const odesli = await resolveOdesliSmartLinkThrottled(musicUrl, fetchFn, odesliApiKey)
               const platforms = odesli.platforms
               const { error: updateErr } = await db
                 .from('artists')
