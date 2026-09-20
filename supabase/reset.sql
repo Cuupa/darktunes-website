@@ -16,6 +16,20 @@
 -- ---------------------------------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Scheduler extensions (Supabase: pg_cron + pg_net). Guarded so environments
+-- without them (e.g. bare local Postgres) still apply the rest of the schema.
+DO $$ BEGIN
+  CREATE EXTENSION IF NOT EXISTS pg_cron;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'pg_cron extension not available: %', SQLERRM;
+END $$;
+
+DO $$ BEGIN
+  CREATE EXTENSION IF NOT EXISTS pg_net;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'pg_net extension not available: %', SQLERRM;
+END $$;
+
 -- ---------------------------------------------------------------------------
 -- SCHEMA PERMISSIONS
 -- ---------------------------------------------------------------------------
@@ -3117,6 +3131,179 @@ DROP POLICY IF EXISTS "sync_queue: admin all" ON public.sync_queue;
 CREATE POLICY "sync_queue: admin all" ON public.sync_queue
   FOR ALL USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
+
+-- =============================================================================
+-- SYNC INFRASTRUCTURE — ledger, worker lease, atomic claim, scheduler
+-- -----------------------------------------------------------------------------
+-- Enterprise sync orchestration:
+--   * cron_ticks         — dead-man's switch: 'scheduler' (pg_cron alive) and
+--                          'worker' (HTTP hop reached Next.js)
+--   * sync_runs          — durable per-run ledger (health + audit)
+--   * sync_worker_lease  — single-flight lease (atomic, TTL, owner token)
+--   * claim_sync_jobs()  — atomic batch claim via FOR UPDATE SKIP LOCKED
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS public.cron_ticks (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  kind       TEXT        NOT NULL,   -- 'scheduler' | 'worker'
+  status     TEXT,                   -- 'ok' | 'error' | 'already_running'
+  detail     TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_cron_ticks_kind_created ON public.cron_ticks (kind, created_at DESC);
+ALTER TABLE public.cron_ticks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "cron_ticks: admin read" ON public.cron_ticks;
+CREATE POLICY "cron_ticks: admin read" ON public.cron_ticks
+  FOR SELECT USING (public.get_my_role() = 'admin');
+
+CREATE TABLE IF NOT EXISTS public.sync_runs (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  trigger     TEXT        NOT NULL,  -- 'cron' | 'admin' | 'self-chain' | 'enqueue-kick'
+  status      TEXT        NOT NULL,  -- 'ok' | 'error' | 'already_running'
+  claimed     INTEGER     NOT NULL DEFAULT 0,
+  completed   INTEGER     NOT NULL DEFAULT 0,
+  failed      INTEGER     NOT NULL DEFAULT 0,
+  duration_ms INTEGER,
+  error       TEXT,
+  started_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  finished_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_sync_runs_started_at ON public.sync_runs (started_at DESC);
+ALTER TABLE public.sync_runs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "sync_runs: admin read" ON public.sync_runs;
+CREATE POLICY "sync_runs: admin read" ON public.sync_runs
+  FOR SELECT USING (public.get_my_role() = 'admin');
+
+-- Single-row lease table (id = 1). The owner token prevents a stale worker
+-- from clearing a newer worker's lease after a hard kill.
+CREATE TABLE IF NOT EXISTS public.sync_worker_lease (
+  id         INTEGER     PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  token      TEXT,
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT to_timestamp(0),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+INSERT INTO public.sync_worker_lease (id, token, expires_at)
+VALUES (1, NULL, to_timestamp(0))
+ON CONFLICT (id) DO NOTHING;
+ALTER TABLE public.sync_worker_lease ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "sync_worker_lease: admin read" ON public.sync_worker_lease;
+CREATE POLICY "sync_worker_lease: admin read" ON public.sync_worker_lease
+  FOR SELECT USING (public.get_my_role() = 'admin');
+
+-- Atomically claim up to p_qty due jobs. Replaces the old KV lease + optimistic
+-- lock: FOR UPDATE SKIP LOCKED makes concurrent workers safe by construction.
+CREATE OR REPLACE FUNCTION public.claim_sync_jobs(p_qty INTEGER DEFAULT 1)
+RETURNS SETOF public.sync_queue
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_now          TIMESTAMPTZ := NOW();
+  v_locked_until TIMESTAMPTZ := NOW() + INTERVAL '6 minutes';
+  v_qty          INTEGER     := GREATEST(COALESCE(p_qty, 1), 1);
+BEGIN
+  -- Visibility-timeout recovery: running jobs past their lock are re-queued.
+  UPDATE public.sync_queue
+     SET status = 'pending', locked_until = NULL, started_at = NULL
+   WHERE status = 'running'
+     AND (
+       locked_until < v_now
+       OR (locked_until IS NULL AND started_at < v_now - INTERVAL '6 minutes')
+     );
+
+  RETURN QUERY
+  WITH candidates AS (
+    SELECT id
+      FROM public.sync_queue
+     WHERE status = 'pending'
+       AND attempt_count < 3
+       AND scheduled_at <= v_now
+     ORDER BY scheduled_at ASC
+     FOR UPDATE SKIP LOCKED
+     LIMIT v_qty
+  )
+  UPDATE public.sync_queue q
+     SET status        = 'running',
+         started_at    = v_now,
+         locked_until  = v_locked_until,
+         attempt_count = q.attempt_count + 1
+    FROM candidates c
+   WHERE q.id = c.id
+  RETURNING q.*;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.acquire_sync_worker_lease(
+  p_token TEXT,
+  p_ttl_ms INTEGER DEFAULT 90000
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_row public.sync_worker_lease;
+BEGIN
+  SELECT * INTO v_row FROM public.sync_worker_lease WHERE id = 1 FOR UPDATE;
+  IF NOT FOUND THEN
+    INSERT INTO public.sync_worker_lease (id, token, expires_at)
+    VALUES (1, p_token, NOW() + make_interval(secs => (p_ttl_ms::DOUBLE PRECISION / 1000.0)));
+    RETURN TRUE;
+  END IF;
+  IF v_row.expires_at > NOW() AND v_row.token IS DISTINCT FROM p_token THEN
+    RETURN FALSE;
+  END IF;
+  UPDATE public.sync_worker_lease
+     SET token      = p_token,
+         expires_at = NOW() + make_interval(secs => (p_ttl_ms::DOUBLE PRECISION / 1000.0)),
+         updated_at = NOW()
+   WHERE id = 1;
+  RETURN TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.renew_sync_worker_lease(
+  p_token TEXT,
+  p_ttl_ms INTEGER DEFAULT 90000
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  UPDATE public.sync_worker_lease
+     SET expires_at = NOW() + make_interval(secs => (p_ttl_ms::DOUBLE PRECISION / 1000.0)),
+         updated_at = NOW()
+   WHERE id = 1 AND token = p_token;
+  RETURN FOUND;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.release_sync_worker_lease(p_token TEXT)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  UPDATE public.sync_worker_lease
+     SET token = NULL, expires_at = to_timestamp(0), updated_at = NOW()
+   WHERE id = 1 AND token = p_token;
+END;
+$$;
+
+-- Only the service role (Next.js worker) may claim jobs / manage the lease.
+REVOKE ALL ON FUNCTION public.claim_sync_jobs(INTEGER) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.acquire_sync_worker_lease(TEXT, INTEGER) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.renew_sync_worker_lease(TEXT, INTEGER) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.release_sync_worker_lease(TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_sync_jobs(INTEGER) TO service_role;
+GRANT EXECUTE ON FUNCTION public.acquire_sync_worker_lease(TEXT, INTEGER) TO service_role;
+GRANT EXECUTE ON FUNCTION public.renew_sync_worker_lease(TEXT, INTEGER) TO service_role;
+GRANT EXECUTE ON FUNCTION public.release_sync_worker_lease(TEXT) TO service_role;
 
 -- =============================================================================
 -- COLUMN REMOVALS (idempotent)
@@ -7115,3 +7302,160 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+-- =============================================================================
+-- SCHEDULER — Supabase pg_cron → pg_net → Next.js worker (IaC, no dashboard)
+-- -----------------------------------------------------------------------------
+-- Secrets (`site_url`, `cron_secret`) live in Supabase Vault and are upserted by
+-- the deploy pipeline — never stored in this file. The trigger functions read
+-- them at runtime, so the cron job command never contains a secret.
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.get_vault_secret(p_name TEXT)
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_secret TEXT;
+BEGIN
+  SELECT decrypted_secret INTO v_secret
+    FROM vault.decrypted_secrets
+   WHERE name = p_name
+   LIMIT 1;
+  RETURN v_secret;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.trigger_sync_worker()
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, net, pg_temp
+AS $$
+DECLARE
+  v_url    TEXT;
+  v_secret TEXT;
+BEGIN
+  v_url    := public.get_vault_secret('site_url');
+  v_secret := public.get_vault_secret('cron_secret');
+  IF v_url IS NULL OR v_url = '' OR v_secret IS NULL OR v_secret = '' THEN
+    RAISE WARNING 'trigger_sync_worker: vault secrets site_url/cron_secret not configured';
+    RETURN;
+  END IF;
+  PERFORM net.http_post(
+    rtrim(v_url, '/') || '/api/sync',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    jsonb_build_object(
+      'Authorization', 'Bearer ' || v_secret,
+      'Content-Type', 'application/json'
+    ),
+    5000
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.trigger_sync_enqueue()
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, net, pg_temp
+AS $$
+DECLARE
+  v_url    TEXT;
+  v_secret TEXT;
+BEGIN
+  v_url    := public.get_vault_secret('site_url');
+  v_secret := public.get_vault_secret('cron_secret');
+  IF v_url IS NULL OR v_url = '' OR v_secret IS NULL OR v_secret = '' THEN
+    RAISE WARNING 'trigger_sync_enqueue: vault secrets site_url/cron_secret not configured';
+    RETURN;
+  END IF;
+  PERFORM net.http_post(
+    rtrim(v_url, '/') || '/api/sync/queue',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    jsonb_build_object(
+      'Authorization', 'Bearer ' || v_secret,
+      'Content-Type', 'application/json'
+    ),
+    5000
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.trigger_sync_youtube()
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, net, pg_temp
+AS $$
+DECLARE
+  v_url    TEXT;
+  v_secret TEXT;
+BEGIN
+  v_url    := public.get_vault_secret('site_url');
+  v_secret := public.get_vault_secret('cron_secret');
+  IF v_url IS NULL OR v_url = '' OR v_secret IS NULL OR v_secret = '' THEN
+    RAISE WARNING 'trigger_sync_youtube: vault secrets site_url/cron_secret not configured';
+    RETURN;
+  END IF;
+  PERFORM net.http_post(
+    rtrim(v_url, '/') || '/api/sync-youtube',
+    '{}'::jsonb,
+    '{}'::jsonb,
+    jsonb_build_object(
+      'Authorization', 'Bearer ' || v_secret,
+      'Content-Type', 'application/json'
+    ),
+    5000
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_vault_secret(TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trigger_sync_worker() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trigger_sync_enqueue() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trigger_sync_youtube() FROM PUBLIC, anon, authenticated;
+
+-- Register the cron jobs. Guarded: no-ops when pg_cron is unavailable.
+-- cron.schedule(job_name, …) is idempotent (updates an existing job by name).
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    -- Scheduler liveness (pure SQL, no HTTP) — proves pg_cron itself is alive.
+    PERFORM cron.schedule(
+      'scheduler-heartbeat',
+      '* * * * *',
+      $job$INSERT INTO public.cron_ticks (kind, status) VALUES ('scheduler', 'ok');$job$
+    );
+    -- Worker tick: drive the Next.js sync worker every minute.
+    PERFORM cron.schedule(
+      'sync-worker',
+      '* * * * *',
+      $job$SELECT public.trigger_sync_worker();$job$
+    );
+    -- Daily full enqueue for all artists.
+    PERFORM cron.schedule(
+      'sync-enqueue-daily',
+      '0 3 * * *',
+      $job$SELECT public.trigger_sync_enqueue();$job$
+    );
+    -- Daily YouTube channel sync.
+    PERFORM cron.schedule(
+      'sync-youtube-daily',
+      '0 6 * * *',
+      $job$SELECT public.trigger_sync_youtube();$job$
+    );
+    -- Telemetry retention: keep ticks 14d and run ledger 30d.
+    PERFORM cron.schedule(
+      'sync-telemetry-cleanup',
+      '15 4 * * *',
+      $job$DELETE FROM public.cron_ticks WHERE created_at < NOW() - INTERVAL '14 days'; DELETE FROM public.sync_runs WHERE started_at < NOW() - INTERVAL '30 days';$job$
+    );
+  END IF;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'sync scheduler setup skipped: %', SQLERRM;
+END $$;

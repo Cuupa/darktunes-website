@@ -577,6 +577,90 @@ export interface Database {
           }
         ]
       }
+      cron_ticks: {
+        Row: {
+          id: string
+          kind: string
+          status: string | null
+          detail: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          kind: string
+          status?: string | null
+          detail?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          kind?: string
+          status?: string | null
+          detail?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      sync_runs: {
+        Row: {
+          id: string
+          trigger: string
+          status: string
+          claimed: number
+          completed: number
+          failed: number
+          duration_ms: number | null
+          error: string | null
+          started_at: string
+          finished_at: string | null
+        }
+        Insert: {
+          id?: string
+          trigger: string
+          status: string
+          claimed?: number
+          completed?: number
+          failed?: number
+          duration_ms?: number | null
+          error?: string | null
+          started_at?: string
+          finished_at?: string | null
+        }
+        Update: {
+          id?: string
+          trigger?: string
+          status?: string
+          claimed?: number
+          completed?: number
+          failed?: number
+          duration_ms?: number | null
+          error?: string | null
+          started_at?: string
+          finished_at?: string | null
+        }
+        Relationships: []
+      }
+      sync_worker_lease: {
+        Row: {
+          id: number
+          token: string | null
+          expires_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          token?: string | null
+          expires_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          token?: string | null
+          expires_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_invites: {
         Row: {
           id: string
@@ -5324,6 +5408,46 @@ export interface Database {
           created_at: string
           updated_at: string
         }
+      }
+      claim_sync_jobs: {
+        Args: {
+          p_qty?: number
+        }
+        Returns: {
+          id: string
+          artist_id: string | null
+          job_type: string
+          status: string
+          scheduled_at: string
+          started_at: string | null
+          finished_at: string | null
+          locked_until: string | null
+          cancel_requested_at: string | null
+          cancelled_at: string | null
+          error_message: string | null
+          attempt_count: number
+          created_at: string
+        }[]
+      }
+      acquire_sync_worker_lease: {
+        Args: {
+          p_token: string
+          p_ttl_ms?: number
+        }
+        Returns: boolean
+      }
+      renew_sync_worker_lease: {
+        Args: {
+          p_token: string
+          p_ttl_ms?: number
+        }
+        Returns: boolean
+      }
+      release_sync_worker_lease: {
+        Args: {
+          p_token: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

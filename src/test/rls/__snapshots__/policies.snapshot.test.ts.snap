@@ -81,6 +81,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "concerts: artist own read",
   "concerts: artist own update",
   "concerts: public read visible",
+  "cron_ticks: admin read",
   "custom_permission_definitions: admin read",
   "custom_permission_definitions: admin write",
   "custom_role_permissions: admin read",
@@ -245,6 +246,8 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "support_known_errors: admin write",
   "sync_logs: editor+ read",
   "sync_queue: admin all",
+  "sync_runs: admin read",
+  "sync_worker_lease: admin read",
   "tour_artist_finance: admin all",
   "tour_artist_finance: own artist",
   "tour_collaborators: admin all",
@@ -318,6 +321,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "ban_history",
   "concert_artists",
   "concerts",
+  "cron_ticks",
   "custom_permission_definitions",
   "custom_role_permissions",
   "custom_roles",
@@ -391,6 +395,8 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "support_known_errors",
   "sync_logs",
   "sync_queue",
+  "sync_runs",
+  "sync_worker_lease",
   "tour_artist_finance",
   "tour_collaborators",
   "tour_contacts",
@@ -541,6 +547,9 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
     "concerts: artist own read",
     "concerts: artist own update",
     "concerts: public read visible",
+  ],
+  "cron_ticks": [
+    "cron_ticks: admin read",
   ],
   "custom_permission_definitions": [
     "custom_permission_definitions: admin read",
@@ -849,6 +858,12 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   ],
   "sync_queue": [
     "sync_queue: admin all",
+  ],
+  "sync_runs": [
+    "sync_runs: admin read",
+  ],
+  "sync_worker_lease": [
+    "sync_worker_lease: admin read",
   ],
   "tour_artist_finance": [
     "tour_artist_finance: admin all",
