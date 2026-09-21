@@ -23,7 +23,10 @@ import {
 } from '@/lib/api/settlementPeriods'
 import { createSalesStatementLineItems } from '@/lib/api/salesStatementLineItems'
 import { canPublishStatement } from '@/lib/sos/statementPublishAccess'
-import { validateStatementUploadPeriod } from '@/lib/sos/statementUploadValidation'
+import {
+  validateStatementSourceArchive,
+  validateStatementUploadPeriod,
+} from '@/lib/sos/statementUploadValidation'
 import {
   buildStatementR2Key,
   deleteStatementPdfFromR2,
@@ -57,6 +60,8 @@ export interface UploadStatementInput {
   pdfBase64: string
   /** When true, sends the artist notification email immediately. Defaults to false. */
   notifyArtist?: boolean
+  sourceFileCount?: number
+  archivedFileCount?: number
 }
 
 export interface UploadStatementResult {
@@ -100,6 +105,10 @@ export async function uploadStatement(
     const periodValidation = validateStatementUploadPeriod(input)
     if (!periodValidation.ok) {
       return { success: false, error: periodValidation.message }
+    }
+    const archiveValidation = validateStatementSourceArchive(input)
+    if (!archiveValidation.ok) {
+      return { success: false, error: archiveValidation.message }
     }
     const { periodStart, periodEnd, period } = periodValidation
 

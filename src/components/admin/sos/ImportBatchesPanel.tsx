@@ -11,6 +11,7 @@ import type { DistributorImportBatch } from '@/lib/api/distributorImportBatches'
 import type { LabelArtist } from '@/lib/sos/types'
 import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
+import { explainSosError } from '@/lib/sos/explainSosError'
 
 interface ImportBatchesPanelProps {
   labelArtists: LabelArtist[]
@@ -55,22 +56,27 @@ export function ImportBatchesPanel({
   const t = useMergedAccountingLabels(BRONZE_FALLBACK)
   const [batches, setBatches] = useState<DistributorImportBatch[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const loadBatches = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const res = await fetch('/api/admin/sos/import-batches')
       if (!res.ok) throw new Error(t.bronzeLoadError)
       const data = (await res.json()) as { batches: DistributorImportBatch[] }
       setBatches(data.batches ?? [])
+      setLoadError(null)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t.bronzeLoadError)
+      const message = explainSosError(err instanceof Error ? err.message : t.bronzeLoadError, t)
+      setLoadError(message)
+      toast.error(message)
     } finally {
       setLoading(false)
     }
-  }, [t.bronzeLoadError])
+  }, [t])
 
   useEffect(() => {
     void loadBatches()
@@ -108,7 +114,7 @@ export function ImportBatchesPanel({
         setDeleteTargetId(null)
         await loadBatches()
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t.bronzeDeleteError)
+        toast.error(explainSosError(err instanceof Error ? err.message : t.bronzeDeleteError, t))
       }
     })
   }
@@ -143,13 +149,27 @@ export function ImportBatchesPanel({
         )
         await loadBatches()
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t.bronzeReprocessError)
+        toast.error(explainSosError(err instanceof Error ? err.message : t.bronzeReprocessError, t))
       }
     })
   }
 
-  if (loading) {
+  if (loading && batches.length === 0 && !loadError) {
     return <p className="text-sm text-muted-foreground p-4">{t.bronzeLoading}</p>
+  }
+
+  if (loadError && batches.length === 0) {
+    return (
+      <div
+        className="flex flex-col gap-3 border border-border rounded-lg p-4 sm:flex-row sm:items-center sm:justify-between"
+        role="alert"
+      >
+        <p className="text-sm text-destructive">{loadError}</p>
+        <Button type="button" size="sm" variant="outline" onClick={() => void loadBatches()} disabled={loading}>
+          {t.bronzeRefresh}
+        </Button>
+      </div>
+    )
   }
 
   if (batches.length === 0) {
@@ -173,6 +193,14 @@ export function ImportBatchesPanel({
           {t.bronzeRefresh}
         </Button>
       </div>
+      {loadError && (
+        <div className="flex flex-col gap-2 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between" role="alert">
+          <p className="text-sm text-destructive">{loadError}</p>
+          <Button type="button" size="sm" variant="outline" onClick={() => void loadBatches()} disabled={loading}>
+            {t.bronzeRefresh}
+          </Button>
+        </div>
+      )}
       <div className={horizontalScrollClass} data-lenis-prevent>
         <table className="w-full text-sm">
           <thead>

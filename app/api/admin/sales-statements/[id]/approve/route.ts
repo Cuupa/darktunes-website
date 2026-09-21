@@ -7,6 +7,7 @@ import {
 } from '@/lib/api/salesStatements'
 import { assertStatementPeriodWritable } from '@/lib/api/settlementPeriods'
 import { ApiError, withErrorHandler } from '@/lib/errors'
+import { emitNotification } from '@/lib/notifications/emit'
 import { notifyStatementArtist } from '@/lib/sos/notifyStatementArtist'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 const approveSchema = z.object({
@@ -38,6 +39,20 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   )
 
   await linkApprovedStatementToSettlement(supabase, outcome.statement, userId)
+
+  if (outcome.emailSent) {
+    try {
+      await emitNotification(serviceSupabase, {
+        type: 'statement_available',
+        entityId: outcome.statement.id,
+        entityName: outcome.statement.period || outcome.statement.filename || 'New statement',
+        artistId: outcome.statement.artistId,
+        dedupeKey: `statement_available:${outcome.statement.id}`,
+      })
+    } catch (err) {
+      console.error('[sales-statements/approve] in-app notification failed:', err)
+    }
+  }
 
   return NextResponse.json({
     statement: outcome.statement,

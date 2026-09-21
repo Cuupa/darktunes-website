@@ -8,16 +8,17 @@ export type SalesStatementStatus = Database['public']['Tables']['sales_statement
  * received (handled on artist_invoices). No reverse / unlock / unpay.
  *
  * invoiced/acknowledged may go to superseded so a correction of an already
- * invoiced statement can replace it on approve.
+ * invoiced statement can replace it on approve. `cancelled` is terminal/legacy
+ * only — drafts are deleted, there is no statement-cancel writer.
  */
 export const STATEMENT_TRANSITIONS: Record<SalesStatementStatus, readonly SalesStatementStatus[]> = {
-  draft: ['label_approved', 'cancelled'],
-  label_approved: ['artist_notified', 'viewed', 'invoiced', 'cancelled', 'superseded'],
-  artist_notified: ['viewed', 'invoiced', 'cancelled', 'superseded'],
-  viewed: ['invoiced', 'paid', 'cancelled', 'superseded'],
-  invoiced: ['paid', 'cancelled', 'superseded'],
+  draft: ['label_approved'],
+  label_approved: ['artist_notified', 'viewed', 'invoiced', 'superseded'],
+  artist_notified: ['viewed', 'invoiced', 'superseded'],
+  viewed: ['invoiced', 'paid', 'superseded'],
+  invoiced: ['paid', 'superseded'],
   paid: [],
-  acknowledged: ['paid', 'cancelled', 'superseded'],
+  acknowledged: ['paid', 'superseded'],
   superseded: [],
   cancelled: [],
 }

@@ -15,7 +15,6 @@ import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import {
-  formatAccountingPeriodLabel,
   resolveAccountingPeriod,
 } from '@/lib/sos/accountingPeriod'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -37,6 +36,8 @@ import type {
 } from '@/lib/sos/types'
 import { DEFAULT_PDF_EXPORT_SETTINGS, DEFAULT_APP_DEFAULTS, DEFAULT_EMAIL_CONFIG, DEFAULT_LABEL_INFO } from '@/lib/sos/defaults'
 import {
+  durableAccountingSettings,
+  mergePeriodScopedSettings,
   normalizeAccountingConfig,
   settingsFingerprint,
   type SosAccountingSettings,
@@ -48,22 +49,10 @@ import {
 } from '@/lib/sos/excelExportSettings'
 import { ExcelExportDialog } from '@/components/admin/sos/ExcelExportDialog'
 import type { CsvImportProfile } from '@/lib/sos/ingest/types'
-import {
-  ASSISTANT_WIZARD_STEP_IDS,
-  QUICK_WIZARD_STEP_IDS,
-  type GuidedWizardStep,
-} from '@/lib/sos/guidedWizard'
-import { SosWizardModeChooser, type SosWizardMode } from '@/components/admin/sos/SosWizardModeChooser'
-import { SosSetupWizardStep } from '@/components/admin/sos/SosSetupWizardStep'
-import { SosValidationPanel } from '@/components/admin/sos/SosValidationPanel'
-import {
-  validateSosWizardState,
-  wizardHasBlockingIssues,
-  type WizardValidationIssue,
-} from '@/lib/sos/wizardValidation'
+import { MonthField } from '@/components/ui/month-field'
+import { isValidPeriodRange } from '@/lib/sos/accountingInputValidation'
 import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUploadZone'
 import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
-import { AccountingGuidedWizard } from '@/components/admin/sos/AccountingGuidedWizard'
 import { CurrencyRatesBanner } from '@/components/admin/sos/CurrencyRatesBanner'
 import { SettlementCenterPanel } from '@/components/admin/sos/SettlementCenterPanel'
 import { OperatorPlaybook } from '@/components/admin/sos/OperatorPlaybook'
@@ -85,8 +74,8 @@ import { useSosWorkspaceSync } from '@/hooks/useSosWorkspaceSync'
 import { WorkspaceManager } from '@/components/admin/sos/WorkspaceManager'
 
 import {
-  Wallet, ClockCounterClockwise, FileText, Bank, Sliders,
-  ChartBar, TrendUp, BookmarkSimple, DownloadSimple, Table, SealCheck, Sparkle,
+  Wallet, ClockCounterClockwise, FileText,
+  ChartBar, BookmarkSimple, DownloadSimple, Table, SealCheck,
   MagnifyingGlass,
 } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -107,8 +96,6 @@ const StatementsManager = lazy(
 )
 
 type SubTab = 'upload' | 'reporting' | 'settlements' | 'analytics' | 'payout' | 'rules' | 'trends'
-
-type ViewMode = 'guided' | 'advanced'
 
 const SUB_TAB_IDS: SubTab[] = ['upload', 'reporting', 'settlements', 'analytics', 'payout', 'trends', 'rules']
 
@@ -197,9 +184,6 @@ function SosGeneratorPanel() {
   const [appDefaults, setAppDefaults] = useState<AppDefaults>(DEFAULT_APP_DEFAULTS)
   const [emailConfig, setEmailConfig] = useState<Partial<EmailConfig>>(DEFAULT_EMAIL_CONFIG)
   const [showPdfSettings, setShowPdfSettings] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>('guided')
-  const [wizardMode, setWizardMode] = useState<SosWizardMode | null>(null)
-  const [guidedStep, setGuidedStep] = useState<GuidedWizardStep>('upload')
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('upload')
   const [manualPeriodStart, setManualPeriodStart] = useState('')
   const [manualPeriodEnd, setManualPeriodEnd] = useState('')
@@ -210,26 +194,16 @@ function SosGeneratorPanel() {
   useEffect(() => {
     const subTab = searchParams.get('subTab')
     const guidedStepParam = searchParams.get('guidedStep')
-    if (subTab === 'settlements') {
-      setViewMode('guided')
-      setWizardMode('quick')
-      setGuidedStep('settle')
+    if (subTab === 'payout' || subTab === 'settlements' || guidedStepParam === 'settle') {
+      setActiveSubTab('settlements')
+      return
+    }
+    if (subTab === 'trends') {
+      setActiveSubTab('analytics')
       return
     }
     if (isSubTab(subTab)) {
-      setViewMode('advanced')
       setActiveSubTab(subTab)
-    }
-    if (
-      guidedStepParam === 'upload' ||
-      guidedStepParam === 'review' ||
-      guidedStepParam === 'settle' ||
-      guidedStepParam === 'setup' ||
-      guidedStepParam === 'validate'
-    ) {
-      setViewMode('guided')
-      setWizardMode(guidedStepParam === 'setup' || guidedStepParam === 'validate' ? 'assistant' : 'quick')
-      setGuidedStep(guidedStepParam)
     }
   }, [searchParams])
 
@@ -405,8 +379,8 @@ function SosGeneratorPanel() {
   }, [applySettings, settingsBundle])
 
   const handlePresetLoad = useCallback((preset: SosAccountingSettings) => {
-    applySettings(preset)
-  }, [applySettings])
+    applySettings(mergePeriodScopedSettings(durableAccountingSettings(preset), settingsBundle))
+  }, [applySettings, settingsBundle])
 
   // File managers for each source
   const believeManager   = useFileManager('believe')
@@ -484,7 +458,6 @@ function SosGeneratorPanel() {
     merchOrderRows,
     requestExcelBlob,
     exchangeRatesLoading,
-    exchangeRatesReady,
     exchangeRatesSource,
     exchangeRates,
     historicalRates,
@@ -539,11 +512,6 @@ function SosGeneratorPanel() {
   const effectivePeriodEnd = effectivePeriod?.endMonth ?? ''
   const effectivePeriodStartDate = effectivePeriod?.startDate ?? ''
   const effectivePeriodEndDate = effectivePeriod?.endDate ?? ''
-  // The setup step requires an explicit manual end month; a start-only manual
-  // selection must not unlock Continue while the step still shows an error.
-  const setupComplete =
-    effectivePeriod != null && (!manualPeriodStart.trim() || manualPeriodEnd.trim() !== '')
-
   useEffect(() => {
     if (!effectivePeriodStartDate || !effectivePeriodEndDate) {
       setCarryForwardByArtist({})
@@ -612,7 +580,6 @@ function SosGeneratorPanel() {
     printfulManager.clearAll()
     darkmerchManager.clearAll()
     setCarryForwardByArtist({})
-    setGuidedStep(wizardMode === 'assistant' ? 'setup' : 'upload')
     toast.message(t.sessionResetTitle, {
       description: t.sessionResetDesc,
     })
@@ -622,138 +589,38 @@ function SosGeneratorPanel() {
     shopifyManager,
     printfulManager,
     darkmerchManager,
-    wizardMode,
     t.sessionResetTitle,
     t.sessionResetDesc,
   ])
 
-  const wizardValidationIssues = useMemo(() => {
-    return validateSosWizardState(
-      {
-        revenues,
-        labelArtists,
-        splitFees,
-        periodStart: effectivePeriodStart,
-        periodEnd: effectivePeriodEnd,
-        hasBelieveFile: believeManager.files.length > 0,
-        hasBandcampFile: bandcampManager.files.length > 0,
-        hasShopifyFile: shopifyManager.files.length > 0,
-        hasPrintfulFile: printfulManager.files.length > 0,
-        hasDarkmerchFile: darkmerchManager.files.length > 0,
-        trackRevenueAssignments,
-        skippedRowCount: [
-          ...believeManager.files,
-          ...bandcampManager.files,
-          ...shopifyManager.files,
-          ...printfulManager.files,
-          ...darkmerchManager.files,
-        ].reduce((sum, file) => sum + (file.rowsSkipped ?? 0), 0),
-        skipReasons: [...new Set(
-          [
-            ...believeManager.files,
-            ...bandcampManager.files,
-            ...shopifyManager.files,
-            ...printfulManager.files,
-            ...darkmerchManager.files,
-          ].flatMap((file) => file.skipReasons ?? []),
-        )],
-        emptyCurrencyRowCount: [
-          ...believeManager.files,
-          ...bandcampManager.files,
-        ].reduce((sum, file) => sum + (file.emptyCurrencyRows ?? 0), 0),
-      },
-      {
-        validationMissingPeriodTitle: t.validationMissingPeriodTitle,
-        validationMissingPeriodDesc: t.validationMissingPeriodDesc,
-        validationMissingPeriodAction: t.validationMissingPeriodAction,
-        validationNoRevenuesTitle: t.validationNoRevenuesTitle,
-        validationNoRevenuesDesc: t.validationNoRevenuesDesc,
-        validationNoRevenuesAction: t.validationNoRevenuesAction,
-        validationUnknownArtistTitle: t.validationUnknownArtistTitle,
-        validationUnknownArtistDesc: t.validationUnknownArtistDesc,
-        validationUnknownArtistAction: t.validationUnknownArtistAction,
-        validationNoPortalIdTitle: t.validationNoPortalIdTitle,
-        validationNoPortalIdDesc: t.validationNoPortalIdDesc,
-        validationNoPortalIdAction: t.validationNoPortalIdAction,
-        validationMissingSplitTitle: t.validationMissingSplitTitle,
-        validationMissingSplitDesc: t.validationMissingSplitDesc,
-        validationMissingSplitAction: t.validationMissingSplitAction,
-        validationZeroPayoutTitle: t.validationZeroPayoutTitle,
-        validationZeroPayoutDesc: t.validationZeroPayoutDesc,
-        validationZeroPayoutAction: t.validationZeroPayoutAction,
-        validationExistingDraftTitle: t.validationExistingDraftTitle,
-        validationExistingDraftDesc: t.validationExistingDraftDesc,
-        validationExistingDraftAction: t.validationExistingDraftAction,
-        validationNoFilesTitle: t.validationNoFilesTitle,
-        validationNoFilesDesc: t.validationNoFilesDesc,
-        validationNoFilesAction: t.validationNoFilesAction,
-        validationRosterNoPortalTitle: t.validationRosterNoPortalTitle,
-        validationRosterNoPortalDesc: t.validationRosterNoPortalDesc,
-        validationRosterNoPortalAction: t.validationRosterNoPortalAction,
-        validationTrackSplitTitle: t.validationTrackSplitTitle,
-        validationTrackSplitDesc: t.validationTrackSplitDesc,
-        validationTrackSplitAction: t.validationTrackSplitAction,
-        validationParseSkipsTitle: t.validationParseSkipsTitle,
-        validationParseSkipsDesc: t.validationParseSkipsDesc,
-        validationEmptyCurrencyTitle: t.validationEmptyCurrencyTitle,
-        validationEmptyCurrencyDesc: t.validationEmptyCurrencyDesc,
-      },
-    )
-  }, [
-    revenues,
-    labelArtists,
-    splitFees,
-    effectivePeriodStart,
-    effectivePeriodEnd,
-    trackRevenueAssignments,
-    believeManager.files,
-    bandcampManager.files,
-    shopifyManager.files,
-    printfulManager.files,
-    darkmerchManager.files,
-    t,
-  ])
-
-  const hasBlockingValidation = wizardHasBlockingIssues(wizardValidationIssues)
-
-  const handleValidationAction = useCallback((issue: WizardValidationIssue) => {
-    if (issue.actionTarget === 'rules-mappings' || issue.actionTarget === 'rules-splits' || issue.actionTarget === 'rules-defaults') {
-      setViewMode('advanced')
-      setActiveSubTab('rules')
-      return
-    }
-    if (issue.actionTarget === 'setup') {
-      setGuidedStep('setup')
-      return
-    }
-    if (issue.actionTarget === 'upload') {
-      setGuidedStep('upload')
-      return
-    }
-    if (issue.actionTarget === 'settlements') {
-      setGuidedStep('settle')
-    }
-  }, [])
-
-  const bronzeBatchIds = useMemo(() => {
-    const ids = new Set<string>()
-    for (const file of [
+  const sessionFiles = useMemo(
+    () => [
       ...believeManager.files,
       ...bandcampManager.files,
       ...shopifyManager.files,
       ...printfulManager.files,
       ...darkmerchManager.files,
-    ]) {
+    ],
+    [
+      believeManager.files,
+      bandcampManager.files,
+      shopifyManager.files,
+      printfulManager.files,
+      darkmerchManager.files,
+    ],
+  )
+  const unarchivedSourceFiles = useMemo(
+    () => sessionFiles.filter((file) => !file.bronzeBatchId).map((file) => file.name),
+    [sessionFiles],
+  )
+
+  const bronzeBatchIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const file of sessionFiles) {
       if (file.bronzeBatchId) ids.add(file.bronzeBatchId)
     }
     return Array.from(ids)
-  }, [
-    believeManager.files,
-    bandcampManager.files,
-    shopifyManager.files,
-    printfulManager.files,
-    darkmerchManager.files,
-  ])
+  }, [sessionFiles])
 
   const exportPersistContext = useMemo(
     () =>
@@ -763,6 +630,9 @@ function SosGeneratorPanel() {
             merchOrderRows,
             revenues,
             bronzeBatchIds,
+            sourceFileCount: sessionFiles.length,
+            archivedFileCount: sessionFiles.length - unarchivedSourceFiles.length,
+            unarchivedSourceFiles,
             rulesFingerprint: settingsFingerprint(settingsBundle),
             fxSnapshot: {
               rates: exchangeRates,
@@ -777,6 +647,8 @@ function SosGeneratorPanel() {
       merchOrderRows,
       revenues,
       bronzeBatchIds,
+      sessionFiles.length,
+      unarchivedSourceFiles,
       settingsBundle,
       exchangeRates,
       historicalRates,
@@ -865,7 +737,6 @@ function SosGeneratorPanel() {
     confirmReloadFromServer,
     reloadConfirmOpen,
     setReloadConfirmOpen,
-    loadDefaultPreset,
     saveCurrentWorkspace,
     persistImportedSettings,
   } = useSosWorkspaceSync({
@@ -946,25 +817,13 @@ function SosGeneratorPanel() {
 
   // Sub-tabs definition
   const subTabs: { id: SubTab; label: React.ReactNode }[] = [
-    { id: 'upload',    label: t.subTabUpload },
+    { id: 'upload', label: t.subTabUpload },
     { id: 'reporting', label: t.subTabReporting },
-    {
-      id: 'settlements',
-      label: (
-        <>
-          <SealCheck size={13} className="inline mr-1" />
-          {t.subTabSettlements}
-        </>
-      ),
-    },
-    { id: 'analytics', label: <><ChartBar size={13} className="inline mr-1" />{t.subTabAnalytics}</> },
-    { id: 'payout',    label: t.subTabPayout },
-    { id: 'trends',    label: <><TrendUp size={13} className="inline mr-1" />{t.subTabTrends}</> },
+    { id: 'settlements', label: t.subTabSettlements },
     {
       id: 'rules',
       label: (
         <>
-          <Sliders size={14} className="inline mr-1" />
           {t.subTabRules}
           {rulesCount > 0 && (
             <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 ml-1 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
@@ -974,37 +833,52 @@ function SosGeneratorPanel() {
         </>
       ),
     },
+    { id: 'analytics', label: t.subTabAnalytics },
   ]
 
-  const setupPanel = (
-    <SosSetupWizardStep
-      periodStart={manualPeriodStart}
-      periodEnd={manualPeriodEnd}
-      onPeriodStartChange={setManualPeriodStart}
-      onPeriodEndChange={setManualPeriodEnd}
-      appDefaults={appDefaults}
-      onAppDefaultsChange={setAppDefaults}
-      labelInfo={labelInfo}
-      onLabelInfoChange={handleLabelInfoUpdate}
-      onLoadPreset={() => void loadDefaultPreset()}
-      presetLoading={isWorkspaceLoading}
-    />
-  )
-
-  const validatePanel = (
-    <SosValidationPanel issues={wizardValidationIssues} onIssueAction={handleValidationAction} />
-  )
+  const periodError =
+    manualPeriodStart && manualPeriodEnd && !isValidPeriodRange(manualPeriodStart, manualPeriodEnd)
+      ? t.setupPeriodOrderError
+      : undefined
 
   const uploadPanel = (
     <div className="p-6 space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">
-          {t.uploadPeriodLabel} {formatAccountingPeriodLabel(effectivePeriod) || '—'}
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="grid gap-3 sm:grid-cols-2 flex-1 min-w-[16rem]">
+          <MonthField
+            id="sos-period-start"
+            label={t.setupPeriodFrom}
+            value={manualPeriodStart}
+            onChange={(value) => {
+              setManualPeriodStart(value)
+              if (!manualPeriodEnd || !isValidPeriodRange(value, manualPeriodEnd)) {
+                setManualPeriodEnd(value)
+              }
+            }}
+            required
+            max={manualPeriodEnd || undefined}
+          />
+          <MonthField
+            id="sos-period-end"
+            label={t.setupPeriodTo}
+            value={manualPeriodEnd}
+            onChange={setManualPeriodEnd}
+            required
+            min={manualPeriodStart || undefined}
+            error={periodError}
+          />
+        </div>
         <Button type="button" variant="outline" size="sm" onClick={resetSession}>
           {t.resetSessionLabel}
         </Button>
       </div>
+      {unarchivedSourceFiles.length > 0 && (
+        <Alert className="border-amber-500/40 bg-amber-500/10">
+          <AlertDescription className="text-xs text-amber-400">
+            {interpolate(t.validationIncompleteArchiveDesc, { files: unarchivedSourceFiles.join(', ') })}
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="rounded-md border border-border bg-muted/10 p-3 space-y-1">
         <p className="text-xs font-semibold text-foreground">{t.uploadHelpTitle}</p>
         <p className="text-xs text-muted-foreground leading-relaxed">{t.uploadHelpBody}</p>
@@ -1054,10 +928,11 @@ function SosGeneratorPanel() {
       labelArtists={labelArtists}
       labelInfo={labelInfo}
       appDefaults={appDefaults}
+      splitFees={splitFees}
       emailConfig={emailConfig}
       periodStart={effectivePeriodStart}
       periodEnd={effectivePeriodEnd}
-      onGoToSettlementCenter={() => setGuidedStep('settle')}
+      onGoToSettlementCenter={() => setActiveSubTab('settlements')}
       disabled={isProcessing || excelBusy}
     />
   ) : (
@@ -1079,11 +954,10 @@ function SosGeneratorPanel() {
           step2={t.coachCheckApprove}
           step3={t.coachCheckPay}
         />
-        {wizardMode === 'quick' && hasBlockingValidation && (
+        {unarchivedSourceFiles.length > 0 && (
           <Alert className="border-amber-500/40 bg-amber-500/10">
-            <AlertDescription className="text-xs space-y-1">
-              <p className="font-medium text-foreground">{t.quickSettleWarningTitle}</p>
-              <p className="text-muted-foreground">{t.quickSettleWarningBody}</p>
+            <AlertDescription className="text-xs text-amber-400">
+              {interpolate(t.validationIncompleteArchiveDesc, { files: unarchivedSourceFiles.join(', ') })}
             </AlertDescription>
           </Alert>
         )}
@@ -1096,10 +970,20 @@ function SosGeneratorPanel() {
         territoryMetrics={territoryMetrics}
         merchOrderRows={merchOrderRows}
         bronzeBatchIds={bronzeBatchIds}
-        persistDisabled={isProcessing}
+        persistDisabled={isProcessing || unarchivedSourceFiles.length > 0}
         onCreateDraft={handlePublishToPortal}
         onBuildCorrectionPdf={buildCorrectionPdfBase64}
       />
+      <div className="px-6 pb-6 space-y-3">
+        <h3 className="text-sm font-semibold text-foreground">{t.subTabPayout}</h3>
+        <PayoutManager
+          labelArtists={labelArtists}
+          labelInfo={labelInfo}
+          periodStart={effectivePeriodStart}
+          periodEnd={effectivePeriodEnd}
+          onLabelSepaUpdate={handleLabelSepaUpdate}
+        />
+      </div>
     </div>
   ) : (
     <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
@@ -1139,7 +1023,7 @@ function SosGeneratorPanel() {
     </p>
   ) : null
 
-  const periodBanner = hasData && effectivePeriod ? (
+  const periodBanner = effectivePeriod ? (
     <Alert className="mx-6 mt-4 border-primary/30 bg-primary/5">
       <FileText size={14} className="text-primary" />
       <AlertDescription className="text-xs">
@@ -1168,89 +1052,6 @@ function SosGeneratorPanel() {
       disabled={isProcessing || excelBusy}
     />
   )
-
-  if (viewMode === 'guided') {
-    if (wizardMode == null) {
-      return (
-        <div className="space-y-0">
-          {rulesStatusBanner}
-          {currencyBanner}
-          <SosWizardModeChooser
-            onSelect={(mode) => {
-              setWizardMode(mode)
-              setGuidedStep(mode === 'assistant' ? 'setup' : 'upload')
-            }}
-          />
-        </div>
-      )
-    }
-
-    const stepIds = wizardMode === 'assistant' ? ASSISTANT_WIZARD_STEP_IDS : QUICK_WIZARD_STEP_IDS
-
-    return (
-      <div className="space-y-0">
-        {rulesStatusBanner}
-        {periodBanner}
-        {showPdfSettings && (
-          <PdfExportSettingsPanel settings={pdfSettings} onUpdate={setPdfSettings} />
-        )}
-        <AccountingGuidedWizard
-          hasData={hasData}
-          isProcessing={isProcessing}
-          activeStep={guidedStep}
-          onActiveStepChange={setGuidedStep}
-          onSwitchToAdvanced={() => setViewMode('advanced')}
-          onImportReady={() => {
-            toast.success(t.importReadyTitle, {
-              description: t.importReadyDesc,
-            })
-          }}
-          stepIds={stepIds}
-          hasBlockingValidation={hasBlockingValidation}
-          setupComplete={setupComplete}
-          ratesReady={exchangeRatesReady}
-          exchangeRatesLoading={exchangeRatesLoading}
-          revenueCount={revenues.length}
-          issueCount={wizardValidationIssues.length}
-          statusBanner={currencyBanner}
-          setupPanel={wizardMode === 'assistant' ? setupPanel : undefined}
-          validatePanel={wizardMode === 'assistant' ? validatePanel : undefined}
-          uploadPanel={uploadPanel}
-          reviewPanel={reviewPanel}
-          settlePanel={settlePanel}
-          labels={{
-            guidedSwitchAdvanced: t.guidedSwitchAdvanced,
-            guidedStepSetup: t.guidedStepSetup,
-            guidedStepSetupDesc: t.guidedStepSetupDesc,
-            guidedStepUpload: t.guidedStepUpload,
-            guidedStepUploadDesc: t.guidedStepUploadDesc,
-            guidedStepValidate: t.guidedStepValidate,
-            guidedStepValidateDesc: t.guidedStepValidateDesc,
-            guidedStepReview: t.guidedStepReview,
-            guidedStepReviewDesc: t.guidedStepReviewDesc,
-            guidedStepSettle: t.guidedStepSettle,
-            guidedStepSettleDesc: t.guidedStepSettleDesc,
-            guidedBack: t.guidedBack,
-            guidedNext: t.guidedNext,
-            guidedOpenSettle: t.guidedOpenSettle,
-            guidedProcessingHint: t.guidedProcessingHint,
-            guidedUploadHint: t.guidedUploadHint,
-            guidedReviewHint: t.guidedReviewHint,
-            guidedSettleHint: t.guidedSettleHint,
-            guidedStepperAria: t.guidedStepperAria,
-            guidedStepOf: t.guidedStepOf,
-            blockedSetupPeriod: t.blockedSetupPeriod,
-            blockedUploadNoData: t.blockedUploadNoData,
-            blockedUploadProcessing: t.blockedUploadProcessing,
-            blockedUploadRates: t.blockedUploadRates,
-            blockedValidateErrors: t.blockedValidateErrors,
-            blockedReviewNoData: t.blockedReviewNoData,
-          }}
-        />
-        {excelExportDialog}
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-0">
@@ -1283,16 +1084,6 @@ function SosGeneratorPanel() {
           </button>
         ))}
         <div className="flex-1" />
-
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 gap-1.5 text-xs mb-0.5"
-          onClick={() => setViewMode('guided')}
-        >
-          <Sparkle size={13} aria-hidden="true" />
-          {t.guidedSwitchGuided}
-        </Button>
 
         {/* Presets sheet */}
         <Sheet>
@@ -1413,24 +1204,7 @@ function SosGeneratorPanel() {
             role="tabpanel"
             aria-labelledby="accounting-subtab-upload"
           >
-          <div className="p-6 space-y-3">
-            <p className="text-xs text-muted-foreground">
-              {interpolate(t.rosterFromDbHint, { count: labelArtists.length })}
-            </p>
-            <UniversalFileUploadZone
-              believeManager={believeManager}
-              bandcampManager={bandcampManager}
-              shopifyManager={shopifyManager}
-              printfulManager={printfulManager}
-              darkmerchManager={darkmerchManager}
-              csvProfiles={csvImportProfiles}
-              isProcessing={isProcessing}
-              pipelineProgress={pipelineProgress}
-              onAddAliases={aliases => {
-                aliases.forEach(alias => handleAddCsvAlias(alias))
-              }}
-            />
-          </div>
+            {uploadPanel}
           </div>
         )}
 
@@ -1440,27 +1214,7 @@ function SosGeneratorPanel() {
             role="tabpanel"
             aria-labelledby="accounting-subtab-reporting"
           >
-          {hasData ? (
-            <ReportingPanel
-              revenues={revenues}
-              onDownloadPDF={handleDownloadPDF}
-              onDownloadExcel={requestExcelForArtist}
-              onDownloadAll={requestExcelAll}
-              onDownloadSelected={requestExcelSelected}
-              labelArtists={labelArtists}
-              labelInfo={labelInfo}
-              appDefaults={appDefaults}
-              periodStart={effectivePeriodStart}
-              periodEnd={effectivePeriodEnd}
-              onGoToSettlementCenter={() => setActiveSubTab('settlements')}
-              disabled={isProcessing || excelBusy}
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
-              <FileText size={32} className="opacity-30" />
-              <p className="text-sm">{t.emptyReporting}</p>
-            </div>
-          )}
+            {reviewPanel}
           </div>
         )}
 
@@ -1470,25 +1224,7 @@ function SosGeneratorPanel() {
             role="tabpanel"
             aria-labelledby="accounting-subtab-settlements"
           >
-          {effectivePeriod ? (
-            <SettlementCenterPanel
-              revenues={revenues}
-              labelArtists={labelArtists}
-              periodStart={effectivePeriodStart}
-              periodEnd={effectivePeriodEnd}
-              territoryMetrics={territoryMetrics}
-              merchOrderRows={merchOrderRows}
-              bronzeBatchIds={bronzeBatchIds}
-              persistDisabled={isProcessing}
-              onCreateDraft={handlePublishToPortal}
-              onBuildCorrectionPdf={buildCorrectionPdfBase64}
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
-              <SealCheck size={32} className="opacity-30" />
-              <p className="text-sm">{t.emptySettlements}</p>
-            </div>
-          )}
+            {settlePanel}
           </div>
         )}
 
@@ -1611,44 +1347,18 @@ function SosGeneratorPanel() {
                 />
               </section>
             )}
-          </div>
-        )}
 
-        {activeSubTab === 'payout' && (
-          <div
-            id="accounting-subtab-panel-payout"
-            role="tabpanel"
-            aria-labelledby="accounting-subtab-payout"
-          >
-          {hasData ? (
-            <PayoutManager
-              labelArtists={labelArtists}
-              labelInfo={labelInfo}
-              periodStart={effectivePeriodStart}
-              periodEnd={effectivePeriodEnd}
-              onLabelSepaUpdate={handleLabelSepaUpdate}
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center py-24 text-muted-foreground gap-3">
-              <Bank size={32} className="opacity-30" />
-              <p className="text-sm">{t.emptyPayout}</p>
-            </div>
-          )}
-          </div>
-        )}
-
-        {activeSubTab === 'trends' && (
-          <div
-            id="accounting-subtab-panel-trends"
-            role="tabpanel"
-            aria-labelledby="accounting-subtab-trends"
-          >
-          <TrendsDashboard
-            revenues={revenues}
-            periodStart={effectivePeriodStart}
-            periodEnd={effectivePeriodEnd}
-            bronzeBatchIds={bronzeBatchIds}
-          />
+            <section className="space-y-3" aria-labelledby="analytics-trends-heading">
+              <h3 id="analytics-trends-heading" className="text-sm font-semibold text-foreground">
+                {t.subTabTrends}
+              </h3>
+              <TrendsDashboard
+                revenues={revenues}
+                periodStart={effectivePeriodStart}
+                periodEnd={effectivePeriodEnd}
+                bronzeBatchIds={bronzeBatchIds}
+              />
+            </section>
           </div>
         )}
 
@@ -1767,7 +1477,7 @@ export function AccountingPanel() {
 
       <TabsContent value="history" className="flex-1 mt-0 p-6">
         <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-          <StatementsManager readOnly settlementHref="/admin/accounting?guidedStep=settle" />
+          <StatementsManager readOnly settlementHref="/admin/accounting?subTab=settlements" />
         </Suspense>
       </TabsContent>
     </Tabs>

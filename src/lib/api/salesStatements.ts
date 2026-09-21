@@ -99,6 +99,20 @@ async function assertNoDuplicateDraft(
   if (data && data.length > 0) throw new DuplicateDraftStatementError()
 }
 
+function requireOptimisticStatusWrite(
+  error: { code?: string; message?: string } | null,
+  row: unknown,
+  conflictMessage: string,
+): SalesStatementRow {
+  if (error && error.code !== 'PGRST116') {
+    throw new Error(error.message ?? 'Statement update failed')
+  }
+  if (error?.code === 'PGRST116' || !row) {
+    throw new BusinessRuleError(conflictMessage, 409, 'STATEMENT_STATUS_CONFLICT')
+  }
+  return row as SalesStatementRow
+}
+
 function rowToSalesStatement(row: SalesStatementRow): SalesStatement {
   return {
     id: row.id,
@@ -223,9 +237,13 @@ export async function approveSalesStatement(
     .select('*')
     .single()
 
-  if (error) throw new Error(error.message)
-  if (!row) throw new BusinessRuleError('Cannot approve statement in status "draft" (concurrent update)')
-  return rowToSalesStatement(row as SalesStatementRow)
+  return rowToSalesStatement(
+    requireOptimisticStatusWrite(
+      error,
+      row,
+      'Cannot approve statement in status "draft" (concurrent update)',
+    ),
+  )
 }
 
 export interface ApproveSalesStatementResult {
@@ -255,6 +273,34 @@ export async function approveAndNotifySalesStatement(
   }
 }
 
+export async function notifyApprovedSalesStatement(
+  db: DbClient,
+  id: string,
+  notify: (statement: SalesStatement) => Promise<{ success: boolean; error?: string }>,
+): Promise<ApproveSalesStatementResult> {
+  const existing = await getSalesStatementById(db, id)
+  if (!existing) throw new BusinessRuleError('Statement not found', 404, 'NOT_FOUND')
+  if (existing.status !== 'label_approved') {
+    throw new BusinessRuleError(
+      `Notification retry is only available for label_approved statements (current: "${existing.status}")`,
+      409,
+      'STATEMENT_NOT_APPROVED',
+    )
+  }
+
+  const emailResult = await notify(existing)
+  if (!emailResult.success) {
+    return {
+      statement: existing,
+      emailSent: false,
+      emailError: emailResult.error,
+    }
+  }
+
+  const notified = await updateSalesStatementStatus(db, id, 'artist_notified')
+  return { statement: notified, emailSent: true }
+}
+
 export async function updateSalesStatementStatus(
   db: DbClient,
   id: string,
@@ -273,9 +319,13 @@ export async function updateSalesStatementStatus(
     .select('*')
     .single()
 
-  if (error) throw new Error(error.message)
-  if (!row) throw new BusinessRuleError(`Cannot change statement status from "${existing.status}" (concurrent update)`)
-  return rowToSalesStatement(row as SalesStatementRow)
+  return rowToSalesStatement(
+    requireOptimisticStatusWrite(
+      error,
+      row,
+      `Cannot change statement status from "${existing.status}" (concurrent update)`,
+    ),
+  )
 }
 
 export async function getSalesSummariesForAdmin(

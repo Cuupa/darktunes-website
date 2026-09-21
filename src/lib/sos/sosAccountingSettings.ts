@@ -45,6 +45,49 @@ export interface SosAccountingSettings {
   excelExport: ExcelExportState
 }
 
+/** One-off settlement lines. Must not ride along on Default / named presets. */
+export type PeriodScopedAccountingSettings = Pick<
+  SosAccountingSettings,
+  'manualRevenues' | 'expenses' | 'ignoredEntries'
+>
+
+const EMPTY_PERIOD_SCOPED: PeriodScopedAccountingSettings = {
+  manualRevenues: [],
+  expenses: [],
+  ignoredEntries: [],
+}
+
+export function periodScopedSettings(
+  settings: SosAccountingSettings,
+): PeriodScopedAccountingSettings {
+  return {
+    manualRevenues: settings.manualRevenues,
+    expenses: settings.expenses,
+    ignoredEntries: settings.ignoredEntries,
+  }
+}
+
+export function durableAccountingSettings(
+  settings: SosAccountingSettings,
+): SosAccountingSettings {
+  return {
+    ...settings,
+    ...EMPTY_PERIOD_SCOPED,
+  }
+}
+
+export function mergePeriodScopedSettings(
+  durable: SosAccountingSettings,
+  period: PeriodScopedAccountingSettings,
+): SosAccountingSettings {
+  return {
+    ...durable,
+    manualRevenues: period.manualRevenues,
+    expenses: period.expenses,
+    ignoredEntries: period.ignoredEntries,
+  }
+}
+
 export const DEFAULT_SOS_ACCOUNTING_SETTINGS: SosAccountingSettings = {
   artistMappings: [],
   compilationFilters: [],

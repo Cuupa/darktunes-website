@@ -6,7 +6,7 @@ import { portalMemberWrite, withPortalMembershipWrite } from '@/lib/portal/withP
 
 const patchSchema = z.object({
   artist_id: z.string().uuid(),
-  status: z.enum(['draft', 'sent', 'paid', 'cancelled']),
+  status: z.enum(['cancelled']),
 })
 
 const ROUTE = 'PATCH /api/portal/invoices/[id]'
@@ -30,8 +30,11 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
   )
   if (!existing) throw new ApiError(404, 'Invoice not found')
 
-  if (existing.status === 'sent' && parsed.data.status !== 'paid') {
-    throw new ApiError(409, 'Sent invoices are immutable')
+  if (existing.status !== 'draft') {
+    throw new ApiError(409, 'Only draft invoices can be cancelled by the artist')
+  }
+  if (existing.paidAmountCents > 0) {
+    throw new ApiError(409, 'Invoices with recorded payments cannot be cancelled here')
   }
 
   const { value: updated } = await portalMemberWrite(

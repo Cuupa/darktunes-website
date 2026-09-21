@@ -66,9 +66,16 @@ async function InvoicesContent({
   }
 
   const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
-  const { invoices } = artist
-    ? await listArtistInvoices(supabase, artist.id, 1, 200).catch(() => ({ invoices: [], total: 0 }))
-    : { invoices: [] }
+  let invoices: Awaited<ReturnType<typeof listArtistInvoices>>['invoices'] = []
+  let loadError: string | null = null
+  if (artist) {
+    try {
+      const listed = await listArtistInvoices(supabase, artist.id, 1, 200)
+      invoices = listed.invoices
+    } catch {
+      loadError = t('invoices_load_failed')
+    }
+  }
   const billingProfile = artist ? await getBillingProfile(supabase, artist.id).catch(() => null) : null
   const selectedStatement = artist && statement
     ? await getSalesStatementById(supabase, statement, artist.id).catch(() => null)
@@ -88,6 +95,7 @@ async function InvoicesContent({
       labelClient={labelClient}
       invoices={invoices.map(toPortalInvoiceListItem)}
       statement={selectedStatement}
+      loadError={loadError}
     />
   )
 }

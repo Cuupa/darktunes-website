@@ -8,6 +8,8 @@ import {
   archiveSettlementPeriod,
   bulkApproveStatements,
   createStatementCorrection,
+  retryStatementNotification,
+  fetchStatementPdfUrl,
   deleteSalesStatement,
   fetchSettlementRegister,
   lockSettlementPeriod,
@@ -29,6 +31,7 @@ import {
 } from '@/lib/sos/statementWorkflow'
 import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
+import { explainSosError } from '@/lib/sos/explainSosError'
 import {
   buildInvoiceStatusLabels,
   buildPeriodStatusLabels,
@@ -60,11 +63,13 @@ export function useSettlementCenter({
 
   const [register, setRegister] = useState<SettlementRegister | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
   const [selectedArtists, setSelectedArtists] = useState<Set<string>>(new Set())
   const [approvalNotes, setApprovalNotes] = useState('')
   const [creatingDrafts, setCreatingDrafts] = useState(false)
   const [approving, setApproving] = useState(false)
+  const [notifying, setNotifying] = useState(false)
   const [markingReceived, setMarkingReceived] = useState(false)
   const [locking, setLocking] = useState(false)
   const [archiving, setArchiving] = useState(false)
@@ -151,12 +156,14 @@ export function useSettlementCenter({
   const refreshRegister = useCallback(async () => {
     if (!periodStartDate || !periodEndDate) {
       setLoading(false)
+      setLoadError(null)
       return
     }
 
     const seq = refreshSeqRef.current + 1
     refreshSeqRef.current = seq
     setLoading(true)
+    setLoadError(null)
     try {
       const token = await getAdminAccessToken()
       if (!token) throw new Error(t.settlementSessionExpired)
@@ -167,16 +174,21 @@ export function useSettlementCenter({
         periodEndDate,
         t.settlementRegisterLoadFailed,
       )
-      // A late response for the previous period must not overwrite newer data.
       if (seq !== refreshSeqRef.current) return
       setRegister(registerData)
+      setLoadError(null)
     } catch (err) {
       if (seq !== refreshSeqRef.current) return
-      toast.error(err instanceof Error ? err.message : t.settlementRegisterLoadFailed)
+      const message = explainSosError(
+        err instanceof Error ? err.message : t.settlementRegisterLoadFailed,
+        t,
+      )
+      setLoadError(message)
+      toast.error(message)
     } finally {
       if (seq === refreshSeqRef.current) setLoading(false)
     }
-  }, [periodStartDate, periodEndDate, t.settlementRegisterLoadFailed, t.settlementSessionExpired])
+  }, [periodStartDate, periodEndDate, t])
 
   useEffect(() => {
     void refreshRegister()
@@ -339,7 +351,7 @@ export function useSettlementCenter({
       await refreshRegister()
       toast.success(interpolate(t.settlementDeleteDraftSuccess, { artist: artistName }))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t.settlementDeleteDraftFailed)
+      toast.error(t.settlementDeleteDraftFailed, { description: explainSosError(err, t) })
     } finally {
       setDeletingDraft(false)
     }
@@ -407,9 +419,56 @@ export function useSettlementCenter({
         }
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t.settlementApproveFailed)
+      toast.error(t.settlementApproveFailed, { description: explainSosError(err, t) })
     } finally {
       setApproving(false)
+    }
+  }
+
+  const runDownloadPdf = async (statementId: string) => {
+    const newTab = window.open('', '_blank')
+    if (newTab) newTab.opener = null
+    try {
+      const token = await getAdminAccessToken()
+      if (!token) throw new Error(t.settlementSessionExpired)
+      const url = await fetchStatementPdfUrl(token, statementId, t.settlementPdfFailed)
+      if (newTab) {
+        newTab.location.href = url
+      } else {
+        window.location.assign(url)
+      }
+    } catch (err) {
+      newTab?.close()
+      toast.error(t.settlementPdfFailed, { description: explainSosError(err, t) })
+    }
+  }
+
+  const runNotify = async (statementId: string, artistName: string) => {
+    setNotifying(true)
+    setBusyArtists((current) => new Set(current).add(artistName))
+    try {
+      const token = await getAdminAccessToken()
+      if (!token) throw new Error(t.settlementSessionExpired)
+      const result = await retryStatementNotification(
+        token,
+        statementId,
+        t.settlementNotifyFailed,
+      )
+      await refreshRegister()
+      if (result.email_sent) {
+        toast.success(interpolate(t.settlementNotifySent, { artist: artistName }))
+      } else {
+        toast.error(result.email_error || t.settlementNotifyFailed)
+      }
+    } catch (err) {
+      toast.error(t.settlementNotifyFailed, { description: explainSosError(err, t) })
+    } finally {
+      setBusyArtists((current) => {
+        const next = new Set(current)
+        next.delete(artistName)
+        return next
+      })
+      setNotifying(false)
     }
   }
 
@@ -436,7 +495,7 @@ export function useSettlementCenter({
       setSelectedArtists(new Set())
       toast.success(interpolate(t.settlementInvoicesMarkedReceived, { count: updated }))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t.settlementMarkReceivedFailed)
+      toast.error(t.settlementMarkReceivedFailed, { description: explainSosError(err, t) })
     } finally {
       setMarkingReceived(false)
     }
@@ -514,7 +573,7 @@ export function useSettlementCenter({
       setPaymentDialogOpen(false)
       toast.success(interpolate(t.settlementPaymentsRecorded, { count: recorded }))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t.settlementRecordPaymentFailed)
+      toast.error(t.settlementRecordPaymentFailed, { description: explainSosError(err, t) })
     } finally {
       setRecordingPayment(false)
     }
@@ -533,7 +592,7 @@ export function useSettlementCenter({
       setLockDialogOpen(false)
       toast.success(t.settlementPeriodLockedToast)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t.settlementLockFailedToast)
+      toast.error(t.settlementLockFailedToast, { description: explainSosError(err, t) })
     } finally {
       setLocking(false)
     }
@@ -598,7 +657,7 @@ export function useSettlementCenter({
         interpolate(t.settlementCorrectionCreated, { artist: correctionTarget.artistName }),
       )
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t.settlementCorrectionFailedToast)
+      toast.error(t.settlementCorrectionFailedToast, { description: explainSosError(err, t) })
     } finally {
       setCorrecting(false)
     }
@@ -623,7 +682,7 @@ export function useSettlementCenter({
       setArchiveDialogOpen(false)
       toast.success(t.settlementPeriodArchivedToast)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t.settlementArchiveFailedToast)
+      toast.error(t.settlementArchiveFailedToast, { description: explainSosError(err, t) })
     } finally {
       setArchiving(false)
     }
@@ -654,6 +713,9 @@ export function useSettlementCenter({
     setSyncAnalyticsOnApprove,
     creatingDrafts,
     approving,
+    notifying,
+    runNotify,
+    runDownloadPdf,
     markingReceived,
     locking,
     archiving,
@@ -670,6 +732,8 @@ export function useSettlementCenter({
     filter,
     setFilter,
     loading,
+    loadError,
+    refreshRegister,
     filteredRows,
     selectableRows,
     allSelected,

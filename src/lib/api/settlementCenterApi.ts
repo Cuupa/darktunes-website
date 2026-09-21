@@ -73,6 +73,45 @@ export async function bulkApproveStatements(
   return (json ?? {}) as { approved?: number; emailed?: number }
 }
 
+export async function fetchStatementPdfUrl(
+  token: string,
+  statementId: string,
+  fallbackError: string,
+): Promise<string> {
+  const response = await fetch(`/api/admin/sales-statements/${statementId}/pdf`, {
+    headers: authHeaders(token),
+  })
+  const json = await readJson(response)
+  if (!response.ok) {
+    throw new Error(readApiError(json, fallbackError))
+  }
+  const url = json && typeof json === 'object' && 'url' in json ? (json as { url?: unknown }).url : undefined
+  if (typeof url !== 'string' || url.length === 0) {
+    throw new Error(fallbackError)
+  }
+  return url
+}
+
+export async function retryStatementNotification(
+  token: string,
+  statementId: string,
+  fallbackError: string,
+): Promise<{ email_sent: boolean; email_error: string | null }> {
+  const response = await fetch(`/api/admin/sales-statements/${statementId}/notifications`, {
+    method: 'POST',
+    headers: authHeaders(token),
+  })
+  const json = await readJson(response)
+  if (!response.ok) {
+    throw new Error(readApiError(json, fallbackError))
+  }
+  const body = (json ?? {}) as { email_sent?: boolean; email_error?: string | null }
+  return {
+    email_sent: Boolean(body.email_sent),
+    email_error: body.email_error ?? null,
+  }
+}
+
 export async function markInvoiceReceived(
   token: string,
   invoiceId: string,

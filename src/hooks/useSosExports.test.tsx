@@ -235,6 +235,43 @@ describe('useSosExports.handlePublishToPortal', () => {
     )
   })
 
+  it('blocks portal publish when session files are not archived', async () => {
+    const labelArtists: LabelArtist[] = [
+      { id: '1', name: 'Artist One', artistId: '123e4567-e89b-12d3-a456-426614174000' },
+    ]
+    const { result } = renderHook(() =>
+      useExports(
+        [makeProcessedArtist('Artist One')],
+        labelInfo,
+        '2026-03',
+        '2026-03',
+        {},
+        {},
+        labelArtists,
+        {},
+        [],
+        false,
+        {
+          territoryMetrics: [],
+          merchOrderRows: [],
+          revenues: [],
+          bronzeBatchIds: [],
+          sourceFileCount: 2,
+          archivedFileCount: 0,
+        },
+      ),
+    )
+
+    await act(async () => {
+      await result.current.handlePublishToPortal('Artist One')
+    })
+
+    expect(mockUploadStatement).not.toHaveBeenCalled()
+    expect(mockToastError).toHaveBeenCalledWith(
+      'Archive every uploaded source file before creating a statement. Preview and Excel still work.',
+    )
+  })
+
   it('shows upload error and does not fall back to local download', async () => {
     mockUploadStatement.mockResolvedValue({ success: false, error: 'Portal unavailable' })
     const labelArtists: LabelArtist[] = [

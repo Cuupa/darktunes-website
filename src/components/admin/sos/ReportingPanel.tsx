@@ -23,7 +23,7 @@ import {
   AdminResizableDataTable,
   useResizableAdminTable,
 } from '@/components/admin/DataTable'
-import type { ArtistRevenue, LabelArtist, LabelInfo, AppDefaults, EmailConfig } from '@/lib/sos/types'
+import type { ArtistRevenue, LabelArtist, LabelInfo, AppDefaults, EmailConfig, SplitFee } from '@/lib/sos/types'
 import { buildMailtoLink } from '@/lib/sos/utils'
 
 interface ReportingPanelProps {
@@ -35,6 +35,7 @@ interface ReportingPanelProps {
   labelArtists?: LabelArtist[]
   labelInfo?: LabelInfo
   appDefaults?: Partial<AppDefaults>
+  splitFees?: SplitFee[]
   emailConfig?: Partial<EmailConfig>
   periodStart?: string
   periodEnd?: string
@@ -80,6 +81,7 @@ export function ReportingPanel({
   labelArtists = [],
   labelInfo,
   appDefaults,
+  splitFees = [],
   emailConfig,
   periodStart,
   periodEnd,
@@ -421,6 +423,8 @@ export function ReportingPanel({
         onOpenChange={(open) => {
           if (!open) setBreakdownArtist(null)
         }}
+        splitFees={splitFees}
+        appDefaults={appDefaults}
       />
     </div>
   )

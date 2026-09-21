@@ -14,6 +14,7 @@ import {
   type ExcelExportSettingsPatch,
 } from '../excelExportSettings'
 import { excelSafeSheetName, type ArtistRawSourceSheet } from './rawSourceRows'
+import { toTransferableArrayBuffer } from './transferableBuffer'
 import { DEFAULT_PDF_SETTINGS, isCompilationRelease } from './shared'
 
 type ExcelGenerateSettings = ExcelExportSettingsPatch | Partial<PdfExportSettings>
@@ -417,5 +418,5 @@ async function buildExcel(
   // emit a phase so the UI can show what it is waiting for.
   onPhase?.('summary')
   const buffer = await workbook.xlsx.writeBuffer()
-  return buffer
+  return toTransferableArrayBuffer(buffer)
 }

@@ -264,9 +264,14 @@ export function AdminInvoicesClient({ artists }: AdminInvoicesClientProps) {
                   {formatAmount(invoice)}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={statusBadgeVariant(invoice.status as InvoiceStatus)}>
-                    {t(`status.${invoice.status}`)}
-                  </Badge>
+                  <div className="flex flex-col gap-1">
+                    <Badge variant={statusBadgeVariant(invoice.status as InvoiceStatus)}>
+                      {t(`status.${invoice.status}`)}
+                    </Badge>
+                    {invoice.deliveryStatus === 'failed' && (
+                      <span className="text-[10px] text-amber-400">{t('deliveryFailed')}</span>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="whitespace-nowrap text-sm">
                   {formatDate(invoice.issuedDate)}

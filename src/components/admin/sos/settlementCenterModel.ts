@@ -34,6 +34,7 @@ export type MasterRow = {
   invoiceId?: string
   invoiceStatus?: string
   invoiceNumber?: string
+  invoiceDeliveryStatus?: 'not_sent' | 'sent' | 'failed'
   receivedAt?: string
   paidAt?: string
   paidAmountCents: number
@@ -141,6 +142,7 @@ export function registerToMasterRow(row: SettlementRegisterRow): MasterRow {
     invoiceId: row.invoiceId,
     invoiceStatus: row.invoiceStatus,
     invoiceNumber: row.invoiceNumber,
+    invoiceDeliveryStatus: row.invoiceDeliveryStatus,
     receivedAt: row.receivedAt,
     paidAt: row.paidAt,
     paidAmountCents: row.paidAmountCents,

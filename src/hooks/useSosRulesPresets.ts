@@ -6,7 +6,12 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import type { SosAccountingSettings } from '@/lib/sos/sosAccountingSettings'
+import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
+import { interpolate } from '@/lib/i18n/interpolate'
+import {
+  durableAccountingSettings,
+  type SosAccountingSettings,
+} from '@/lib/sos/sosAccountingSettings'
 
 export type PresetConfig = SosAccountingSettings
 
@@ -19,6 +24,7 @@ export interface SosRulesPreset {
 }
 
 export function useSosRulesPresets() {
+  const t = useAccountingLabels()
   const [presets, setPresets] = useState<SosRulesPreset[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -47,7 +53,7 @@ export function useSosRulesPresets() {
       const res = await fetch('/api/admin/sos/presets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, config }),
+        body: JSON.stringify({ name, config: durableAccountingSettings(config) }),
       })
       if (!res.ok) throw new Error('Failed to save preset')
       const data = await res.json() as { preset: SosRulesPreset }
@@ -64,24 +70,24 @@ export function useSosRulesPresets() {
         }
         return [data.preset, ...prev]
       })
-      toast.success(`Preset "${name}" saved`)
+      toast.success(interpolate(t.presetSaveSuccess, { name }))
     } catch {
-      toast.error('Failed to save preset')
+      toast.error(t.presetSaveFailed)
     } finally {
       setIsSaving(false)
     }
-  }, [])
+  }, [t])
 
   const deletePreset = useCallback(async (id: string): Promise<void> => {
     try {
       const res = await fetch(`/api/admin/sos/presets/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete preset')
       setPresets((prev) => prev.filter((p) => p.id !== id))
-      toast.success('Preset deleted')
+      toast.success(t.presetDeleted)
     } catch {
-      toast.error('Failed to delete preset')
+      toast.error(t.presetDeleteFailed)
     }
-  }, [])
+  }, [t])
 
   return { presets, isLoading, isSaving, savePreset, deletePreset, reloadPresets: loadPresets }
 }

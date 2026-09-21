@@ -90,6 +90,9 @@ function makeMockSettlement(overrides?: Partial<SettlementCenterState>): Settlem
     setSyncAnalyticsOnApprove: vi.fn(),
     creatingDrafts: false,
     approving: false,
+    notifying: false,
+    runNotify: vi.fn(),
+    runDownloadPdf: vi.fn(),
     markingReceived: false,
     locking: false,
     archiving: false,
@@ -106,6 +109,8 @@ function makeMockSettlement(overrides?: Partial<SettlementCenterState>): Settlem
     filter: '',
     setFilter: vi.fn(),
     loading: false,
+    loadError: null,
+    refreshRegister: vi.fn(),
     filteredRows: [
       {
         artistName: 'Artist A',

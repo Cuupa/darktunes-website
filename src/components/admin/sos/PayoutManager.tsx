@@ -16,6 +16,7 @@ import { generateSepaXml, downloadSepaXml } from '@/lib/sos/sepa-generator'
 import type { SepaPayoutEntry } from '@/lib/sos/sepa-generator'
 import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
+import { explainSosError } from '@/lib/sos/explainSosError'
 import { getAdminAccessToken } from '@/lib/admin/getAccessToken'
 import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
 import type { SettlementRegister } from '@/lib/api/settlementRegister'
@@ -49,6 +50,7 @@ const payoutFallback = {
   payoutLedgerSourceHint: 'Amounts come from the settlement ledger, not the CSV session.',
   payoutLoadingRegister: 'Loading settlement ledger…',
   payoutRegisterFailed: 'Could not load settlement ledger',
+  payoutRegisterRetry: 'Reload',
   payoutColArtist: 'Artist',
   payoutColHolder: 'Account holder',
   payoutColIban: 'IBAN',
@@ -92,62 +94,58 @@ export function PayoutManager({
 
   const [register, setRegister] = useState<SettlementRegister | null>(null)
   const [loadingRegister, setLoadingRegister] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const periodStartDate = monthToPeriodDate(periodStart, false)
   const periodEndDate = monthToPeriodDate(periodEnd || periodStart, true)
 
+  const loadRegister = useCallback(async () => {
+    if (!periodStartDate || !periodEndDate) {
+      setRegister(null)
+      setLoadError(null)
+      setLoadingRegister(false)
+      return
+    }
+
+    setLoadingRegister(true)
+    setLoadError(null)
+    try {
+      const token = await getAdminAccessToken()
+      if (!token) throw new Error('Session expired')
+
+      const params = new URLSearchParams({
+        periodStart: periodStartDate,
+        periodEnd: periodEndDate,
+      })
+      const response = await fetch(`/api/admin/settlements/register?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      const json = (await response.json().catch(() => null)) as
+        | SettlementRegister
+        | { error?: string }
+        | null
+
+      if (!response.ok) {
+        throw new Error(
+          (json as { error?: string } | null)?.error ?? t.payoutRegisterFailed,
+        )
+      }
+
+      setRegister(json as SettlementRegister)
+      setLoadError(null)
+    } catch (err) {
+      const message = explainSosError(err instanceof Error ? err.message : t.payoutRegisterFailed, t)
+      setLoadError(message)
+      toast.error(message)
+    } finally {
+      setLoadingRegister(false)
+    }
+  }, [periodStartDate, periodEndDate, t])
+
   useEffect(() => {
-    let cancelled = false
-
-    async function loadRegister() {
-      if (!periodStartDate || !periodEndDate) {
-        setRegister(null)
-        setLoadingRegister(false)
-        return
-      }
-
-      setLoadingRegister(true)
-      try {
-        const token = await getAdminAccessToken()
-        if (!token) throw new Error('Session expired')
-
-        const params = new URLSearchParams({
-          periodStart: periodStartDate,
-          periodEnd: periodEndDate,
-        })
-        const response = await fetch(`/api/admin/settlements/register?${params}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-
-        const json = (await response.json().catch(() => null)) as
-          | SettlementRegister
-          | { error?: string }
-          | null
-
-        if (!response.ok) {
-          throw new Error(
-            (json as { error?: string } | null)?.error ?? t.payoutRegisterFailed,
-          )
-        }
-
-        if (!cancelled) {
-          setRegister(json as SettlementRegister)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setRegister(null)
-          toast.error(err instanceof Error ? err.message : t.payoutRegisterFailed)
-        }
-      } finally {
-        if (!cancelled) setLoadingRegister(false)
-      }
-    }
-
     void loadRegister()
-    return () => {
-      cancelled = true
-    }
-  }, [periodStartDate, periodEndDate, t.payoutRegisterFailed])
+  }, [loadRegister])
 
   const [draftSepaIban, setDraftSepaIban] = useState(labelInfo.sepaIban ?? '')
   const [draftSepaAccountHolder, setDraftSepaAccountHolder] = useState(
@@ -254,8 +252,7 @@ export function PayoutManager({
         }),
       })
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      toast.error(t.payoutSepaExportFailedToast, { description: message })
+      toast.error(t.payoutSepaExportFailedToast, { description: explainSosError(err, t) })
     }
   }, [selectedPayouts, labelInfo, periodStart, periodEnd, totalSelected, t])
 
@@ -269,11 +266,13 @@ export function PayoutManager({
       <div className="flex flex-col h-full">
         <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-4 border-b border-white/10 bg-card/60 sticky top-0 z-10">
           <div className="flex flex-wrap items-center gap-4 text-sm">
-            {loadingRegister ? (
+            {loadingRegister && rows.length === 0 ? (
               <div className="flex items-center gap-1.5 text-muted-foreground">
                 <CircleNotch size={14} className="animate-spin" />
                 <span>{t.payoutLoadingRegister}</span>
               </div>
+            ) : loadError && rows.length === 0 ? (
+              <p className="text-sm text-destructive">{loadError}</p>
             ) : (
               <>
                 <div className="flex items-center gap-1.5">
@@ -373,11 +372,30 @@ export function PayoutManager({
           </div>
         )}
 
+        {loadError && rows.length > 0 && (
+          <div
+            className="mx-6 mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+            role="alert"
+          >
+            <p className="text-sm text-destructive">{loadError}</p>
+            <Button type="button" size="sm" variant="outline" onClick={() => void loadRegister()} disabled={loadingRegister}>
+              {t.payoutRegisterRetry}
+            </Button>
+          </div>
+        )}
+
         <div className={cn(horizontalScrollClass, 'flex-1')} data-lenis-prevent>
-          {loadingRegister ? (
+          {loadingRegister && rows.length === 0 && !loadError ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-muted-foreground">
               <CircleNotch size={32} className="animate-spin opacity-50" />
               <p className="text-sm">{t.payoutLoadingRegister}</p>
+            </div>
+          ) : loadError && rows.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-3" role="alert">
+              <p className="text-sm text-destructive">{loadError}</p>
+              <Button type="button" size="sm" variant="outline" onClick={() => void loadRegister()} disabled={loadingRegister}>
+                {t.payoutRegisterRetry}
+              </Button>
             </div>
           ) : rows.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-muted-foreground">

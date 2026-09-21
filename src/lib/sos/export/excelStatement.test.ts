@@ -290,6 +290,9 @@ describe('generateExcel column filters', () => {
       normalizeExcelExportSettings({ sheets: { raw: false } }),
       [oversizedSheet],
     )
+    expect(Object.prototype.toString.call(buffer)).toBe('[object ArrayBuffer]')
     expect(buffer.byteLength).toBeGreaterThan(0)
+    const transferred = structuredClone({ buffer }, { transfer: [buffer] })
+    expect(transferred.buffer.byteLength).toBeGreaterThan(0)
   })
 })

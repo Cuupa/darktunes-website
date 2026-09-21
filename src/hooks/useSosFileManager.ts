@@ -5,6 +5,7 @@ import { useKV } from '@/hooks/useLocalKV'
 import { toast } from 'sonner'
 import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
+import { explainSosError } from '@/lib/sos/explainSosError'
 import { extractPeriodBounds, uploadBronzeDistributorCsv } from '@/lib/sos/bronzeUpload'
 import { formatBytes, formatInteger, type SosParseDoneStats } from '@/lib/sos/ingestProgress'
 import { readFileWithProgress } from '@/lib/sos/readFileWithProgress'
@@ -47,6 +48,7 @@ const FILE_FALLBACK = {
   ingestArchiving: 'Archiving to storage…',
   ingestArchiveNoPeriod:
     'No reporting period detected in the file — archiving skipped. Fix the source dates and re-add the file.',
+  ingestArchiveRetryNoData: 'Data not in memory — re-upload the file to archive it.',
 } as const
 
 export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
@@ -87,6 +89,78 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
       return next
     })
   }, [])
+
+  const archiveFile = useCallback(
+    async (id: string, periodHint?: { periodStart?: string; periodEnd?: string }) => {
+      const data = fileDataRef.current[id]
+      const meta = (fileMetasRef.current ?? []).find((file) => file.id === id)
+      if (!data || !meta) {
+        setFileState(id, {
+          bronzeStatus: 'error',
+          bronzeError: t.ingestArchiveRetryNoData,
+          phase: 'done',
+          detail: undefined,
+        })
+        return
+      }
+      const bounds = extractPeriodBounds(
+        [periodHint?.periodStart ?? meta.periodStart, periodHint?.periodEnd ?? meta.periodEnd].filter(
+          (value): value is string => Boolean(value),
+        ),
+      )
+      if (!bounds) {
+        setFileState(id, {
+          bronzeStatus: 'skipped',
+          bronzeError: t.ingestArchiveNoPeriod,
+          phase: 'done',
+          detail: undefined,
+        })
+        return
+      }
+      setFileState(id, {
+        bronzeStatus: 'uploading',
+        phase: 'archiving',
+        detail: t.ingestArchiving,
+      })
+      const bronze = await uploadBronzeDistributorCsv({
+        distributor: type,
+        filename: meta.name,
+        uploadBody: data,
+        rowCount: meta.rowsParsed ?? 0,
+        periodStart: bounds.periodStart,
+        periodEnd: bounds.periodEnd,
+      })
+      if (bronze.ok) {
+        setFileMetas((current) =>
+          (current ?? []).map((file) =>
+            file.id === id ? { ...file, bronzeBatchId: bronze.batchId } : file,
+          ),
+        )
+        setFileState(id, {
+          bronzeStatus: 'done',
+          bronzeError: undefined,
+          phase: 'done',
+          detail: undefined,
+        })
+      } else {
+        setFileState(id, {
+          bronzeStatus: 'error',
+          bronzeError: bronze.message,
+          phase: 'done',
+          detail: undefined,
+        })
+      }
+    },
+    [setFileMetas, setFileState, t.ingestArchiving, t.ingestArchiveNoPeriod, t.ingestArchiveRetryNoData, type],
+  )
+
+  const retryArchive = useCallback(
+    (id: string) => {
+      bronzeStartedRef.current.add(id)
+      void archiveFile(id)
+    },
+    [archiveFile],
+  )
 
   const processAndStore = useCallback(
     async (rawFile: File, id: string): Promise<{ data: string }> => {
@@ -176,6 +250,8 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
                 uniqueArtistsCount: stats.uniqueArtistsCount,
                 emptyCurrencyRows: stats.emptyCurrencyRows,
                 skipReasons: stats.skipReasons,
+                periodStart: stats.periodStart,
+                periodEnd: stats.periodEnd,
               }
             : file,
         ),
@@ -191,48 +267,9 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
 
       if (bronzeStartedRef.current.has(id)) return
       bronzeStartedRef.current.add(id)
-      const data = fileDataRef.current[id]
-      const meta = (fileMetasRef.current ?? []).find((file) => file.id === id)
-      if (!data || !meta) return
-
-      const bounds = extractPeriodBounds(
-        [stats.periodStart, stats.periodEnd].filter(Boolean),
-      )
-      if (!bounds) {
-        setFileState(id, {
-          bronzeStatus: 'skipped',
-          bronzeError: t.ingestArchiveNoPeriod,
-          phase: 'done',
-        })
-        return
-      }
-      void (async () => {
-        setFileState(id, {
-          bronzeStatus: 'uploading',
-          phase: 'archiving',
-          detail: t.ingestArchiving,
-        })
-        const bronze = await uploadBronzeDistributorCsv({
-          distributor: type,
-          filename: meta.name,
-          uploadBody: data,
-          rowCount: stats.rowsParsed,
-          periodStart: bounds.periodStart,
-          periodEnd: bounds.periodEnd,
-        })
-        if (bronze.ok) {
-          setFileMetas((current) =>
-            (current ?? []).map((file) =>
-              file.id === id ? { ...file, bronzeBatchId: bronze.batchId } : file,
-            ),
-          )
-          setFileState(id, { bronzeStatus: 'done', bronzeError: undefined, phase: 'done' })
-        } else {
-          setFileState(id, { bronzeStatus: 'error', bronzeError: bronze.message, phase: 'done' })
-        }
-      })()
+      void archiveFile(id, { periodStart: stats.periodStart, periodEnd: stats.periodEnd })
     },
-    [setFileMetas, setFileState, t.ingestArchiving, t.ingestArchiveNoPeriod, type],
+    [archiveFile, setFileMetas, setFileState],
   )
 
   const addFiles = useCallback(
@@ -269,7 +306,9 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to process file'
             setFileState(id, { status: 'error', progress: 0, error: message })
-            toast.error(t.fileProcessFailed.replace('{filename}', rawFile.name), { description: message })
+            toast.error(t.fileProcessFailed.replace('{filename}', rawFile.name), {
+              description: explainSosError(message, t),
+            })
             throw err
           }
         })
@@ -313,7 +352,9 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
       // Update metadata immediately so the user sees the new name.
       setFileMetas(current =>
         (current ?? []).map(f =>
-          f.id === id ? { ...f, name: rawFile.name, size: rawFile.size } : f
+          f.id === id
+            ? { ...f, name: rawFile.name, size: rawFile.size, bronzeBatchId: undefined }
+            : f
         )
       )
 
@@ -333,7 +374,7 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to process file'
         setFileState(id, { status: 'error', progress: 0, error: message })
-        toast.error(t.fileReplaceFailed, { description: message })
+        toast.error(t.fileReplaceFailed, { description: explainSosError(message, t) })
       }
     },
     [processAndStore, setFileMetas, setFileState, type, callbacks, t]
@@ -353,6 +394,7 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
     addFiles,
     removeFile,
     replaceFile,
+    retryArchive,
     clearAll,
     patchFileState: setFileState,
     applyParseResult,

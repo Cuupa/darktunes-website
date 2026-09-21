@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { computeOtherDigitalRevenue } from './artistPayoutBreakdown'
+import { computeOtherDigitalRevenue, explainAppliedSplits } from './artistPayoutBreakdown'
 import type { ArtistRevenue } from './types'
+import { DEFAULT_APP_DEFAULTS } from './defaults'
 
 function revenue(partial: Partial<ArtistRevenue>): ArtistRevenue {
   return {
@@ -73,5 +74,45 @@ describe('computeOtherDigitalRevenue', () => {
         }),
       ),
     ).toBe(0)
+  })
+})
+
+describe('explainAppliedSplits', () => {
+  const base = {
+    defaultSplitPercentage: 50,
+    defaultSplitPercentageDigital: 50,
+    defaultSplitPercentagePhysical: 15,
+    sourceSplits: { ...DEFAULT_APP_DEFAULTS.sourceSplits },
+  }
+
+  it('lets a global Believe split beat the artist digital percentage', () => {
+    const explained = explainAppliedSplits(
+      'Neuroklast',
+      [{ artist: 'Neuroklast', percentage: 50, digitalPercentage: 90 }],
+      { ...base, sourceSplits: { ...base.sourceSplits, believe: 70 } },
+    )
+    expect(explained.believe).toEqual({ percent: 70, origin: 'global-source' })
+  })
+
+  it('prefers a per-artist Believe source override over the global split', () => {
+    const explained = explainAppliedSplits(
+      'Neuroklast',
+      [{
+        artist: 'Neuroklast',
+        percentage: 50,
+        sourceOverrides: [{ source: 'believe', percentage: 85 }],
+      }],
+      { ...base, sourceSplits: { ...base.sourceSplits, believe: 70 } },
+    )
+    expect(explained.believe).toEqual({ percent: 85, origin: 'artist-source' })
+  })
+
+  it('uses artist physical % before the global physical split', () => {
+    const explained = explainAppliedSplits(
+      'Neuroklast',
+      [{ artist: 'Neuroklast', percentage: 50, physicalPercentage: 40 }],
+      { ...base, sourceSplits: { ...base.sourceSplits, physical: 65 } },
+    )
+    expect(explained.physical).toEqual({ percent: 40, origin: 'artist-physical' })
   })
 })

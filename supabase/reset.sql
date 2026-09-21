@@ -7046,7 +7046,7 @@ CREATE TABLE IF NOT EXISTS public.artist_settlement_ledger (
   entry_type           TEXT           NOT NULL
                        CHECK (entry_type IN (
                          'statement_payout', 'invoice_liability', 'payment',
-                         'carry_in', 'carry_out', 'correction', 'opening_balance', 'partial_payment'
+                         'carry_in', 'carry_out', 'correction', 'partial_payment'
                        )),
   amount_eur           NUMERIC(14, 4) NOT NULL,
   currency             VARCHAR(3),
@@ -7062,6 +7062,19 @@ CREATE TABLE IF NOT EXISTS public.artist_settlement_ledger (
 CREATE INDEX IF NOT EXISTS idx_settlement_ledger_artist    ON public.artist_settlement_ledger (artist_id);
 CREATE INDEX IF NOT EXISTS idx_settlement_ledger_period    ON public.artist_settlement_ledger (settlement_period_id);
 CREATE INDEX IF NOT EXISTS idx_settlement_ledger_ref       ON public.artist_settlement_ledger (reference_type, reference_id);
+
+UPDATE public.artist_settlement_ledger
+  SET entry_type = 'carry_in'
+  WHERE entry_type = 'opening_balance';
+
+ALTER TABLE public.artist_settlement_ledger
+  DROP CONSTRAINT IF EXISTS artist_settlement_ledger_entry_type_check;
+ALTER TABLE public.artist_settlement_ledger
+  ADD CONSTRAINT artist_settlement_ledger_entry_type_check
+  CHECK (entry_type IN (
+    'statement_payout', 'invoice_liability', 'payment',
+    'carry_in', 'carry_out', 'correction', 'partial_payment'
+  ));
 
 ALTER TABLE public.artist_settlement_ledger ENABLE ROW LEVEL SECURITY;
 

@@ -28,7 +28,6 @@ const ENTRY_TYPE_KEYS: Record<LedgerEntry['entryType'], PortalMessageKey> = {
   carry_in: 'analytics_settlement_type_carry_in',
   carry_out: 'analytics_settlement_type_carry_out',
   correction: 'analytics_settlement_type_correction',
-  opening_balance: 'analytics_settlement_type_opening_balance',
   partial_payment: 'analytics_settlement_type_partial_payment',
 }
 

@@ -75,6 +75,7 @@ export interface FileManagerCallbacks {
   addFiles: (files: File[]) => void
   removeFile: (id: string) => void
   replaceFile: (id: string, file: File) => void
+  retryArchive?: (id: string) => void
 }
 
 /**
@@ -90,6 +91,7 @@ export interface EcommerceManagerCallbacks {
   fileStates?: Record<string, FileProcessingState>
   addFiles: (files: File[]) => void
   removeFile: (id: string) => void
+  retryArchive?: (id: string) => void
 }
 
 interface UniversalFileUploadZoneProps {
@@ -239,7 +241,9 @@ function FileProgressBar({ state }: { state: FileProcessingState | undefined }) 
   if (!showBar && state.bronzeStatus !== 'error') return null
 
   let label = state.detail ?? ''
-  if (state.phase === 'reading') {
+  if (state.bronzeStatus === 'error') {
+    label = ''
+  } else if (state.phase === 'reading') {
     label = interpolate(t('ingestReading'), {
       read: formatBytes(state.bytesRead ?? 0),
       total: formatBytes(state.bytesTotal ?? 0),
@@ -558,9 +562,11 @@ interface FileItemProps {
   onReplace: (() => void) | null
   replaceRef: ((el: HTMLInputElement | null) => void) | null
   onReplaceInput: ((e: React.ChangeEvent<HTMLInputElement>) => void) | null
+  onRetryArchive: (() => void) | null
 }
 
-function FileItem({ file, source, state, index, onRemove, onReplace, replaceRef, onReplaceInput }: FileItemProps) {
+function FileItem({ file, source, state, index, onRemove, onReplace, replaceRef, onReplaceInput, onRetryArchive }: FileItemProps) {
+  const t = useTranslations('admin.accounting')
   const isProcessingFile =
     state?.status === 'uploading' ||
     state?.status === 'processing' ||
@@ -647,6 +653,18 @@ function FileItem({ file, source, state, index, onRemove, onReplace, replaceRef,
           </div>
 
           <div className="flex items-center gap-1 flex-shrink-0">
+            {onRetryArchive && state?.bronzeStatus === 'error' && !file.bronzeBatchId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onRetryArchive}
+                disabled={isProcessingFile}
+                title={t('ingestArchiveRetry')}
+                className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+              >
+                <CloudArrowUp size={15} />
+              </Button>
+            )}
             {onReplace && (
               <Button
                 variant="ghost"
@@ -686,6 +704,7 @@ interface FileEntry {
   onReplace: (() => void) | null
   replaceRef: ((el: HTMLInputElement | null) => void) | null
   onReplaceInput: ((e: React.ChangeEvent<HTMLInputElement>) => void) | null
+  onRetryArchive: (() => void) | null
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -891,6 +910,7 @@ export function UniversalFileUploadZone({
         onReplace: () => replaceRefs.current.get(f.id)?.click(),
         replaceRef: makeRefSetter(f.id),
         onReplaceInput: (e: React.ChangeEvent<HTMLInputElement>) => handleReplaceInput(manager, f.id, e),
+        onRetryArchive: manager.retryArchive ? () => manager.retryArchive?.(f.id) : null,
       })),
     [makeRefSetter, handleReplaceInput]
   )
@@ -906,6 +926,7 @@ export function UniversalFileUploadZone({
         onReplace: null,
         replaceRef: null,
         onReplaceInput: null,
+        onRetryArchive: manager.retryArchive ? () => manager.retryArchive?.(f.id) : null,
       })),
     []
   )
@@ -1054,7 +1075,7 @@ export function UniversalFileUploadZone({
             transition={prefersReducedMotion ? { duration: 0 } : undefined}
             className="space-y-2"
           >
-            {allFiles.map(({ file, source, state, onRemove, onReplace, replaceRef, onReplaceInput }, index) => (
+            {allFiles.map(({ file, source, state, onRemove, onReplace, replaceRef, onReplaceInput, onRetryArchive }, index) => (
               <FileItem
                 key={file.id}
                 file={file}
@@ -1065,6 +1086,7 @@ export function UniversalFileUploadZone({
                 onReplace={onReplace}
                 replaceRef={replaceRef}
                 onReplaceInput={onReplaceInput}
+                onRetryArchive={onRetryArchive}
               />
             ))}
           </motion.div>

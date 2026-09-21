@@ -1,9 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { extractPeriodBounds, uploadBronzeDistributorCsv } from './bronzeUpload'
+import {
+  extractPeriodBounds,
+  humanizeBronzeUploadError,
+  uploadBronzeDistributorCsv,
+} from './bronzeUpload'
 
 vi.mock('@/lib/sos/clientAppLog', () => ({
   logClientAppEvent: vi.fn(async () => undefined),
 }))
+
+describe('humanizeBronzeUploadError', () => {
+  it('rewrites Failed to fetch without blaming file size', () => {
+    expect(humanizeBronzeUploadError('Failed to fetch')).toMatch(/could not reach the server/i)
+    expect(humanizeBronzeUploadError('Failed to fetch')).not.toMatch(/size/i)
+    expect(humanizeBronzeUploadError('R2 PUT failed (403)')).toMatch(/file archive refused/i)
+    expect(humanizeBronzeUploadError('R2 PUT failed (403)')).not.toMatch(/R2|403/)
+  })
+})
 
 describe('extractPeriodBounds', () => {
   it('returns min and max valid YYYY-MM months', () => {

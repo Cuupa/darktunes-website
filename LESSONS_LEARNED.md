@@ -228,6 +228,36 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-09-21 — A parse error is not parse-done
+
+- **Finding:** `pendingParsesRef` only decreased on `parse-done`. Worker `error` with `fileId` left the counter high, so `process` never ran. Replace kept the old `bronzeBatchId`, so a new CSV could publish against the previous archive.
+- **Rule:** Treat parse error as finishing that file (decrement, drop fingerprint). Clear `bronzeBatchId` on replace until re-archive. Stamp process errors with `requestId`.
+
+### 2026-09-21 — Same file id is not the same parse
+
+- **Finding:** `replaceFile` keeps the CSV worker file id. Sync only sent `add-file` for unknown ids, so a replacement kept the old parsed rows and re-processed them.
+- **Rule:** Fingerprint sent content (`id + length + head/tail`). Same id with a new fingerprint is remove + add. Tag `process` results with `requestId` so a late run cannot overwrite a newer one.
+
+### 2026-09-21 — A reusable preset is not a settlement
+
+- **Finding:** Default preset and named presets stored the same blob as the period workspace, including `manualRevenues` / `expenses` / `ignoredEntries`. The next quarter inherited last quarter’s recoup.
+- **Rule:** Split durable rules from period one-offs (`durableAccountingSettings`). Presets save durable only; period workspace keeps the one-offs. Loading a preset merges, it does not wipe this period’s lines.
+
+### 2026-09-21 — Global source splits can beat an artist digital percentage
+
+- **Finding:** `resolveSplitPercentageWithSourceOverride` prefers a per-artist digital % over global `sourceSplits` when a `splitFee` row exists. `buildProcessedArtistData` Believe/Bandcamp buckets do the opposite: global `sourceSplits.believe|bandcamp` wins unless a per-artist `sourceOverrides` entry exists. “Artist always wins” is false.
+- **Rule:** Document the bucket chain and lock it with pipeline reference tests. Do not “align” the helper and the buckets without an explicit product decision.
+
+### 2026-09-21 — ExcelJS writeBuffer is not a transferable ArrayBuffer
+
+- **Finding:** The worker posted `writeBuffer()` in the transfer list. ExcelJS returns a Node `Buffer`/`Uint8Array`. Chrome then throws `postMessage`: “Value at index 0 does not have a transferable type.” The worker test injected an already-valid `ArrayBuffer` and never hit that seam.
+- **Rule:** Copy ExcelJS output into a real `ArrayBuffer` (`toTransferableArrayBuffer`) before transfer. Tests must convert the real `writeBuffer()` result, not a hand-made buffer.
+
+### 2026-09-21 — A green parse check is not an archived source
+
+- **Finding:** Believe CSVs parsed (green) while bronze PUT failed (`Failed to fetch`). `bronzeBatchIds` only collected successes, wizard validation never saw archive status, and `uploadStatement` treated `batchId` as optional — so drafts could be created from unsaved sources. The file card also kept “Archiving to storage…”.
+- **Rule:** Preview may continue; statement create must require `archivedFileCount >= sourceFileCount` on client and server. Humanize opaque fetch errors, clear the archiving line on failure, and offer per-file retry.
+
 ### 2026-09-20 — A scheduler configured in a dashboard is not observable
 
 - **Finding:** Sync stopped for ~5 days while the admin Health UI could only say “Executor offline”. Scheduling lived in a manually-configured Supabase Cron → `trigger-sync` Edge Function relay (not in `reset.sql`, not in CI), the KV lease TTL (305s) exceeded the cron interval (300s), and the heartbeat was a read-modify-write JSON blob. The actual break — no HTTP request ever reached `/api/sync` — was invisible.

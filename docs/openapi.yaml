@@ -2877,6 +2877,61 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/sales-statements/{id}/notifications:
+    post:
+      operationId: postadmin_sales-statements_ById_notifications
+      tags: [Admin]
+      summary: "Create or submit /api/admin/sales-statements/{id}/notifications"
+      security:
+        - AdminBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/sales-statements/{id}/pdf:
+    get:
+      operationId: getadmin_sales-statements_ById_pdf
+      tags: [Admin]
+      summary: Get a presigned download URL for a statement PDF
+      security:
+        - AdminBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresignedUrlResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/admin/sales-statements/bulk-approve:
     post:
       operationId: postadmin_sales-statements_bulk-approve
@@ -5745,6 +5800,37 @@ paths:
       operationId: patchportal_invoices_ById
       tags: [Portal]
       summary: "Update /api/portal/invoices/{id}"
+      security:
+        - SessionBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/portal/invoices/{id}/deliveries:
+    post:
+      operationId: postportal_invoices_ById_deliveries
+      tags: [Portal]
+      summary: "Create or submit /api/portal/invoices/{id}/deliveries"
       security:
         - SessionBearer: []
       parameters:
