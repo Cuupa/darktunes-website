@@ -1,5 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { fetchSettlementRegister } from '@/lib/api/settlementCenterApi'
+import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
 import { useSettlementCenter } from './useSettlementCenter'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
@@ -10,6 +12,8 @@ vi.mock('@/lib/api/settlementCenterApi', () => ({
   bulkApproveStatements: vi.fn(),
   createStatementCorrection: vi.fn(),
   deleteSalesStatement: vi.fn(),
+  fetchStatementPdfUrl: vi.fn(),
+  retryStatementNotification: vi.fn(),
   lockSettlementPeriod: vi.fn(),
   markInvoiceReceived: vi.fn(),
   recordInvoicePayment: vi.fn(),
@@ -50,6 +54,28 @@ describe('useSettlementCenter', () => {
     await waitFor(() => {
       expect(result.current.periodLabel).toBe('Current Period')
       expect(typeof result.current.setFilter).toBe('function')
+    })
+  })
+
+  it('keeps a load error instead of looking empty', async () => {
+    vi.mocked(monthToPeriodDate).mockReturnValue('2026-01-01')
+    vi.mocked(fetchSettlementRegister).mockRejectedValueOnce(new Error('register down'))
+
+    const { result } = renderHook(() => useSettlementCenter({
+      revenues: [],
+      labelArtists: [],
+      periodStart: '2026-01',
+      periodEnd: '2026-01',
+      territoryMetrics: [],
+      merchOrderRows: [],
+      bronzeBatchIds: [],
+      onCreateDraft: vi.fn(),
+      onBuildCorrectionPdf: vi.fn(),
+    } as never))
+
+    await waitFor(() => {
+      expect(result.current.loadError).toBe('register down')
+      expect(result.current.loading).toBe(false)
     })
   })
 })

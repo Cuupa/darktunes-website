@@ -91,14 +91,28 @@
 - [ ] Portal invoice against locked settlement period returns 422
 - [ ] Save to Portal / persist-analytics against a locked or archived period returns 409 `problem+json` and writes no gold rows
 - [ ] Reporting / PDF / Excel: **Period payout** is this period only; **Opening** is last period’s leftover; **Amount due** = payout + opening (opening is not inside payout)
-- [ ] Archive a period with leftover → next period opening line + `carry_in`; new `amount_eur` does not include that leftover
+- [ ] Archive a period with leftover → next period opening line + `carry_in`; new `amount_eur` does not include that leftover; ledger has no `opening_balance` rows
 - [ ] Track split 70/20 blocks Continue and does not leak 10% to the original artist
 - [ ] Pay a statement-linked invoice: no second `payment` ledger row after `invoice_liability`; `received_at` is set if it was empty
-- [ ] Illegal statement status jump (e.g. draft → paid) returns 422; submitting the same SOS invoice again returns `200` with the existing invoice (`warnings: already_exists`) instead of a duplicate row or 409
+- [ ] Illegal statement status jump (e.g. draft → paid or draft → cancelled) returns 422; two tabs approving the same draft: the loser gets 409 `STATEMENT_STATUS_CONFLICT` (not 500); submitting the same SOS invoice again returns `200` with the existing invoice (`warnings: already_exists`) instead of a duplicate row or 409
+- [ ] Settlement register has no Cancel-statement action; unused drafts are deleted, not cancelled
 - [ ] Submit a statement-linked invoice → admin bell shows **Invoice submitted**; clicking it opens `/admin/invoices?id=…` with the row highlighted
 - [ ] Free invoice (no statement) is visible in `/admin/invoices` with artist/status filters and pagination — even though it never appears in the Settlement Center
 - [ ] Invoice mail recipient is the Accounting **finance email** (Default preset); with an invalid Resend key the portal toasts a warning (“email could not be sent”), not a success message
 - [ ] Invoice email PDF link points to `/api/invoices/{id}/pdf?token=…` (no `cdn.` public URL); portal/admin PDF buttons open a presigned URL
+- [ ] Settlement register **PDF** opens the stored statement (including drafts); URL is presigned and expires; R2 key is not shown
+- [ ] Open Accounting with a period set and no CSV session → Statements shows the register and SEPA/Payout (not hidden until upload)
+- [ ] Replace an already-parsed CSV with a different file (same slot) → amounts update to the new file; bronze id clears until re-archive; statement draft stays blocked until the new file is archived
+- [ ] A file that fails to parse does not leave Accounting stuck on “processing”; other files still produce amounts
+- [ ] Disconnect the network during archive/save → message names connection (not file size); sign-out → sign-in again; locked period → use correction; other tab saved → reload; unreadable CSV → re-export from the distributor. No codes like Failed to fetch / 403.
+- [ ] Real example files (`statement of sales examples/Q4 2025 - Q1 2026/`): Believe Q4+Q1, Bandcamp UTF-16, Darkmerch CSV/XLSX parse without NaN payouts (`realStatementExamples.test.ts`)
+- [ ] Change billing period with unsaved rules/one-offs → previous period is saved, then the new period workspace loads
+- [ ] Block `/api/admin/settlements/register` → Statements tab shows the error and **Reload**, not an empty artist list
+- [ ] Block `/api/admin/sos/import-batches` → Bronze archives show the error and **Refresh**, not “No Bronze CSV archives yet”
+- [ ] Block `/api/admin/settlements/register` on Statements/SEPA → Payout shows the error and **Reload**, not “No ledger payouts for this period”
+- [ ] Block `/api/admin/sos/period-summaries` → Insights/Trends shows the error and **Reload**, not “No historical data yet”
+- [ ] Force a statements list failure in the portal → error + **Reload**, not “No statements available yet”
+- [ ] Force an invoices list failure in the portal → error + **Reload**, not “No invoices yet”
 - [ ] Re-submitting the same statement invoice returns the existing invoice (no duplicate row, no second mail)
 - [ ] Retry after a mail failure still shows the invoice in `/admin/invoices` (warnings do not drop the row)
 - [ ] Bandcamp payout rows show as skipped (not revenue); empty currency rows warn “treated as EUR”
@@ -128,9 +142,20 @@
 - [ ] Change a precondition between dry run and apply (edit the row) → the run stops with `Voraussetzung geändert`, writes nothing further and keeps prior successful steps visible
 - [ ] Repair plan on a locked/archived period → 409 `SETTLEMENT_PERIOD_LOCKED`; only `is_archived` alignment of statements in archived periods is allowed
 - [ ] `/admin/accounting` Statement History tab and `/admin/statements` render without `Something went wrong`
-- [ ] Guided Publish / Drafts step (`?guidedStep=settle`) does not crash; failed draft create shows a toast
-- [ ] `/admin/accounting` shows Assistant as recommended; 5-step “what happens next” list
-- [ ] Assistant: empty period → Continue disabled with plain reason; set months → Continue works
+- [ ] Add an expense in period A, save Default / a named preset, open period B → expense is gone; mappings and splits remain
+- [ ] Load a preset while the current period has a manual revenue line → the line is still there
+- [ ] Sampler listed in compilation checks still appears in the artist payout; hiding compilations in PDF/Excel does not change the euro amount
+- [ ] Ignored release is gone from payout; ignored artist without a release title drops that artist entirely
+- [ ] Track split 60/40 that sums to 100% splits across roster artists; 70/20 stays on the original artist
+- [ ] Portal PATCH invoice status `paid` returns 4xx; only admin payment records paid. Artist can cancel a draft with no payment
+- [ ] Portal invoice with failed mail: list shows “Email failed”, Retry send delivers without a new PDF; still-failed send keeps draft
+- [ ] Approve with mail down → statement stays Approved; Retry notify succeeds later without a second Approve; artist sees in-app statement_available once
+- [ ] Amounts → artist row: breakdown shows source euros, fee, expenses, payout, opening, due, and split origin (e.g. global Believe default vs artist override)
+- [ ] `/admin/accounting` tab strip is Files → Amounts → Statements → Rules → Insights (no separate SEPA / Trends / Portal Data tabs)
+- [ ] SEPA export is on Statements; Trends is under Insights; `?subTab=payout` still opens Statements
+- [ ] `/admin/accounting` opens Files first (no Assistant / Quick Start chooser); `?guidedStep=settle` and Statement History open Statements
+- [ ] Upload shows period from/to month fields; Excel download works while a bronze archive is still failing; creating a draft is blocked until every session file is archived or removed
+- [ ] Failed bronze archive: no leftover “Archiving to storage…”, humanized network error, Retry on the file card
 - [ ] Set a manual period different from the detected source range → PDF/Excel, Settlement Center, payout, workspace key and carry-forward all use the manual period
 - [ ] Invalid period (end before start, month 13, start without end) → Export/PDF/Excel/Publish blocked with a plain reason; no `Q1-<current year>` upload appears
 - [ ] Source file without any recognizable sales month → bronze card shows “archiving skipped” instead of archiving under the current month
@@ -144,7 +169,7 @@
 - [ ] Open an approved statement as artist → status becomes `viewed` once (counter +1); open the same statement again after the invoice is created → status stays `invoiced` (no downgrade)
 - [ ] Shopify order with two Printful cost rows → costs are summed (100 − 15 − 5 = 80), not last-wins; a self-fulfilled order without Printful costs stays at full net revenue
 - [ ] Editor account cannot publish a statement (`uploadStatement` → Forbidden: admin role required); admin works unchanged
-- [ ] Invoice with a failing Resend key → status stays `draft`, `delivery_status='failed'` with the provider error visible; successful send → `sent` + `delivery_status='sent'`; no mail requested → `not_sent`
+- [ ] Invoice with a failing Resend key → status stays `draft`, `delivery_status='failed'` with the provider error visible; successful send → `sent` + `delivery_status='sent'`; no mail requested → `not_sent`; Settlement register and `/admin/invoices` show **Email failed** on that row
 - [ ] Upload one CSV → coach checklist updates; Continue enabled only after numbers appear
 - [ ] Block/throttle `/api/exchange-rates` → sticky fallback banner + Refresh; no crash on first process
 - [ ] Validate step: blocking errors prevent Continue; warnings allow continue

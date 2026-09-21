@@ -24,7 +24,9 @@ import type { SettlementCenterState } from '@/hooks/useSettlementCenter'
 import { interpolate } from '@/lib/i18n/interpolate'
 import {
   CircleNotch,
-  FileArrowUp,
+    EnvelopeSimple,
+    FileArrowUp,
+    FilePdf,
   MagnifyingGlass,
   PaperPlaneTilt,
   PencilSimple,
@@ -75,6 +77,8 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
     filter,
     setFilter,
     loading,
+    loadError,
+    refreshRegister,
     filteredRows,
     selectableRows,
     allSelected,
@@ -84,6 +88,9 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
     busyArtists,
     creatingDrafts,
     approving,
+    notifying,
+    runNotify,
+    runDownloadPdf,
     correcting,
     deletingDraft,
     runDraftCreation,
@@ -94,6 +101,17 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
 
   const renderRowActions = (row: MasterRow, isBusy: boolean) => (
     <div className="flex flex-wrap gap-2">
+      {row.statementId && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void runDownloadPdf(row.statementId!)}
+          aria-label={interpolate(t.settlementPdfAria, { artist: row.artistName })}
+        >
+          <FilePdf size={14} />
+          {t.settlementPdfBtn}
+        </Button>
+      )}
       {row.workflowStatus === 'not_uploaded' && row.artistId && row.payout != null && periodWritable && (
         <Button
           size="sm"
@@ -127,6 +145,18 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
             {t.settlementDeleteDraftBtn}
           </Button>
         </>
+      )}
+      {row.workflowStatus === 'label_approved' && row.statementId && periodWritable && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={isBusy || notifying}
+          onClick={() => void runNotify(row.statementId!, row.artistName)}
+          aria-label={interpolate(t.settlementNotifyAria, { artist: row.artistName })}
+        >
+          {isBusy ? <CircleNotch size={14} className="animate-spin" /> : <EnvelopeSimple size={14} />}
+          {t.settlementNotifyBtn}
+        </Button>
       )}
       {canCorrectStatement(row) && periodWritable && (
         <Button
@@ -200,6 +230,9 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
           <InvoiceStatusBadge status={row.original.invoiceStatus} labels={invoiceStatusLabels} />
           {row.original.invoiceNumber && (
             <span className="text-[10px] text-muted-foreground">{row.original.invoiceNumber}</span>
+          )}
+          {row.original.invoiceDeliveryStatus === 'failed' && (
+            <span className="text-[10px] text-amber-400">{t.settlementInvoiceDeliveryFailed}</span>
           )}
         </div>
       ),
@@ -318,10 +351,22 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
         </Button>
       </div>
 
+      {loadError && (
+        <div
+          className="flex flex-col gap-2 border-b border-border px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+          role="alert"
+        >
+          <p className="text-sm text-destructive">{loadError}</p>
+          <Button size="sm" variant="outline" onClick={() => void refreshRegister()} disabled={loading}>
+            {t.settlementRegisterRetry}
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-3 border-b border-border p-4 lg:hidden">
         {loading ? (
           <p className="py-6 text-center text-sm text-muted-foreground">{t.settlementLoadingRegister}</p>
-        ) : filteredRows.length === 0 ? (
+        ) : loadError && filteredRows.length === 0 ? null : filteredRows.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">{t.settlementNoArtistsFilter}</p>
         ) : (
           filteredRows.map((row) => {
@@ -375,7 +420,7 @@ export function SettlementRegisterTable({ settlement }: SettlementRegisterTableP
         <AdminDataTable
           table={table}
           loading={loading}
-          emptyMessage={t.settlementNoArtistsFilter}
+          emptyMessage={loadError ? loadError : t.settlementNoArtistsFilter}
           skeletonRowCount={6}
         />
       </div>

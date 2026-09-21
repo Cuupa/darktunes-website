@@ -29,6 +29,7 @@ export interface SettlementRegisterRow {
   invoiceId: string | undefined
   invoiceStatus: string | undefined
   invoiceNumber: string | undefined
+  invoiceDeliveryStatus?: 'not_sent' | 'sent' | 'failed'
   receivedAt: string | undefined
   paidAt: string | undefined
   paidAmountCents: number
@@ -127,6 +128,7 @@ export async function buildSettlementRegister(
       invoiceId: invoice?.id,
       invoiceStatus: invoice?.status,
       invoiceNumber: invoice?.artistInvoiceNumber ?? invoice?.invoiceNumber,
+      invoiceDeliveryStatus: invoice?.deliveryStatus,
       receivedAt: invoice?.receivedAt,
       paidAt: invoice?.paidAt,
       paidAmountCents: invoice?.paidAmountCents ?? 0,

@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import type { AccountingWorkspaceConfig } from '@/lib/api/sosAccountingWorkspaces'
 import {
   DEFAULT_SOS_ACCOUNTING_SETTINGS,
+  durableAccountingSettings,
+  mergePeriodScopedSettings,
   settingsFingerprint,
   type SosAccountingSettings,
 } from '@/lib/sos/sosAccountingSettings'
@@ -17,6 +19,7 @@ import {
 } from '@/lib/sos/migrateKvToDb'
 import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { logClientAppEvent } from '@/lib/sos/clientAppLog'
+import { explainSosError } from '@/lib/sos/explainSosError'
 
 const AUTO_SAVE_DEBOUNCE_MS = 2_000
 
@@ -64,6 +67,8 @@ export function useSosWorkspaceSync({
   const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(false)
   const [isWorkspaceSaving, setIsWorkspaceSaving] = useState(false)
   const [isSettingsDirty, setIsSettingsDirty] = useState(false)
+  const isSettingsDirtyRef = useRef(false)
+  isSettingsDirtyRef.current = isSettingsDirty
   const [isPeriodWorkspaceReady, setIsPeriodWorkspaceReady] = useState(false)
   const [isDefaultPresetReady, setIsDefaultPresetReady] = useState(false)
   const [reloadConfirmOpen, setReloadConfirmOpen] = useState(false)
@@ -81,6 +86,7 @@ export function useSosWorkspaceSync({
   const workspaceRevisionRef = useRef<number | null>(null)
   /** Sequence guard so a late load response cannot overwrite a newer period. */
   const periodLoadSeqRef = useRef(0)
+  const prevPeriodKeyRef = useRef<PeriodKey | null>(null)
   /** Blocks further saves until the user reloads after a revision conflict. */
   const workspaceConflictRef = useRef(false)
 
@@ -162,7 +168,7 @@ export function useSosWorkspaceSync({
         return true
       } catch (e) {
         const msg = e instanceof Error ? e.message : t.workspaceSaveFailed
-        toast.error(msg)
+        toast.error(explainSosError(msg, t))
         void logClientAppEvent('useSosWorkspaceSync', msg, 'error', {
           action: 'saveWorkspace',
           periodStart: periodKey.start,
@@ -173,17 +179,21 @@ export function useSosWorkspaceSync({
         setIsWorkspaceSaving(false)
       }
     },
-    [bronzeBatchIds, markSynced, setConflict, t.workspaceConflict, t.workspaceSaveError, t.workspaceSaveFailed],
+    [bronzeBatchIds, markSynced, setConflict, t],
   )
+
+  const saveWorkspaceRef = useRef(saveWorkspace)
+  saveWorkspaceRef.current = saveWorkspace
 
   const saveDefaultPreset = useCallback(
     async (nextSettings: SosAccountingSettings): Promise<boolean> => {
+      const durable = durableAccountingSettings(nextSettings)
       setIsWorkspaceSaving(true)
       try {
         const res = await fetch('/api/admin/sos/presets/default', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ config: nextSettings }),
+          body: JSON.stringify({ config: durable }),
         })
 
         if (!res.ok) {
@@ -193,20 +203,20 @@ export function useSosWorkspaceSync({
 
         const json = (await res.json()) as DefaultPresetApiResponse
         markDefaultSynced(
-          nextSettings,
+          durable,
           json.preset?.updated_at ?? new Date().toISOString(),
         )
         return true
       } catch (e) {
         const msg = e instanceof Error ? e.message : t.workspaceSaveFailed
-        toast.error(msg)
+        toast.error(explainSosError(msg, t))
         void logClientAppEvent('useSosWorkspaceSync', msg, 'error', { action: 'saveDefaultPreset' })
         return false
       } finally {
         setIsWorkspaceSaving(false)
       }
     },
-    [markDefaultSynced, t.workspaceDefaultSaveError, t.workspaceSaveFailed],
+    [markDefaultSynced, t],
   )
 
   const loadDefaultPreset = useCallback(async (): Promise<void> => {
@@ -219,9 +229,10 @@ export function useSosWorkspaceSync({
       const preset = json.preset
       if (preset?.config) {
         suppressAutoSaveRef.current = true
-        applySettings(preset.config)
+        const durable = durableAccountingSettings(preset.config)
+        applySettings(mergePeriodScopedSettings(durable, settingsRef.current))
         markDefaultSynced(
-          preset.config,
+          durable,
           preset.updated_at ?? new Date().toISOString(),
         )
       }
@@ -290,6 +301,8 @@ export function useSosWorkspaceSync({
             ws.updated_by ?? null,
           )
         } else {
+          suppressAutoSaveRef.current = true
+          applySettings(durableAccountingSettings(settingsRef.current))
           setWorkspaceLoadedAt(null)
           setWorkspaceUpdatedBy(null)
           clearSavedFingerprint()
@@ -382,7 +395,7 @@ export function useSosWorkspaceSync({
             if (res.ok) {
               const json = await res.json() as DefaultPresetApiResponse
               const current = json.preset?.config ?? DEFAULT_SOS_ACCOUNTING_SETTINGS
-              const merged = mergeKvIntoSettings(current, legacy.settings)
+              const merged = durableAccountingSettings(mergeKvIntoSettings(current, legacy.settings))
               await fetch('/api/admin/sos/presets/default', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -410,8 +423,18 @@ export function useSosWorkspaceSync({
     }
 
     setIsPeriodWorkspaceReady(false)
+    const prev = prevPeriodKeyRef.current
+    prevPeriodKeyRef.current = currentPeriodKey
     let cancelled = false
     void (async () => {
+      if (
+        prev &&
+        (prev.start !== currentPeriodKey.start || prev.end !== currentPeriodKey.end) &&
+        isSettingsDirtyRef.current
+      ) {
+        await saveWorkspaceRef.current(settingsRef.current, prev)
+      }
+      if (cancelled) return
       await loadPeriodWorkspace(currentPeriodKey)
       if (cancelled) setIsPeriodWorkspaceReady(false)
     })()
@@ -425,7 +448,9 @@ export function useSosWorkspaceSync({
   useEffect(() => {
     if (!settingsReady || disabled) return
 
-    const fingerprint = settingsFingerprint(settings)
+    const fingerprint = currentPeriodKey
+      ? settingsFingerprint(settings)
+      : settingsFingerprint(durableAccountingSettings(settings))
     const saved = lastSavedFingerprintRef.current
 
     if (!currentPeriodKey) {

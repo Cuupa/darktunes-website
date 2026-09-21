@@ -23,6 +23,7 @@ import { getStatementPresignedUrl } from '../_actions/presignedUrl'
 import { InlineBillingProfileStep } from '../../invoices/_components/InlineBillingProfileStep'
 import { QuickInvoiceButton } from '../../analytics/_components/QuickInvoiceButton'
 import { StatementProvenanceCard } from './StatementProvenanceCard'
+import { PortalLoadError } from '@/components/portal/PortalLoadError'
 import { StatementsTrustBanner } from './StatementsTrustBanner'
 
 interface StatementsTableProps {
@@ -32,6 +33,7 @@ interface StatementsTableProps {
   invoicedStatementIds: string[]
   statements: SalesStatement[]
   provenanceByStatementId?: Record<string, StatementSourceProvenance>
+  loadError?: string | null
 }
 
 function formatAmountEur(amount: number | undefined): string {
@@ -134,6 +136,7 @@ export function StatementsTable({
   invoicedStatementIds,
   statements,
   provenanceByStatementId = {},
+  loadError = null,
 }: StatementsTableProps) {
   const t = useTranslations('portal')
 
@@ -179,7 +182,13 @@ export function StatementsTable({
 
       <StatementsTrustBanner />
 
-      {statements.length === 0 ? (
+      {loadError && statements.length > 0 && (
+        <PortalLoadError message={loadError} retryLabel={t('portal_retry')} />
+      )}
+
+      {loadError && statements.length === 0 ? (
+        <PortalLoadError message={loadError} retryLabel={t('portal_retry')} />
+      ) : statements.length === 0 ? (
         <PortalEmptyState icon={FileText} heading={t('statements_noData')} description={t('statements_heading')} />
       ) : (
         <Card className="border-border bg-card">

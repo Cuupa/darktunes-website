@@ -288,7 +288,6 @@ export interface Database {
             | 'carry_in'
             | 'carry_out'
             | 'correction'
-            | 'opening_balance'
             | 'partial_payment'
           amount_eur: number
           currency: string | null
@@ -311,7 +310,6 @@ export interface Database {
             | 'carry_in'
             | 'carry_out'
             | 'correction'
-            | 'opening_balance'
             | 'partial_payment'
           amount_eur: number
           currency?: string | null
@@ -334,7 +332,6 @@ export interface Database {
             | 'carry_in'
             | 'carry_out'
             | 'correction'
-            | 'opening_balance'
             | 'partial_payment'
           amount_eur?: number
           currency?: string | null

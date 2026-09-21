@@ -50,6 +50,7 @@ vi.mock('@/lib/api/artistInvoices', () => ({
       paidAt: undefined,
       paidAmountCents: 0,
       outstandingAmountCents: 50000,
+      deliveryStatus: 'failed',
     },
   ]),
 }))
@@ -115,6 +116,7 @@ describe('buildSettlementRegister', () => {
     expect(neuro).toMatchObject({
       statementStatus: 'label_approved',
       invoiceStatus: 'sent',
+      invoiceDeliveryStatus: 'failed',
       ledgerBalanceEur: 120,
       statementAmountEur: 500,
     })

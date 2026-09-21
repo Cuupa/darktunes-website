@@ -9,7 +9,6 @@ import {
 describe('statementStatusTransitions', () => {
   it('allows the documented operator edges', () => {
     expect(canTransitionStatementStatus('draft', 'label_approved')).toBe(true)
-    expect(canTransitionStatementStatus('draft', 'cancelled')).toBe(true)
     expect(canTransitionStatementStatus('label_approved', 'artist_notified')).toBe(true)
     expect(canTransitionStatementStatus('label_approved', 'viewed')).toBe(true)
     expect(canTransitionStatementStatus('label_approved', 'invoiced')).toBe(true)
@@ -32,6 +31,8 @@ describe('statementStatusTransitions', () => {
     expect(canTransitionStatementStatus('draft', 'paid')).toBe(false)
     expect(canTransitionStatementStatus('label_approved', 'paid')).toBe(false)
     expect(canTransitionStatementStatus('paid', 'invoiced')).toBe(false)
+    expect(canTransitionStatementStatus('draft', 'cancelled')).toBe(false)
+    expect(canTransitionStatementStatus('invoiced', 'cancelled')).toBe(false)
     expect(canTransitionStatementStatus('cancelled', 'draft')).toBe(false)
     expect(canTransitionStatementStatus('superseded', 'label_approved')).toBe(false)
   })

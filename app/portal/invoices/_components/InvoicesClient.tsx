@@ -3,12 +3,13 @@
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Plus, DownloadSimple, FileText } from '@phosphor-icons/react'
+import { Plus, DownloadSimple, EnvelopeSimple, FileText } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { PortalEmptyState } from '@/components/portal/PortalEmptyState'
+import { PortalLoadError } from '@/components/portal/PortalLoadError'
 import {
   Table,
   TableBody,
@@ -41,6 +42,7 @@ interface InvoicesClientProps {
   labelClient: LabelClientInfo
   invoices: PortalInvoiceListItem[]
   statement: SalesStatement | null
+  loadError?: string | null
 }
 
 function statusBadgeVariant(status: ArtistInvoice['status']): 'default' | 'secondary' | 'destructive' | 'outline' {
@@ -80,6 +82,7 @@ export function InvoicesClient({
   labelClient,
   invoices: initialInvoices,
   statement,
+  loadError = null,
 }: InvoicesClientProps) {
   const t = useTranslations('portal')
 
@@ -142,6 +145,31 @@ export function InvoicesClient({
     } catch (err) {
       newTab?.close()
       toast.error(err instanceof Error ? err.message : t('invoice_error'))
+    }
+  }
+
+  const handleRetryDelivery = async (invoice: PortalInvoiceListItem) => {
+    try {
+      const headers = await getPortalAuthHeaders()
+      const response = await fetch(`/api/portal/invoices/${invoice.id}/deliveries`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artist_id: artistId }),
+      })
+      const json = (await response.json().catch(() => null)) as
+        | { invoice?: PortalInvoiceListItem; email_sent?: boolean; email_error?: string | null; error?: string }
+        | null
+      if (!response.ok) throw new Error(json?.error ?? t('invoice_retry_error'))
+      if (json?.invoice) {
+        setInvoices((prev) => prev.map((row) => (row.id === json.invoice!.id ? json.invoice! : row)))
+      }
+      if (json?.email_sent) {
+        toast.success(t('invoice_retry_sent'))
+      } else {
+        toast.warning(t('invoice_email_failed', { error: json?.email_error ?? 'unknown' }))
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t('invoice_retry_error'))
     }
   }
 
@@ -246,7 +274,12 @@ export function InvoicesClient({
               />
             ) : null}
 
-            {invoices.length === 0 ? (
+            {loadError && invoices.length > 0 && (
+              <PortalLoadError message={loadError} retryLabel={t('portal_retry')} />
+            )}
+            {loadError && invoices.length === 0 ? (
+              <PortalLoadError message={loadError} retryLabel={t('portal_retry')} />
+            ) : invoices.length === 0 ? (
               <PortalEmptyState
                 icon={FileText}
                 heading={t('invoices_heading')}
@@ -290,11 +323,28 @@ export function InvoicesClient({
                               }).format(total)}
                             </TableCell>
                             <TableCell>
-                              <Badge variant={statusBadgeVariant(invoice.status)}>
-                                {statusLabel(invoice.status, t)}
-                              </Badge>
+                              <div className="flex flex-col gap-1">
+                                <Badge variant={statusBadgeVariant(invoice.status)}>
+                                  {statusLabel(invoice.status, t)}
+                                </Badge>
+                                {invoice.deliveryStatus === 'failed' && (
+                                  <span className="text-[10px] text-amber-400">{t('invoice_delivery_failed')}</span>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell className="text-right">
+                              <div className="flex flex-wrap justify-end gap-1">
+                              {invoice.deliveryStatus === 'failed' && invoice.hasPdf && (
+                                <Button
+                                  className="gap-1"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => void handleRetryDelivery(invoice)}
+                                >
+                                  <EnvelopeSimple size={14} aria-hidden="true" />
+                                  {t('invoice_retry_send')}
+                                </Button>
+                              )}
                               {invoice.hasPdf ? (
                                 <Button
                                   className="gap-1"
@@ -316,6 +366,7 @@ export function InvoicesClient({
                                   {t('invoice_no_pdf')}
                                 </Button>
                               )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         )

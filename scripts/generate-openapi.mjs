@@ -860,6 +860,15 @@ const schemaOverrides = {
       responses: { 200: { schema: 'PresignedUrlResponse' } },
     },
   },
+  '/api/admin/sales-statements/{id}/pdf': {
+    GET: {
+      summary: 'Get a presigned download URL for a statement PDF',
+      responses: {
+        200: { schema: 'PresignedUrlResponse' },
+        404: { description: 'Statement or PDF object not found.' },
+      },
+    },
+  },
   '/api/invoices/{id}/pdf': {
     GET: {
       summary: 'Download an invoice PDF with an expiring email token',

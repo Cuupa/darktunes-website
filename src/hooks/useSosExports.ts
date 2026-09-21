@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
+import { explainSosError } from '@/lib/sos/explainSosError'
 import {
   generatePDF,
   generateExcel,
@@ -45,6 +46,9 @@ export interface SosExportPersistContext {
   merchOrderRows: MerchOrderRow[]
   revenues: ArtistRevenue[]
   bronzeBatchIds: string[]
+  sourceFileCount?: number
+  archivedFileCount?: number
+  unarchivedSourceFiles?: string[]
   /** Fingerprint of the rules stand used for this calculation (#620). */
   rulesFingerprint?: string
   /** Spot + historical FX rates used for this calculation (#620). */
@@ -95,9 +99,9 @@ function resolveBronzeBatchLineage(bronzeBatchIds: string[] | undefined) {
 const exportFallback = {
   exportNoArtistData: 'No data found for artist "{artist}"',
   exportPdfDownloaded: 'PDF for "{artist}" downloaded',
-  exportPdfFailed: 'PDF export failed',
+  exportPdfFailed: 'The PDF was not created, so nothing was downloaded.',
   exportExcelDownloaded: 'Excel for "{artist}" downloaded',
-  exportExcelFailed: 'Excel export failed',
+  exportExcelFailed: 'The Excel file was not created, so nothing was downloaded.',
   exportExcelPreparing: 'Preparing Excel for "{artist}"…',
   exportExcelRawSkipped:
     'Original-report files were skipped. Summary sheets are in the file.',
@@ -112,13 +116,19 @@ const exportFallback = {
   exportExcelBatchSkipped:
     '{count} artist(s) had no original-report Excel and were skipped in the ZIP. The ZIP contains a placeholder note for each.',
   exportZipDownloaded: 'ZIP with {count} statements downloaded',
-  exportZipFailed: 'ZIP export failed',
+  exportZipFailed: 'The ZIP was not created, so nothing was downloaded.',
   exportPortalDraftSaved:
     'Draft statement saved to portal. Approve in Settlement Center to notify the artist.',
-  exportPortalUploadFailed: 'Upload failed: {error}. PDF saved locally instead.',
+  exportPortalUploadFailed: '{error} A local PDF was saved instead so the numbers are not lost.',
+  exportNoSelectedArtists:
+    'No processed amounts match the selected artists. Process the CSVs first, then select artists that appear on Amounts.',
+  exportNoneSelected: 'No artists were selected for export. Select at least one row on Amounts.',
+  exportPublishFailed: 'The statement draft was not created.',
   exportPortalUploading: 'Uploading statement to portal…',
   exportPeriodRequired:
     'Set a valid billing period (YYYY-MM) before exporting or publishing. Nothing was changed.',
+  exportArchiveRequired:
+    'Archive every uploaded source file before creating a statement. Preview and Excel still work.',
 } as const
 
 function buildUploadPayload(
@@ -179,6 +189,16 @@ export function useExports(
     }
     return true
   }, [periodStart, periodEnd, t.exportPeriodRequired])
+
+  const requireArchive = useCallback((): boolean => {
+    const sourceFileCount = persistContext?.sourceFileCount ?? 0
+    const archivedFileCount = persistContext?.archivedFileCount ?? persistContext?.bronzeBatchIds.length ?? 0
+    if (sourceFileCount > 0 && archivedFileCount < sourceFileCount) {
+      toast.error(t.exportArchiveRequired)
+      return false
+    }
+    return true
+  }, [persistContext, t.exportArchiveRequired])
 
   /** Maps typed Excel worker failures to a specific toast message. */
   const excelWorkerErrorMessage = useCallback(
@@ -253,6 +273,10 @@ export function useExports(
           isValidArtistId(artistInfo.artistId)
 
         if (shouldUpload && artistInfo?.artistId) {
+          if (!requireArchive()) {
+            downloadBlob(blob, `${createSafeFilename(artist)}_statement.pdf`)
+            return
+          }
           const filename = `${createSafeFilename(artist)}_statement.pdf`
 
           toast.loading(t.exportPortalUploading, { id: 'sos-upload' })
@@ -276,6 +300,8 @@ export function useExports(
               artistData,
               analyticsPayload.totalStreams,
             ),
+            sourceFileCount: persistContext?.sourceFileCount,
+            archivedFileCount: persistContext?.archivedFileCount,
           })
 
           if (result.success) {
@@ -303,7 +329,7 @@ export function useExports(
           } else {
             toast.error(
               interpolate(t.exportPortalUploadFailed, {
-                error: result.error ?? 'Unknown error',
+                error: explainSosError(result.error, t),
               }),
               { id: 'sos-upload' },
             )
@@ -314,12 +340,11 @@ export function useExports(
           toast.success(interpolate(t.exportPdfDownloaded, { artist }))
         }
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
-        toast.error(t.exportPdfFailed, { description: message })
+        toast.error(t.exportPdfFailed, { description: explainSosError(err, t) })
         console.error('PDF export error:', err)
       }
     },
-    [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, artistInfoMap, compilationFilters, autoUploadToPortal, persistContext, labelArtists, t, requirePeriod]
+    [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, artistInfoMap, compilationFilters, autoUploadToPortal, persistContext, labelArtists, t, requirePeriod, requireArchive]
   )
 
   const handleDownloadExcel = useCallback(
@@ -388,8 +413,7 @@ export function useExports(
           toast.error(workerMessage, { id: toastId })
           return
         }
-        const message = err instanceof Error ? err.message : 'Unknown error'
-        toast.error(t.exportExcelFailed, { id: toastId, description: message })
+        toast.error(t.exportExcelFailed, { id: toastId, description: explainSosError(err, t) })
         console.error('Excel export error:', err)
       }
     },
@@ -468,8 +492,7 @@ export function useExports(
         toast.error(workerMessage, { id: toastId })
         return
       }
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      toast.error(t.exportZipFailed, { id: toastId, description: message })
+      toast.error(t.exportZipFailed, { id: toastId, description: explainSosError(err, t) })
       console.error('ZIP export error:', err)
     }
   }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters, requestExcelBlob, t, excelWorkerErrorMessage, requirePeriod])
@@ -483,14 +506,14 @@ export function useExports(
     excelSettings?: ExcelExportSettingsPatch,
   ) => {
     if (selectedArtistNames.length === 0) {
-      toast.info('No artists selected for export')
+      toast.info(t.exportNoneSelected)
       return
     }
     if (!requirePeriod()) return
 
     const subset = processedData.filter(d => selectedArtistNames.includes(d.artist))
     if (subset.length === 0) {
-      toast.error('No matching processed data for selected artists')
+      toast.error(t.exportNoSelectedArtists)
       return
     }
 
@@ -553,8 +576,7 @@ export function useExports(
         toast.error(workerMessage, { id: toastId })
         return
       }
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      toast.error(t.exportZipFailed, { id: toastId, description: message })
+      toast.error(t.exportZipFailed, { id: toastId, description: explainSosError(err, t) })
       console.error('ZIP export error:', err)
     }
   }, [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, labelArtists, appDefaults, emailConfig, compilationFilters, requestExcelBlob, t, excelWorkerErrorMessage, requirePeriod])
@@ -567,6 +589,7 @@ export function useExports(
         return
       }
       if (!requirePeriod()) return
+      if (!requireArchive()) return
 
       const artistInfo = artistInfoMap.get(artist.toLowerCase())
 
@@ -612,6 +635,8 @@ export function useExports(
             artistData,
             analyticsPayload.totalStreams,
           ),
+          sourceFileCount: persistContext?.sourceFileCount,
+          archivedFileCount: persistContext?.archivedFileCount,
         })
 
         if (!result.success) {
@@ -639,11 +664,10 @@ export function useExports(
 
         toast.success(t.exportPortalDraftSaved)
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
-        toast.error(message)
+        toast.error(t.exportPublishFailed, { description: explainSosError(err, t) })
       }
     },
-    [processedData, artistInfoMap, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters, persistContext, labelArtists, t, requirePeriod]
+    [processedData, artistInfoMap, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters, persistContext, labelArtists, t, requirePeriod, requireArchive]
   )
 
   const buildCorrectionPdfBase64 = useCallback(

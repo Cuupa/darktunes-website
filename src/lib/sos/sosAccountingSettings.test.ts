@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeAccountingConfig } from '@/lib/sos/sosAccountingSettings'
+import {
+  durableAccountingSettings,
+  mergePeriodScopedSettings,
+  normalizeAccountingConfig,
+} from '@/lib/sos/sosAccountingSettings'
 import { DEFAULT_PDF_EXPORT_SETTINGS } from '@/lib/sos/defaults'
 
 describe('normalizeAccountingConfig', () => {
@@ -57,5 +61,47 @@ describe('normalizeAccountingConfig', () => {
     expect(config.excelExport.settings.columns['releases.upcEan']).toBe(false)
     expect(config.excelExport.settings.columns['releases.title']).toBe(true)
     expect(config.excelExport.presets).toHaveLength(1)
+  })
+})
+
+describe('period vs durable settings', () => {
+  it('strips one-off settlement lines from reusable presets', () => {
+    const full = normalizeAccountingConfig({
+      splitFees: [{ artist: 'Neuroklast', percentage: 50 }],
+      manualRevenues: [{ id: 'mr', artist: 'Neuroklast', description: 'Sync', amount: 15 }],
+      expenses: [{ id: 'ex', artist: 'Neuroklast', description: 'Recoup', amount: 10, date: '2024-03-01' }],
+      ignoredEntries: [{
+        id: 'ig',
+        artist: 'Neuroklast',
+        createdAt: '2024-03-01T00:00:00.000Z',
+      }],
+    })
+
+    const durable = durableAccountingSettings(full)
+    expect(durable.splitFees).toEqual(full.splitFees)
+    expect(durable.manualRevenues).toEqual([])
+    expect(durable.expenses).toEqual([])
+    expect(durable.ignoredEntries).toEqual([])
+    expect(full.expenses).toHaveLength(1)
+  })
+
+  it('reapplies the current period lines when loading durable rules', () => {
+    const durable = durableAccountingSettings(
+      normalizeAccountingConfig({
+        splitFees: [{ artist: 'Neuroklast', percentage: 80 }],
+        expenses: [{ id: 'old', artist: 'Neuroklast', description: 'leak', amount: 99, date: '2024-01-01' }],
+      }),
+    )
+    const merged = mergePeriodScopedSettings(durable, {
+      manualRevenues: [{ id: 'mr', artist: 'Neuroklast', description: 'Sync', amount: 15 }],
+      expenses: [{ id: 'ex', artist: 'Neuroklast', description: 'This period', amount: 10, date: '2024-03-01' }],
+      ignoredEntries: [],
+    })
+
+    expect(merged.splitFees[0]?.percentage).toBe(80)
+    expect(merged.expenses).toEqual([
+      { id: 'ex', artist: 'Neuroklast', description: 'This period', amount: 10, date: '2024-03-01' },
+    ])
+    expect(merged.manualRevenues).toHaveLength(1)
   })
 })

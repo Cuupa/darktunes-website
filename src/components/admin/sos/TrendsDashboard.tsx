@@ -26,6 +26,7 @@ import { RevenueSummaryCard } from './RevenueSummaryCard'
 import type { ArtistRevenue } from '@/lib/sos/types'
 import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
+import { explainSosError } from '@/lib/sos/explainSosError'
 
 interface PeriodSummary {
   id: string
@@ -72,6 +73,7 @@ export function TrendsDashboard({
     trendsSavePeriod: 'Save period {period}',
     trendsUpdatePeriod: 'Update period {period}',
     trendsLoadFailed: 'Failed to load period summaries',
+    trendsRetry: 'Reload',
     trendsSaved: 'Period summary saved',
     trendsUpdated: 'Period summary updated',
     trendsHeading: 'Revenue Trends',
@@ -90,24 +92,29 @@ export function TrendsDashboard({
 
   const [summaries, setSummaries] = useState<PeriodSummary[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
   const loadSummaries = useCallback(async () => {
     setIsLoading(true)
+    setLoadError(null)
     try {
       const res = await fetch('/api/admin/sos/period-summaries')
       if (!res.ok) {
         const payload = await res.json().catch(() => ({})) as { error?: string }
-        throw new Error(payload.error ?? 'Failed to load period summaries')
+        throw new Error(payload.error ?? t.trendsLoadFailed)
       }
       const data = await res.json() as { summaries: PeriodSummary[] }
       setSummaries((data.summaries ?? []).sort((a, b) => a.period_start.localeCompare(b.period_start)))
+      setLoadError(null)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t.trendsLoadFailed)
+      const message = explainSosError(err instanceof Error ? err.message : t.trendsLoadFailed, t)
+      setLoadError(message)
+      toast.error(message)
     } finally {
       setIsLoading(false)
     }
-  }, [t.trendsLoadFailed])
+  }, [t])
 
   useEffect(() => {
     void loadSummaries()
@@ -138,12 +145,12 @@ export function TrendsDashboard({
         toast.success(payload.updated ? t.trendsUpdated : t.trendsSaved)
         await loadSummaries()
       } else {
-        toast.error(payload.error ?? t.trendsSaveFailed)
+        toast.error(t.trendsSaveFailed, { description: explainSosError(payload.error, t) })
       }
     } finally {
       setIsSaving(false)
     }
-  }, [revenues, periodStart, periodEnd, bronzeBatchIds, loadSummaries, t.trendsSaved, t.trendsUpdated, t.trendsSaveFailed])
+  }, [revenues, periodStart, periodEnd, bronzeBatchIds, loadSummaries, t])
 
   const chartData = summaries.map(s => ({
     period: s.period_start,
@@ -195,11 +202,23 @@ export function TrendsDashboard({
         </div>
       )}
 
-      {isLoading && (
+      {isLoading && summaries.length === 0 && !loadError && (
         <p className="text-sm text-muted-foreground animate-pulse">{t.trendsLoading}</p>
       )}
 
-      {!isLoading && chartData.length === 0 && (
+      {loadError && (
+        <div
+          className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+          role="alert"
+        >
+          <p className="text-sm text-destructive">{loadError}</p>
+          <Button type="button" size="sm" variant="outline" onClick={() => void loadSummaries()} disabled={isLoading}>
+            {t.trendsRetry}
+          </Button>
+        </div>
+      )}
+
+      {!isLoading && !loadError && chartData.length === 0 && (
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
           <CalendarBlank size={32} className="opacity-30" />
           <p className="text-sm">{t.trendsEmptyTitle}</p>

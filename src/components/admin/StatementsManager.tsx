@@ -132,7 +132,7 @@ interface StatementsManagerProps {
 
 export function StatementsManager({
   readOnly = true,
-  settlementHref = '/admin/accounting?guidedStep=settle',
+  settlementHref = '/admin/accounting?subTab=settlements',
   hideReadOnlyBanner = false,
 }: StatementsManagerProps) {
   const t = useMergedAccountingLabels(STATEMENTS_FALLBACK)

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { validateStatementUploadPeriod } from './statementUploadValidation'
+import {
+  validateStatementSourceArchive,
+  validateStatementUploadPeriod,
+} from './statementUploadValidation'
 
 describe('validateStatementUploadPeriod', () => {
   it('accepts a resolved month matching the billing period start', () => {
@@ -59,5 +62,26 @@ describe('validateStatementUploadPeriod', () => {
         periodEnd: '2026-03-31',
       }),
     ).toMatchObject({ ok: false, error: 'period_mismatch' })
+  })
+})
+
+describe('validateStatementSourceArchive', () => {
+  it('allows publishes with no session files', () => {
+    expect(validateStatementSourceArchive({})).toEqual({ ok: true })
+    expect(validateStatementSourceArchive({ sourceFileCount: 0, archivedFileCount: 0 })).toEqual({
+      ok: true,
+    })
+  })
+
+  it('rejects when session files outnumber archives', () => {
+    expect(
+      validateStatementSourceArchive({ sourceFileCount: 2, archivedFileCount: 1 }),
+    ).toMatchObject({ ok: false, error: 'source_archive_incomplete' })
+  })
+
+  it('accepts when every session file is archived', () => {
+    expect(
+      validateStatementSourceArchive({ sourceFileCount: 2, archivedFileCount: 2 }),
+    ).toEqual({ ok: true })
   })
 })

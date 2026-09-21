@@ -52,3 +52,18 @@ export function validateStatementUploadPeriod(
 
   return { ok: true, periodStart, periodEnd, period }
 }
+
+export function validateStatementSourceArchive(input: {
+  sourceFileCount?: number
+  archivedFileCount?: number
+}): { ok: true } | { ok: false; error: 'source_archive_incomplete'; message: string } {
+  const sourceFileCount = input.sourceFileCount ?? 0
+  const archivedFileCount = input.archivedFileCount ?? 0
+  if (sourceFileCount <= 0) return { ok: true }
+  if (archivedFileCount >= sourceFileCount) return { ok: true }
+  return {
+    ok: false,
+    error: 'source_archive_incomplete',
+    message: 'All uploaded source files must be archived before creating a statement.',
+  }
+}

@@ -38,6 +38,8 @@ import type {
   SosParseProgress,
   SosProcessProgress,
 } from '@/lib/sos/ingestProgress'
+import { explainSosError } from '@/lib/sos/explainSosError'
+import { fileParseFingerprint, planCsvWorkerFileSync } from '@/lib/sos/workerFileSync'
 import type {
   SosExcelBuildArgs,
   WorkerRequest,
@@ -120,8 +122,8 @@ const EMPTY_RESULT: WorkerResult = {
  *   They live only inside the worker until discarded after aggregation.
  * • The worker is a long-lived singleton; file content is sent once per file
  *   (on add) and config-only re-processing is cheap (no re-parse).
- * • `knownFileIdsRef` tracks which files have already been sent to the
- *   worker so that incremental adds/removes work correctly.
+  * • `sentFingerprintRef` tracks the parse fingerprint last sent so a
+   *   replace of the same file id re-parses instead of keeping the old rows.
  * • When csvAliases change the entire worker cache is reset and all files
  *   are re-parsed with the new column mappings.
  * • `pendingParsesRef` ensures we only send a 'process' message after all
@@ -137,8 +139,8 @@ export function useCSVProcessor(
   events: CsvProcessorEvents = {},
 ) {
   const workerRef = useRef<Worker | null>(null)
-  /** IDs of files that have been successfully sent to the worker for parsing. */
-  const knownFileIdsRef = useRef(new Set<string>())
+  const sentFingerprintRef = useRef(new Map<string, string>())
+  const processSeqRef = useRef(0)
   /** Number of 'add-file' messages still awaiting 'parse-done' from the worker. */
   const pendingParsesRef = useRef(0)
   /** Latest config snapshot — updated synchronously so the parse-done handler uses it. */
@@ -312,11 +314,11 @@ export function useCSVProcessor(
   customAliasesRef.current = customAliases
 
   const aliasKey = config.csvAliases.map(a => `${a.fieldName}:${a.synonym}`).join(',')
-  const believeKey = believeFiles.map(f => `${f.id}:${f.data?.length ?? 0}`).join(',')
-  const bandcampKey = bandcampFiles.map(f => `${f.id}:${f.data?.length ?? 0}`).join(',')
-  const shopifyKey = shopifyFiles.map(f => `${f.id}:${f.data?.length ?? 0}`).join(',')
-  const printfulKey = printfulFiles.map(f => `${f.id}:${f.data?.length ?? 0}`).join(',')
-  const darkmerchKey = darkmerchFiles.map(f => `${f.id}:${f.data?.length ?? 0}`).join(',')
+  const believeKey = believeFiles.map(f => fileParseFingerprint(f.id, f.data ?? '')).join(',')
+  const bandcampKey = bandcampFiles.map(f => fileParseFingerprint(f.id, f.data ?? '')).join(',')
+  const shopifyKey = shopifyFiles.map(f => fileParseFingerprint(f.id, f.data ?? '')).join(',')
+  const printfulKey = printfulFiles.map(f => fileParseFingerprint(f.id, f.data ?? '')).join(',')
+  const darkmerchKey = darkmerchFiles.map(f => fileParseFingerprint(f.id, f.data ?? '')).join(',')
 
   const configKey = [
     config.compilationFilters.map(f => f.id).join(','),
@@ -371,7 +373,9 @@ export function useCSVProcessor(
       return
     }
     const cfg = latestConfigRef.current ?? buildConfig()
-    workerRef.current?.postMessage({ type: 'process', config: cfg } satisfies WorkerRequest)
+    const requestId = processSeqRef.current + 1
+    processSeqRef.current = requestId
+    workerRef.current?.postMessage({ type: 'process', config: cfg, requestId } satisfies WorkerRequest)
     setIsProcessing(true)
   }, [buildConfig])
 
@@ -385,7 +389,7 @@ export function useCSVProcessor(
   useEffect(() => {
     // A recreated worker starts empty — re-send every file so parsing runs again.
     if (workerGeneration > 0) {
-      knownFileIdsRef.current.clear()
+      sentFingerprintRef.current.clear()
       pendingParsesRef.current = 0
       prevAliasKeyRef.current = undefined
     }
@@ -427,6 +431,7 @@ export function useCSVProcessor(
           break
 
         case 'process-progress':
+          if (msg.requestId !== undefined && msg.requestId !== processSeqRef.current) break
           setPipelineProgress({ phase: msg.phase, percentage: msg.percentage })
           eventsRef.current.onProcessProgress?.({
             phase: msg.phase,
@@ -435,13 +440,19 @@ export function useCSVProcessor(
           break
 
         case 'result':
+          if (msg.requestId !== undefined && msg.requestId !== processSeqRef.current) break
           setWorkerResult(msg.data)
           setPipelineProgress(null)
           setIsProcessing(false)
           break
 
         case 'error': {
+          if (msg.requestId !== undefined && msg.requestId !== processSeqRef.current) break
           console.error('CSV Worker error:', msg.message)
+          if (msg.fileId) {
+            pendingParsesRef.current = Math.max(0, pendingParsesRef.current - 1)
+            sentFingerprintRef.current.delete(msg.fileId)
+          }
           const labels = tRef.current
           const missingCurrency = parseMissingExchangeRateCurrency(msg.message)
           if (missingCurrency) {
@@ -451,10 +462,26 @@ export function useCSVProcessor(
               }),
             })
           } else {
-            toast.error(labels('csvProcessingError'), { description: msg.message })
+            toast.error(labels('csvProcessingError'), {
+              description: explainSosError(msg.message, {
+                explainCsvParse: labels('explainCsvParse'),
+                explainNetwork: labels('explainNetwork'),
+                explainUnknown: labels('explainUnknown'),
+                explainFailed: labels('explainFailed'),
+                explainStorage: labels('explainStorage'),
+                explainTimeout: labels('explainTimeout'),
+                explainSession: labels('explainSession'),
+              }),
+            })
           }
           setPipelineProgress(null)
-          setIsProcessing(false)
+          if (pendingParsesRef.current === 0) {
+            if (sentFingerprintRef.current.size > 0) {
+              sendProcessRef.current()
+            } else {
+              setIsProcessing(false)
+            }
+          }
           break
         }
 
@@ -512,7 +539,10 @@ export function useCSVProcessor(
       console.error('CSV Worker uncaught error:', err)
       const labels = tRef.current
       toast.error(labels('workerCrashed'), {
-        description: err.message || labels('workerCrashedUnknown'),
+        description: explainSosError(err.message || labels('workerCrashedUnknown'), {
+          explainUnknown: labels('explainUnknown'),
+          explainFailed: labels('explainFailed'),
+        }),
       })
       setIsProcessing(false)
       for (const pending of pendingExcelRef.current.values()) {
@@ -527,13 +557,13 @@ export function useCSVProcessor(
       }
     }
 
-    const knownFileIds = knownFileIdsRef.current
+    const sentFingerprints = sentFingerprintRef.current
     const pendingExcel = pendingExcelRef.current
     const orphanExcel = orphanExcelRef.current
     return () => {
       worker.terminate()
       workerRef.current = null
-      knownFileIds.clear()
+      sentFingerprints.clear()
       pendingParsesRef.current = 0
       for (const pending of pendingExcel.values()) pending.resolve(null)
       pendingExcel.clear()
@@ -571,35 +601,36 @@ export function useCSVProcessor(
       if (!isFirstRun) {
         // Aliases actually changed — reset the worker cache.
         worker.postMessage({ type: 'reset' } satisfies WorkerRequest)
-        knownFileIdsRef.current.clear()
+        sentFingerprintRef.current.clear()
         pendingParsesRef.current = 0
       }
     }
 
-    // Remove files that are no longer present
-    for (const id of knownFileIdsRef.current) {
-      if (!currentFileMap.has(id)) {
-        worker.postMessage({ type: 'remove-file', fileId: id } satisfies WorkerRequest)
-        knownFileIdsRef.current.delete(id)
-      }
+    const { toRemove, toAdd } = planCsvWorkerFileSync(
+      [...currentFileMap.values()],
+      sentFingerprintRef.current,
+    )
+
+    for (const id of toRemove) {
+      worker.postMessage({ type: 'remove-file', fileId: id } satisfies WorkerRequest)
+      sentFingerprintRef.current.delete(id)
     }
 
-    // Send newly added files (with data) to the worker
     let newFilesQueued = 0
-    for (const [id, file] of currentFileMap.entries()) {
-      if (!knownFileIdsRef.current.has(id) && file.data) {
-        knownFileIdsRef.current.add(id)
-        pendingParsesRef.current++
-        newFilesQueued++
-        worker.postMessage({
-          type: 'add-file',
-          fileId: id,
-          content: file.data,
-          source: file.type,
-          customAliases: customAliasesRef.current,
-        } satisfies WorkerRequest)
-        setIsProcessing(true)
-      }
+    for (const id of toAdd) {
+      const file = currentFileMap.get(id)
+      if (!file?.data) continue
+      sentFingerprintRef.current.set(id, fileParseFingerprint(id, file.data))
+      pendingParsesRef.current++
+      newFilesQueued++
+      worker.postMessage({
+        type: 'add-file',
+        fileId: id,
+        content: file.data,
+        source: file.type,
+        customAliases: customAliasesRef.current,
+      } satisfies WorkerRequest)
+      setIsProcessing(true)
     }
 
     // If all files were already known (no new adds) and there are no pending
@@ -620,7 +651,7 @@ export function useCSVProcessor(
   useEffect(() => {
     const cfg = buildConfig()
     latestConfigRef.current = cfg
-    if (workerRef.current && pendingParsesRef.current === 0 && knownFileIdsRef.current.size > 0) {
+    if (workerRef.current && pendingParsesRef.current === 0 && sentFingerprintRef.current.size > 0) {
       sendProcessRef.current()
     }
   }, [configKey, buildConfig])

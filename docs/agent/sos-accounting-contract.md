@@ -37,10 +37,9 @@ Owner issues: #616, #621, #622, #623, #628. Mirror into #622/#623/#621/#628.
 | `artist_invoices.delivery_status` (neu, #623) | `not_sent`, `sent`, `failed` | target |
 | `settlement_periods.status` | `open`, `under_review`, `approved`, `locked`, `archived` | `src/types/database.ts` |
 | `distributor_import_batches.status` | `uploaded`, `processing`, `completed`, `failed` | `src/types/database.ts` |
-| `artist_settlement_ledger.entry_type` | `statement_payout`, `invoice_liability`, `payment`, `partial_payment`, `carry_in`, `carry_out`, `correction`, `opening_balance` | `src/types/database.ts` |
+| `artist_settlement_ledger.entry_type` | `statement_payout`, `invoice_liability`, `payment`, `partial_payment`, `carry_in`, `carry_out`, `correction` | `src/types/database.ts` |
 
-`opening_balance` has no writer. It MUSS either be implemented by #628 or removed from the
-enum in `reset.sql` + `database.ts`; it darf nicht als undokumentierter Reservewert bleiben.
+Period opening is `carry_in` (from archive). `opening_balance` was an unused reserve and is removed from the ledger enum.
 
 ### A.2 Statement transitions (binding)
 
@@ -48,12 +47,12 @@ Allowed edges (same-status is a no-op). No reverse, no unlock, no unpay.
 
 | From | Allowed to |
 |---|---|
-| `draft` | `label_approved`, `cancelled` |
-| `label_approved` | `artist_notified`, `viewed`, `invoiced`, `cancelled`, `superseded` |
-| `artist_notified` | `viewed`, `invoiced`, `cancelled`, `superseded` |
-| `viewed` | `invoiced`, `paid`, `cancelled`, `superseded` |
-| `invoiced` | `paid`, `cancelled`, `superseded` |
-| `acknowledged` | `paid`, `cancelled`, `superseded` |
+| `draft` | `label_approved` |
+| `label_approved` | `artist_notified`, `viewed`, `invoiced`, `superseded` |
+| `artist_notified` | `viewed`, `invoiced`, `superseded` |
+| `viewed` | `invoiced`, `paid`, `superseded` |
+| `invoiced` | `paid`, `superseded` |
+| `acknowledged` | `paid`, `superseded` |
 | `paid` | terminal |
 | `superseded` | terminal |
 | `cancelled` | terminal |
@@ -67,18 +66,17 @@ MUSS-Regeln:
    Ansichtsereignis und kein Finanzvorgang: Es darf auch in `locked`/`archived`
    Perioden geschrieben werden, jedoch nur aus `label_approved`/`artist_notified`
    und nur einmal (Idempotenz über `first_viewed_at`).
-2. Optimistische Nebenläufigkeit: `updateSalesStatementStatus` prüft
-   `.eq('status', expected)`. Konflikt MUSS als HTTP 409 mit problem+json enden, nicht als
-   500 (heute: plain Error → 500, #616).
+2. Optimistische Nebenläufigkeit: `updateSalesStatementStatus` und
+   `approveSalesStatement` prüfen `.eq('status', expected)`. 0 Treffer/`PGRST116`
+   MUSS als HTTP 409 `STATEMENT_STATUS_CONFLICT` (problem+json) enden, nicht als 500.
 3. `label_approved` ohne Zustellung: Schlägt die Benachrichtigung fehl, bleibt der
-   Statement-Status `label_approved` (IST, bestätigt). Es MUSS eine ausdrückliche
-   Wiederholungsaktion geben, die ausschließlich `label_approved → artist_notified`
-   nachholt (heute fehlt jeder Writer, #623).
+   Statement-Status `label_approved` (IST, bestätigt). Wiederholung:
+   `POST /api/admin/sales-statements/{id}/notifications` (`label_approved → artist_notified`).
 4. `acknowledged` ist ein Migrationsaltwert. Kein neuer Writer; Leser behandeln ihn wie
    `invoiced` (IST, `statementWorkflow.ts`).
-5. `cancelled` hat keinen Writer im App-Code. #622/#625 MUSS entscheiden: entweder
-   implementierte, auditierte Stornoaktion (mit Ledger-/Rechnungsfolgen) oder Streichung
-   aus UI und Übergangsgraph. Ein toter Status darf nicht als erreichbar dargestellt werden.
+5. `cancelled` hat keinen Writer. Entscheidung: kein Statement-Storno in der App.
+   Entwürfe werden gelöscht. `cancelled` bleibt Enum/Terminal für Altzeilen, ist aber
+   aus dem Übergangsgraph entfernt (kein erreichbarer Zielstatus).
 
 ### A.3 Action contract (statements)
 
@@ -112,7 +110,7 @@ Zielmodell (#621/#623): **Dokument-/Finanzstatus** (`status`) und **Zustellung**
 
 - `not_sent`: kein Versand versucht.
 - `sent`: Provider (Resend) hat den Versand bestätigt.
-- `failed`: Versand fehlgeschlagen; Fehlergrund gespeichert; Wiederholungsaktion vorhanden.
+- `failed`: Versand fehlgeschlagen; Fehlergrund gespeichert; Wiederholungsaktion vorhanden. Label-UI (Settlement-Register, `/admin/invoices`) MUSS diesen Zustand sichtbar machen, unabhängig vom Finanzstatus.
 
 MUSS-Regeln:
 
@@ -132,8 +130,8 @@ MUSS-Regeln:
 5. `received` ist ein Eingangsnachweis. Eine Zahlung darf `received_at`/`received_by`
    einmalig nachtragen (IST, dokumentiert), aber `received` nie zurücknehmen.
 6. Artist-PATCH auf `paid` ohne Ledger, `paid_at` und Statement-Folge ist unzulässig.
-   `app/api/portal/invoices/[id]/route.ts:33-44` MUSS auf reine Lese-/Downloadpfade
-   reduziert oder mit den vollständigen Zahlungsregeln aus §E ausgestattet werden (#629).
+    `PATCH /api/portal/invoices/{id}` erlaubt nur noch `cancelled` auf `draft`
+    ohne Zahlung; `paid`/`sent` gehen über Admin-Zahlung bzw. Deliveries (#629).
 
 ### A.5 Settlement periods, carry-forward, archive
 
@@ -207,11 +205,13 @@ Owner issues: #624, #625. Mirror into #624/#625/#622.
 
 ### B.1 Informationsarchitektur
 
-Ein Ablauf: **1 Dateien → 2 Prüfung → 3 Beträge → 4 Statements**. Nach Freigabe wird
-dieselbe Abrechnung direkt zur Rechnungs-/Zahlungsbearbeitung geöffnet; kein erneuter
-Wizard. Moduswahl Quick/Assistant/Advanced entfällt als vorgeschalteter Entscheid;
-vorhandene Fachfunktionen bleiben über Einstellungen bzw. kontextuelle Aktionen erreichbar.
-Es gibt keine vierte Oberfläche.
+Ein Ablauf: **1 Dateien → 2 Beträge → 3 Statements** (inkl. SEPA). Regeln bleiben
+erreichbar; Auswertungen (Archive, Portal, Trends) liegen außerhalb des Geldwegs.
+Nach Freigabe wird dieselbe Abrechnung direkt zur Rechnungs-/Zahlungsbearbeitung
+geöffnet; kein erneuter Wizard. Moduswahl Quick/Assistant/Advanced entfällt
+(`/admin/accounting` öffnet den Arbeitsbereich direkt; Periode auf Dateien).
+Vorschau/Excel dürfen ohne vollständiges Bronze-Archiv laufen; das Anlegen eines
+Statement-Entwurfs nicht.
 
 ### B.2 Ansichten
 
@@ -237,9 +237,9 @@ Regeln:
    gefilterten Treffer“ ist eine eigene Aktion mit Gesamtzahl.
 2. Zeilen behalten stabile IDs über Sortierung/Filterung.
 3. Die Settlement-Ansicht MUSS auch ohne hochgeladene Dateien aus der DB öffnen
-   (heute hängt sie an `revenues.length > 0`, `AccountingPanel.tsx:569,977,1367` — #617).
+   (Register + Payout/SEPA bei gesetzter Periode; CSV-Session ist nicht Voraussetzung).
 4. Der manuell gewählte Zeitraum ist die verbindliche Abrechnungsperiode und MUSS in
-   allen Ansichten sichtbar und änderbar sein (heute nur im Assistant-Setup, #615).
+   allen Ansichten sichtbar sein (Periodenfelder auf Dateien, Banner bei gesetzter Periode).
 
 ### B.3 View states (für jede Ansicht verbindlich)
 
@@ -254,10 +254,7 @@ Regeln:
 | Kein Zugriff | klare Meldung ohne fremde Dokumentdetails |
 | Veraltete Revision | Hinweis + „Neu prüfen“; keine Freigabe alter Revision |
 
-Heute als leer getarnte Fehler, die #624 MUSS korrigieren: Settlement-Register
-(`useSettlementCenter.ts:167-171`), Trends (`TrendsDashboard.tsx:95-110`), Import-Batches
-(`ImportBatchesPanel.tsx:61-73`), Payout (`PayoutManager.tsx:136-143`), Portal-Seiten
-(`app/portal/statements/page.tsx:64-70`, `app/portal/invoices/page.tsx:68-81`).
+Ladefehler werden nicht als leere Liste getarnt: Settlement-Register, Bronze-Archive, Payout/SEPA, Trends, Portal-Statements und Portal-Rechnungen zeigen den Fehler mit Retry.
 
 ### B.4 Sammelaktionen
 
@@ -301,7 +298,7 @@ Owner issues: #616, #617, #618, #620, #631. Mirror into those issues.
 |---|---|---|
 | Datei hinzugefügt | Berechnung, Prüfung, Beträge, Entwürfe | Neu parsen/verarbeiten; Prüfung neu bewerten; betroffene Entwürfe als veraltet markieren; Quellenzuordnung aktualisieren |
 | Datei entfernt | Berechnung, Prüfung, Beträge, Quellenzeilen | Ergebnisse invalidieren; Entwürfe nicht mehr freigebbar, bis neu geprüft; Archiv unberührt lassen; Hinweis mit Quelle |
-| Datei ersetzt (gleicher Name/ID) | alles | **Erneut parsen** (heute bleibt der alte Worker-Stand aktiv, `useSosCSVProcessor.ts:589-603` — #618) |
+| Datei ersetzt (gleicher Name/ID) | alles | **Erneut parsen** (`planCsvWorkerFileSync`: gleiche ID mit neuem Inhalt → remove + add) |
 | Split/Kosten/manuelle Einnahme geändert | Beträge, Dokumente | Neu berechnen; Entwürfe veraltet; freigegebene Dokumente unverändert |
 | Künstlermapping/Alias geändert | Zuordnung, Beträge | Neu berechnen; uneindeutige Namen nie automatisch zuordnen |
 | Compilation-Filter geändert | Beträge | Neu berechnen; Entwürfe veraltet |
@@ -350,19 +347,18 @@ Owner issues: #616, #617, #618, #620, #631. Mirror into those issues.
 1. Finanzmutationen sind nie Last-write-wins. Statuswechsel nutzen bedingte Updates
    (`.eq('status', expected)`), Zahlungen laufen über eine Transaktion/RPC (§E).
 2. Ladevorgänge (Workspace, Register, Listen) MÜSSEN Anfragen sequenzieren oder abbrechen;
-   eine verspätete Antwort für Periode A darf Periode B nicht überschreiben
-   (heute ohne Schutz: `useSosWorkspaceSync.ts:362-378`, `useSettlementCenter.ts:149-176`
-   — #617).
+    eine verspätete Antwort für Periode A darf Periode B nicht überschreiben
+    (`periodLoadSeqRef`, Register-`refreshSeqRef`).
 3. Worker-Ergebnisse tragen eine Sequenz; nur das Ergebnis der letzten Konfiguration darf
-   angewendet werden (`useSosCSVProcessor.ts:437-441` — #618).
+   angewendet werden (`process` `requestId` / `processSeqRef`).
 4. Bei Konflikt gewinnt der Serverzustand; die UI zeigt „Neu laden“ statt zu raten.
 
 ### C.6 Persistenz und Fortsetzen
 
 | Zustand | Speicherort | Überlebt Reload |
 |---|---|---|
-| Einstellungen/Regeln je Periode | `sos_accounting_workspaces.config` | ja |
-| Standard-Preset | `sos_rules_presets` | ja |
+| Einstellungen/Regeln je Periode (inkl. Manual/Ausgaben/Ignore) | `sos_accounting_workspaces.config` | ja |
+| Standard-/Namens-Preset (ohne Perioden-Einmalposten) | `sos_rules_presets` | ja |
 | Bronze-Archiv + Hash | `distributor_import_batches` + R2 | ja |
 | Datei-Metadaten (Name, Zeilen, `bronzeBatchId`) | IndexedDB je Quelle | ja |
 | Roh-CSV, Parse-Zustand, Worker-Cache | Speicher | nein (Re-Upload oder Bronze-Load) |
@@ -379,7 +375,7 @@ MUSS-Regeln:
 2. Ungespeicherte Zustände dürfen nicht wie gespeicherte aussehen: Dirty-Anzeige +
    ausdrückliche Bestätigung vor Verwerfen/Neuladen.
 3. Automatischer Periodenwechsel darf lokale ungespeicherte Änderungen nicht still
-   überschreiben (heute der Fall, `useSosWorkspaceSync.ts:244-255` — #617).
+   überschreiben: dirty Periode A wird gespeichert, bevor Periode B geladen wird.
 
 ---
 
@@ -429,7 +425,7 @@ IST-Abweichungen, die #629 MUSS bereinigen:
 | Rechnungs-PDF admin | 10-min presigned URL | 600 s | admin-only |
 | Rechnungs-PDF portal | 10-min presigned URL | 600 s | Mitglied + eigener Datensatz |
 | Statement-PDF portal | Server Action, presigned URL | 300 s | Mitglied, Status nicht `draft`/`superseded`/`cancelled` |
-| Statement-PDF admin | kein Pfad vorhanden | — | #622/#624 MUSS einen admin-fähigen, autorisierten Download schaffen oder begründet streichen |
+| Statement-PDF admin | 10-min presigned URL `GET /api/admin/sales-statements/{id}/pdf` | 600 s | admin-only; auch Entwürfe/Storno mit vorhandenem R2-Objekt; kein View-Tracking |
 | Quell-CSV portal | servergestreamt | Session | Mitglied + Status-Allowlist + `file_hash` |
 | Bronze-CSV admin | presigned GET für den Browser (`…/presign-download`) | 300 s | admin-only; R2-Bucket-CORS erforderlich (Architekturentscheidung #618: Direktstrecke Browser → R2) |
 
@@ -589,4 +585,24 @@ Server-Proxy-Einzelrequest ≤ 4 MB ohne Multipart (`src/lib/sos/bronzeUploadLim
 
 | Datum | Änderung |
 |---|---|
+| 2026-09-21 | Parse-Fehler gibt pending Parses frei; Replace löscht bronzeBatchId; Periodenwechsel setzt prev-Key synchron |
+| 2026-09-21 | Datei-Replace gleicher ID wird neu geparst; Worker-Results sind seq-guarded; dirty Periode wird vor Periodenwechsel gespeichert |
+| 2026-09-21 | Payout/SEPA und Periodenbanner ohne CSV-Session, sobald die Periode gesetzt ist |
+| 2026-09-21 | Portal-Statements/-Rechnungen: Listen-Ladefehler sichtbar + Reload, nicht leere Empty-States |
+| 2026-09-21 | Trends: Perioden-Summaries-Ladefehler sichtbar + Reload, nicht „Noch keine Daten“ |
+| 2026-09-21 | Payout/SEPA: Ledger-Ladefehler sichtbar + Reload, nicht „Keine Auszahlungen“ |
+| 2026-09-21 | Bronze-Archive: Ladefehler sichtbar + Refresh, nicht als leere Archive-Meldung |
+| 2026-09-21 | Settlement-Register: Ladefehler sichtbar + Retry, nicht als leere Tabelle |
+| 2026-09-21 | Ledger-`opening_balance` entfernt; Eröffnung ist `carry_in` |
+| 2026-09-21 | Statement-`cancelled` ist nicht mehr erreichbar; Entwürfe werden gelöscht, kein Storno-Writer |
+| 2026-09-21 | Status-Write-Konflikt (`PGRST116`/0 Zeilen) → 409 `STATEMENT_STATUS_CONFLICT`, nicht 500 |
+| 2026-09-21 | Admin-Statement-PDF: `GET /api/admin/sales-statements/{id}/pdf` (presigned, 10 min) |
+| 2026-09-21 | Label sieht `delivery_status=failed` im Settlement-Register und in `/admin/invoices` |
+| 2026-09-21 | Portal-PATCH setzt kein `paid` mehr; nur Draft-Storno ohne Zahlungsbetrag |
+| 2026-09-21 | Rechnungsversand: `POST /api/portal/invoices/{id}/deliveries` wiederholt fehlgeschlagenen Versand ohne neues PDF |
+| 2026-09-21 | `label_approved` hat eine Wiederholungsaktion: `POST /api/admin/sales-statements/{id}/notifications` → bei Erfolg `artist_notified` |
+| 2026-09-21 | Accounting-Tabs: Dateien → Beträge → Statements (SEPA dort) → Regeln; Auswertungen zuletzt. `payout`/`trends` Query-Parameter werden umgeleitet |
+| 2026-09-21 | Default-/Namens-Presets speichern nur dauerhafte Regeln; Manual/Ausgaben/Ignore bleiben auf dem Perioden-Workspace |
+| 2026-09-21 | Berechnung: Sampler bleibt in der Auszahlung; Ignorieren entfernt Zeilen; Track-Split nur bei 100 %; globale Believe/Bandcamp-Splits schlagen Künstler-Digital-% ohne `sourceOverrides`. Referenztests: `calculationReference.test.ts` |
+| 2026-09-21 | Accounting-Entry ohne Moduswahl; Archiv-Gate vor Statement-Entwurf; ExcelJS-Buffer muss vor Worker-Transfer in ein `ArrayBuffer` kopiert werden |
 | 2026-09-17 | Erstfassung auf Basis main `701155a3` (Review-Basis `5e2abf0a`); Status-/Aktionsvertrag, Bildschirmzustände, Invalidierung, Berechtigungen, Zahlungen, Leistung |

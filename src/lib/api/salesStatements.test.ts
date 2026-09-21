@@ -10,6 +10,7 @@ import {
   getSalesStatementById,
   approveSalesStatement,
   approveAndNotifySalesStatement,
+  notifyApprovedSalesStatement,
   createCorrectionStatement,
   updateSalesStatementStatus,
   getSalesSummariesForAdmin,
@@ -316,6 +317,18 @@ describe('approveSalesStatement', () => {
     const db = makeApproveDb({ status: 'draft' }, null, { message: 'update failed' })
     await expect(approveSalesStatement(db, 'stmt-uuid-1')).rejects.toThrow('update failed')
   })
+
+  it('returns 409 when a concurrent approve wins', async () => {
+    const db = makeApproveDb({ status: 'draft' }, null, {
+      code: 'PGRST116',
+      message: 'JSON object requested, multiple (or no) rows returned',
+    })
+    await expect(approveSalesStatement(db, 'stmt-uuid-1')).rejects.toMatchObject({
+      name: 'BusinessRuleError',
+      status: 409,
+      code: 'STATEMENT_STATUS_CONFLICT',
+    })
+  })
 })
 
 describe('approveAndNotifySalesStatement', () => {
@@ -378,6 +391,72 @@ describe('approveAndNotifySalesStatement', () => {
   })
 })
 
+describe('notifyApprovedSalesStatement', () => {
+  function makeNotifyDb(current: SalesStatementRow, updated?: SalesStatementRow) {
+    let fromCalls = 0
+    return {
+      from: vi.fn(() => {
+        fromCalls += 1
+        if (fromCalls <= 2) {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({ data: current, error: null }),
+          }
+        }
+        return {
+          update: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          select: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({ data: updated ?? current, error: null }),
+        }
+      }),
+    } as unknown as DbClient
+  }
+
+  it('notifies a label_approved statement', async () => {
+    const approvedRow: SalesStatementRow = {
+      ...mockStatementRow,
+      status: 'label_approved',
+    }
+    const notifiedRow: SalesStatementRow = {
+      ...approvedRow,
+      status: 'artist_notified',
+    }
+    const notify = vi.fn().mockResolvedValue({ success: true })
+    const result = await notifyApprovedSalesStatement(
+      makeNotifyDb(approvedRow, notifiedRow),
+      'stmt-uuid-1',
+      notify,
+    )
+    expect(result.emailSent).toBe(true)
+    expect(result.statement.status).toBe('artist_notified')
+    expect(notify).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps label_approved when retry email fails', async () => {
+    const approvedRow: SalesStatementRow = {
+      ...mockStatementRow,
+      status: 'label_approved',
+    }
+    const notify = vi.fn().mockResolvedValue({ success: false, error: 'SMTP down' })
+    const result = await notifyApprovedSalesStatement(
+      makeNotifyDb(approvedRow),
+      'stmt-uuid-1',
+      notify,
+    )
+    expect(result.emailSent).toBe(false)
+    expect(result.statement.status).toBe('label_approved')
+  })
+
+  it('rejects retry when the statement is not label_approved', async () => {
+    const draftRow: SalesStatementRow = { ...mockStatementRow, status: 'draft' }
+    await expect(
+      notifyApprovedSalesStatement(makeNotifyDb(draftRow), 'stmt-uuid-1', vi.fn()),
+    ).rejects.toMatchObject({ status: 409 })
+  })
+})
+
 describe('updateSalesStatementStatus', () => {
   it('updates and returns the mapped domain object with new status', async () => {
     const acknowledgedRow: SalesStatementRow = {
@@ -410,6 +489,19 @@ describe('updateSalesStatementStatus', () => {
     await expect(
       updateSalesStatementStatus(db, 'stmt-uuid-1', 'acknowledged'),
     ).rejects.toThrow('update error')
+  })
+
+  it('returns 409 when a concurrent status write wins', async () => {
+    const current: SalesStatementRow = { ...mockStatementRow, status: 'label_approved' }
+    const db = makeApproveDb(current, null, {
+      code: 'PGRST116',
+      message: 'JSON object requested, multiple (or no) rows returned',
+    })
+    await expect(updateSalesStatementStatus(db, 'stmt-uuid-1', 'invoiced')).rejects.toMatchObject({
+      name: 'BusinessRuleError',
+      status: 409,
+      code: 'STATEMENT_STATUS_CONFLICT',
+    })
   })
 })
 

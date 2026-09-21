@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
+import { explainSosError } from '@/lib/sos/explainSosError'
 import { ArrowsClockwise, SpotifyLogo } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 
@@ -67,7 +68,7 @@ export function ApifySpotifySyncPanel() {
         setLastSummary(msg)
         toast.success(msg)
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Spotify Apify sync failed')
+        toast.error(explainSosError(err instanceof Error ? err.message : 'Spotify sync failed'))
       }
     })
   }

@@ -107,6 +107,9 @@ export interface UploadedFile {
   uniqueArtistsCount?: number
   /** Bronze import batch ID when raw CSV was archived in R2. */
   bronzeBatchId?: string
+  /** Reporting-period bounds detected at parse time (YYYY-MM). */
+  periodStart?: string
+  periodEnd?: string
 }
 
 /** Transient per-file processing state (not persisted). */

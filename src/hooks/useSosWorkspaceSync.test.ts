@@ -20,10 +20,14 @@ vi.mock('@/lib/sos/migrateKvToDb', () => ({
   mergeKvIntoSettings: vi.fn((s: unknown) => s),
   readLegacyKvSettings: vi.fn().mockResolvedValue(null),
 }))
-vi.mock('@/lib/sos/sosAccountingSettings', () => ({
-  DEFAULT_SOS_ACCOUNTING_SETTINGS: { version: 1 },
-  settingsFingerprint: vi.fn(() => 'fp'),
-}))
+vi.mock('@/lib/sos/sosAccountingSettings', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/sos/sosAccountingSettings')>()
+  return {
+    ...actual,
+    DEFAULT_SOS_ACCOUNTING_SETTINGS: { version: 1 },
+    settingsFingerprint: vi.fn(() => 'fp'),
+  }
+})
 
 describe('useSosWorkspaceSync', () => {
   it('exposes confirmation toggles and load action', async () => {
@@ -46,30 +50,45 @@ describe('useSosWorkspaceSync', () => {
     expect(result.current.reloadConfirmOpen).toBe(true)
   })
 
-  it('persistImportedSettings writes the Default preset', async () => {
+  it('persistImportedSettings writes the Default preset without period one-offs', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ preset: { updated_at: '2026-08-14T00:00:00.000Z' } }),
     })
     vi.stubGlobal('fetch', fetchMock)
 
+    const imported = {
+      splitFees: [{ artist: 'Neuroklast', percentage: 50 }],
+      manualRevenues: [{ id: 'mr', artist: 'Neuroklast', description: 'Sync', amount: 15 }],
+      expenses: [{ id: 'ex', artist: 'Neuroklast', description: 'Recoup', amount: 10, date: '2024-03-01' }],
+      ignoredEntries: [],
+    }
+
     const { result } = renderHook(() => useSosWorkspaceSync({
       currentPeriodKey: null,
-      settings: { version: 1 } as never,
+      settings: imported as never,
       applySettings: vi.fn(),
       bronzeBatchIds: [],
       disabled: true,
     }))
 
     await act(async () => {
-      const ok = await result.current.persistImportedSettings({ version: 1 } as never)
+      const ok = await result.current.persistImportedSettings(imported as never)
       expect(ok).toBe(true)
     })
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/admin/sos/presets/default',
-      expect.objectContaining({ method: 'PUT' }),
+    const put = fetchMock.mock.calls.find(
+      (call) =>
+        String(call[0]) === '/api/admin/sos/presets/default' &&
+        (call[1] as RequestInit | undefined)?.method === 'PUT',
     )
+    expect(put).toBeTruthy()
+    const body = JSON.parse(String((put?.[1] as RequestInit).body)) as {
+      config: { expenses: unknown[]; manualRevenues: unknown[]; splitFees: unknown[] }
+    }
+    expect(body.config.splitFees).toHaveLength(1)
+    expect(body.config.expenses).toEqual([])
+    expect(body.config.manualRevenues).toEqual([])
   })
 
   it('sends the loaded revision, stores the returned one and reads bronze batch ids', async () => {

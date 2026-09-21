@@ -176,4 +176,22 @@ describe('wizardValidation', () => {
     expect(issues.some((i) => i.id === 'empty-currency')).toBe(true)
     expect(wizardHasBlockingIssues(issues)).toBe(false)
   })
+
+  it('blocks when session files are not archived', () => {
+    const issues = validateSosWizardState({
+      revenues: [],
+      labelArtists: [],
+      splitFees: [],
+      periodStart: '2025-01',
+      periodEnd: '2025-03',
+      hasBelieveFile: true,
+      hasBandcampFile: false,
+      hasShopifyFile: false,
+      hasPrintfulFile: false,
+      hasDarkmerchFile: false,
+      unarchivedSourceFiles: ['Believe_Q1_2026.csv'],
+    })
+    expect(issues.some((i) => i.id === 'incomplete-archive')).toBe(true)
+    expect(wizardHasBlockingIssues(issues)).toBe(true)
+  })
 })

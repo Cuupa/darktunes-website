@@ -163,7 +163,7 @@ export interface WorkerResult {
 export type WorkerRequest =
   | { type: 'add-file'; fileId: string; content: string; source: 'believe' | 'bandcamp' | 'shopify' | 'printful' | 'darkmerch'; customAliases: Record<string, string[]> }
   | { type: 'remove-file'; fileId: string }
-  | { type: 'process'; config: WorkerProcessConfig }
+  | { type: 'process'; config: WorkerProcessConfig; requestId?: number }
   | { type: 'reset' }
   | {
       type: 'build-excel'
@@ -203,9 +203,10 @@ export type WorkerResponse =
       type: 'process-progress'
       phase: 'aggregating' | 'summaries' | 'finalizing'
       percentage: number
+      requestId?: number
     }
-  | { type: 'result'; data: WorkerResult }
-  | { type: 'error'; message: string; fileId?: string }
+  | { type: 'result'; data: WorkerResult; requestId?: number }
+  | { type: 'error'; message: string; fileId?: string; requestId?: number }
   | { type: 'excel-done'; requestId: string; buffer: ArrayBuffer; kind: 'zip' | 'xlsx' }
   | { type: 'excel-progress'; requestId: string; phase: string; rows?: number }
   | {
@@ -329,15 +330,16 @@ function getAllTransactions(): SalesTransaction[] {
   return all
 }
 
-function runProcess(config: WorkerProcessConfig): void {
+function runProcess(config: WorkerProcessConfig, requestId?: number): void {
   try {
-    post({ type: 'process-progress', phase: 'aggregating', percentage: 8 })
+    post({ type: 'process-progress', phase: 'aggregating', percentage: 8, requestId })
     const allTransactions = getAllTransactions()
 
     if (allTransactions.length === 0) {
       lastProcessedArtistData = []
       post({
         type: 'result',
+        requestId,
         data: {
           processedData: [],
           artistTrees: [],
@@ -386,13 +388,13 @@ function runProcess(config: WorkerProcessConfig): void {
       0,
     )
 
-    post({ type: 'process-progress', phase: 'aggregating', percentage: 35 })
+    post({ type: 'process-progress', phase: 'aggregating', percentage: 35, requestId })
     // Core processing — financial math runs unchanged (no modifications to data-processor.ts)
     const { artistData, filteredCompilations } = processTransactionsWithCompilations(
       allTransactions,
       config
     )
-    post({ type: 'process-progress', phase: 'summaries', percentage: 70 })
+    post({ type: 'process-progress', phase: 'summaries', percentage: 70, requestId })
     // Pre-compute tree structures while we still have raw transactions in scope
     const artistTrees: ArtistTreeNode[] = buildArtistTree(artistData)
     const collabTransactions = config.excludePhysical
@@ -425,9 +427,10 @@ function runProcess(config: WorkerProcessConfig): void {
     // Raw transaction arrays and the full ProcessedArtistData (with .transactions)
     // are now only in local scope and will be garbage-collected once this
     // function returns — they are NEVER sent to the main thread.
-    post({ type: 'process-progress', phase: 'finalizing', percentage: 92 })
+    post({ type: 'process-progress', phase: 'finalizing', percentage: 92, requestId })
     post({
       type: 'result',
+      requestId,
       data: {
         processedData,
         artistTrees,
@@ -445,6 +448,7 @@ function runProcess(config: WorkerProcessConfig): void {
   } catch (err) {
     post({
       type: 'error',
+      requestId,
       message: err instanceof Error ? err.message : 'Unknown processing error',
     })
   }
@@ -528,7 +532,7 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest>) => {
     }
 
     case 'process': {
-      runProcess(msg.config)
+      runProcess(msg.config, msg.requestId)
       break
     }
 
@@ -616,7 +620,11 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest>) => {
             })
           },
         )
-        post({ type: 'excel-done', requestId: msg.requestId, buffer, kind: 'xlsx' }, [buffer])
+        try {
+          post({ type: 'excel-done', requestId: msg.requestId, buffer, kind: 'xlsx' }, [buffer])
+        } catch {
+          post({ type: 'excel-done', requestId: msg.requestId, buffer, kind: 'xlsx' })
+        }
       } catch (err) {
         console.error('[sos-worker] build-excel failed:', err)
         if (err instanceof ExcelRawRowsLimitError) {

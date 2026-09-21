@@ -10,6 +10,7 @@ import type { MerchOrderRow } from '@/lib/sos/merchOrderRows'
 import type { ArtistRevenue, LabelArtist } from '@/lib/sos/types'
 import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
+import { explainSosError } from '@/lib/sos/explainSosError'
 
 interface SosAnalyticsPersistPanelProps {
   periodStart: string
@@ -71,7 +72,7 @@ export function SosAnalyticsPersistPanel({
           bronzeBatchIds,
         })
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : t.persistFailed)
+        toast.error(t.persistFailed, { description: explainSosError(err, t) })
         return
       }
 
@@ -102,7 +103,7 @@ export function SosAnalyticsPersistPanel({
           })
         }
       } else {
-        toast.error(result.error ?? t.persistFailed)
+        toast.error(t.persistFailed, { description: explainSosError(result.error, t) })
       }
     })
   }

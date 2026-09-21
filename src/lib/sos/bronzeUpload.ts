@@ -9,6 +9,7 @@
  */
 
 import { logClientAppEvent } from '@/lib/sos/clientAppLog'
+import { explainSosError } from '@/lib/sos/explainSosError'
 import {
   BRONZE_DIRECT_UPLOAD_PART_BYTES,
   BRONZE_R2_MIN_PART_BYTES,
@@ -69,12 +70,21 @@ function toUploadBlob(body: Blob | ArrayBuffer | string, contentType: string): B
 }
 
 export async function sha256HexFromBuffer(buffer: ArrayBuffer): Promise<string> {
-  const bytes = new Uint8Array(buffer.byteLength)
-  bytes.set(new Uint8Array(buffer))
-  const hash = await crypto.subtle.digest('SHA-256', bytes)
+  const hash = await crypto.subtle.digest('SHA-256', buffer)
   return Array.from(new Uint8Array(hash))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
+}
+
+const TRANSIENT_FETCH_RE = /failed to fetch|networkerror|load failed|network request failed/i
+
+export function isTransientBronzeFetchError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return TRANSIENT_FETCH_RE.test(message)
+}
+
+export function humanizeBronzeUploadError(message: string): string {
+  return explainSosError(message)
 }
 
 /** @deprecated Prefer sha256HexFromBuffer — kept for tests and legacy callers. */
@@ -154,15 +164,23 @@ function normalizeEtag(etag: string | null): string {
 }
 
 async function putToPresignedUrl(url: string, body: Blob, contentType: string): Promise<string> {
-  const res = await fetch(url, {
-    method: 'PUT',
-    body,
-    headers: { 'Content-Type': contentType },
-  })
-  if (!res.ok) {
-    throw new Error(`R2 PUT failed (${res.status})`)
+  const attempt = async (): Promise<string> => {
+    const res = await fetch(url, {
+      method: 'PUT',
+      body,
+      headers: { 'Content-Type': contentType },
+    })
+    if (!res.ok) {
+      throw new Error(`R2 PUT failed (${res.status})`)
+    }
+    return normalizeEtag(res.headers.get('ETag') ?? res.headers.get('etag'))
   }
-  return normalizeEtag(res.headers.get('ETag') ?? res.headers.get('etag'))
+  try {
+    return await attempt()
+  } catch (err) {
+    if (!isTransientBronzeFetchError(err)) throw err
+    return await attempt()
+  }
 }
 
 async function uploadBronzeCsvDirectSingle(
@@ -186,10 +204,8 @@ async function uploadBronzeCsvDirectSingle(
     await putToPresignedUrl(presignJson.uploadUrl, uploadBlob, contentType)
     return { ok: true }
   } catch (err) {
-    return {
-      ok: false,
-      message: err instanceof Error ? err.message : 'Direct R2 upload failed',
-    }
+    const raw = err instanceof Error ? err.message : 'Direct R2 upload failed'
+    return { ok: false, message: humanizeBronzeUploadError(raw) }
   }
 }
 
@@ -438,7 +454,7 @@ export async function uploadBronzeDistributorCsv(
 
     return { ok: true, batchId: batch.id, r2Key }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = humanizeBronzeUploadError(err instanceof Error ? err.message : String(err))
     await logBronzeError('unexpected error', { error: message })
     return { ok: false, message }
   }

@@ -61,8 +61,16 @@ async function StatementsContent({ searchParams }: { searchParams: Promise<{ art
   }
 
   const artist = await resolvePortalArtist(supabase, user.id, artistId).catch(() => null)
-  const [statements, invoiceList, billingProfile] = await Promise.all([
-    artist ? getSalesStatementsByArtistId(supabase, artist.id).catch(() => []) : Promise.resolve([]),
+  let statements: Awaited<ReturnType<typeof getSalesStatementsByArtistId>> = []
+  let loadError: string | null = null
+  if (artist) {
+    try {
+      statements = await getSalesStatementsByArtistId(supabase, artist.id)
+    } catch {
+      loadError = t('statements_load_failed')
+    }
+  }
+  const [invoiceList, billingProfile] = await Promise.all([
     artist
       ? listArtistInvoices(supabase, artist.id, 1, 200).catch(() => ({ invoices: [], total: 0 }))
       : Promise.resolve({ invoices: [], total: 0 }),
@@ -88,6 +96,7 @@ async function StatementsContent({ searchParams }: { searchParams: Promise<{ art
       )}
       statements={statements}
       provenanceByStatementId={provenanceByStatementId}
+      loadError={loadError}
     />
   )
 }

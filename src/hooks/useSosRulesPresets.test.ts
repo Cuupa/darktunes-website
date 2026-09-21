@@ -30,6 +30,13 @@ describe('useSosRulesPresets', () => {
 
     expect(result.current.presets[0]?.id).toBe('p2')
     expect(toastSuccess).toHaveBeenCalled()
+    const saveCall = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.find(
+      (call) => (call[1] as RequestInit | undefined)?.method === 'POST',
+    )
+    const body = JSON.parse(String((saveCall?.[1] as RequestInit).body)) as {
+      config: { expenses: unknown[] }
+    }
+    expect(body.config.expenses).toEqual([])
   })
 
   it('reports save errors', async () => {

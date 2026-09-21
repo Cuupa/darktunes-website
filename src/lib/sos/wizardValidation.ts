@@ -30,6 +30,8 @@ export interface WizardValidationInput {
   skippedRowCount?: number
   skipReasons?: string[]
   emptyCurrencyRowCount?: number
+  /** Session files that parsed but have no bronze archive id. */
+  unarchivedSourceFiles?: string[]
 }
 
 /** English defaults for wizard validation copy (also mirrored in accountingFallbacks). */
@@ -78,6 +80,10 @@ export const WIZARD_VALIDATION_FALLBACK = {
   validationEmptyCurrencyTitle: '{count} rows had no currency and were treated as EUR',
   validationEmptyCurrencyDesc:
     'Believe sometimes leaves the currency cell empty. Those rows stay in EUR. Missing or zero FX rates still abort processing.',
+  validationIncompleteArchiveTitle: 'Source files are not archived',
+  validationIncompleteArchiveDesc:
+    'These files are not in storage yet: {files}. Retry archive before creating statements. Preview and Excel still work.',
+  validationIncompleteArchiveAction: 'Go to Upload',
 } as const
 
 export type WizardValidationLabels = {
@@ -106,6 +112,20 @@ export function validateSosWizardState(
   const splitByArtist = new Map(
     input.splitFees.map((s) => [normalizeArtistNameKey(s.artist), s]),
   )
+
+  const unarchived = (input.unarchivedSourceFiles ?? []).filter(Boolean)
+  if (unarchived.length > 0) {
+    issues.push({
+      id: 'incomplete-archive',
+      severity: 'error',
+      title: labels.validationIncompleteArchiveTitle,
+      description: interpolate(labels.validationIncompleteArchiveDesc, {
+        files: unarchived.join(', '),
+      }),
+      actionLabel: labels.validationIncompleteArchiveAction,
+      actionTarget: 'upload',
+    })
+  }
 
   if (!input.periodStart || !input.periodEnd) {
     issues.push({
