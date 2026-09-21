@@ -488,4 +488,79 @@ describe('useCSVProcessor', () => {
     expect(result.current.excelBusy).toBe(true)
     vi.mocked(AbortSignal.timeout).mockRestore()
   })
+
+  it('requestExcelBlob posts the current process revision', async () => {
+    const { result } = renderHook(() => useCSVProcessor([], [], makeConfig()))
+
+    await waitFor(() => {
+      expect(workerInstances).toHaveLength(1)
+    })
+
+    await act(async () => {
+      void result.current.requestExcelBlob({
+        artist: 'Reaper',
+        artistData: { artist: 'Reaper' } as never,
+        labelInfo: { name: 'darkTunes', address: '' },
+        compilationFilters: [],
+      })
+    })
+
+    const posted = workerInstances[0]?.postMessage.mock.calls.find(
+      (c) => (c[0] as { type?: string })?.type === 'build-excel',
+    )?.[0] as { inputRevision?: number } | undefined
+    expect(posted?.inputRevision).toBe(0)
+  })
+
+  it('rejects a second Excel export while one is running', async () => {
+    const { result } = renderHook(() => useCSVProcessor([], [], makeConfig()))
+
+    await waitFor(() => {
+      expect(workerInstances).toHaveLength(1)
+    })
+
+    await act(async () => {
+      void result.current.requestExcelBlob({
+        artist: 'Reaper',
+        artistData: { artist: 'Reaper' } as never,
+        labelInfo: { name: 'darkTunes', address: '' },
+        compilationFilters: [],
+      })
+    })
+
+    await expect(
+      result.current.requestExcelBlob({
+        artist: 'Other',
+        artistData: { artist: 'Other' } as never,
+        labelInfo: { name: 'darkTunes', address: '' },
+        compilationFilters: [],
+      }),
+    ).rejects.toMatchObject({ code: 'EXCEL_BUSY' })
+  })
+
+  it('cancelExcelExport rejects the pending job and recreates the worker', async () => {
+    const { result } = renderHook(() => useCSVProcessor([], [], makeConfig()))
+
+    await waitFor(() => {
+      expect(workerInstances).toHaveLength(1)
+    })
+
+    const worker = workerInstances[0]
+    let pending: Promise<Blob | null> | undefined
+    await act(async () => {
+      pending = result.current.requestExcelBlob({
+        artist: 'Reaper',
+        artistData: { artist: 'Reaper' } as never,
+        labelInfo: { name: 'darkTunes', address: '' },
+        compilationFilters: [],
+      })
+    })
+
+    const rejected = expect(pending).rejects.toMatchObject({ code: 'EXCEL_CANCELLED' })
+    await act(async () => {
+      result.current.cancelExcelExport()
+    })
+    await rejected
+    expect(worker?.terminate).toHaveBeenCalled()
+    expect(result.current.excelBusy).toBe(false)
+  })
 })

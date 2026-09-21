@@ -59,6 +59,7 @@ import {
 } from '../lib/sos/excelExportSettings'
 import { buildExcelBuffer, ExcelRawRowsLimitError } from '../lib/sos/export/excelStatement'
 import { normalizeArtistNameKey } from '../lib/sos/artistNameKey'
+import { isStaleExcelRevision } from '../lib/sos/excelExportError'
 import { periodBoundsFromMonths } from '../lib/sos/ingestProgress'
 import type { ProcessedArtistData } from '../lib/sos/data-processor'
 import { buildArtistCollabTree } from '../lib/sos/grouping'
@@ -168,6 +169,7 @@ export type WorkerRequest =
   | {
       type: 'build-excel'
       requestId: string
+      inputRevision?: number
       artist: string
       artistData: SafeProcessedArtistData
       labelInfo: LabelInfo
@@ -225,6 +227,8 @@ const fileTransactions = new Map<string, SalesTransaction[]>()
 
 /** Last process result including transactions — worker-only, never posted. */
 let lastProcessedArtistData: ProcessedArtistData[] = []
+let lastProcessRevision: number | undefined
+let processedArtistByKey = new Map<string, ProcessedArtistData>()
 
 /**
  * Raw Shopify order groups, keyed by file ID.
@@ -405,6 +409,10 @@ function runProcess(config: WorkerProcessConfig, requestId?: number): void {
     const uniqueArtists = artistData.map(d => d.artist).sort()
 
     lastProcessedArtistData = artistData
+    lastProcessRevision = requestId
+    processedArtistByKey = new Map(
+      artistData.map((row) => [normalizeArtistNameKey(row.artist), row]),
+    )
 
     // Strip raw transactions (which must never reach the main thread) by
     // destructuring them out and spreading the remaining safe fields.
@@ -541,6 +549,8 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest>) => {
       shopifyRawOrdersMap.clear()
       printfulRawCostsMap.clear()
       lastProcessedArtistData = []
+      lastProcessRevision = undefined
+      processedArtistByKey = new Map()
       break
     }
 
@@ -556,11 +566,23 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest>) => {
           })
           break
         }
+        if (isStaleExcelRevision(msg.inputRevision, lastProcessRevision)) {
+          post({
+            type: 'excel-error',
+            requestId: msg.requestId,
+            code: 'EXCEL_STALE_REVISION',
+            message:
+              'The sales files or rules changed after this export started. The file was not downloaded. Export again.',
+          })
+          break
+        }
 
         post({ type: 'excel-progress', requestId: msg.requestId, phase: 'original-reports' })
-        const match = lastProcessedArtistData.find(
-          (row) => normalizeArtistNameKey(row.artist) === normalizeArtistNameKey(msg.artist),
-        )
+        const match =
+          processedArtistByKey.get(normalizeArtistNameKey(msg.artist)) ??
+          lastProcessedArtistData.find(
+            (row) => normalizeArtistNameKey(row.artist) === normalizeArtistNameKey(msg.artist),
+          )
         if (!match) {
           post({
             type: 'excel-error',
@@ -620,6 +642,16 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest>) => {
             })
           },
         )
+        if (isStaleExcelRevision(msg.inputRevision, lastProcessRevision)) {
+          post({
+            type: 'excel-error',
+            requestId: msg.requestId,
+            code: 'EXCEL_STALE_REVISION',
+            message:
+              'The sales files or rules changed after this export started. The file was not downloaded. Export again.',
+          })
+          break
+        }
         try {
           post({ type: 'excel-done', requestId: msg.requestId, buffer, kind: 'xlsx' }, [buffer])
         } catch {

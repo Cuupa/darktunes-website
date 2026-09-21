@@ -541,4 +541,62 @@ describe('useSosExports.handleDownloadExcel', () => {
       expect.anything(),
     )
   })
+
+  it('does not download a summary file when Raw is on and the worker is missing', async () => {
+    const mockGenerateExcel = vi.mocked(generateExcel)
+    mockGenerateExcel.mockResolvedValue(new Blob(['xlsx']))
+
+    const { result } = renderHook(() =>
+      useExports(
+        [makeProcessedArtist('Artist One')],
+        labelInfo,
+        '2026-03',
+        '2026-03',
+      ),
+    )
+
+    await act(async () => {
+      await result.current.handleDownloadExcel('Artist One')
+    })
+
+    expect(mockGenerateExcel).not.toHaveBeenCalled()
+    expect(mockDownloadBlob).not.toHaveBeenCalled()
+    expect(mockToastError).toHaveBeenCalledWith(
+      expect.stringContaining('incomplete statement'),
+      expect.anything(),
+    )
+  })
+
+  it('shows a specific message when the worker export is stale', async () => {
+    const requestExcelBlob = vi.fn().mockRejectedValue(
+      new ExcelExportWorkerError('stale', { code: 'EXCEL_STALE_REVISION' }),
+    )
+
+    const { result } = renderHook(() =>
+      useExports(
+        [makeProcessedArtist('Artist One')],
+        labelInfo,
+        '2026-03',
+        '2026-03',
+        {},
+        {},
+        [],
+        {},
+        [],
+        false,
+        undefined,
+        requestExcelBlob,
+      ),
+    )
+
+    await act(async () => {
+      await result.current.handleDownloadExcel('Artist One')
+    })
+
+    expect(mockDownloadBlob).not.toHaveBeenCalled()
+    expect(mockToastError).toHaveBeenCalledWith(
+      expect.stringContaining('sales files or rules changed'),
+      expect.anything(),
+    )
+  })
 })
