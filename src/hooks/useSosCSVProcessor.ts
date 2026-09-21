@@ -372,6 +372,15 @@ export function useCSVProcessor(
       setIsProcessing(false)
       return
     }
+    if (pendingExcelRef.current.size > 0) {
+      const stale = new ExcelExportWorkerError(
+        'The sales files or rules changed after this export started. The file was not downloaded. Export again.',
+        { code: 'EXCEL_STALE_REVISION' },
+      )
+      for (const pending of pendingExcelRef.current.values()) pending.reject(stale)
+      pendingExcelRef.current.clear()
+      if (orphanExcelRef.current.size === 0) setExcelBusy(false)
+    }
     const cfg = latestConfigRef.current ?? buildConfig()
     const requestId = processSeqRef.current + 1
     processSeqRef.current = requestId
@@ -709,17 +718,31 @@ export function useCSVProcessor(
         }),
       )
     }
+    if (pendingExcelRef.current.size > 0 || orphanExcelRef.current.size > 0) {
+      return Promise.reject(
+        new ExcelExportWorkerError(
+          'An Excel export is already running. Wait until it finishes, then retry.',
+          { code: 'EXCEL_BUSY' },
+        ),
+      )
+    }
     const requestId = crypto.randomUUID()
     const signal = AbortSignal.timeout(SOS_EXCEL_WORKER_TIMEOUT_MS)
     return new Promise((resolve, reject) => {
       const finish = (blob: Blob | null) => {
         pendingExcelRef.current.delete(requestId)
         signal.removeEventListener('abort', onAbort)
+        if (pendingExcelRef.current.size === 0 && orphanExcelRef.current.size === 0) {
+          setExcelBusy(false)
+        }
         resolve(blob)
       }
       const fail = (error: Error) => {
         pendingExcelRef.current.delete(requestId)
         signal.removeEventListener('abort', onAbort)
+        if (pendingExcelRef.current.size === 0 && orphanExcelRef.current.size === 0) {
+          setExcelBusy(false)
+        }
         reject(error)
       }
       const onAbort = () => {
@@ -762,9 +785,11 @@ export function useCSVProcessor(
       }
       signal.addEventListener('abort', onAbort, { once: true })
       pendingExcelRef.current.set(requestId, { resolve: finish, reject: fail, onProgress })
+      setExcelBusy(true)
       worker.postMessage({
         type: 'build-excel',
         requestId,
+        inputRevision: processSeqRef.current,
         artist: args.artist,
         artistData: args.artistData,
         labelInfo: args.labelInfo,
@@ -800,6 +825,25 @@ export function useCSVProcessor(
     territoryMetrics: workerResult.territoryMetrics,
     merchOrderRows: workerResult.merchOrderRows,
     requestExcelBlob,
+    cancelExcelExport: () => {
+      const cancelled = new ExcelExportWorkerError(
+        'The Excel export was cancelled. Nothing was downloaded.',
+        { code: 'EXCEL_CANCELLED' },
+      )
+      for (const pending of pendingExcelRef.current.values()) pending.reject(cancelled)
+      pendingExcelRef.current.clear()
+      orphanExcelRef.current.clear()
+      if (orphanGraceTimerRef.current) {
+        clearTimeout(orphanGraceTimerRef.current)
+        orphanGraceTimerRef.current = null
+      }
+      const stuckWorker = workerRef.current
+      workerRef.current = null
+      stuckWorker?.terminate()
+      setExcelBusy(false)
+      setIsProcessing(false)
+      setWorkerGeneration((generation) => generation + 1)
+    },
   }
 }
 

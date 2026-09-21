@@ -248,6 +248,11 @@ Distilled anti-patterns from project history. **Append session findings before o
 - **Finding:** `resolveSplitPercentageWithSourceOverride` prefers a per-artist digital % over global `sourceSplits` when a `splitFee` row exists. `buildProcessedArtistData` Believe/Bandcamp buckets do the opposite: global `sourceSplits.believe|bandcamp` wins unless a per-artist `sourceOverrides` entry exists. “Artist always wins” is false.
 - **Rule:** Document the bucket chain and lock it with pipeline reference tests. Do not “align” the helper and the buckets without an explicit product decision.
 
+### 2026-09-21 — A missing worker blob is not a summary Excel
+
+- **Finding:** Raw-on Excel fell through to `generateExcel()` when the worker was absent or returned null, so a summary-only file could download as if original-report tabs were attached. Process could also finish after Excel started (`await` yields in the worker), so a late workbook could match a previous rules/CSV stand.
+- **Rule:** Raw-on without a worker blob fails closed (no download). Tag `build-excel` with `inputRevision` and re-check after serialization. Re-process rejects in-flight Excel. Cancel/stale abort the ZIP instead of writing a placeholder.
+
 ### 2026-09-21 — ExcelJS writeBuffer is not a transferable ArrayBuffer
 
 - **Finding:** The worker posted `writeBuffer()` in the transfer list. ExcelJS returns a Node `Buffer`/`Uint8Array`. Chrome then throws `postMessage`: “Value at index 0 does not have a transferable type.” The worker test injected an already-valid `ArrayBuffer` and never hit that seam.

@@ -604,5 +604,5 @@ Server-Proxy-Einzelrequest ≤ 4 MB ohne Multipart (`src/lib/sos/bronzeUploadLim
 | 2026-09-21 | Accounting-Tabs: Dateien → Beträge → Statements (SEPA dort) → Regeln; Auswertungen zuletzt. `payout`/`trends` Query-Parameter werden umgeleitet |
 | 2026-09-21 | Default-/Namens-Presets speichern nur dauerhafte Regeln; Manual/Ausgaben/Ignore bleiben auf dem Perioden-Workspace |
 | 2026-09-21 | Berechnung: Sampler bleibt in der Auszahlung; Ignorieren entfernt Zeilen; Track-Split nur bei 100 %; globale Believe/Bandcamp-Splits schlagen Künstler-Digital-% ohne `sourceOverrides`. Referenztests: `calculationReference.test.ts` |
-| 2026-09-21 | Accounting-Entry ohne Moduswahl; Archiv-Gate vor Statement-Entwurf; ExcelJS-Buffer muss vor Worker-Transfer in ein `ArrayBuffer` kopiert werden |
+| 2026-09-21 | Excel-Export: max. 1 Build; Raw ohne Worker-Blob nicht als Summary herunterladen; `inputRevision` verwirft veraltete Workbooks; ZIP abbrechbar |
 | 2026-09-17 | Erstfassung auf Basis main `701155a3` (Review-Basis `5e2abf0a`); Status-/Aktionsvertrag, Bildschirmzustände, Invalidierung, Berechtigungen, Zahlungen, Leistung |

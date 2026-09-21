@@ -42,6 +42,7 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 - **Artist profile preview rows:** Admin → Settings can set how many **grid rows** of videos and news show on `/artists/[slug]` before an in-place **Show all** control (defaults: 2 rows each). Responsive columns match the existing grids (videos 1/2/3, news 1/2). Personal/Fan page unchanged.
 
 ### Fixed
+- **SOS Excel export no longer ships a stale or summary-only file by mistake:** Raw-on without worker tabs does not download a summary workbook. A second Excel job is refused until the first finishes. Re-processing CSVs/rules cancels an in-flight Excel (`EXCEL_STALE_REVISION`). ZIP-of-all can be aborted; cancel/stale does not download the ZIP. Placeholder notes for skipped artists include the error reason.
 - **Accounting errors say why, without jargon:** Failures map to a cause and a next step (signed out, other tab saved first, period frozen, archive refused, unreadable CSV). Raw codes like Failed to fetch / R2 / 403 are not shown.
 - **SOS parse errors no longer stall the pipeline:** A failed file parse decrements the pending counter and re-processes remaining files. Replacing a file clears its bronze archive id until re-archive. Period switch records the previous period key synchronously so a fast second switch cannot save the wrong period.
 - **Replacing a SOS file re-parses it:** Same file id with new contents is removed and re-added in the CSV worker instead of keeping the old rows. Stale process results are ignored via `requestId`.

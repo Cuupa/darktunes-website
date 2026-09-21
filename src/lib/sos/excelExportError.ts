@@ -11,6 +11,23 @@ export type ExcelExportWorkerErrorCode =
   | 'EXCEL_WORKER_DATA_MISSING'
   | 'EXCEL_ARTIST_NOT_IN_WORKER'
   | 'EXCEL_RAW_ROWS_LIMIT'
+  | 'EXCEL_CANCELLED'
+  | 'EXCEL_STALE_REVISION'
+  | 'EXCEL_BUSY'
+
+export function isStaleExcelRevision(
+  jobRevision: number | undefined,
+  currentRevision: number | undefined,
+): boolean {
+  return jobRevision != null && currentRevision != null && jobRevision !== currentRevision
+}
+
+export function isAbortingExcelExport(err: unknown): boolean {
+  return (
+    err instanceof ExcelExportWorkerError &&
+    (err.code === 'EXCEL_CANCELLED' || err.code === 'EXCEL_STALE_REVISION')
+  )
+}
 
 export class ExcelExportWorkerError extends Error {
   readonly code?: string

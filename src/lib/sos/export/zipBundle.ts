@@ -1,3 +1,4 @@
+import { ExcelExportWorkerError, isAbortingExcelExport } from '../excelExportError'
 import type { ExcelExportSettingsPatch } from '../excelExportSettings'
 import type {
   AppDefaults,
@@ -47,7 +48,8 @@ export async function generateZipOfAllStatements(
     onProgress?: (phase: string, rows?: number) => void,
   ) => Promise<Blob | null | undefined>,
   onExcelProgress?: (artist: string, phase: string, rows?: number) => void,
-  onExcelSkipped?: (artist: string) => void,
+  onExcelSkipped?: (artist: string, reason: string) => void,
+  signal?: AbortSignal,
 ): Promise<Blob> {
   const JSZip = (await import('jszip')).default
   const zip = new JSZip()
@@ -60,9 +62,21 @@ export async function generateZipOfAllStatements(
   }
 
   for (let i = 0; i < artistsData.length; i++) {
+    if (signal?.aborted) {
+      throw new ExcelExportWorkerError(
+        'The Excel export was cancelled. Nothing was downloaded.',
+        { code: 'EXCEL_CANCELLED' },
+      )
+    }
     const artistData = artistsData[i]
 
     await new Promise<void>(resolve => setTimeout(resolve, 0))
+    if (signal?.aborted) {
+      throw new ExcelExportWorkerError(
+        'The Excel export was cancelled. Nothing was downloaded.',
+        { code: 'EXCEL_CANCELLED' },
+      )
+    }
 
     const safeArtistName = artistData.artist.replace(/[^a-z0-9]/gi, '_')
     const prefix = labelInfo.invoiceNumberPrefix ?? 'SOS'
@@ -88,6 +102,8 @@ export async function generateZipOfAllStatements(
     if (format === 'excel' || format === 'both') {
       if (buildExcelBlob) {
         let workerBlob: Blob | null | undefined = null
+        let skipReason =
+          'Original-report Excel could not be generated. No spreadsheet was added, so an incomplete statement cannot be sent by mistake.'
         try {
           workerBlob = await buildExcelBlob(
             artistData.artist,
@@ -95,19 +111,17 @@ export async function generateZipOfAllStatements(
             (phase, rows) => onExcelProgress?.(artistData.artist, phase, rows),
           )
         } catch (err) {
-          // Batch export stays resilient: mark the gap and keep going.
+          if (isAbortingExcelExport(err)) throw err
           console.error(`Excel build failed for ${artistData.artist}:`, err)
           workerBlob = null
+          skipReason = err instanceof Error ? err.message : skipReason
         }
         if (workerBlob) {
           const ext = workerBlob.type.includes('zip') ? 'zip' : 'xlsx'
           zip.file(`${safeArtistName}_statement.${ext}`, workerBlob)
         } else {
-          zip.file(
-            `${safeArtistName}_EXCEL_NOT_INCLUDED.txt`,
-            'Original-report Excel could not be generated. No spreadsheet was added, so an incomplete statement cannot be sent by mistake.',
-          )
-          onExcelSkipped?.(artistData.artist)
+          zip.file(`${safeArtistName}_EXCEL_NOT_INCLUDED.txt`, skipReason)
+          onExcelSkipped?.(artistData.artist, skipReason)
         }
       } else {
         const excelBlob = await generateExcel(
