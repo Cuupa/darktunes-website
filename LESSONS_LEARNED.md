@@ -228,6 +228,11 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-09-22 — “Fail closed” still needs a way out
+
+- **Finding:** Raw-on Excel failed closed on `EXCEL_WORKER_DATA_MISSING` / `EXCEL_ARTIST_NOT_IN_WORKER`, but the operator only got an error toast — no file and no retry path, even though the worker rows are rebuilt by re-processing the loaded files.
+- **Rule:** For recoverable worker states, re-process, await the fresh `result`, then retry `build-excel` exactly once with a visible “Rebuilding original reports…” phase. If it still fails, offer an explicit choice — **Retry** / **summary-only** (named `*_summary-only.xlsx`, warned) / **Cancel**. No silent fallback, no dead end. A user-cancelled export never opens the fallback dialog.
+
 ### 2026-09-21 — A parse error is not parse-done
 
 - **Finding:** `pendingParsesRef` only decreased on `parse-done`. Worker `error` with `fileId` left the counter high, so `process` never ran. Replace kept the old `bronzeBatchId`, so a new CSV could publish against the previous archive.

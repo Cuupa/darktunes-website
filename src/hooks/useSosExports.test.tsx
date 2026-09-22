@@ -35,6 +35,7 @@ vi.mock('sonner', () => ({
     loading: vi.fn(),
     info: vi.fn(),
     warning: vi.fn(),
+    dismiss: vi.fn(),
   },
 }))
 
@@ -296,7 +297,9 @@ describe('useSosExports.handlePublishToPortal', () => {
       await result.current.handlePublishToPortal('Artist One')
     })
 
-    expect(mockToastError).toHaveBeenCalledWith('Portal unavailable')
+    expect(mockToastError).toHaveBeenCalledWith('The statement draft was not created.', {
+      description: expect.stringContaining('did not say why'),
+    })
     expect(mockDownloadBlob).not.toHaveBeenCalled()
   })
 })
@@ -438,7 +441,7 @@ describe('useSosExports.handleDownloadExcel', () => {
     )
   })
 
-  it('does not download a file when original-report tabs cannot be built', async () => {
+  it('opens the fallback dialog instead of downloading when original-report tabs cannot be built', async () => {
     const mockGenerateExcel = vi.mocked(generateExcel)
     mockGenerateExcel.mockResolvedValue(new Blob(['xlsx']))
     const requestExcelBlob = vi.fn().mockResolvedValue(null)
@@ -467,10 +470,13 @@ describe('useSosExports.handleDownloadExcel', () => {
     expect(requestExcelBlob).toHaveBeenCalled()
     expect(mockGenerateExcel).not.toHaveBeenCalled()
     expect(mockDownloadBlob).not.toHaveBeenCalled()
-    expect(mockToastError).toHaveBeenCalled()
+    expect(result.current.excelFallback).toEqual(
+      expect.objectContaining({ artist: 'Artist One' }),
+    )
+    expect(result.current.excelFallback?.reason).toContain('incomplete statement')
   })
 
-  it('shows a specific message when the worker export times out', async () => {
+  it('offers the fallback with the timeout reason when the worker export times out', async () => {
     const requestExcelBlob = vi
       .fn()
       .mockRejectedValue(
@@ -500,13 +506,11 @@ describe('useSosExports.handleDownloadExcel', () => {
       await result.current.handleDownloadExcel('Artist One')
     })
 
-    expect(mockToastError).toHaveBeenCalledWith(
-      expect.stringContaining('stopped after 5 minutes'),
-      expect.anything(),
-    )
+    expect(result.current.excelFallback?.reason).toContain('stopped after 5 minutes')
+    expect(mockDownloadBlob).not.toHaveBeenCalled()
   })
 
-  it('shows the raw-row limit with formatted numbers', async () => {
+  it('offers the fallback with the raw-row limit and formatted numbers', async () => {
     const requestExcelBlob = vi.fn().mockRejectedValue(
       new ExcelExportWorkerError('Too many rows', {
         code: 'EXCEL_RAW_ROWS_LIMIT',
@@ -536,13 +540,11 @@ describe('useSosExports.handleDownloadExcel', () => {
       await result.current.handleDownloadExcel('Artist One')
     })
 
-    expect(mockToastError).toHaveBeenCalledWith(
-      expect.stringContaining('2,345,678'),
-      expect.anything(),
-    )
+    expect(result.current.excelFallback?.reason).toContain('2,345,678')
+    expect(result.current.excelFallback?.reason).toContain('1,500,000')
   })
 
-  it('does not download a summary file when Raw is on and the worker is missing', async () => {
+  it('opens the fallback when Raw is on and the worker is missing', async () => {
     const mockGenerateExcel = vi.mocked(generateExcel)
     mockGenerateExcel.mockResolvedValue(new Blob(['xlsx']))
 
@@ -561,13 +563,10 @@ describe('useSosExports.handleDownloadExcel', () => {
 
     expect(mockGenerateExcel).not.toHaveBeenCalled()
     expect(mockDownloadBlob).not.toHaveBeenCalled()
-    expect(mockToastError).toHaveBeenCalledWith(
-      expect.stringContaining('incomplete statement'),
-      expect.anything(),
-    )
+    expect(result.current.excelFallback?.reason).toContain('incomplete statement')
   })
 
-  it('shows a specific message when the worker export is stale', async () => {
+  it('offers the fallback with the stale-revision reason', async () => {
     const requestExcelBlob = vi.fn().mockRejectedValue(
       new ExcelExportWorkerError('stale', { code: 'EXCEL_STALE_REVISION' }),
     )
@@ -594,9 +593,162 @@ describe('useSosExports.handleDownloadExcel', () => {
     })
 
     expect(mockDownloadBlob).not.toHaveBeenCalled()
-    expect(mockToastError).toHaveBeenCalledWith(
-      expect.stringContaining('sales files or rules changed'),
-      expect.anything(),
+    expect(result.current.excelFallback?.reason).toContain('sales files or rules changed')
+  })
+
+  it('downloads an explicitly named summary-only workbook from the fallback dialog', async () => {
+    const mockGenerateExcel = vi.mocked(generateExcel)
+    const summaryBlob = new Blob(['summary'])
+    mockGenerateExcel.mockResolvedValue(summaryBlob)
+    const requestExcelBlob = vi
+      .fn()
+      .mockRejectedValue(new ExcelExportWorkerError('Missing original-report tabs: believe'))
+
+    const { result } = renderHook(() =>
+      useExports(
+        [makeProcessedArtist('Artist One')],
+        labelInfo,
+        '2026-03',
+        '2026-03',
+        {},
+        {},
+        [],
+        {},
+        [],
+        false,
+        undefined,
+        requestExcelBlob,
+      ),
     )
+
+    await act(async () => {
+      await result.current.handleDownloadExcel('Artist One')
+    })
+    expect(result.current.excelFallback).not.toBeNull()
+
+    await act(async () => {
+      await result.current.resolveExcelFallback('summary')
+    })
+
+    expect(mockGenerateExcel).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      [],
+    )
+    expect(mockDownloadBlob).toHaveBeenCalledWith(
+      summaryBlob,
+      expect.stringMatching(/Artist_One_statement_summary-only\.xlsx$/),
+    )
+    expect(result.current.excelFallback).toBeNull()
+  })
+
+  it('retries the full export from the fallback dialog', async () => {
+    const workerBlob = new Blob(['worker-xlsx'])
+    const requestExcelBlob = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new ExcelExportWorkerError('no data', { code: 'EXCEL_WORKER_DATA_MISSING' }),
+      )
+      .mockResolvedValueOnce(workerBlob)
+
+    const { result } = renderHook(() =>
+      useExports(
+        [makeProcessedArtist('Artist One')],
+        labelInfo,
+        '2026-03',
+        '2026-03',
+        {},
+        {},
+        [],
+        {},
+        [],
+        false,
+        undefined,
+        requestExcelBlob,
+      ),
+    )
+
+    await act(async () => {
+      await result.current.handleDownloadExcel('Artist One')
+    })
+    expect(result.current.excelFallback).not.toBeNull()
+
+    await act(async () => {
+      await result.current.resolveExcelFallback('retry')
+    })
+
+    expect(requestExcelBlob).toHaveBeenCalledTimes(2)
+    expect(mockDownloadBlob).toHaveBeenCalledWith(
+      workerBlob,
+      expect.stringMatching(/Artist_One_statement\.xlsx$/),
+    )
+    expect(result.current.excelFallback).toBeNull()
+  })
+
+  it('cancels the fallback without downloading anything', async () => {
+    const mockGenerateExcel = vi.mocked(generateExcel)
+    const requestExcelBlob = vi.fn().mockResolvedValue(null)
+
+    const { result } = renderHook(() =>
+      useExports(
+        [makeProcessedArtist('Artist One')],
+        labelInfo,
+        '2026-03',
+        '2026-03',
+        {},
+        {},
+        [],
+        {},
+        [],
+        false,
+        undefined,
+        requestExcelBlob,
+      ),
+    )
+
+    await act(async () => {
+      await result.current.handleDownloadExcel('Artist One')
+    })
+    await act(async () => {
+      await result.current.resolveExcelFallback('cancel')
+    })
+
+    expect(result.current.excelFallback).toBeNull()
+    expect(mockGenerateExcel).not.toHaveBeenCalled()
+    expect(mockDownloadBlob).not.toHaveBeenCalled()
+  })
+
+  it('does not open the fallback dialog when the export was cancelled', async () => {
+    const requestExcelBlob = vi
+      .fn()
+      .mockRejectedValue(new ExcelExportWorkerError('cancelled', { code: 'EXCEL_CANCELLED' }))
+
+    const { result } = renderHook(() =>
+      useExports(
+        [makeProcessedArtist('Artist One')],
+        labelInfo,
+        '2026-03',
+        '2026-03',
+        {},
+        {},
+        [],
+        {},
+        [],
+        false,
+        undefined,
+        requestExcelBlob,
+      ),
+    )
+
+    await act(async () => {
+      await result.current.handleDownloadExcel('Artist One')
+    })
+
+    expect(result.current.excelFallback).toBeNull()
+    expect(mockDownloadBlob).not.toHaveBeenCalled()
   })
 })

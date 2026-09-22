@@ -48,6 +48,7 @@ import {
   type ExcelExportState,
 } from '@/lib/sos/excelExportSettings'
 import { ExcelExportDialog } from '@/components/admin/sos/ExcelExportDialog'
+import { ExcelExportFallbackDialog } from '@/components/admin/sos/ExcelExportFallbackDialog'
 import type { CsvImportProfile } from '@/lib/sos/ingest/types'
 import { MonthField } from '@/components/ui/month-field'
 import { isValidPeriodRange } from '@/lib/sos/accountingInputValidation'
@@ -663,6 +664,8 @@ function SosGeneratorPanel() {
     handleDownloadSelected,
     handlePublishToPortal,
     buildCorrectionPdfBase64,
+    excelFallback,
+    resolveExcelFallback,
   } = useExports(
       processedData,
       labelInfo,
@@ -1439,6 +1442,18 @@ function SosGeneratorPanel() {
         onConfirm={confirmWorkspaceDelete}
       />
       {excelExportDialog}
+
+      <ExcelExportFallbackDialog
+        open={excelFallback !== null}
+        title={t.excelFallbackTitle}
+        description={excelFallback?.reason ?? ''}
+        retryLabel={t.excelFallbackRetry}
+        summaryOnlyLabel={t.excelFallbackSummaryOnly}
+        cancelLabel={t.excelFallbackCancel}
+        onRetry={() => void resolveExcelFallback('retry')}
+        onSummaryOnly={() => void resolveExcelFallback('summary')}
+        onCancel={() => void resolveExcelFallback('cancel')}
+      />
     </div>
   )
 }

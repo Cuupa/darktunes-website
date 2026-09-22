@@ -70,7 +70,9 @@ function toUploadBlob(body: Blob | ArrayBuffer | string, contentType: string): B
 }
 
 export async function sha256HexFromBuffer(buffer: ArrayBuffer): Promise<string> {
-  const hash = await crypto.subtle.digest('SHA-256', buffer)
+  // Pass a typed-array view: WebCrypto rejects foreign-realm ArrayBuffers
+  // (jsdom in tests), while views are accepted across realms.
+  const hash = await crypto.subtle.digest('SHA-256', new Uint8Array(buffer))
   return Array.from(new Uint8Array(hash))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
@@ -454,8 +456,9 @@ export async function uploadBronzeDistributorCsv(
 
     return { ok: true, batchId: batch.id, r2Key }
   } catch (err) {
-    const message = humanizeBronzeUploadError(err instanceof Error ? err.message : String(err))
-    await logBronzeError('unexpected error', { error: message })
+    const raw = err instanceof Error ? err.message : String(err)
+    const message = humanizeBronzeUploadError(raw)
+    await logBronzeError('unexpected error', { error: message, raw })
     return { ok: false, message }
   }
 }

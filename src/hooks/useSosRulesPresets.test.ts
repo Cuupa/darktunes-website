@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSosRulesPresets } from './useSosRulesPresets'
+import { ACCOUNTING_FALLBACK } from '@/lib/i18n/accountingFallbacks'
 import { DEFAULT_SOS_ACCOUNTING_SETTINGS } from '@/lib/sos/sosAccountingSettings'
 
 const { toastSuccess, toastError } = vi.hoisted(() => ({ toastSuccess: vi.fn(), toastError: vi.fn() }))
@@ -51,6 +52,6 @@ describe('useSosRulesPresets', () => {
       await result.current.savePreset('Broken', DEFAULT_SOS_ACCOUNTING_SETTINGS)
     })
 
-    expect(toastError).toHaveBeenCalledWith('Failed to save preset')
+    expect(toastError).toHaveBeenCalledWith(ACCOUNTING_FALLBACK.presetSaveFailed)
   })
 })
