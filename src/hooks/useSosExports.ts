@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useMergedAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
@@ -109,6 +109,9 @@ const exportFallback = {
     'Original distributor tabs could not be attached. The file was not downloaded so an incomplete statement cannot be sent by mistake. Retry, or turn off Raw data for a summary-only file.',
   exportExcelProgressReports: 'Collecting original reports…',
   exportExcelProgressSummary: 'Writing summary workbook…',
+  exportExcelProgressResync: 'Rebuilding original reports from the loaded files…',
+  exportExcelSummaryOnlyDownloaded:
+    'Summary-only Excel for "{artist}" downloaded. Original reports are missing from this file.',
   exportExcelTimeout:
     'Excel export stopped after 5 minutes. The file is too large — turn off Raw data or export fewer artists.',
   exportExcelCancelled: 'The Excel export was cancelled. Nothing was downloaded.',
@@ -181,6 +184,16 @@ export function useExports(
 ) {
   const t = useMergedAccountingLabels(exportFallback)
   const zipAbortRef = useRef<AbortController | null>(null)
+  /**
+   * Raw export failed (worker memory, timeout, limit, stale, missing tabs).
+   * The UI asks the operator to retry, download an explicitly named
+   * summary-only file, or cancel — never a silent fallback, never a dead end.
+   */
+  const [excelFallback, setExcelFallback] = useState<{
+    artist: string
+    settings?: ExcelExportSettingsPatch
+    reason: string
+  } | null>(null)
 
   const startZipExport = useCallback(() => {
     zipAbortRef.current?.abort()
@@ -372,42 +385,65 @@ export function useExports(
       if (!requirePeriod()) return
 
       const toastId = toast.loading(interpolate(t.exportExcelPreparing, { artist }))
+      const wantRaw = wantsRawExcelSheet(excelSettings)
+      const rawSettings = excelSettings ?? pdfSettings
       try {
-        const wantRaw = wantsRawExcelSheet(excelSettings)
         let blob: Blob | null = null
-        if (wantRaw && requestExcelBlob) {
-          blob = await requestExcelBlob(
-            {
+        if (wantRaw) {
+          try {
+            blob = requestExcelBlob
+              ? await requestExcelBlob(
+                  {
+                    artist,
+                    artistData,
+                    labelInfo,
+                    periodStart: periodStart || undefined,
+                    periodEnd: periodEnd || undefined,
+                    compilationFilters,
+                    settings: rawSettings,
+                  },
+                  (phase, rows) => {
+                    const description =
+                      phase === 'original-reports'
+                        ? rows
+                          ? `${t.exportExcelProgressReports} ${rows}`
+                          : t.exportExcelProgressReports
+                        : phase === 'summary'
+                          ? t.exportExcelProgressSummary
+                          : phase === 'resync'
+                            ? t.exportExcelProgressResync
+                            : undefined
+                    toast.loading(interpolate(t.exportExcelPreparing, { artist }), {
+                      id: toastId,
+                      description,
+                    })
+                  },
+                )
+              : null
+          } catch (err) {
+            if (err instanceof ExcelExportWorkerError && err.code === 'EXCEL_CANCELLED') {
+              toast.info(t.exportExcelCancelled, { id: toastId })
+              return
+            }
+            toast.dismiss(toastId)
+            setExcelFallback({
               artist,
-              artistData,
-              labelInfo,
-              periodStart: periodStart || undefined,
-              periodEnd: periodEnd || undefined,
-              compilationFilters,
-              settings: excelSettings ?? pdfSettings,
-            },
-            (phase, rows) => {
-              const description =
-                phase === 'original-reports'
-                  ? rows
-                    ? `${t.exportExcelProgressReports} ${rows}`
-                    : t.exportExcelProgressReports
-                  : phase === 'summary'
-                    ? t.exportExcelProgressSummary
-                    : undefined
-              toast.loading(interpolate(t.exportExcelPreparing, { artist }), {
-                id: toastId,
-                description,
-              })
-            },
-          )
-          if (!blob) {
-            toast.error(t.exportExcelRawRequired, { id: toastId })
+              settings: excelSettings,
+              reason:
+                excelWorkerErrorMessage(err) ??
+                (err instanceof Error ? err.message : t.exportExcelRawRequired),
+            })
             return
           }
-        } else if (wantRaw) {
-          toast.error(t.exportExcelRawRequired, { id: toastId })
-          return
+          if (!blob) {
+            toast.dismiss(toastId)
+            setExcelFallback({
+              artist,
+              settings: excelSettings,
+              reason: t.exportExcelRawRequired,
+            })
+            return
+          }
         }
         if (!blob) {
           blob = await generateExcel(
@@ -416,7 +452,7 @@ export function useExports(
             periodStart || undefined,
             periodEnd || undefined,
             compilationFilters,
-            excelSettings ?? pdfSettings,
+            rawSettings,
             [],
           )
         }
@@ -426,16 +462,66 @@ export function useExports(
         downloadBlob(blob, filename)
         toast.success(interpolate(t.exportExcelDownloaded, { artist }), { id: toastId })
       } catch (err) {
-        const workerMessage = excelWorkerErrorMessage(err)
-        if (workerMessage) {
-          toast.error(workerMessage, { id: toastId })
-          return
-        }
         toast.error(t.exportExcelFailed, { id: toastId, description: explainSosError(err, t) })
         console.error('Excel export error:', err)
       }
     },
     [processedData, labelInfo, periodStart, periodEnd, compilationFilters, pdfSettings, requestExcelBlob, t, excelWorkerErrorMessage, requirePeriod]
+  )
+
+  /**
+   * Resolves the raw-export fallback dialog: retry the full export, download an
+   * explicitly named summary-only workbook, or cancel without a file.
+   */
+  const resolveExcelFallback = useCallback(
+    async (choice: 'retry' | 'summary' | 'cancel') => {
+      const pending = excelFallback
+      setExcelFallback(null)
+      if (!pending || choice === 'cancel') return
+
+      if (choice === 'retry') {
+        await handleDownloadExcel(pending.artist, pending.settings)
+        return
+      }
+
+      const artistData = processedData.find(d => d.artist === pending.artist)
+      if (!artistData) {
+        toast.error(interpolate(t.exportNoArtistData, { artist: pending.artist }))
+        return
+      }
+      try {
+        const blob = await generateExcel(
+          artistData,
+          labelInfo,
+          periodStart || undefined,
+          periodEnd || undefined,
+          compilationFilters,
+          pending.settings ?? pdfSettings,
+          [],
+        )
+        downloadBlob(
+          blob,
+          `${createSafeFilename(pending.artist)}_statement_summary-only.xlsx`,
+        )
+        toast.warning(
+          interpolate(t.exportExcelSummaryOnlyDownloaded, { artist: pending.artist }),
+        )
+      } catch (err) {
+        toast.error(t.exportExcelFailed, { description: explainSosError(err, t) })
+        console.error('Excel summary-only export error:', err)
+      }
+    },
+    [
+      excelFallback,
+      handleDownloadExcel,
+      processedData,
+      labelInfo,
+      periodStart,
+      periodEnd,
+      compilationFilters,
+      pdfSettings,
+      t,
+    ],
   )
 
   /**
@@ -740,5 +826,7 @@ export function useExports(
     handleDownloadSelected,
     handlePublishToPortal,
     buildCorrectionPdfBase64,
+    excelFallback,
+    resolveExcelFallback,
   }
 }

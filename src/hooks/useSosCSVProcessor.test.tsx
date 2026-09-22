@@ -129,10 +129,14 @@ describe('useCSVProcessor', () => {
 
     const worker = workerInstances[0]
     await act(async () => {
-      worker?.onmessage?.({ data: { type: 'error', message: 'invalid csv' } } as MessageEvent)
+      worker?.onmessage?.({
+        data: { type: 'error', fileId: 'f-1', message: 'invalid csv' },
+      } as MessageEvent)
     })
 
-    expect(mockToastError).toHaveBeenCalledWith('csvProcessingError', { description: 'invalid csv' })
+    expect(mockToastError).toHaveBeenCalledWith('csvProcessingError', {
+      description: 'explainUnknown',
+    })
     expect(result.current.isProcessing).toBe(false)
   })
 
@@ -561,6 +565,164 @@ describe('useCSVProcessor', () => {
     })
     await rejected
     expect(worker?.terminate).toHaveBeenCalled()
+    expect(result.current.excelBusy).toBe(false)
+  })
+
+  it('rebuilds raw rows and retries once when the worker lost the processed data', async () => {
+    const file = {
+      id: 'f-retry',
+      name: 'believe.csv',
+      size: 10,
+      type: 'believe' as const,
+      data: 'artist,revenue\nA,10',
+      uploadedAt: '2026-01-01T00:00:00.000Z',
+    }
+
+    const config = makeConfig()
+    const { result } = renderHook(() => useCSVProcessor([file], [], config))
+
+    await waitFor(() => {
+      expect(workerInstances).toHaveLength(1)
+    })
+
+    const worker = workerInstances[0]
+    let pending: Promise<Blob | null> | undefined
+    await act(async () => {
+      pending = result.current.requestExcelBlob({
+        artist: 'Reaper',
+        artistData: { artist: 'Reaper' } as never,
+        labelInfo: { name: 'darkTunes', address: '' },
+        compilationFilters: [],
+      })
+    })
+
+    const firstBuild = worker?.postMessage.mock.calls.find(
+      (c) => (c[0] as { type?: string })?.type === 'build-excel',
+    )?.[0] as { requestId: string } | undefined
+
+    await act(async () => {
+      worker?.onmessage?.({
+        data: {
+          type: 'excel-error',
+          requestId: firstBuild?.requestId,
+          code: 'EXCEL_WORKER_DATA_MISSING',
+          message: 'No processed data in the export worker.',
+        },
+      } as MessageEvent)
+    })
+
+    await act(async () => {
+      worker?.onmessage?.({
+        data: {
+          type: 'parse-done',
+          fileId: 'f-retry',
+          rowsParsed: 1,
+          rowsSkipped: 0,
+          uniqueArtistsCount: 1,
+          periodStart: '2026-01',
+          periodEnd: '2026-01',
+        },
+      } as MessageEvent)
+    })
+
+    const processCall = worker?.postMessage.mock.calls.find(
+      (c) => (c[0] as { type?: string; requestId?: number })?.type === 'process',
+    )?.[0] as { requestId?: number } | undefined
+    expect(processCall?.requestId).toBe(1)
+
+    await act(async () => {
+      worker?.onmessage?.({
+        data: {
+          type: 'result',
+          requestId: processCall?.requestId,
+          data: {
+            processedData: [],
+            artistTrees: [],
+            collabTree: [],
+            filteredCompilations: [],
+            uniqueArtists: [],
+            periodStart: '',
+            periodEnd: '',
+            totalGrossAllData: 0,
+            releaseTitlesByArtistIncFeaturing: {},
+            territoryMetrics: [],
+            merchOrderRows: [],
+          },
+        },
+      } as MessageEvent)
+    })
+
+    await waitFor(() => {
+      const buildCalls = worker?.postMessage.mock.calls.filter(
+        (c) => (c[0] as { type?: string })?.type === 'build-excel',
+      )
+      expect(buildCalls).toHaveLength(2)
+    })
+    const secondBuild = worker?.postMessage.mock.calls.filter(
+      (c) => (c[0] as { type?: string })?.type === 'build-excel',
+    )[1]?.[0] as { requestId: string } | undefined
+    expect(secondBuild?.requestId).toBeTruthy()
+    expect(secondBuild?.requestId).not.toBe(firstBuild?.requestId)
+
+    let blob: Blob | null | undefined
+    await act(async () => {
+      worker?.onmessage?.({
+        data: {
+          type: 'excel-done',
+          requestId: secondBuild?.requestId,
+          kind: 'xlsx',
+          buffer: new Uint8Array([7, 8]).buffer,
+        },
+      } as MessageEvent)
+      blob = await pending
+    })
+
+    expect(blob).toBeInstanceOf(Blob)
+    expect((blob as Blob).size).toBe(2)
+  })
+
+  it('fails the export retry immediately when the worker holds no files', async () => {
+    const { result } = renderHook(() => useCSVProcessor([], [], makeConfig()))
+
+    await waitFor(() => {
+      expect(workerInstances).toHaveLength(1)
+    })
+
+    const worker = workerInstances[0]
+    let pending: Promise<Blob | null> | undefined
+    await act(async () => {
+      pending = result.current.requestExcelBlob({
+        artist: 'Reaper',
+        artistData: { artist: 'Reaper' } as never,
+        labelInfo: { name: 'darkTunes', address: '' },
+        compilationFilters: [],
+      })
+    })
+
+    const posted = worker?.postMessage.mock.calls.find(
+      (c) => (c[0] as { type?: string })?.type === 'build-excel',
+    )?.[0] as { requestId: string } | undefined
+
+    const rejected = expect(pending!).rejects.toMatchObject({
+      code: 'EXCEL_WORKER_DATA_MISSING',
+    })
+    await act(async () => {
+      worker?.onmessage?.({
+        data: {
+          type: 'excel-error',
+          requestId: posted?.requestId,
+          code: 'EXCEL_WORKER_DATA_MISSING',
+          message: 'No processed data in the export worker.',
+        },
+      } as MessageEvent)
+    })
+    await rejected
+
+    expect(
+      worker?.postMessage.mock.calls.filter(
+        (c) => (c[0] as { type?: string })?.type === 'process',
+      ),
+    ).toHaveLength(0)
     expect(result.current.excelBusy).toBe(false)
   })
 })

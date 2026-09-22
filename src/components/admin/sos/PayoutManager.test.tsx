@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { SOS_ERROR_FALLBACK } from '@/lib/sos/explainSosError'
 import { PayoutManager } from './PayoutManager'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }))
@@ -30,7 +31,9 @@ describe('PayoutManager', () => {
       />,
     )
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('register down')
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      SOS_ERROR_FALLBACK.explainUnknown,
+    )
     expect(screen.queryByText(/No ledger payouts for this period/)).toBeNull()
   })
 })

@@ -51,6 +51,32 @@ import type {
 /** Safety cap. Original reports are CSV now, so this should not be the happy path. */
 export const SOS_EXCEL_WORKER_TIMEOUT_MS = 5 * 60 * 1000
 
+/**
+ * Raw tabs can only be rebuilt by re-processing the files the worker already
+ * holds. Wait this long for the fresh `result` before failing the export.
+ */
+export const SOS_EXCEL_RESYNC_TIMEOUT_MS = 60 * 1000
+
+/**
+ * Worker states that mean "the raw rows are not in worker memory (anymore)".
+ * Re-processing rebuilds them; the export retries exactly once.
+ */
+const RETRYABLE_EXCEL_ERROR_CODES = new Set([
+  'EXCEL_WORKER_DATA_MISSING',
+  'EXCEL_ARTIST_NOT_IN_WORKER',
+])
+
+interface PendingExcelRequest {
+  /** Current worker request id — changes when a resync retry re-posts the job. */
+  requestId: string
+  attempts: number
+  onProgress?: (phase: string, rows?: number) => void
+  resolve: (blob: Blob | null) => void
+  reject: (error: Error) => void
+  /** Re-process the files, wait for the fresh result and post the build again. */
+  retry: (error: { code?: string; message: string }) => void
+}
+
 export {
   ExcelExportWorkerError,
   type ExcelExportWorkerErrorCode,
@@ -148,16 +174,26 @@ export function useCSVProcessor(
   /** The alias key that was in effect the last time files were synced with the worker. */
   const prevAliasKeyRef = useRef<string | undefined>(undefined)
   /** In-flight `build-excel` requests, keyed by requestId. */
-  const pendingExcelRef = useRef(
-    new Map<
-      string,
-      {
-        resolve: (blob: Blob | null) => void
-        reject: (error: Error) => void
-        onProgress?: (phase: string, rows?: number) => void
-      }
-    >(),
-  )
+  const pendingExcelRef = useRef(new Map<string, PendingExcelRequest>())
+  /** Resolvers waiting for the next `result` after a re-process (export retry). */
+  const resultWaitersRef = useRef<Array<(ok: boolean) => void>>([])
+
+  /** Resolves true on the next worker `result`, false on timeout/error. */
+  const waitForNextResult = useCallback((timeoutMs: number): Promise<boolean> => {
+    return new Promise((resolve) => {
+      let settled = false
+      const timer = setTimeout(() => {
+        settled = true
+        resolve(false)
+      }, timeoutMs)
+      resultWaitersRef.current.push((ok) => {
+        if (settled) return
+        settled = true
+        clearTimeout(timer)
+        resolve(ok)
+      })
+    })
+  }, [])
   /**
    * Requests abandoned by the timeout that the worker is still computing.
    * The worker is single-threaded and cannot be cancelled mid-serialization,
@@ -409,6 +445,10 @@ export function useCSVProcessor(
     )
     workerRef.current = worker
 
+    const resolveResultWaiters = (ok: boolean) => {
+      for (const waiter of resultWaitersRef.current.splice(0)) waiter(ok)
+    }
+
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       const msg = event.data
       switch (msg.type) {
@@ -453,10 +493,12 @@ export function useCSVProcessor(
           setWorkerResult(msg.data)
           setPipelineProgress(null)
           setIsProcessing(false)
+          resolveResultWaiters(true)
           break
 
         case 'error': {
           if (msg.requestId !== undefined && msg.requestId !== processSeqRef.current) break
+          resolveResultWaiters(false)
           console.error('CSV Worker error:', msg.message)
           if (msg.fileId) {
             pendingParsesRef.current = Math.max(0, pendingParsesRef.current - 1)
@@ -522,6 +564,20 @@ export function useCSVProcessor(
         case 'excel-error': {
           console.error('CSV Worker excel error:', msg.message)
           const pending = pendingExcelRef.current.get(msg.requestId)
+          if (
+            pending &&
+            msg.code &&
+            RETRYABLE_EXCEL_ERROR_CODES.has(msg.code) &&
+            pending.attempts < 1
+          ) {
+            // The raw rows are no longer in worker memory (worker recreated or
+            // data replaced). Drop the request from the map first so the
+            // re-process below is not treated as a stale revision, then retry
+            // once after the fresh result arrives.
+            pendingExcelRef.current.delete(msg.requestId)
+            pending.retry({ code: msg.code, message: msg.message })
+            break
+          }
           if (pending) {
             pendingExcelRef.current.delete(msg.requestId)
             pending.reject(
@@ -546,6 +602,7 @@ export function useCSVProcessor(
 
     worker.onerror = (err) => {
       console.error('CSV Worker uncaught error:', err)
+      resolveResultWaiters(false)
       const labels = tRef.current
       toast.error(labels('workerCrashed'), {
         description: explainSosError(err.message || labels('workerCrashedUnknown'), {
@@ -572,6 +629,7 @@ export function useCSVProcessor(
     return () => {
       worker.terminate()
       workerRef.current = null
+      resolveResultWaiters(false)
       sentFingerprints.clear()
       pendingParsesRef.current = 0
       for (const pending of pendingExcel.values()) pending.resolve(null)
@@ -726,54 +784,104 @@ export function useCSVProcessor(
         ),
       )
     }
-    const requestId = crypto.randomUUID()
+    const initialRequestId = crypto.randomUUID()
     const signal = AbortSignal.timeout(SOS_EXCEL_WORKER_TIMEOUT_MS)
     return new Promise((resolve, reject) => {
-      const finish = (blob: Blob | null) => {
-        pendingExcelRef.current.delete(requestId)
-        signal.removeEventListener('abort', onAbort)
-        if (pendingExcelRef.current.size === 0 && orphanExcelRef.current.size === 0) {
-          setExcelBusy(false)
-        }
-        resolve(blob)
-      }
-      const fail = (error: Error) => {
-        pendingExcelRef.current.delete(requestId)
-        signal.removeEventListener('abort', onAbort)
-        if (pendingExcelRef.current.size === 0 && orphanExcelRef.current.size === 0) {
-          setExcelBusy(false)
-        }
-        reject(error)
-      }
-      const onAbort = () => {
-        // The worker cannot be cancelled mid-serialization. Track the orphaned
-        // request so new exports stay disabled until its result arrives.
-        orphanExcelRef.current.add(requestId)
-        setExcelBusy(true)
-        if (orphanGraceTimerRef.current) clearTimeout(orphanGraceTimerRef.current)
-        orphanGraceTimerRef.current = setTimeout(() => {
-          // The worker never answered the orphan — terminate and recreate it.
-          // The file-sync effect re-sends every CSV for the new generation.
-          orphanGraceTimerRef.current = null
-          console.error('[useCSVProcessor] Excel worker unresponsive — recreating worker')
-          const stuckWorker = workerRef.current
-          workerRef.current = null
-          stuckWorker?.terminate()
-          for (const pending of pendingExcelRef.current.values()) {
-            pending.reject(
-              new ExcelExportWorkerError(
-                'Excel worker was unresponsive and has been restarted. Please retry the export.',
-                { code: 'EXCEL_TIMEOUT' },
-              ),
-            )
+      const cleanup = () => signal.removeEventListener('abort', onAbort)
+
+      const entry: PendingExcelRequest = {
+        requestId: initialRequestId,
+        attempts: 0,
+        onProgress,
+        resolve: (blob) => {
+          pendingExcelRef.current.delete(entry.requestId)
+          cleanup()
+          if (pendingExcelRef.current.size === 0 && orphanExcelRef.current.size === 0) {
+            setExcelBusy(false)
           }
-          pendingExcelRef.current.clear()
-          orphanExcelRef.current.clear()
-          setExcelBusy(false)
-          setIsProcessing(false)
-          setWorkerGeneration((generation) => generation + 1)
-        }, SOS_EXCEL_WORKER_TIMEOUT_MS)
-        fail(
+          resolve(blob)
+        },
+        reject: (error) => {
+          pendingExcelRef.current.delete(entry.requestId)
+          cleanup()
+          if (pendingExcelRef.current.size === 0 && orphanExcelRef.current.size === 0) {
+            setExcelBusy(false)
+          }
+          reject(error)
+        },
+        retry: (error) => {
+          entry.attempts += 1
+          entry.onProgress?.('resync')
+          // Without files in the worker there is nothing to rebuild.
+          if (sentFingerprintRef.current.size === 0 && pendingParsesRef.current === 0) {
+            entry.reject(new ExcelExportWorkerError(error.message, { code: error.code }))
+            return
+          }
+          if (sentFingerprintRef.current.size > 0 && pendingParsesRef.current === 0) {
+            sendProcessRef.current()
+          }
+          void waitForNextResult(SOS_EXCEL_RESYNC_TIMEOUT_MS).then((ok) => {
+            if (!ok) {
+              if (!signal.aborted) {
+                entry.reject(new ExcelExportWorkerError(error.message, { code: error.code }))
+              }
+              return
+            }
+            if (signal.aborted) return
+            const nextRequestId = crypto.randomUUID()
+            entry.requestId = nextRequestId
+            pendingExcelRef.current.set(nextRequestId, entry)
+            postBuild(nextRequestId)
+          })
+        },
+      }
+
+      const postBuild = (requestId: string) => {
+        worker.postMessage({
+          type: 'build-excel',
+          requestId,
+          inputRevision: processSeqRef.current,
+          artist: args.artist,
+          artistData: args.artistData,
+          labelInfo: args.labelInfo,
+          periodStart: args.periodStart,
+          periodEnd: args.periodEnd,
+          compilationFilters: args.compilationFilters,
+          settings: args.settings,
+        } satisfies WorkerRequest)
+      }
+
+      const onAbort = () => {
+        // Only orphan a request the worker is still computing. A request that
+        // is waiting for its re-process has no build in flight.
+        if (pendingExcelRef.current.has(entry.requestId)) {
+          orphanExcelRef.current.add(entry.requestId)
+          setExcelBusy(true)
+          if (orphanGraceTimerRef.current) clearTimeout(orphanGraceTimerRef.current)
+          orphanGraceTimerRef.current = setTimeout(() => {
+            // The worker never answered the orphan — terminate and recreate it.
+            // The file-sync effect re-sends every CSV for the new generation.
+            orphanGraceTimerRef.current = null
+            console.error('[useCSVProcessor] Excel worker unresponsive — recreating worker')
+            const stuckWorker = workerRef.current
+            workerRef.current = null
+            stuckWorker?.terminate()
+            for (const pending of pendingExcelRef.current.values()) {
+              pending.reject(
+                new ExcelExportWorkerError(
+                  'Excel worker was unresponsive and has been restarted. Please retry the export.',
+                  { code: 'EXCEL_TIMEOUT' },
+                ),
+              )
+            }
+            pendingExcelRef.current.clear()
+            orphanExcelRef.current.clear()
+            setExcelBusy(false)
+            setIsProcessing(false)
+            setWorkerGeneration((generation) => generation + 1)
+          }, SOS_EXCEL_WORKER_TIMEOUT_MS)
+        }
+        entry.reject(
           new ExcelExportWorkerError('Excel export timed out after 5 minutes', {
             code: 'EXCEL_TIMEOUT',
           }),
@@ -784,22 +892,11 @@ export function useCSVProcessor(
         return
       }
       signal.addEventListener('abort', onAbort, { once: true })
-      pendingExcelRef.current.set(requestId, { resolve: finish, reject: fail, onProgress })
+      pendingExcelRef.current.set(entry.requestId, entry)
       setExcelBusy(true)
-      worker.postMessage({
-        type: 'build-excel',
-        requestId,
-        inputRevision: processSeqRef.current,
-        artist: args.artist,
-        artistData: args.artistData,
-        labelInfo: args.labelInfo,
-        periodStart: args.periodStart,
-        periodEnd: args.periodEnd,
-        compilationFilters: args.compilationFilters,
-        settings: args.settings,
-      } satisfies WorkerRequest)
+      postBuild(entry.requestId)
     })
-  }, [])
+  }, [waitForNextResult])
 
   return {
     isProcessing,

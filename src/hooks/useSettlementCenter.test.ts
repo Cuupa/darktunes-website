@@ -2,12 +2,16 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { fetchSettlementRegister } from '@/lib/api/settlementCenterApi'
 import { monthToPeriodDate } from '@/lib/sos/lineItemsFromArtistData'
+import { SOS_ERROR_FALLBACK } from '@/lib/sos/explainSosError'
 import { useSettlementCenter } from './useSettlementCenter'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 vi.mock('@/lib/admin/getAccessToken', () => ({ getAdminAccessToken: vi.fn().mockResolvedValue('token') }))
 vi.mock('@/lib/api/settlementCenterApi', () => ({
-  fetchSettlementRegister: vi.fn().mockResolvedValue({ rows: [] }),
+  fetchSettlementRegister: vi.fn().mockResolvedValue({
+    rows: [],
+    kpis: { approved: 0, viewed: 0, invoiced: 0, received: 0, paid: 0, openBalanceEur: 0 },
+  }),
   archiveSettlementPeriod: vi.fn(),
   bulkApproveStatements: vi.fn(),
   createStatementCorrection: vi.fn(),
@@ -27,7 +31,13 @@ vi.mock('@/lib/sos/statementWorkflow', () => ({
   deriveCompletedWorkflowSteps: vi.fn(() => []),
   workflowStatusFromStatement: vi.fn(() => 'draft'),
 }))
-vi.mock('@/lib/i18n/accountingFallbacks', () => ({ useAccountingLabels: () => ({ settlementCurrentPeriod: 'Current Period' }) }))
+const { mockAccountingLabels } = vi.hoisted(() => ({
+  mockAccountingLabels: { settlementCurrentPeriod: 'Current Period' },
+}))
+
+vi.mock('@/lib/i18n/accountingFallbacks', () => ({
+  useAccountingLabels: () => mockAccountingLabels,
+}))
 vi.mock('@/lib/i18n/interpolate', () => ({ interpolate: vi.fn((s: string) => s) }))
 vi.mock('@/components/admin/sos/settlementCenterModel', () => ({
   buildInvoiceStatusLabels: vi.fn(() => ({})),
@@ -74,7 +84,7 @@ describe('useSettlementCenter', () => {
     } as never))
 
     await waitFor(() => {
-      expect(result.current.loadError).toBe('register down')
+      expect(result.current.loadError).toBe(SOS_ERROR_FALLBACK.explainUnknown)
       expect(result.current.loading).toBe(false)
     })
   })

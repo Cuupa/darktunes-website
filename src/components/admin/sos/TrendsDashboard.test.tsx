@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { SOS_ERROR_FALLBACK } from '@/lib/sos/explainSosError'
 import { TrendsDashboard } from './TrendsDashboard'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }))
@@ -20,7 +21,9 @@ describe('TrendsDashboard', () => {
 
     render(<TrendsDashboard />)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('summaries down')
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      SOS_ERROR_FALLBACK.explainUnknown,
+    )
     expect(screen.queryByText(/No historical data yet/)).toBeNull()
   })
 })
