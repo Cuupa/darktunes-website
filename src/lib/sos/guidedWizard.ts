@@ -1,32 +1,20 @@
-export type QuickWizardStep = 'upload' | 'review' | 'settle'
+export type GuidedWizardStep = 'upload' | 'validate' | 'review' | 'settle'
 
-export type AssistantWizardStep = 'setup' | 'upload' | 'validate' | 'review' | 'settle'
-
-export type GuidedWizardStep = QuickWizardStep | AssistantWizardStep
-
-export const QUICK_WIZARD_STEP_IDS: readonly QuickWizardStep[] = [
-  'upload',
-  'review',
-  'settle',
-] as const
-
-export const ASSISTANT_WIZARD_STEP_IDS: readonly AssistantWizardStep[] = [
-  'setup',
+/**
+ * One linear billing flow: files → checks → amounts → statements.
+ * Settings (rules) and insights stay reachable outside the money path.
+ */
+export const GUIDED_WIZARD_STEP_IDS: readonly GuidedWizardStep[] = [
   'upload',
   'validate',
   'review',
   'settle',
 ] as const
 
-/** @deprecated Use QUICK_WIZARD_STEP_IDS */
-export const GUIDED_WIZARD_STEP_IDS = QUICK_WIZARD_STEP_IDS
-
 export type GuidedStepGateInput = {
   hasData: boolean
   isProcessing: boolean
   hasBlockingValidation?: boolean
-  /** When false, Setup step cannot continue (invalid period / required fields). */
-  setupComplete?: boolean
   /** When false, Upload cannot continue (exchange rates not loaded yet). */
   ratesReady?: boolean
 }
@@ -34,7 +22,7 @@ export type GuidedStepGateInput = {
 export function deriveSuggestedGuidedStep(input: {
   hasData: boolean
   isProcessing: boolean
-}): QuickWizardStep {
+}): GuidedWizardStep {
   if (!input.hasData || input.isProcessing) return 'upload'
   return 'review'
 }
@@ -49,15 +37,10 @@ export function guidedStepIndex(
 export function canAdvanceGuidedStep(
   step: GuidedWizardStep,
   input: GuidedStepGateInput,
-  _stepIds: readonly GuidedWizardStep[] = QUICK_WIZARD_STEP_IDS,
+  _stepIds: readonly GuidedWizardStep[] = GUIDED_WIZARD_STEP_IDS,
 ): boolean {
-  if (step === 'setup') return input.setupComplete !== false
   if (step === 'upload') {
-    return (
-      input.hasData &&
-      !input.isProcessing &&
-      input.ratesReady !== false
-    )
+    return input.hasData && !input.isProcessing && input.ratesReady !== false
   }
   if (step === 'validate') return input.hasData && !input.hasBlockingValidation
   if (step === 'review') return input.hasData
@@ -67,7 +50,7 @@ export function canAdvanceGuidedStep(
 export function canNavigateToGuidedStep(
   target: GuidedWizardStep,
   input: GuidedStepGateInput,
-  stepIds: readonly GuidedWizardStep[] = QUICK_WIZARD_STEP_IDS,
+  stepIds: readonly GuidedWizardStep[] = GUIDED_WIZARD_STEP_IDS,
 ): boolean {
   const targetIndex = guidedStepIndex(target, stepIds)
   if (targetIndex < 0) return false
@@ -81,7 +64,6 @@ export function canNavigateToGuidedStep(
 }
 
 export type GuidedBlockedReasonLabels = {
-  blockedSetupPeriod: string
   blockedUploadNoData: string
   blockedUploadProcessing: string
   blockedUploadRates: string
@@ -90,7 +72,6 @@ export type GuidedBlockedReasonLabels = {
 }
 
 const BLOCKED_REASON_FALLBACK: GuidedBlockedReasonLabels = {
-  blockedSetupPeriod: 'Select a valid billing period (start and end month) to continue.',
   blockedUploadNoData: 'Upload at least one sales file and wait until numbers appear.',
   blockedUploadProcessing: 'Please wait — files are still being processed.',
   blockedUploadRates: 'Please wait — exchange rates are still loading.',
@@ -109,7 +90,6 @@ export function guidedContinueBlockedReason(
   const t = { ...BLOCKED_REASON_FALLBACK, ...labels }
   if (canAdvanceGuidedStep(step, input)) return null
 
-  if (step === 'setup') return t.blockedSetupPeriod
   if (step === 'upload') {
     if (input.ratesReady === false) return t.blockedUploadRates
     if (input.isProcessing) return t.blockedUploadProcessing

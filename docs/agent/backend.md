@@ -87,7 +87,7 @@ SSOT: `assets` table + `asset_folders`. Upload: `POST /api/upload`. Explorer API
 
 ## Admin accounting (`/admin/accounting`)
 
-Admin/editor only. **Guided** default: `AccountingGuidedWizard` (Upload → Review → Publish). **Advanced:** SOS upload, reporting, Abrechnungszentrale (`SettlementCenterPanel`), portal persist, SEPA, trends, rules.
+Admin/editor only. One linear flow: `AccountingGuidedWizard` (**Files → Checks → Amounts → Statements**). Rules (`RulesPanel`) and Insights (archives, portal persist, trends) are secondary views in the settings toolbar; Statements hosts the Abrechnungszentrale (`SettlementCenterPanel`) and SEPA (`PayoutManager`).
 
 **Binding contract:** [sos-accounting-contract.md](sos-accounting-contract.md) §A (status/actions), §D (permissions), §E (payments). Financial mutations are admin-only; DAL precondition violations must surface as 4xx problem+json, never as generic 500 (#616). SOS period writability (`open|under_review|approved`) applies to **every** financial mutation including `persist-analytics` and `purge-sos-data` (#628/#630).
 
