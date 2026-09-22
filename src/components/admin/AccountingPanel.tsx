@@ -49,6 +49,8 @@ import {
 } from '@/lib/sos/excelExportSettings'
 import { ExcelExportDialog } from '@/components/admin/sos/ExcelExportDialog'
 import { ExcelExportFallbackDialog } from '@/components/admin/sos/ExcelExportFallbackDialog'
+import { AccountingGuidedWizard } from '@/components/admin/sos/AccountingGuidedWizard'
+import { SosValidationPanel } from '@/components/admin/sos/SosValidationPanel'
 import type { CsvImportProfile } from '@/lib/sos/ingest/types'
 import { MonthField } from '@/components/ui/month-field'
 import { isValidPeriodRange } from '@/lib/sos/accountingInputValidation'
@@ -77,7 +79,7 @@ import { WorkspaceManager } from '@/components/admin/sos/WorkspaceManager'
 import {
   Wallet, ClockCounterClockwise, FileText,
   ChartBar, BookmarkSimple, DownloadSimple, Table, SealCheck,
-  MagnifyingGlass,
+  MagnifyingGlass, SlidersHorizontal, ArrowLeft,
 } from '@phosphor-icons/react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -89,6 +91,8 @@ import { v4 as uuidv4 } from 'uuid'
 import { toast } from 'sonner'
 import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { interpolate } from '@/lib/i18n/interpolate'
+import { validateSosWizardState } from '@/lib/sos/wizardValidation'
+import type { GuidedWizardStep } from '@/lib/sos/guidedWizard'
 import { type SosParseDoneStats, type SosParseProgress } from '@/lib/sos/ingestProgress'
 import type { FileProcessingState } from '@/lib/sos/types'
 
@@ -96,9 +100,16 @@ const StatementsManager = lazy(
   () => import('@/components/admin/StatementsManager').then(m => ({ default: m.StatementsManager }))
 )
 
-type SubTab = 'upload' | 'reporting' | 'settlements' | 'analytics' | 'payout' | 'rules' | 'trends'
+type SubTab = 'upload' | 'validate' | 'reporting' | 'settlements' | 'analytics' | 'rules'
 
-const SUB_TAB_IDS: SubTab[] = ['upload', 'reporting', 'settlements', 'analytics', 'payout', 'trends', 'rules']
+const SUB_TAB_IDS: SubTab[] = ['upload', 'validate', 'reporting', 'settlements', 'analytics', 'rules']
+
+const SUB_TAB_BY_WIZARD_STEP: Record<GuidedWizardStep, SubTab> = {
+  upload: 'upload',
+  validate: 'validate',
+  review: 'reporting',
+  settle: 'settlements',
+}
 
 function isSubTab(value: string | null): value is SubTab {
   return value != null && (SUB_TAB_IDS as string[]).includes(value)
@@ -270,22 +281,9 @@ function SosGeneratorPanel() {
     setExcelExport(bundle.excelExport ?? DEFAULT_EXCEL_EXPORT_STATE)
   }, [])
 
-  const handleSubTabKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLButtonElement>, tabId: SubTab) => {
-      const currentIndex = SUB_TAB_IDS.indexOf(tabId)
-      if (currentIndex < 0) return
-      let nextIndex = currentIndex
-      if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % SUB_TAB_IDS.length
-      else if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + SUB_TAB_IDS.length) % SUB_TAB_IDS.length
-      else if (event.key === 'Home') nextIndex = 0
-      else if (event.key === 'End') nextIndex = SUB_TAB_IDS.length - 1
-      else return
-      event.preventDefault()
-      const nextTab = SUB_TAB_IDS[nextIndex]
-      if (nextTab) setActiveSubTab(nextTab)
-    },
-    [setActiveSubTab],
-  )
+  const handleSubTabChange = useCallback((subTab: SubTab) => {
+    setActiveSubTab(subTab)
+  }, [])
 
   // Artist mapping handlers
   const handleAddMapping = useCallback((m: Omit<ArtistMapping, 'id'>) => {
@@ -459,6 +457,7 @@ function SosGeneratorPanel() {
     merchOrderRows,
     requestExcelBlob,
     exchangeRatesLoading,
+    exchangeRatesReady,
     exchangeRatesSource,
     exchangeRates,
     historicalRates,
@@ -818,27 +817,6 @@ function SosGeneratorPanel() {
     manualRevenues.length + expenses.length + ignoredEntries.length +
     csvAliases.length + trackRevenueAssignments.length
 
-  // Sub-tabs definition
-  const subTabs: { id: SubTab; label: React.ReactNode }[] = [
-    { id: 'upload', label: t.subTabUpload },
-    { id: 'reporting', label: t.subTabReporting },
-    { id: 'settlements', label: t.subTabSettlements },
-    {
-      id: 'rules',
-      label: (
-        <>
-          {t.subTabRules}
-          {rulesCount > 0 && (
-            <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 ml-1 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
-              {rulesCount}
-            </span>
-          )}
-        </>
-      ),
-    },
-    { id: 'analytics', label: t.subTabAnalytics },
-  ]
-
   const periodError =
     manualPeriodStart && manualPeriodEnd && !isValidPeriodRange(manualPeriodStart, manualPeriodEnd)
       ? t.setupPeriodOrderError
@@ -951,12 +929,6 @@ function SosGeneratorPanel() {
     <div className="space-y-4">
       <div className="px-6 pt-4 space-y-3">
         <p className="text-sm text-muted-foreground leading-relaxed">{t.settlementDauIntro}</p>
-        <OperatorPlaybook
-          title={t.playbookTitle}
-          step1={t.coachCheckDrafts}
-          step2={t.coachCheckApprove}
-          step3={t.coachCheckPay}
-        />
         {unarchivedSourceFiles.length > 0 && (
           <Alert className="border-amber-500/40 bg-amber-500/10">
             <AlertDescription className="text-xs text-amber-400">
@@ -994,6 +966,92 @@ function SosGeneratorPanel() {
       <p className="text-sm">{t.emptySettlements}</p>
     </div>
   )
+
+  // ── Step 2: Checks ──────────────────────────────────────────────────────────
+
+  const validationIssues = useMemo(
+    () =>
+      validateSosWizardState(
+        {
+          revenues,
+          labelArtists,
+          splitFees,
+          periodStart: effectivePeriodStart,
+          periodEnd: effectivePeriodEnd,
+          hasBelieveFile: believeManager.files.length > 0,
+          hasBandcampFile: bandcampManager.files.length > 0,
+          hasShopifyFile: shopifyManager.files.length > 0,
+          hasPrintfulFile: printfulManager.files.length > 0,
+          hasDarkmerchFile: darkmerchManager.files.length > 0,
+          trackRevenueAssignments,
+          skippedRowCount: sessionFiles.reduce((sum, file) => sum + (file.rowsSkipped ?? 0), 0),
+          skipReasons: [...new Set(sessionFiles.flatMap((file) => file.skipReasons ?? []))],
+          emptyCurrencyRowCount: sessionFiles.reduce(
+            (sum, file) => sum + (file.emptyCurrencyRows ?? 0),
+            0,
+          ),
+          unarchivedSourceFiles,
+        },
+        t,
+      ),
+    [
+      revenues,
+      labelArtists,
+      splitFees,
+      effectivePeriodStart,
+      effectivePeriodEnd,
+      believeManager.files.length,
+      bandcampManager.files.length,
+      shopifyManager.files.length,
+      printfulManager.files.length,
+      darkmerchManager.files.length,
+      trackRevenueAssignments,
+      sessionFiles,
+      unarchivedSourceFiles,
+      t,
+    ],
+  )
+
+  const hasBlockingValidation = useMemo(
+    () => validationIssues.some((issue) => issue.severity === 'error'),
+    [validationIssues],
+  )
+
+  const validatePanel = (
+    <SosValidationPanel
+      issues={validationIssues}
+      onIssueAction={(issue) => {
+        if (issue.actionTarget === 'settlements') {
+          setActiveSubTab('settlements')
+          return
+        }
+        if (
+          issue.actionTarget === 'rules-mappings' ||
+          issue.actionTarget === 'rules-splits' ||
+          issue.actionTarget === 'rules-defaults'
+        ) {
+          setActiveSubTab('rules')
+          return
+        }
+        setActiveSubTab('upload')
+      }}
+    />
+  )
+
+  const wizardStep: GuidedWizardStep =
+    activeSubTab === 'validate'
+      ? 'validate'
+      : activeSubTab === 'reporting'
+        ? 'review'
+        : activeSubTab === 'settlements'
+          ? 'settle'
+          : 'upload'
+
+  const secondaryView = activeSubTab === 'rules' || activeSubTab === 'analytics'
+
+  const handleImportReady = useCallback(() => {
+    toast.success(t.importReadyTitle, { description: t.importReadyDesc })
+  }, [t.importReadyTitle, t.importReadyDesc])
 
   const currencyBanner = (
     <CurrencyRatesBanner
@@ -1059,33 +1117,34 @@ function SosGeneratorPanel() {
   return (
     <div className="space-y-0">
       {currencyBanner}
-      {/* Sub-tab navigation */}
+      {/* Settings toolbar — Rules and Insights stay outside the billing flow */}
       <div
-        className={cn('flex items-center gap-1 px-6 pt-4 border-b border-border', horizontalScrollClass)}
+        className={cn('flex flex-wrap items-center gap-1 px-6 pt-4 border-b border-border', horizontalScrollClass)}
         data-lenis-prevent
-        role="tablist"
-        aria-label={t.subTabListLabel}
       >
-        {subTabs.map(tab => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            id={`accounting-subtab-${tab.id}`}
-            aria-selected={activeSubTab === tab.id}
-            aria-controls={`accounting-subtab-panel-${tab.id}`}
-            tabIndex={activeSubTab === tab.id ? 0 : -1}
-            onClick={() => setActiveSubTab(tab.id)}
-            onKeyDown={(event) => handleSubTabKeyDown(event, tab.id)}
-            className={`px-3 py-2.5 text-sm font-medium rounded-t-md transition-colors flex items-center gap-1.5 whitespace-nowrap border-b-2 ${
-              activeSubTab === tab.id
-                ? 'border-primary bg-primary/10 text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        <Button
+          type="button"
+          variant={activeSubTab === 'rules' ? 'secondary' : 'outline'}
+          size="sm"
+          className="h-8 gap-1.5 text-xs mb-0.5"
+          onClick={() => handleSubTabChange('rules')}
+        >
+          <SlidersHorizontal size={13} aria-hidden="true" /> {t.subTabRules}
+          {rulesCount > 0 && (
+            <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-primary/10 text-primary text-[10px] font-semibold">
+              {rulesCount}
+            </span>
+          )}
+        </Button>
+        <Button
+          type="button"
+          variant={activeSubTab === 'analytics' ? 'secondary' : 'outline'}
+          size="sm"
+          className="h-8 gap-1.5 text-xs mb-0.5"
+          onClick={() => handleSubTabChange('analytics')}
+        >
+          <ChartBar size={13} aria-hidden="true" /> {t.subTabAnalytics}
+        </Button>
         <div className="flex-1" />
 
         {/* Presets sheet */}
@@ -1184,12 +1243,6 @@ function SosGeneratorPanel() {
         </button>
       </div>
 
-      {(activeSubTab === 'analytics' || activeSubTab === 'settlements') && (
-        <p className="px-6 py-2 text-xs text-muted-foreground border-b border-border bg-muted/20">
-          {activeSubTab === 'analytics' ? t.subTabAnalyticsHint : t.subTabSettlementsHint}
-        </p>
-      )}
-
       {periodBanner}
 
       {/* PDF Settings collapsible */}
@@ -1199,45 +1252,43 @@ function SosGeneratorPanel() {
 
       {rulesStatusBanner}
 
-      {/* Sub-tab content */}
+      {/* Billing flow: Files → Checks → Amounts → Statements */}
       <div className="min-h-[500px]">
-        {activeSubTab === 'upload' && (
-          <div
-            id="accounting-subtab-panel-upload"
-            role="tabpanel"
-            aria-labelledby="accounting-subtab-upload"
-          >
-            {uploadPanel}
-          </div>
+        {!secondaryView && (
+          <AccountingGuidedWizard
+            hasData={hasData}
+            isProcessing={isProcessing}
+            activeStep={wizardStep}
+            onActiveStepChange={(step) => handleSubTabChange(SUB_TAB_BY_WIZARD_STEP[step])}
+            onImportReady={handleImportReady}
+            hasBlockingValidation={hasBlockingValidation}
+            ratesReady={exchangeRatesReady}
+            uploadPanel={uploadPanel}
+            validatePanel={validatePanel}
+            reviewPanel={reviewPanel}
+            settlePanel={settlePanel}
+          />
         )}
 
-        {activeSubTab === 'reporting' && (
-          <div
-            id="accounting-subtab-panel-reporting"
-            role="tabpanel"
-            aria-labelledby="accounting-subtab-reporting"
-          >
-            {reviewPanel}
-          </div>
-        )}
-
-        {activeSubTab === 'settlements' && (
-          <div
-            id="accounting-subtab-panel-settlements"
-            role="tabpanel"
-            aria-labelledby="accounting-subtab-settlements"
-          >
-            {settlePanel}
+        {secondaryView && (
+          <div className="flex items-center justify-between gap-3 px-6 pt-4">
+            <h2 className="text-sm font-semibold text-foreground">
+              {activeSubTab === 'rules' ? t.subTabRules : t.subTabAnalytics}
+            </h2>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => handleSubTabChange('upload')}
+            >
+              <ArrowLeft size={13} aria-hidden="true" /> {t.guidedBack}
+            </Button>
           </div>
         )}
 
         {activeSubTab === 'analytics' && (
-          <div
-            id="accounting-subtab-panel-analytics"
-            role="tabpanel"
-            aria-labelledby="accounting-subtab-analytics"
-            className="p-6 space-y-6"
-          >
+          <div id="accounting-analytics-panel" className="p-6 space-y-6">
             <section className="space-y-4" aria-labelledby="analytics-ops-heading">
               <h3 id="analytics-ops-heading" className="text-sm font-semibold text-foreground">
                 {t.analyticsOpsHeading}
@@ -1366,11 +1417,7 @@ function SosGeneratorPanel() {
         )}
 
         {activeSubTab === 'rules' && (
-          <div
-            id="accounting-subtab-panel-rules"
-            role="tabpanel"
-            aria-labelledby="accounting-subtab-rules"
-          >
+          <div id="accounting-rules-panel">
           <RulesPanel
             artistMappings={artistMappings}
             compilationFilters={compilationFilters}

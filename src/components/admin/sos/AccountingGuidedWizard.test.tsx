@@ -6,15 +6,10 @@ import { AccountingGuidedWizard } from './AccountingGuidedWizard'
 vi.mock('@phosphor-icons/react', () => ({
   ArrowLeft: () => <span data-testid="icon-arrow-left" />,
   ArrowRight: () => <span data-testid="icon-arrow-right" />,
-  List: () => <span data-testid="icon-list" />,
   UploadSimple: () => <span data-testid="icon-upload" />,
   ChartBar: () => <span data-testid="icon-chart" />,
   SealCheck: () => <span data-testid="icon-seal" />,
-  Gear: () => <span data-testid="icon-gear" />,
   ShieldCheck: () => <span data-testid="icon-shield" />,
-  CheckCircle: () => <span data-testid="icon-check" />,
-  Circle: () => <span data-testid="icon-circle" />,
-  Warning: () => <span data-testid="icon-warning" />,
 }))
 
 vi.mock('@/components/ui/button', () => ({
@@ -38,40 +33,14 @@ vi.mock('@/components/ui/alert', () => ({
 }))
 
 vi.mock('@/lib/i18n/accountingFallbacks', () => ({
-  useAccountingLabels: () => ({
-    coachSetupTitle: 'Step: Set up the period',
-    coachSetupBody: 'Pick months',
-    coachUploadTitle: 'Step: Upload sales files',
-    coachUploadBody: 'Drop files',
-    coachValidateTitle: 'Step: Automatic checks',
-    coachValidateBody: 'Fix errors',
-    coachReviewTitle: 'Step: Check payouts',
-    coachReviewBody: 'Look at euros',
-    coachSettleTitle: 'Step: Publish & pay',
-    coachSettleBody: 'Create drafts',
-    coachCheckPeriod: 'Period set',
-    coachCheckFees: 'Fees ok',
-    coachCheckLabel: 'Label ok',
-    coachCheckRates: 'Rates loaded',
-    coachCheckFiles: 'Files uploaded',
-    coachCheckProcessed: 'Numbers ready',
-    coachCheckNoBlocking: 'No blocking',
-    coachCheckNoIssues: 'No issues',
-    coachCheckIssuesCount: '{count} issues',
-    coachCheckPayouts: '{count} payouts',
-    coachCheckDrafts: 'Drafts',
-    coachCheckApprove: 'Approve',
-    coachCheckPay: 'Pay',
-  }),
+  useAccountingLabels: () => ({}),
 }))
 
 describe('AccountingGuidedWizard navigation', () => {
   const onActiveStepChange = vi.fn()
-  const onSwitchToAdvanced = vi.fn()
 
   beforeEach(() => {
     onActiveStepChange.mockReset()
-    onSwitchToAdvanced.mockReset()
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
       value: vi.fn(),
@@ -87,8 +56,8 @@ describe('AccountingGuidedWizard navigation', () => {
         isProcessing={false}
         activeStep="upload"
         onActiveStepChange={onActiveStepChange}
-        onSwitchToAdvanced={onSwitchToAdvanced}
         uploadPanel={<div>upload-panel</div>}
+        validatePanel={<div>validate-panel</div>}
         reviewPanel={<div>review-panel</div>}
         settlePanel={<div>settle-panel</div>}
         {...overrides}
@@ -105,18 +74,32 @@ describe('AccountingGuidedWizard navigation', () => {
     expect(screen.getAllByText(/Upload at least one sales file/i).length).toBeGreaterThanOrEqual(1)
   })
 
-  it('uses Continue to publish label on the review step', () => {
+  it('shows the checks panel as step 2 of 4', () => {
+    renderWizard({ hasData: true, activeStep: 'validate' })
+
+    expect(screen.getByText('validate-panel')).toBeInTheDocument()
+    expect(screen.getByText(/Step 2 of 4/)).toBeInTheDocument()
+  })
+
+  it('uses Continue to statements on the review step', () => {
     renderWizard({ hasData: true, activeStep: 'review' })
 
     expect(screen.getByText('review-panel')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Continue to publish' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Continue to statements' })).toBeEnabled()
   })
 
   it('advances to settle when continue is clicked on review', () => {
     renderWizard({ hasData: true, activeStep: 'review' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Continue to publish' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to statements' }))
     expect(onActiveStepChange).toHaveBeenCalledWith('settle')
+  })
+
+  it('blocks continue when blocking checks exist', () => {
+    renderWizard({ hasData: true, activeStep: 'validate', hasBlockingValidation: true })
+
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    expect(screen.getByText(/Fix the blocking errors/i)).toBeInTheDocument()
   })
 
   it('jumps to settle when the settle stepper control is clicked', () => {
@@ -128,7 +111,7 @@ describe('AccountingGuidedWizard navigation', () => {
 
   it('shows step progress in the footer', () => {
     renderWizard({ hasData: true, activeStep: 'review' })
-    expect(screen.getByText(/Step 2 of 3/)).toBeInTheDocument()
+    expect(screen.getByText(/Step 3 of 4/)).toBeInTheDocument()
   })
 
   it('notifies import ready without auto-advancing from upload', () => {
@@ -141,9 +124,9 @@ describe('AccountingGuidedWizard navigation', () => {
         isProcessing={false}
         activeStep="upload"
         onActiveStepChange={onActiveStepChange}
-        onSwitchToAdvanced={onSwitchToAdvanced}
         onImportReady={onImportReady}
         uploadPanel={<div>upload-panel</div>}
+        validatePanel={<div>validate-panel</div>}
         reviewPanel={<div>review-panel</div>}
         settlePanel={<div>settle-panel</div>}
       />,

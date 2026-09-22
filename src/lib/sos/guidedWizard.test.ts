@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  ASSISTANT_WIZARD_STEP_IDS,
-  QUICK_WIZARD_STEP_IDS,
+  GUIDED_WIZARD_STEP_IDS,
   canAdvanceGuidedStep,
   canNavigateToGuidedStep,
   deriveSuggestedGuidedStep,
@@ -25,112 +24,7 @@ describe('guidedWizard', () => {
     expect(canAdvanceGuidedStep('upload', { hasData: true, isProcessing: false })).toBe(true)
   })
 
-  it('blocks validate step when blocking validation issues exist', () => {
-    expect(
-      canAdvanceGuidedStep(
-        'validate',
-        { hasData: true, isProcessing: false, hasBlockingValidation: true },
-        ASSISTANT_WIZARD_STEP_IDS,
-      ),
-    ).toBe(false)
-    expect(
-      canAdvanceGuidedStep(
-        'validate',
-        { hasData: true, isProcessing: false, hasBlockingValidation: false },
-        ASSISTANT_WIZARD_STEP_IDS,
-      ),
-    ).toBe(true)
-  })
-
-  it('gates setup advance on setupComplete', () => {
-    expect(
-      canAdvanceGuidedStep(
-        'setup',
-        { hasData: false, isProcessing: false, setupComplete: false },
-        ASSISTANT_WIZARD_STEP_IDS,
-      ),
-    ).toBe(false)
-    expect(
-      canAdvanceGuidedStep(
-        'setup',
-        { hasData: false, isProcessing: false, setupComplete: true },
-        ASSISTANT_WIZARD_STEP_IDS,
-      ),
-    ).toBe(true)
-    // Undefined setupComplete remains allowed (quick mode / default).
-    expect(
-      canAdvanceGuidedStep(
-        'setup',
-        { hasData: false, isProcessing: false },
-        ASSISTANT_WIZARD_STEP_IDS,
-      ),
-    ).toBe(true)
-  })
-
-  it('orders quick steps upload → review → settle', () => {
-    expect(guidedStepIndex('upload', QUICK_WIZARD_STEP_IDS)).toBe(0)
-    expect(guidedStepIndex('review', QUICK_WIZARD_STEP_IDS)).toBe(1)
-    expect(guidedStepIndex('settle', QUICK_WIZARD_STEP_IDS)).toBe(2)
-  })
-
-  it('gates stepper navigation by data readiness', () => {
-    const idle = { hasData: false, isProcessing: false }
-    const processing = { hasData: true, isProcessing: true }
-    const ready = { hasData: true, isProcessing: false }
-
-    expect(canNavigateToGuidedStep('upload', idle)).toBe(true)
-    expect(canNavigateToGuidedStep('review', idle)).toBe(false)
-    expect(canNavigateToGuidedStep('settle', idle)).toBe(false)
-
-    expect(canNavigateToGuidedStep('review', processing)).toBe(false)
-    expect(canNavigateToGuidedStep('settle', processing)).toBe(false)
-
-    expect(canNavigateToGuidedStep('review', ready)).toBe(true)
-    expect(canNavigateToGuidedStep('settle', ready)).toBe(true)
-  })
-
-  it('uses the same gates for stepper navigation as for Continue (#616)', () => {
-    const ready = { hasData: true, isProcessing: false }
-
-    // Assistant: no jump to review while the setup period is incomplete.
-    expect(
-      canNavigateToGuidedStep(
-        'review',
-        { ...ready, setupComplete: false },
-        ASSISTANT_WIZARD_STEP_IDS,
-      ),
-    ).toBe(false)
-    expect(
-      canNavigateToGuidedStep(
-        'review',
-        { ...ready, setupComplete: true, ratesReady: true, hasBlockingValidation: true },
-        ASSISTANT_WIZARD_STEP_IDS,
-      ),
-    ).toBe(false)
-    expect(
-      canNavigateToGuidedStep(
-        'review',
-        { ...ready, setupComplete: true, ratesReady: true, hasBlockingValidation: false },
-        ASSISTANT_WIZARD_STEP_IDS,
-      ),
-    ).toBe(true)
-
-    // Upload is not reachable before the setup period in assistant mode.
-    expect(
-      canNavigateToGuidedStep(
-        'upload',
-        { ...ready, setupComplete: false },
-        ASSISTANT_WIZARD_STEP_IDS,
-      ),
-    ).toBe(false)
-
-    // The rates gate applies to direct navigation too.
-    expect(
-      canNavigateToGuidedStep('review', { ...ready, ratesReady: false }),
-    ).toBe(false)
-  })
-
-  it('blocks upload advance when rates are not ready', () => {
+  it('gates upload advance on exchange rates', () => {
     expect(
       canAdvanceGuidedStep('upload', {
         hasData: true,
@@ -147,15 +41,56 @@ describe('guidedWizard', () => {
     ).toBe(true)
   })
 
-  it('returns plain-language blocked reasons', () => {
+  it('blocks validate advance when blocking validation issues exist', () => {
     expect(
-      guidedContinueBlockedReason('setup', {
-        hasData: false,
+      canAdvanceGuidedStep('validate', {
+        hasData: true,
         isProcessing: false,
-        setupComplete: false,
+        hasBlockingValidation: true,
       }),
-    ).toMatch(/period/i)
+    ).toBe(false)
+    expect(
+      canAdvanceGuidedStep('validate', {
+        hasData: true,
+        isProcessing: false,
+        hasBlockingValidation: false,
+      }),
+    ).toBe(true)
+  })
 
+  it('orders the billing flow upload → validate → review → settle', () => {
+    expect(guidedStepIndex('upload', GUIDED_WIZARD_STEP_IDS)).toBe(0)
+    expect(guidedStepIndex('validate', GUIDED_WIZARD_STEP_IDS)).toBe(1)
+    expect(guidedStepIndex('review', GUIDED_WIZARD_STEP_IDS)).toBe(2)
+    expect(guidedStepIndex('settle', GUIDED_WIZARD_STEP_IDS)).toBe(3)
+  })
+
+  it('gates stepper navigation by data readiness and blocking checks', () => {
+    const idle = { hasData: false, isProcessing: false }
+    const processing = { hasData: true, isProcessing: true }
+    const ready = { hasData: true, isProcessing: false }
+    const blocked = { hasData: true, isProcessing: false, hasBlockingValidation: true }
+
+    expect(canNavigateToGuidedStep('upload', idle)).toBe(true)
+    expect(canNavigateToGuidedStep('validate', idle)).toBe(false)
+    expect(canNavigateToGuidedStep('review', idle)).toBe(false)
+    expect(canNavigateToGuidedStep('settle', idle)).toBe(false)
+
+    expect(canNavigateToGuidedStep('validate', processing)).toBe(false)
+    expect(canNavigateToGuidedStep('review', processing)).toBe(false)
+
+    expect(canNavigateToGuidedStep('review', blocked)).toBe(false)
+    expect(canNavigateToGuidedStep('settle', blocked)).toBe(false)
+
+    expect(canNavigateToGuidedStep('validate', ready)).toBe(true)
+    expect(canNavigateToGuidedStep('review', ready)).toBe(true)
+    expect(canNavigateToGuidedStep('settle', ready)).toBe(true)
+
+    // The rates gate applies to direct navigation too.
+    expect(canNavigateToGuidedStep('review', { ...ready, ratesReady: false })).toBe(false)
+  })
+
+  it('returns plain-language blocked reasons', () => {
     expect(
       guidedContinueBlockedReason('upload', {
         hasData: false,

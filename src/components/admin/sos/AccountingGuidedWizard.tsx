@@ -4,17 +4,15 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
-  List,
   UploadSimple,
   ChartBar,
   SealCheck,
-  Gear,
   ShieldCheck,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
-  QUICK_WIZARD_STEP_IDS,
+  GUIDED_WIZARD_STEP_IDS,
   canAdvanceGuidedStep,
   canNavigateToGuidedStep,
   guidedContinueBlockedReason,
@@ -22,33 +20,27 @@ import {
   type GuidedBlockedReasonLabels,
   type GuidedWizardStep,
 } from '@/lib/sos/guidedWizard'
-import { SosWizardStepCoach } from '@/components/admin/sos/SosWizardStepCoach'
+import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { cn } from '@/lib/utils'
 
 const GUIDED_FALLBACK = {
-  guidedModeLabel: 'Guided',
-  advancedModeLabel: 'Advanced',
-  guidedSwitchAdvanced: 'Switch to advanced mode',
-  guidedStepSetup: 'Setup',
-  guidedStepSetupDesc: 'Period and accounting parameters',
-  guidedStepUpload: 'Upload',
+  guidedStepUpload: 'Files',
   guidedStepUploadDesc: 'Import sales CSV files',
   guidedStepValidate: 'Checks',
   guidedStepValidateDesc: 'Automatic checks before payout review',
-  guidedStepReview: 'Payouts',
+  guidedStepReview: 'Amounts',
   guidedStepReviewDesc: 'Check amounts before publishing',
-  guidedStepSettle: 'Publish',
+  guidedStepSettle: 'Statements',
   guidedStepSettleDesc: 'Create drafts, approve, and pay',
   guidedBack: 'Back',
   guidedNext: 'Continue',
-  guidedOpenSettle: 'Continue to publish',
+  guidedOpenSettle: 'Continue to statements',
   guidedProcessingHint: 'Processing CSV data…',
   guidedUploadHint: 'Upload at least one sales CSV to continue.',
-  guidedReviewHint: 'Check artist payouts, then continue to publish statements.',
+  guidedReviewHint: 'Check artist payouts, then continue to statements.',
   guidedSettleHint: 'Create drafts, approve them, then record payments below.',
-  guidedStepperAria: 'Accounting guided workflow',
+  guidedStepperAria: 'Accounting workflow',
   guidedStepOf: 'Step {current} of {total}',
-  blockedSetupPeriod: 'Select a valid billing period (start and end month) to continue.',
   blockedUploadNoData: 'Upload at least one sales file and wait until numbers appear.',
   blockedUploadProcessing: 'Please wait — files are still being processed.',
   blockedUploadRates: 'Please wait — exchange rates are still loading.',
@@ -60,11 +52,6 @@ const STEP_META: Record<
   GuidedWizardStep,
   { icon: typeof UploadSimple; labelKey: keyof typeof GUIDED_FALLBACK; descKey: keyof typeof GUIDED_FALLBACK }
 > = {
-  setup: {
-    icon: Gear,
-    labelKey: 'guidedStepSetup',
-    descKey: 'guidedStepSetupDesc',
-  },
   upload: {
     icon: UploadSimple,
     labelKey: 'guidedStepUpload',
@@ -92,19 +79,12 @@ export interface AccountingGuidedWizardProps {
   isProcessing: boolean
   activeStep: GuidedWizardStep
   onActiveStepChange: (step: GuidedWizardStep) => void
-  onSwitchToAdvanced: () => void
   onImportReady?: () => void
   stepIds?: readonly GuidedWizardStep[]
   hasBlockingValidation?: boolean
-  /** When false, Continue is disabled on the Setup step. Default true. */
-  setupComplete?: boolean
   ratesReady?: boolean
-  exchangeRatesLoading?: boolean
-  revenueCount?: number
-  issueCount?: number
-  /** Extra content under the coach (e.g. FX banner). */
+  /** Extra content under the stepper (e.g. FX banner). */
   statusBanner?: React.ReactNode
-  setupPanel?: React.ReactNode
   uploadPanel: React.ReactNode
   validatePanel?: React.ReactNode
   reviewPanel: React.ReactNode
@@ -112,39 +92,40 @@ export interface AccountingGuidedWizardProps {
   labels?: Partial<Record<keyof typeof GUIDED_FALLBACK, string>>
 }
 
+/**
+ * The single billing flow: Files → Checks → Amounts → Statements.
+ * One primary action per step; blocked steps explain themselves.
+ */
 export function AccountingGuidedWizard({
   hasData,
   isProcessing,
   activeStep,
   onActiveStepChange,
-  onSwitchToAdvanced,
   onImportReady,
-  stepIds = QUICK_WIZARD_STEP_IDS,
+  stepIds = GUIDED_WIZARD_STEP_IDS,
   hasBlockingValidation = false,
-  setupComplete = true,
   ratesReady = true,
-  exchangeRatesLoading = false,
-  revenueCount = 0,
-  issueCount = 0,
   statusBanner,
-  setupPanel,
   uploadPanel,
   validatePanel,
   reviewPanel,
   settlePanel,
   labels,
 }: AccountingGuidedWizardProps) {
-  const t = useMemo(() => ({ ...GUIDED_FALLBACK, ...labels }), [labels])
+  const accountingLabels = useAccountingLabels()
+  const t = useMemo(
+    () => ({ ...GUIDED_FALLBACK, ...accountingLabels, ...labels }),
+    [accountingLabels, labels],
+  )
   const settlePanelRef = useRef<HTMLDivElement>(null)
   const stepInput = useMemo(
     () => ({
       hasData,
       isProcessing,
       hasBlockingValidation,
-      setupComplete,
       ratesReady,
     }),
-    [hasData, isProcessing, hasBlockingValidation, setupComplete, ratesReady],
+    [hasData, isProcessing, hasBlockingValidation, ratesReady],
   )
   const importReadyNotifiedRef = useRef(false)
 
@@ -166,7 +147,6 @@ export function AccountingGuidedWizard({
   }, [activeStep])
 
   const blockedReasonLabels = useMemo((): GuidedBlockedReasonLabels => ({
-    blockedSetupPeriod: t.blockedSetupPeriod,
     blockedUploadNoData: t.blockedUploadNoData,
     blockedUploadProcessing: t.blockedUploadProcessing,
     blockedUploadRates: t.blockedUploadRates,
@@ -180,9 +160,6 @@ export function AccountingGuidedWizard({
   )
 
   const stepHint = useMemo(() => {
-    if (activeStep === 'setup') {
-      return t.guidedStepSetupDesc
-    }
     if (activeStep === 'upload') {
       return isProcessing ? t.guidedProcessingHint : t.guidedUploadHint
     }
@@ -260,39 +237,15 @@ export function AccountingGuidedWizard({
             })}
           </ol>
         </nav>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 gap-1.5 text-xs text-muted-foreground"
-          onClick={onSwitchToAdvanced}
-        >
-          <List size={14} aria-hidden="true" />
-          {t.guidedSwitchAdvanced}
-        </Button>
       </div>
 
       {statusBanner}
-
-      <SosWizardStepCoach
-        step={activeStep}
-        hasData={hasData}
-        isProcessing={isProcessing}
-        setupComplete={setupComplete}
-        hasBlockingValidation={hasBlockingValidation}
-        ratesReady={ratesReady}
-        exchangeRatesLoading={exchangeRatesLoading}
-        revenueCount={revenueCount}
-        issueCount={issueCount}
-        blockedReason={activeStep === 'settle' ? null : blockedReason}
-      />
 
       <Alert className="mx-6 mt-3 border-border bg-card/40">
         <AlertDescription className="text-xs">{stepHint}</AlertDescription>
       </Alert>
 
       <div className="flex-1">
-        {activeStep === 'setup' && setupPanel}
         {activeStep === 'upload' && uploadPanel}
         {activeStep === 'validate' && validatePanel}
         {activeStep === 'review' && reviewPanel}
