@@ -153,9 +153,9 @@
 - [ ] Portal invoice with failed mail: list shows “Email failed”, Retry send delivers without a new PDF; still-failed send keeps draft
 - [ ] Approve with mail down → statement stays Approved; Retry notify succeeds later without a second Approve; artist sees in-app statement_available once
 - [ ] Amounts → artist row: breakdown shows source euros, fee, expenses, payout, opening, due, and split origin (e.g. global Believe default vs artist override)
-- [ ] `/admin/accounting` tab strip is Files → Amounts → Statements → Rules → Insights (no separate SEPA / Trends / Portal Data tabs)
+- [ ] `/admin/accounting` shows one flow **Files → Checks → Amounts → Statements** (stepper, no sub-tab strip); Rules and Insights open from the settings toolbar and offer a back action to the flow
 - [ ] SEPA export is on Statements; Trends is under Insights; `?subTab=payout` still opens Statements
-- [ ] `/admin/accounting` opens Files first (no Assistant / Quick Start chooser); `?guidedStep=settle` and Statement History open Statements
+- [ ] `/admin/accounting` opens Files first (no Assistant / Quick Start / Advanced chooser); `?guidedStep=settle` and Statement History open Statements; `?subTab=validate` opens Checks
 - [ ] Upload shows period from/to month fields; Excel download works while a bronze archive is still failing; creating a draft is blocked until every session file is archived or removed
 - [ ] Failed bronze archive: no leftover “Archiving to storage…”, humanized network error, Retry on the file card
 - [ ] Set a manual period different from the detected source range → PDF/Excel, Settlement Center, payout, workspace key and carry-forward all use the manual period
@@ -163,7 +163,7 @@
 - [ ] Source file without any recognizable sales month → bronze card shows “archiving skipped” instead of archiving under the current month
 - [ ] Darkmerch CSV with `15,79` (DE) → correct euro basis and artist share; Believe/Bandcamp `15.79` unchanged; `12x` or an empty required amount appears as a row error, never as `0`
 - [ ] Bronze upload >100 MB succeeds via direct multipart (64 MB parts, no `/multipart/part` request); with R2 CORS broken the R2 error is shown (no silent proxy fallback); direct disabled + >4 MB shows the clear “direct upload disabled” message
-- [ ] Publish with a missing or mismatched billing period is rejected server-side; stepper direct navigation cannot skip setup/rates/validation blockers; a rejected status change returns 4xx (problem+json), not 500
+- [ ] Publish with a missing or mismatched billing period is rejected server-side; stepper direct navigation cannot skip files/rates/checks blockers; a rejected status change returns 4xx (problem+json), not 500
 - [ ] Two tabs edit the same period workspace: the second save shows the conflict hint and does not overwrite; “Reload from server” restores the server revision. After reload, the Settlement Center opens an existing period from the database without a CSV upload, and archived sources can be loaded from the workspace hint
 - [ ] Publish a statement → the stored row carries `rules_fingerprint`, `fx_snapshot` and `calculation_snapshot` matching the exported payout (spot check one artist); a 0 % split stays 0 and a refund row lowers the payout instead of being clamped
 - [ ] Invoice submit retry (slow response/reload) with the same operation id returns the existing invoice; changing the payload with the same id returns 409; after a recovered partial create the PDF matches the stored row (no retry-payload values)
@@ -172,10 +172,10 @@
 - [ ] Shopify order with two Printful cost rows → costs are summed (100 − 15 − 5 = 80), not last-wins; a self-fulfilled order without Printful costs stays at full net revenue
 - [ ] Editor account cannot publish a statement (`uploadStatement` → Forbidden: admin role required); admin works unchanged
 - [ ] Invoice with a failing Resend key → status stays `draft`, `delivery_status='failed'` with the provider error visible; successful send → `sent` + `delivery_status='sent'`; no mail requested → `not_sent`; Settlement register and `/admin/invoices` show **Email failed** on that row
-- [ ] Upload one CSV → coach checklist updates; Continue enabled only after numbers appear
+- [ ] Upload one CSV → Checks lists the import result; Continue on Files enables only after numbers appear (no coach/playbook duplicate)
 - [ ] Block/throttle `/api/exchange-rates` → sticky fallback banner + Refresh; no crash on first process
-- [ ] Validate step: blocking errors prevent Continue; warnings allow continue
-- [ ] DE labels: Setup / Dateien / Automatik-Check / Auszahlungen / Veröffentlichen (no double “Prüfen”)
+- [ ] Checks step: blocking errors prevent Continue and each issue offers its repair (upload/rules/statements); warnings allow continue
+- [ ] DE labels: Dateien / Automatik-Check / Beträge / Statements (no Setup step, no mode chooser)
 - [ ] Expense date = calendar picker; period = month picker; track owner % = percent field
 
 ## Portal / admin DAU assistants (1–5)
