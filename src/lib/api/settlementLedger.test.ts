@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   computeCarryForwardOpeningBalance,
+  createPeriodCarryForwards,
   invoiceGrossCents,
   invoiceTotalCents,
   resolveCarryStatementBalance,
@@ -110,5 +111,119 @@ describe('settlementLedger helpers', () => {
     expect(resolvePaymentLedgerEntryType(true, 'partially_paid')).toBeNull()
     expect(resolvePaymentLedgerEntryType(false, 'paid')).toBe('payment')
     expect(resolvePaymentLedgerEntryType(false, 'partially_paid')).toBe('partial_payment')
+  })
+})
+
+describe('createPeriodCarryForwards', () => {
+  const breakdown: CarryForwardBreakdown = {
+    statementBalanceEur: 0,
+    unpaidInvoiceCents: 0,
+    partialPaymentRemainderCents: 0,
+  }
+
+  function makeDb(
+    carriedOutArtistIds: string[],
+    insertError?: { code?: string; message?: string },
+  ) {
+    const upserts: Array<Record<string, unknown>> = []
+    const inserted: Array<Record<string, unknown>> = []
+    const db = {
+      from: (table: string) => {
+        if (table === 'artist_settlement_ledger') {
+          return {
+            // idempotency guard read
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  in: () =>
+                    Promise.resolve({
+                      data: carriedOutArtistIds.map((artist_id) => ({ artist_id })),
+                      error: null,
+                    }),
+                }),
+              }),
+            }),
+            // appendLedgerEntry insert
+            insert: (row: Record<string, unknown>) => ({
+              select: () => ({
+                single: () => {
+                  if (insertError) return Promise.resolve({ data: null, error: insertError })
+                  inserted.push(row)
+                  return Promise.resolve({ data: row, error: null })
+                },
+              }),
+            }),
+          }
+        }
+        return {
+          upsert: (row: Record<string, unknown>) => {
+            upserts.push(row)
+            return Promise.resolve({ error: null })
+          },
+        }
+      },
+    }
+    return { db: db as unknown as Parameters<typeof createPeriodCarryForwards>[0], upserts, inserted }
+  }
+
+  it('posts one carry_out per artist and skips artists that already have one', async () => {
+    const { db, upserts, inserted } = makeDb(['a1'])
+
+    await createPeriodCarryForwards(
+      db,
+      'period-1',
+      [
+        { artistId: 'a1', openingBalanceEur: 50, breakdown },
+        { artistId: 'a2', openingBalanceEur: 20, breakdown },
+      ],
+      'actor-1',
+    )
+
+    expect(upserts).toHaveLength(2)
+    expect(inserted).toHaveLength(1)
+    expect(inserted[0]?.artist_id).toBe('a2')
+    expect(inserted[0]?.entry_type).toBe('carry_out')
+    expect(inserted[0]?.amount_eur).toBe(-20)
+  })
+
+  it('writes nothing when every balance is negligible', async () => {
+    const { db, upserts, inserted } = makeDb([])
+
+    await createPeriodCarryForwards(
+      db,
+      'period-1',
+      [{ artistId: 'a1', openingBalanceEur: 0.001, breakdown }],
+      'actor-1',
+    )
+
+    expect(upserts).toHaveLength(0)
+    expect(inserted).toHaveLength(0)
+  })
+
+  it('swallows a duplicate carry_out (concurrent close) instead of throwing', async () => {
+    const { db, inserted } = makeDb([], { code: '23505', message: 'duplicate key value' })
+
+    await expect(
+      createPeriodCarryForwards(
+        db,
+        'period-1',
+        [{ artistId: 'a1', openingBalanceEur: 20, breakdown }],
+        'actor-1',
+      ),
+    ).resolves.toBeUndefined()
+    expect(inserted).toHaveLength(0)
+  })
+
+  it('rethrows a non-duplicate insert failure', async () => {
+    const { db } = makeDb([], { code: '08006', message: 'connection failure' })
+
+    await expect(
+      createPeriodCarryForwards(
+        db,
+        'period-1',
+        [{ artistId: 'a1', openingBalanceEur: 20, breakdown }],
+        'actor-1',
+      ),
+    ).rejects.toThrow('connection failure')
   })
 })

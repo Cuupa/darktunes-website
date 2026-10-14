@@ -44,9 +44,9 @@ Update when items move in/out of scope. Not a product PRD.
 
 ## Rate-limit inventory (snapshot)
 
-**In-memory** (`checkRateLimit` / `ipRateLimit.ts`): public contact, journalist applications, vitals, page-events, forgot-password, EPK share/export.
+**In-memory** (`checkRateLimit` / `ipRateLimit.ts`): vitals, page-events, forgot-password, EPK share/export.
 
-**Distributed** (`checkDistributedRateLimit`, Upstash when configured): log-error, portal uploads (asset/photo/rider/release cover/documents/fonts), cover-art-check, EPK export, feedback, submit-release/video, portal messages send, tour-planner tech-document upload.
+**Distributed** (`checkDistributedRateLimit`, Upstash when configured; memory fallback when unset): public contact, journalist applications, log-error, portal uploads (asset/photo/rider/release cover/documents/fonts), cover-art-check, EPK export, feedback, submit-release/video, portal messages send, tour-planner tech-document upload.
 
 **IP only (audit, not limit):** admin invite / resend-invite.
 

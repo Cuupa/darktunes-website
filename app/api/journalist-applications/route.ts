@@ -15,7 +15,8 @@ import {
 } from '@/lib/api/journalistApplications'
 import { isPressApplicationsEnabled } from '@/lib/pressAccess'
 import { z } from 'zod'
-import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
+import { getClientIp } from '@/lib/ipRateLimit'
+import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { emitNotification } from '@/lib/notifications/emit'
 
 const ApplySchema = z.object({
@@ -41,8 +42,10 @@ export const GET = withErrorHandler(async () => {
 })
 
 export const POST = withErrorHandler(async (req: NextRequest) => {
-  // 3 applications per 30 minutes per IP
-  if (checkRateLimit(getClientIp(req), 3, 30 * 60_000).limited) {
+  // 3 applications per 30 minutes per IP, shared across servers when Upstash is set.
+  const ip = getClientIp(req)
+  const rl = await checkDistributedRateLimit(`journalist-applications:${ip}`, 3, 30 * 60_000)
+  if (rl.limited) {
     throw new ApiError(429, 'Too many requests. Please try again later.', 'RATE_LIMITED')
   }
 

@@ -143,9 +143,13 @@ async function readApiErrorMessage(res: Response): Promise<string> {
     return 'Upload too large for server proxy (max 4 MB per request)'
   }
   const errBody = await res.json().catch(() => ({}))
-  return typeof errBody === 'object' && errBody && 'error' in errBody
-    ? String((errBody as { error: unknown }).error)
-    : res.statusText || `HTTP ${res.status}`
+  if (typeof errBody === 'object' && errBody) {
+    // problem+json carries the message in `detail`; `error` is the legacy alias.
+    const body = errBody as { detail?: unknown; error?: unknown }
+    if (typeof body.detail === 'string' && body.detail.trim()) return body.detail
+    if (typeof body.error === 'string' && body.error.trim()) return body.error
+  }
+  return res.statusText || `HTTP ${res.status}`
 }
 
 async function abortBronzeMultipartUpload(batchId: string, uploadId: string): Promise<void> {
@@ -378,6 +382,9 @@ export async function uploadBronzeDistributorCsv(
       ? params.filename.replace(/\.xlsx$/i, '.csv')
       : params.filename
 
+    // shortcut: the whole file is buffered once to hash it (WebCrypto has no
+    // streaming digest); fine for the ~60-70 MB reference CSVs, revisit if the
+    // 1 GB bronze cap becomes common.
     const fileHash = await sha256HexFromBuffer(await uploadBlob.arrayBuffer())
 
     const registerPayload = JSON.stringify({

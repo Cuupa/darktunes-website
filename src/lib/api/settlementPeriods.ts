@@ -124,7 +124,15 @@ export async function getOrCreateSettlementPeriod(
     .select('*')
     .single()
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    // Concurrent create: another request inserted the same bounds first
+    // (UNIQUE period_start, period_end). Re-read instead of failing the close.
+    if ((error as { code?: string }).code === '23505') {
+      const raced = await getSettlementPeriodByDates(db, bounds.periodStart, bounds.periodEnd)
+      if (raced) return raced
+    }
+    throw new Error(error.message)
+  }
   return rowToPeriod(data as SettlementPeriodRow)
 }
 

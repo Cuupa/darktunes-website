@@ -75,7 +75,13 @@ export async function appendLedgerEntry(
     .select('*')
     .single()
 
-  if (error) throw new Error(error.message)
+  if (error) {
+    // Keep the Postgres code on the thrown error so callers can treat a
+    // duplicate carry row as idempotent (concurrent period close).
+    const err = new Error(error.message) as Error & { code?: string }
+    err.code = error.code
+    throw err
+  }
   return rowToEntry(data as LedgerRow)
 }
 
@@ -244,9 +250,26 @@ export async function createPeriodCarryForwards(
   }>,
   actorId: string,
 ): Promise<void> {
-  for (const row of artistBalances) {
-    if (Math.abs(row.openingBalanceEur) < 0.005) continue
+  const eligible = artistBalances.filter((row) => Math.abs(row.openingBalanceEur) >= 0.005)
+  if (eligible.length === 0) return
 
+  // Exactly one carry-out per (period, artist): a retry after a partial close
+  // must not post the opening balance twice (#628 / contract §A.5). Read the
+  // already-posted ones once instead of one query per artist.
+  const { data: carryOutRows, error } = await db
+    .from('artist_settlement_ledger')
+    .select('artist_id')
+    .eq('settlement_period_id', fromPeriodId)
+    .eq('entry_type', 'carry_out')
+    .in(
+      'artist_id',
+      eligible.map((row) => row.artistId),
+    )
+  if (error) throw new Error(error.message)
+
+  const alreadyCarriedOut = new Set((carryOutRows ?? []).map((row) => row.artist_id))
+
+  for (const row of eligible) {
     await db.from('period_carry_forwards').upsert(
       {
         from_period_id: fromPeriodId,
@@ -257,16 +280,24 @@ export async function createPeriodCarryForwards(
       { onConflict: 'from_period_id,artist_id' },
     )
 
-    await appendLedgerEntry(db, {
-      artistId: row.artistId,
-      settlementPeriodId: fromPeriodId,
-      entryType: 'carry_out',
-      amountEur: -row.openingBalanceEur,
-      referenceType: 'settlement_period',
-      referenceId: fromPeriodId,
-      description: 'Period carry-forward out',
-      createdBy: actorId,
-    })
+    if (alreadyCarriedOut.has(row.artistId)) continue
+
+    try {
+      await appendLedgerEntry(db, {
+        artistId: row.artistId,
+        settlementPeriodId: fromPeriodId,
+        entryType: 'carry_out',
+        amountEur: -row.openingBalanceEur,
+        referenceType: 'settlement_period',
+        referenceId: fromPeriodId,
+        description: 'Period carry-forward out',
+        createdBy: actorId,
+      })
+    } catch (err) {
+      // A concurrent close posted this carry_out first; the partial unique index
+      // on carry rows makes the race a duplicate key. Keep exactly one row.
+      if ((err as { code?: string }).code !== '23505') throw err
+    }
   }
 }
 

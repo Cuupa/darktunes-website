@@ -72,6 +72,26 @@ export interface CreateSosLinkedInvoiceData extends CreateInvoiceData {
   settlementPeriodId?: string | null
 }
 
+/** The generated internal number collided with an existing invoice. */
+export class DuplicateInvoiceNumberError extends Error {
+  constructor() {
+    super('An invoice with this number already exists')
+    this.name = 'DuplicateInvoiceNumberError'
+  }
+}
+
+/**
+ * A unique violation on artist_invoices can come from two constraints: the
+ * partial statement index or (artist_id, invoice_number). Postgres names the
+ * latter `..._invoice_number_key`, so an explicit `invoice_number` mention
+ * means a number collision that must trigger a retry, not a duplicate
+ * statement (#621). Anything else is the statement index.
+ */
+function isInvoiceNumberConflict(error: { details?: string | null; message?: string | null }): boolean {
+  const text = `${error.details ?? ''} ${error.message ?? ''}`
+  return text.includes('invoice_number')
+}
+
 function rowToArtistInvoice(row: InvoiceRow): ArtistInvoice {
   return {
     id: row.id,
@@ -205,7 +225,10 @@ export async function createArtistInvoice(
     .select()
     .single()
 
-  if (error) throw new Error(`Failed to create invoice: ${error.message}`)
+  if (error) {
+    if (error.code === '23505') throw new DuplicateInvoiceNumberError()
+    throw new Error(`Failed to create invoice: ${error.message}`)
+  }
   return rowToArtistInvoice(row)
 }
 
@@ -243,7 +266,10 @@ export async function createSosLinkedInvoice(
     .single()
 
   if (error) {
-    if (error.code === '23505') throw new DuplicateStatementInvoiceError()
+    if (error.code === '23505') {
+      if (isInvoiceNumberConflict(error)) throw new DuplicateInvoiceNumberError()
+      throw new DuplicateStatementInvoiceError()
+    }
     throw new Error(`Failed to create linked invoice: ${error.message}`)
   }
   return rowToArtistInvoice(row)
@@ -406,7 +432,9 @@ export async function markInvoiceReceived(
 ): Promise<ArtistInvoice> {
   const existing = await getAdminInvoiceById(db, id)
   if (!existing) throw new BusinessRuleError('Invoice not found', 404, 'NOT_FOUND')
-  if (!['sent', 'draft'].includes(existing.status)) {
+  // `received` is an Eingangsnachweis: only a sent invoice can be received
+  // (contract §A.4). Drafts must be sent first.
+  if (existing.status !== 'sent') {
     throw new BusinessRuleError(`Cannot mark received from status "${existing.status}"`)
   }
 

@@ -98,7 +98,9 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
     await assertSettlementPeriodWritableById(supabase, existing.settlementPeriodId)
   }
 
-  const invoice = await recordInvoicePayment(supabase, id, {
+  // The RPC is service-role only (see reset.sql); the route already enforced
+  // the admin role above.
+  const invoice = await recordInvoicePayment(serviceSupabase, id, {
     amountCents: parsed.data.amountCents,
     paymentMethod: parsed.data.paymentMethod,
     paymentReference: parsed.data.paymentReference,

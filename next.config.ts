@@ -1,3 +1,4 @@
+import path from 'node:path'
 import type { NextConfig } from 'next'
 import createNextIntlPlugin from 'next-intl/plugin'
 import withSerwistInit from '@serwist/next'
@@ -84,11 +85,29 @@ const nextConfig: NextConfig = {
   // Tailwind v4 + tw-animate-css use PostCSS features that require transpiling
   transpilePackages: [],
   // web-push pulls Node net/tls — must never land in the client bundle
-  serverExternalPackages: ['sharp', 'fontkit', '@pdf-lib/fontkit', 'web-push'],
+  serverExternalPackages: ['sharp', 'fontkit', '@pdf-lib/fontkit', 'web-push', 'jsdom'],
   outputFileTracingIncludes: {
     '/api/portal/epk/export': ['./src/lib/epk/export/assets/**/*'],
     '/api/epk/share/[token]': ['./src/lib/epk/export/assets/**/*'],
     '/api/epk/press/[slug]/export': ['./src/lib/epk/export/assets/**/*'],
+  },
+  webpack: (config, { isServer }) => {
+    const alias = config.resolve?.alias
+    if (alias && !Array.isArray(alias)) {
+      alias['darktunes-sanitize-html-server'] = path.join(
+        process.cwd(),
+        isServer ? 'src/lib/sanitizeHtml.server.ts' : 'src/lib/sanitizeHtml.server.stub.ts',
+      )
+    }
+    return config
+  },
+  turbopack: {
+    resolveAlias: {
+      'darktunes-sanitize-html-server': {
+        browser: './src/lib/sanitizeHtml.server.stub.ts',
+        default: './src/lib/sanitizeHtml.server.ts',
+      },
+    },
   },
   experimental: {
     // konva/react-konva omitted: optimizePackageImports tree-shakes shape side-effects

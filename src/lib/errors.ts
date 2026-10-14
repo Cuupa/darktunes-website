@@ -18,6 +18,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { ZodError } from 'zod'
 import { writeAppLog } from '@/lib/appLog'
 import { auditAdminMutation } from '@/lib/adminAuditLog'
@@ -172,7 +173,7 @@ function persistRouteError(
   details: Record<string, unknown>,
   level: AppLogLevel,
 ): void {
-  void (async () => {
+  const task = (async () => {
     const ctx = await extractRouteUserContext(req)
     const routePath = (() => {
       try { return new URL(req.url).pathname } catch { return req.url }
@@ -190,6 +191,7 @@ function persistRouteError(
       method: req.method,
     })
   })()
+  waitUntil(task)
 }
 
 // ---------------------------------------------------------------------------

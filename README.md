@@ -164,7 +164,7 @@ Copy `.env.example` to `.env.local` and fill in your values.
 |---|---|
 | `API_CREDENTIALS_ENCRYPTION_KEY` | Required. 64-char hex master key for AES-256-GCM encryption of `api_credentials` values (`openssl rand -hex 32`) |
 
-External integration keys (Spotify, Discogs, Resend, YouTube, MailerLite, etc.) are configured in **Admin → API Keys**, not env vars. See `SECURITY.md` and `DEPLOYMENT.md`.
+External integration keys (Spotify, Discogs, Resend, YouTube, MailerLite, etc.) are configured in **Admin → API Keys**, not env vars. See `SECURITY.md` and `DEPLOYMENT.md`. Compliance roadmap (SOC 2 / ISO 27001): [docs/compliance/README.md](./docs/compliance/README.md).
 
 | Variable | Description |
 |---|---|
@@ -321,7 +321,7 @@ app/                          # Next.js App Router entry points
     ├── contact/route.ts                   # Contact form (Resend delivery)
     ├── exchange-rates/route.ts            # ECB/Frankfurter FX proxy (SOS + non-EUR invoices)
     ├── health/route.ts                    # Health check endpoint
-    ├── log-error/route.ts                 # Client-side error reporting (app_logs)
+    ├── log-error/route.ts                 # Client error ingest (session optional, always 204)
     ├── vitals/route.ts                    # Core Web Vitals RUM ingestion
     ├── page-events/route.ts             # Consent-gated website engagement (rate-limited)
     ├── journalist-applications/           # Journalist application CRUD

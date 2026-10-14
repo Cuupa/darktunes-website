@@ -376,13 +376,12 @@ export async function deleteUser(adminClient: DbClient, userId: string): Promise
 }
 
 /**
- * Soft-deletes a user's own account:
- *  - Sets profiles.deleted_at = NOW()
- *  - Anonymises the stored email
- *  - Bans the auth user so they cannot log in during the grace period
+ * Closes a user's own login:
+ *  - Sets users.deleted_at
+ *  - Anonymises email and display name
+ *  - Bans the auth user so they cannot sign in
  *
- * The actual auth.users row is NOT deleted here; a separate cleanup job
- * (or manual admin action) should remove it after the grace period.
+ * Does not delete auth.users, invoices, or statements. Those records stay.
  */
 export async function softDeleteAccount(
   adminClient: DbClient,
@@ -390,15 +389,7 @@ export async function softDeleteAccount(
 ): Promise<void> {
   const anonymisedEmail = `deleted-${userId}@anonymized.local`
 
-  // 1. Mark profile as deleted and anonymise PII
-  const { error: profileError } = await adminClient
-    .from('users')
-    .update({ deleted_at: new Date().toISOString(), email: anonymisedEmail })
-    .eq('id', userId)
-
-  if (profileError) throw new Error(profileError.message)
-
-  // 2. Ban the auth user to prevent further sign-ins
+  // Ban first. If this fails, deleted_at stays unset so the user can retry.
   const { error: banError } = await (adminClient.auth.admin as {
     updateUserById: (
       id: string,
@@ -410,6 +401,17 @@ export async function softDeleteAccount(
   })
 
   if (banError) throw new Error(banError.message)
+
+  const { error: profileError } = await adminClient
+    .from('users')
+    .update({
+      deleted_at: new Date().toISOString(),
+      email: anonymisedEmail,
+      full_name: 'Deleted user',
+    })
+    .eq('id', userId)
+
+  if (profileError) throw new Error(profileError.message)
 }
 
 /**

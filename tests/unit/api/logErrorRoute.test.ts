@@ -1,5 +1,5 @@
 /**
- * Golden tests for POST /api/log-error — auth, Zammad gating, rate limit, validation.
+ * Golden tests for POST /api/log-error — public ingest, Zammad gating, rate limit.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -66,33 +66,38 @@ describe('POST /api/log-error', () => {
     return POST(req)
   }
 
-  it('401 when unauthenticated', async () => {
+  it('persists without a session and returns 204', async () => {
     mockGetUser.mockResolvedValue({ data: { user: null } })
     const res = await postLogError({ source: 'ui', message: 'x' })
-    expect(res.status).toBe(401)
-    expect(mockWriteAppLog).not.toHaveBeenCalled()
+    expect(res.status).toBe(204)
+    expect(mockWriteAppLog).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'ui', message: 'x', userId: null }),
+    )
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(mockSubmitAutoErrorTicket).not.toHaveBeenCalled()
   })
 
-  it('429 when rate limited', async () => {
+  it('returns 204 without persisting when rate limited', async () => {
     mockCheckDistributedRateLimit.mockResolvedValue({ limited: true, remaining: 0 })
     const res = await postLogError({ source: 'ui', message: 'x' })
-    expect(res.status).toBe(429)
+    expect(res.status).toBe(204)
     expect(mockWriteAppLog).not.toHaveBeenCalled()
   })
 
-  it('400 on invalid payload', async () => {
+  it('returns 204 on invalid payload without persisting', async () => {
     const res = await postLogError({ source: '', message: '' })
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(204)
+    expect(mockWriteAppLog).not.toHaveBeenCalled()
   })
 
-  it('queues Zammad auto ticket only for exact ui source errors', async () => {
+  it('queues Zammad auto ticket only for signed-in ui source errors', async () => {
     const res = await postLogError({
       source: 'ui',
       message: 'Render crashed',
       level: 'error',
     })
 
-    expect(res.status).toBe(201)
+    expect(res.status).toBe(204)
     expect(mockWriteAppLog).toHaveBeenCalledWith(
       expect.objectContaining({ source: 'ui', message: 'Render crashed' }),
     )
@@ -108,7 +113,7 @@ describe('POST /api/log-error', () => {
       level: 'error',
     })
 
-    expect(res.status).toBe(201)
+    expect(res.status).toBe(204)
     expect(mockWriteAppLog).toHaveBeenCalledWith(
       expect.objectContaining({ source: 'admin.health' }),
     )
@@ -123,7 +128,7 @@ describe('POST /api/log-error', () => {
       level: 'error',
     })
 
-    expect(res.status).toBe(201)
+    expect(res.status).toBe(204)
     expect(mockWriteAppLog).toHaveBeenCalledWith(
       expect.objectContaining({ source: 'sos.bronze.upload' }),
     )
@@ -137,7 +142,7 @@ describe('POST /api/log-error', () => {
       message: 'save failed',
       level: 'error',
     })
-    expect(res.status).toBe(201)
+    expect(res.status).toBe(204)
     expect(mockWriteAppLog).toHaveBeenCalledWith(
       expect.objectContaining({ source: 'useSosWorkspaceSync' }),
     )

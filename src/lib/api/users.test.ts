@@ -12,6 +12,7 @@ import {
   updateUserRole,
   banUser,
   deleteUser,
+  softDeleteAccount,
   linkArtistToUser,
   unlinkArtistFromUser,
   syncInvitedUserAccess,
@@ -301,6 +302,23 @@ describe('banUser', () => {
 // ---------------------------------------------------------------------------
 // deleteUser
 // ---------------------------------------------------------------------------
+
+describe('softDeleteAccount', () => {
+  it('anonymises email and display name and does not delete the auth user', async () => {
+    const client = makeAdminClient({ updateUserError: null })
+    await softDeleteAccount(client, 'user-1')
+    const from = client.from as unknown as ReturnType<typeof vi.fn>
+    const builder = from.mock.results[0]?.value as { update: ReturnType<typeof vi.fn> }
+    expect(builder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'deleted-user-1@anonymized.local',
+        full_name: 'Deleted user',
+      }),
+    )
+    const adminApi = client.auth.admin as unknown as { deleteUser: ReturnType<typeof vi.fn> }
+    expect(adminApi.deleteUser).not.toHaveBeenCalled()
+  })
+})
 
 describe('deleteUser', () => {
   it('resolves without error on success', async () => {

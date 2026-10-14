@@ -25,6 +25,12 @@ export interface SepaLabelConfig {
   periodLabel: string
 }
 
+function truncateXmlText(raw: string, max: number): string {
+  let cut = raw
+  while (escapeXml(cut).length > max && cut.length > 0) cut = cut.slice(0, -1)
+  return escapeXml(cut)
+}
+
 function escapeXml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
@@ -34,9 +40,12 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;')
 }
 
-function formatAmount(amount: number): string {
-  const rounded = Math.round(amount * 100) / 100
-  return rounded.toFixed(2)
+function toCents(amount: number): number {
+  return Math.round(amount * 100)
+}
+
+function formatCents(cents: number): string {
+  return (cents / 100).toFixed(2)
 }
 
 function todayIso(): string {
@@ -76,14 +85,14 @@ export function generateSepaXml(
   const msgId         = generateMsgId()
   const creDtTm       = creationDateTime()
   const reqExctnDt    = todayIso()
+  const centAmounts   = payouts.map((payout) => toCents(payout.amount))
   const nbOfTxs       = payouts.length
-  const ctrlSum       = formatAmount(payouts.reduce((acc, p) => acc + p.amount, 0))
+  const ctrlSum       = formatCents(centAmounts.reduce((acc, cents) => acc + cents, 0))
   const pmtInfId      = `PMTINF-${msgId}`
   const labelName     = escapeXml(labelConfig.accountHolder)
   const labelIban     = escapeXml(labelConfig.iban.replace(/[\s-]/g, '').toUpperCase())
-  const periodLabel   = escapeXml(labelConfig.periodLabel)
-  const ustrdBase     = `Abrechnung ${periodLabel} ${escapeXml(labelConfig.accountHolder)}`
-  const ustrdTruncated = ustrdBase.length > USTRD_MAX_LENGTH ? ustrdBase.slice(0, USTRD_MAX_LENGTH) : ustrdBase
+  const rawNote       = `Abrechnung ${labelConfig.periodLabel} ${labelConfig.accountHolder}`
+  const ustrd         = truncateXmlText(rawNote, USTRD_MAX_LENGTH)
 
   const dbtrAgtBlock = labelConfig.bic
     ? `      <DbtrAgt>
@@ -103,7 +112,7 @@ export function generateSepaXml(
     const endToEndId = payout.endToEndId ?? `E2E-${String(index + 1).padStart(4, '0')}`
     const cdtrName = escapeXml(payout.accountHolder)
     const cdtrIban = escapeXml(payout.iban.replace(/[\s-]/g, '').toUpperCase())
-    const instdAmt = formatAmount(payout.amount)
+    const instdAmt = formatCents(centAmounts[index] ?? 0)
 
     const cdtrAgtBlock = payout.bic
       ? `        <CdtrAgt>
@@ -129,7 +138,7 @@ ${cdtrAgtBlock ? `${cdtrAgtBlock}\n` : ''}        <Cdtr>
           </Id>
         </CdtrAcct>
         <RmtInf>
-          <Ustrd>${ustrdTruncated}</Ustrd>
+          <Ustrd>${ustrd}</Ustrd>
         </RmtInf>
       </CdtTrfTxInf>`
   }).join('\n')

@@ -26,6 +26,7 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 
 - **Row-Level Security (RLS)** is enabled on all Supabase tables. Only authenticated users with the `admin` or `editor` role can write data. Portal tables (`artist_epks`, `artist_billing_profiles`, `streaming_stats`, `sales_statements`, `release_checklists`, `artist_replies`, `artist_assets`, `artist_invoices`) enforce artist-scoped RLS using ownership checks via `artist_members` — security is enforced at the database layer, not just middleware.
 - **Public vs private artist data:** Public routes use `PUBLIC_ARTIST_COLUMNS` / `PublicArtist` (`src/lib/api/publicArtist.ts`) — never `select('*')` into client props. Secrets and PII live in `artist_private_data` (RLS: admin/editor + `artist_members` only). After `reset.sql` backfill, secret columns on `public.artists` are cleared so anon `select(*)` cannot recover API keys or email.
+- **Privileged RPCs are service-role only:** every `SECURITY DEFINER` function that writes money or state (`record_invoice_payment`, `record_statement_view`, `upsert_app_log`, `claim_sync_jobs`, `create_release_submission_with_tracks`, `get_assets_storage_stats`) revokes `EXECUTE` from `PUBLIC`/`anon`/`authenticated` and grants it only to `service_role`. Postgres grants `EXECUTE` to `PUBLIC` by default and PostgREST exposes `public` RPCs, so a `SECURITY DEFINER` function without this `REVOKE` is callable with the public anon key. The calling route must authorize the user, then call it with the service-role client.
 - **Videos RLS:** Anon only sees `is_visible = true`; admin/editor see all.
 - **Assets RLS:** Full catalogue is staff-only (`can_view_admin_panel` or admin/editor). Anon/public may only read rows with `is_press_approved AND downloadable_for_press`.
 - **EPK public read:** No direct anon SELECT on `artist_epks` (would expose `epk_password_hash`). Public/press EPK is loaded server-side with the service role and an explicit column whitelist (`PUBLIC_EPK_COLUMNS`).
@@ -48,7 +49,8 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 - **External API rate limiting** — all calls to external APIs (iTunes, Spotify, Discogs, Songkick) go through `withExponentialBackoff()` from `src/lib/rateLimiter.ts`. This prevents runaway requests and provides graceful handling of HTTP 429 / 5xx responses.
 - **External API credentials** (Spotify, Discogs, Resend, YouTube, MailerLite, etc.) are stored AES-256-GCM encrypted in the Supabase `api_credentials` table (admin-only RLS). The encryption master key `API_CREDENTIALS_ENCRYPTION_KEY` lives only in Vercel env (or `.env.local` locally) — never in Supabase, never in `site_settings`, never sent to the browser. Admin UI (`/admin/api-keys`) never receives decrypted values on GET; decryption happens server-side only in Route Handlers via `src/lib/secrets/getExternalCredentials.ts`. Supabase/Cloudflare bootstrap secrets and infra tokens (`CRON_SECRET`, `REVALIDATE_SECRET`) remain in env vars.
 - **Image caching** — external cover art images are downloaded server-side and uploaded to Cloudflare R2. The browser only ever loads images from R2 (via wsrv.nl proxy). External image URLs are never stored in the database or sent to the browser.
-- **Rich-text messaging sanitization** — `label_messages.body_html` and `artist_replies.body_html` store formatted content. Every render path sanitizes the HTML with `sanitizeHtml()` from `src/lib/sanitizeHtml.ts`, which applies a regex-based server-safe pass during SSR and delegates to DOMPurify on the client, before using `dangerouslySetInnerHTML`. This covers both the initial server-rendered response and the client hydration, reducing XSS risk across the admin inbox, artist portal, and all other rich-text surfaces (bio fields, privacy policy, about page).
+- **Rich-text messaging sanitization** — `label_messages.body_html` and `artist_replies.body_html` store formatted content. Every render path sanitizes the HTML with `sanitizeHtml()` from `src/lib/sanitizeHtml.ts` before `dangerouslySetInnerHTML`. Server and browser both use DOMPurify (the server borrows a DOM from `jsdom`). This covers bios, news, privacy policy, the about page, and the inbox.
+- **Press file links** — journalist stream and download actions sign only a stored promo-track key, a press-approved downloadable asset key, or an `is_promo` cover/preview. The signed value is the stored one, never the caller string. A future embargo is refused. An NDA download is refused unless the checkbox action minted a short-lived HMAC for that user and key. A self-inserted download row is not enough.
 - Dependencies are kept up to date. Run `npm audit` before adding new packages.
 
 ## Known residual risks
@@ -77,10 +79,11 @@ IP rate limiter (`src/lib/ipRateLimit.ts`) in addition to other guards:
 
 | Route | Limit | Window | Notes |
 |---|---|---|---|
-| `/api/contact` | 5 requests | 10 minutes | + honeypot field |
-| `/api/journalist-applications` | 3 requests | 30 minutes | POST only |
+| `/api/contact` | 5 requests | 10 minutes | distributed when Upstash is set; + honeypot field |
+| `/api/journalist-applications` | 3 requests | 30 minutes | POST only; distributed when Upstash is set |
 | `/api/page-events` | 120 requests | 10 minutes | Consent-gated analytics only; service-role insert |
 | `/api/vitals` | 120 requests | 10 minutes | Critical vitals logged to `app_logs` |
+| `/api/log-error` | 60 / user+IP or anon+IP | 10 minutes | Session optional; always 204; body cap 20 KB |
 | `/api/portal/cover-art-check` | 30 / user+IP | 10 minutes | `checkDistributedRateLimit` |
 | `/api/portal/submit-release` | 20 / user+IP | 10 minutes | distributed (Upstash when configured) |
 | `/api/portal/submit-video` | 20 / user+IP | 10 minutes | distributed (Upstash when configured) |

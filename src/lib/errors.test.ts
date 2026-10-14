@@ -15,6 +15,12 @@ vi.mock('@/lib/appLog', () => ({
   writeAppLog: mockWriteAppLog,
 }))
 
+vi.mock('@vercel/functions', () => ({
+  waitUntil: (promise: Promise<unknown>) => {
+    void promise
+  },
+}))
+
 vi.mock('@/lib/routeUserContext', () => ({
   extractRouteUserContext: vi.fn().mockResolvedValue({ userId: 'user-123', userRole: 'portal' }),
 }))

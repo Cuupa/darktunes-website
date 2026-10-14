@@ -92,8 +92,8 @@ export function PrivacyClient({ email }: Props) {
             Delete My Account
           </CardTitle>
           <CardDescription>
-            Permanently delete your account and all associated data. This action cannot be
-            undone. Admin accounts cannot be deleted via self-service.
+            Close your login. Your email and display name are anonymised and sign-in is
+            blocked. Invoices and statements are kept. Admin accounts cannot use this.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -242,6 +242,41 @@ describe('applyTrackRevenueAssignments', () => {
     expect(rows.map((r) => r.main_artist).sort()).toEqual(['Alpha', 'Beta'])
   })
 
+  it('does not treat a short title as part of a longer title', () => {
+    const rows = applyTrackRevenueAssignments(
+      [{ ...makeTx({ id: 't1', track_title: 'Nightfall', release_title: 'Album' }), main_artist: 'Neuroklast' }],
+      [{
+        id: 'a1',
+        trackTitle: 'Night',
+        owners: [{ artist: 'Thief', percentage: 100 }],
+      }],
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.main_artist).toBe('Neuroklast')
+  })
+
+  it('lets the longer exact title win when track and release rules both match', () => {
+    const rows = applyTrackRevenueAssignments(
+      [{ ...makeTx({ id: 't1', track_title: 'EP', release_title: 'Nightfall' }), main_artist: 'Neuroklast' }],
+      [
+        { id: 'short', trackTitle: 'EP', owners: [{ artist: 'Short', percentage: 100 }] },
+        { id: 'long', trackTitle: 'Nightfall', owners: [{ artist: 'Long', percentage: 100 }] },
+      ],
+    )
+    expect(rows[0]?.main_artist).toBe('Long')
+  })
+
+  it('prefers the track title when both exact rules are the same length', () => {
+    const rows = applyTrackRevenueAssignments(
+      [{ ...makeTx({ id: 't1', track_title: 'Cut', release_title: 'Bar' }), main_artist: 'Neuroklast' }],
+      [
+        { id: 'rel', trackTitle: 'Bar', owners: [{ artist: 'ReleaseOwner', percentage: 100 }] },
+        { id: 'trk', trackTitle: 'Cut', owners: [{ artist: 'TrackOwner', percentage: 100 }] },
+      ],
+    )
+    expect(rows[0]?.main_artist).toBe('TrackOwner')
+  })
+
   it('does not leak revenue when owner percentages do not sum to 100', () => {
     const original = { ...makeTx({ id: 't1', net_revenue: 100 }), main_artist: 'Neuroklast' }
     const rows = applyTrackRevenueAssignments(

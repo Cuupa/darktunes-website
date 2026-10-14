@@ -2,10 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import {
   computeCarryForwardOpeningBalance,
-  getLedgerEntriesForArtist,
   getOutstandingBalancesForPeriod,
   resolveCarryStatementBalance,
-  sumLedgerBalance,
   unpaidInvoiceContributionCents,
   type CarryForwardBreakdown,
 } from '@/lib/api/settlementLedger'
@@ -182,26 +180,61 @@ export async function computeCarryForwardBalances(
   }> = []
 
   const artistIds = [...new Set((statements ?? []).map((s) => s.artist_id))]
+  if (artistIds.length === 0) return results
+
+  // Batch the per-artist loads (previously one ledger + one invoice query per
+  // artist). Only the `carry_out` bookkeeping written by this close is excluded
+  // so the recomputed opening balance stays stable on a retry; a period's
+  // incoming `carry_in` from the previous close IS part of its balance.
+  const { data: ledgerRows, error: ledgerError } = await db
+    .from('artist_settlement_ledger')
+    .select('artist_id, entry_type, amount_eur')
+    .eq('settlement_period_id', periodId)
+    .in('artist_id', artistIds)
+  if (ledgerError) throw new Error(ledgerError.message)
+
+  const { data: invoiceRows, error: invoiceError } = await db
+    .from('artist_invoices')
+    .select('artist_id, line_items, paid_amount_cents, outstanding_amount_cents, status')
+    .eq('settlement_period_id', periodId)
+    .in('artist_id', artistIds)
+  if (invoiceError) throw new Error(invoiceError.message)
+
+  const statementsByArtist = new Map<string, NonNullable<typeof statements>>()
+  for (const statement of statements ?? []) {
+    const list: NonNullable<typeof statements> = statementsByArtist.get(statement.artist_id) ?? []
+    list.push(statement)
+    statementsByArtist.set(statement.artist_id, list)
+  }
+
+  const ledgerByArtist = new Map<string, { balanceEur: number; entryCount: number }>()
+  for (const row of ledgerRows ?? []) {
+    if (row.entry_type === 'carry_out') continue
+    const current = ledgerByArtist.get(row.artist_id) ?? { balanceEur: 0, entryCount: 0 }
+    current.balanceEur += Number(row.amount_eur)
+    current.entryCount += 1
+    ledgerByArtist.set(row.artist_id, current)
+  }
+
+  const invoicesByArtist = new Map<string, NonNullable<typeof invoiceRows>>()
+  for (const invoice of invoiceRows ?? []) {
+    const list: NonNullable<typeof invoiceRows> = invoicesByArtist.get(invoice.artist_id) ?? []
+    list.push(invoice)
+    invoicesByArtist.set(invoice.artist_id, list)
+  }
 
   for (const artistId of artistIds) {
-    const artistStatements = (statements ?? []).filter((s) => s.artist_id === artistId)
+    const artistStatements = statementsByArtist.get(artistId) ?? []
     const statementBalance = artistStatements.reduce((sum, s) => {
       if (['paid', 'invoiced', 'acknowledged'].includes(s.status)) return sum
       return sum + Number(s.amount_eur ?? 0)
     }, 0)
 
-    const ledgerEntries = await getLedgerEntriesForArtist(db, artistId, periodId)
-    const ledgerBalance = sumLedgerBalance(ledgerEntries)
-
-    const { data: invoices } = await db
-      .from('artist_invoices')
-      .select('line_items, paid_amount_cents, outstanding_amount_cents, status, tax_rate_pct')
-      .eq('artist_id', artistId)
-      .eq('settlement_period_id', periodId)
+    const ledger = ledgerByArtist.get(artistId) ?? { balanceEur: 0, entryCount: 0 }
 
     let unpaidInvoiceCents = 0
     let partialRemainder = 0
-    for (const inv of invoices ?? []) {
+    for (const inv of invoicesByArtist.get(artistId) ?? []) {
       const contribution = unpaidInvoiceContributionCents(inv)
       if (contribution <= 0) continue
       if (Number(inv.paid_amount_cents ?? 0) > 0) partialRemainder += contribution
@@ -210,8 +243,8 @@ export async function computeCarryForwardBalances(
 
     const breakdown: CarryForwardBreakdown = {
       statementBalanceEur: resolveCarryStatementBalance(
-        ledgerEntries.length > 0,
-        ledgerBalance,
+        ledger.entryCount > 0,
+        ledger.balanceEur,
         statementBalance,
       ),
       unpaidInvoiceCents,
@@ -234,9 +267,15 @@ export async function archivePeriodWithCarryForward(
   nextPeriodStart: string,
   nextPeriodEnd: string,
 ): Promise<void> {
-  const { archiveSettlementPeriod } = await import('@/lib/api/settlementPeriods')
+  const { archiveSettlementPeriod, getOrCreateSettlementPeriod, getSettlementPeriodById } =
+    await import('@/lib/api/settlementPeriods')
   const { createPeriodCarryForwards, appendLedgerEntry } = await import('@/lib/api/settlementLedger')
-  const { getOrCreateSettlementPeriod } = await import('@/lib/api/settlementPeriods')
+
+  // Idempotent close: an already-archived period must not post a second
+  // carry-out on retry or double-click (#628 / contract §A.5).
+  const period = await getSettlementPeriodById(db, periodId)
+  if (!period) throw new Error('Settlement period not found')
+  if (period.status === 'archived') return
 
   const balances = await computeCarryForwardBalances(db, periodId)
   await createPeriodCarryForwards(db, periodId, balances, actorId)
@@ -269,16 +308,22 @@ export async function archivePeriodWithCarryForward(
       continue
     }
 
-    await appendLedgerEntry(db, {
-      artistId: row.artistId,
-      settlementPeriodId: nextPeriod.id,
-      entryType: 'carry_in',
-      amountEur: row.openingBalanceEur,
-      referenceType: 'settlement_period',
-      referenceId: periodId,
-      description: 'Opening balance from previous period',
-      createdBy: actorId,
-    })
+    try {
+      await appendLedgerEntry(db, {
+        artistId: row.artistId,
+        settlementPeriodId: nextPeriod.id,
+        entryType: 'carry_in',
+        amountEur: row.openingBalanceEur,
+        referenceType: 'settlement_period',
+        referenceId: periodId,
+        description: 'Opening balance from previous period',
+        createdBy: actorId,
+      })
+    } catch (err) {
+      // A concurrent close already posted this carry_in (unique carry index);
+      // fall through and make sure the metadata row is linked.
+      if ((err as { code?: string }).code !== '23505') throw err
+    }
 
     const { error: linkError } = await db
       .from('period_carry_forwards')

@@ -48,6 +48,9 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   await updateImportBatchStatus(serviceSupabase, id, 'processing')
 
   try {
+    // shortcut: the whole R2 object is decoded to one string and parsed in
+    // memory; safe for the ~60-70 MB reference exports, revisit before the 1 GB
+    // cap is used in production (stream the parse instead).
     const csvContent = await downloadObjectFromR2(batch.r2Key, s3, serverEnv.CLOUDFLARE_R2_BUCKET_NAME)
     const workspace = await getWorkspaceForPeriod(
       serviceSupabase,

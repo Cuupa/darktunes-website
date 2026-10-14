@@ -122,6 +122,37 @@ export function buildFilteredCompilations(
 
 type ResolvedTransaction = SalesTransaction & { main_artist: string }
 
+function normalizeMatchTitle(value: string | null | undefined): string {
+  return (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+/**
+ * Exact title match only. A rule for "Cut" must not take "Haircut".
+ * When a track-title rule and a release-title rule both hit, the longer rule wins.
+ * Equal length prefers the track title. Same length and same side keeps array order.
+ */
+function pickTrackAssignment(
+  assignments: TrackRevenueAssignment[],
+  releaseTitle: string | null | undefined,
+  trackTitle: string | null | undefined,
+): TrackRevenueAssignment | undefined {
+  const rel = normalizeMatchTitle(releaseTitle)
+  const trk = normalizeMatchTitle(trackTitle)
+  let best: { rule: TrackRevenueAssignment; score: number } | undefined
+
+  for (const rule of assignments) {
+    const needle = normalizeMatchTitle(rule.trackTitle)
+    if (!needle) continue
+    const trackHit = trk !== '' && needle === trk
+    const releaseHit = rel !== '' && needle === rel
+    if (!trackHit && !releaseHit) continue
+    const score = needle.length * 2 + (trackHit ? 1 : 0)
+    if (!best || score > best.score) best = { rule, score }
+  }
+
+  return best?.rule
+}
+
 /**
  * Applies track revenue assignment rules (multi-owner splits clone transactions).
  */
@@ -132,14 +163,7 @@ export function applyTrackRevenueAssignments(
   if (trackAssignments.length === 0) return resolved
 
   return resolved.flatMap(t => {
-    const relLower = (t.release_title ?? '').toLowerCase()
-    const trkLower = (t.track_title ?? '').toLowerCase()
-    const match = trackAssignments.find(
-      a =>
-        a.trackTitle.trim() !== '' &&
-        (relLower.includes(a.trackTitle.trim().toLowerCase()) ||
-          trkLower.includes(a.trackTitle.trim().toLowerCase())),
-    )
+    const match = pickTrackAssignment(trackAssignments, t.release_title, t.track_title)
 
     if (!match) return [t]
 

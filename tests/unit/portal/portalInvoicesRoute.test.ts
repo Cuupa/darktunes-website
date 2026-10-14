@@ -28,6 +28,13 @@ class DuplicateStatementInvoiceError extends Error {
   }
 }
 
+class DuplicateInvoiceNumberError extends Error {
+  constructor() {
+    super('An invoice with this number already exists')
+    this.name = 'DuplicateInvoiceNumberError'
+  }
+}
+
 class SettlementPeriodNotWritableError extends Error {
   constructor(message = 'Settlement period is not writable') {
     super(message)
@@ -55,6 +62,7 @@ vi.mock('@/lib/api/artistInvoices', () => ({
   listArtistInvoices: (...args: unknown[]) => listArtistInvoices(...args),
   updateInvoice: (...args: unknown[]) => updateInvoice(...args),
   DuplicateStatementInvoiceError,
+  DuplicateInvoiceNumberError,
 }))
 
 vi.mock('@/lib/api/settlementLedger', () => ({

@@ -162,11 +162,11 @@ Health: `GET /api/health` defaults to **lite** (DB liveness); full dashboard sna
 
 ## Scheduled news publishing
 
-No Vercel Cron. Due posts (`status = scheduled`, `published_at <= now`) are promoted to `published` when `getCachedPublicNews()` revalidates (public homepage, `/news`, etc.). Admin saves trigger `revalidateTag('news')` via `useNews`.
+No Vercel Cron. Due posts (`status = scheduled`, `published_at <= now`) are promoted to `published` at the start of each `/api/sync` tick (service role). The public list still shows a due scheduled post before that tick. Admin saves trigger `revalidateTag('news')` via `useNews`. Do not promote from the anon public client — it cannot update `news_posts`.
 
 ## Emoji-free public text (a11y)
 
-User-facing text is stripped of emoji characters via `src/lib/stripEmojis.ts` on read (DAL mappers), write (DAL sanitizers), HTML display (`sanitizeHtml`), admin paste (TipTap + plain inputs), and a one-time `persistEmojiCleanup()` pass during public cache revalidation. Theme preset emoji pickers in admin are excluded.
+User-facing text is stripped of emoji characters via `src/lib/stripEmojis.ts` on read (DAL mappers), write (DAL sanitizers), HTML display (`sanitizeHtml`), admin paste (TipTap + plain inputs), and a one-time `persistEmojiCleanup()` pass during public cache revalidation. Theme preset emoji pickers in admin are excluded. `sanitizeHtml` runs DOMPurify on the server (via `jsdom`, created on first server call and kept on `globalThis`) and in the browser. The browser build resolves `darktunes-sanitize-html-server` to a stub (`next.config.ts` webpack alias and `turbopack.resolveAlias`). Do not import `@/lib/sanitizeHtml.server` from a client-imported file, and do not register the sanitizer only from `instrumentation.ts`.
 
 ## Hero featured limits
 

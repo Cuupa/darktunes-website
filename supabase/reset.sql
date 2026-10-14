@@ -6306,6 +6306,12 @@ BEGIN
 END;
 $$;
 
+-- Financial view tracking runs only through the portal route/action, which
+-- authorizes the artist membership before calling. Never expose it to anon or a
+-- user JWT via PostgREST RPC, or any caller could spoof views (#622).
+REVOKE ALL ON FUNCTION public.record_statement_view(UUID, UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.record_statement_view(UUID, UUID) TO service_role;
+
 -- ---------------------------------------------------------------------------
 -- FUNCTION: record_invoice_payment — atomic payment recording (#628).
 -- Locks the invoice row, validates status and the gross cap, and updates
@@ -6374,6 +6380,13 @@ BEGIN
   RETURN v_invoice;
 END;
 $$;
+
+-- Payments are admin-only. The route verifies the admin role, then calls this
+-- RPC with the service client; the RPC must never be executable by anon or a
+-- user JWT via PostgREST RPC, or any caller could mark arbitrary invoices paid
+-- (SECURITY DEFINER bypasses RLS) (#628).
+REVOKE ALL ON FUNCTION public.record_invoice_payment(UUID, UUID, BIGINT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.record_invoice_payment(UUID, UUID, BIGINT, TEXT, TEXT) TO service_role;
 
 ALTER TABLE public.artist_invoices ENABLE ROW LEVEL SECURITY;
 
@@ -7071,6 +7084,19 @@ CREATE TABLE IF NOT EXISTS public.artist_settlement_ledger (
 CREATE INDEX IF NOT EXISTS idx_settlement_ledger_artist    ON public.artist_settlement_ledger (artist_id);
 CREATE INDEX IF NOT EXISTS idx_settlement_ledger_period    ON public.artist_settlement_ledger (settlement_period_id);
 CREATE INDEX IF NOT EXISTS idx_settlement_ledger_ref       ON public.artist_settlement_ledger (reference_type, reference_id);
+
+-- Exactly one carry_in and one carry_out per (artist, source period). Makes a
+-- concurrent double-close idempotent at the database, not only in the app
+-- (#628 / contract §A.5). Skipped (not failed) when duplicate carry rows from
+-- the old race already exist; the settlement audit/repair tool clears those.
+DO $$
+BEGIN
+  CREATE UNIQUE INDEX IF NOT EXISTS artist_settlement_ledger_carry_unique
+    ON public.artist_settlement_ledger (artist_id, entry_type, reference_id)
+    WHERE entry_type IN ('carry_in', 'carry_out');
+EXCEPTION WHEN unique_violation THEN
+  RAISE NOTICE 'artist_settlement_ledger_carry_unique skipped: duplicate carry rows exist';
+END $$;
 
 UPDATE public.artist_settlement_ledger
   SET entry_type = 'carry_in'

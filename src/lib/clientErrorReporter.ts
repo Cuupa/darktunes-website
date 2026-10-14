@@ -3,38 +3,27 @@
 /**
  * src/lib/clientErrorReporter.ts
  *
- * Reports client-side errors to POST /api/log-error (authenticated users only).
+ * Reports client-side errors to POST /api/log-error.
+ * Prefers sendBeacon so a crash during navigation still lands. Best-effort,
+ * never throws. Session is optional — the ingest is public and rate-limited.
  */
 
-const DEBOUNCE_MS = 2_000
-const reportedFingerprints = new Set<string>()
+const endpoint = '/api/log-error'
+const windowMs = 60_000
+const maxPerWindow = 5
 
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
-const pendingReports: Array<{
-  source: string
-  message: string
-  level: 'error' | 'warn' | 'info'
-  details: Record<string, unknown>
-}> = []
+let windowStartedAt = 0
+let sentInWindow = 0
 
-function fingerprint(source: string, message: string): string {
-  return `${source}:${message.slice(0, 200)}`
-}
-
-async function flushPendingReports(): Promise<void> {
-  const batch = pendingReports.splice(0, pendingReports.length)
-  for (const report of batch) {
-    try {
-      await fetch('/api/log-error', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(report),
-        credentials: 'include',
-      })
-    } catch {
-      // Non-blocking — client logging is best-effort
-    }
-  }
+/** True only for errors that came from this site. Skips extensions and ResizeObserver noise. */
+export function shouldReportWindowError(
+  event: { filename?: string; message?: string },
+  origin: string,
+): boolean {
+  const message = event.message ?? ''
+  if (message.includes('ResizeObserver loop')) return false
+  if (!event.filename || !origin) return false
+  return event.filename.startsWith(origin)
 }
 
 export function reportClientError(
@@ -43,25 +32,47 @@ export function reportClientError(
   details?: Record<string, unknown>,
   level: 'error' | 'warn' | 'info' = 'error',
 ): void {
-  const message = error instanceof Error ? error.message : String(error)
-  const fp = fingerprint(source, message)
-  if (reportedFingerprints.has(fp)) return
-  reportedFingerprints.add(fp)
+  if (typeof window === 'undefined') return
 
-  pendingReports.push({
+  const now = Date.now()
+  if (now - windowStartedAt > windowMs) {
+    windowStartedAt = now
+    sentInWindow = 0
+  }
+  if (sentInWindow >= maxPerWindow) return
+  sentInWindow += 1
+
+  const message = error instanceof Error ? error.message : String(error)
+  const body = JSON.stringify({
     source,
-    message,
+    message: message.slice(0, 2000),
     level,
     details: {
       ...details,
-      stack: error instanceof Error ? (error.stack ?? null) : null,
-      path: typeof window !== 'undefined' ? window.location.pathname : null,
+      stack: error instanceof Error ? error.stack?.slice(0, 8000) ?? null : null,
+      path: window.location.pathname,
     },
   })
 
-  if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => {
-    debounceTimer = null
-    void flushPendingReports()
-  }, DEBOUNCE_MS)
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      const blob = new Blob([body], { type: 'application/json' })
+      if (navigator.sendBeacon(endpoint, blob)) return
+    }
+    void fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      credentials: 'include',
+      keepalive: true,
+    }).catch(() => undefined)
+  } catch {
+    // Reporting must never affect the app
+  }
+}
+
+/** Test-only — resets the client rate window. */
+export function _resetClientErrorReporterForTests(): void {
+  windowStartedAt = 0
+  sentInWindow = 0
 }

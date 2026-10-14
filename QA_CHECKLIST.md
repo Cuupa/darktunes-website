@@ -1,6 +1,18 @@
 # Pre-Release QA Checklist
 
 ## Functional Tests
+- [ ] Artist bio with `<svg/onload=alert(1)>` does not run script on the public artist page (view source has no `onload`)
+- [ ] News embed from YouTube still plays; an iframe to another host does not
+- [ ] Press promo pool: a track with a future embargo is absent; Stream of a known other R2 key (invoice path) does not return a URL
+- [ ] Press NDA track: preview still plays; download without the checkbox does not; download after the checkbox does
+- [ ] Accounting track rule "Night" does not take revenue from "Nightfall"
+- [ ] SEPA export of two uneven cent amounts: control total equals the sum of the payment lines
+- [ ] Account delete page does not say 7 days or permanent removal; after confirm, display name is "Deleted user" and invoices remain
+- [ ] A news post scheduled for a past time shows as published in admin after the next sync tick
+- [ ] Contact form: a filled hidden website field returns success and does not send mail; a burst above 5 in 10 minutes returns 429
+- [ ] Artist data export JSON includes invoices, billing profile, and statements for that artist, and no R2 key
+- [ ] A signed-in admin resizing a panel does not create a Zammad ticket for `ResizeObserver loop`
+- [ ] Promo download of a cover shared by two releases is logged on the release whose button was clicked
 - [ ] Validate all public routes load successfully (`/`, `/about`, `/artists`, `/releases`, `/news`, `/contact`, `/press`, `/offline`)
 - [ ] Crawl internal links and confirm no broken links / 404 pages
 - [ ] Validate dynamic routes for artist and release detail pages
@@ -181,10 +193,13 @@
 - [ ] Two tabs edit the same period workspace: the second save shows the conflict hint and does not overwrite; “Reload from server” restores the server revision. After reload, the Settlement Center opens an existing period from the database without a CSV upload, and archived sources can be loaded from the workspace hint
 - [ ] Publish a statement → the stored row carries `rules_fingerprint`, `fx_snapshot` and `calculation_snapshot` matching the exported payout (spot check one artist); a 0 % split stays 0 and a refund row lowers the payout instead of being clamped
 - [ ] Invoice submit retry (slow response/reload) with the same operation id returns the existing invoice; changing the payload with the same id returns 409; after a recovered partial create the PDF matches the stored row (no retry-payload values)
-- [ ] Two parallel payments (30 + 20 on a 100 EUR gross invoice) both persist (50 paid / 50 open, two ledger events); a retry after a follow-up failure does not add the amount again; archiving twice creates one carry per artist
+- [ ] Two parallel payments (30 + 20 on a 100 EUR gross invoice) both persist (50 paid / 50 open, two ledger events); a retry after a follow-up failure does not add the amount again; archiving twice (including two near-simultaneous requests) creates one `carry_out` and one `carry_in` per artist
 - [ ] Open an approved statement as artist → status becomes `viewed` once (counter +1); open the same statement again after the invoice is created → status stays `invoiced` (no downgrade)
 - [ ] Shopify order with two Printful cost rows → costs are summed (100 − 15 − 5 = 80), not last-wins; a self-fulfilled order without Printful costs stays at full net revenue
 - [ ] Editor account cannot publish a statement (`uploadStatement` → Forbidden: admin role required); admin works unchanged
+- [ ] With only the public anon key, `POST /rest/v1/rpc/record_invoice_payment` and `/rpc/record_statement_view` are refused (401/403, not 200); admin payment and artist statement view still work
+- [ ] Two invoices created back-to-back for the same artist/year both succeed with distinct `DT-YYYY-NNNN` numbers (no false “invoice for this statement already exists”)
+- [ ] Mark received is not offered for a draft invoice; `PATCH /api/admin/invoices/{id}/received` on a draft returns 4xx; a sent invoice still records
 - [ ] Invoice with a failing Resend key → status stays `draft`, `delivery_status='failed'` with the provider error visible; successful send → `sent` + `delivery_status='sent'`; no mail requested → `not_sent`; Settlement register and `/admin/invoices` show **Email failed** on that row
 - [ ] Upload one CSV → Checks lists the import result; Continue on Files enables only after numbers appear (no coach/playbook duplicate)
 - [ ] Block/throttle `/api/exchange-rates` → sticky fallback banner + Refresh; no crash on first process

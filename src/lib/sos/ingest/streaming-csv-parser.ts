@@ -1,4 +1,4 @@
-import Papa from 'papaparse'
+import Papa, { type ParseResult, type Parser } from 'papaparse'
 import type { SalesTransaction } from './csv-parser'
 import { mapCSVHeadersToModel } from './csv-parser'
 import { normalizeDateToMonth } from './normalizeDateToMonth'
@@ -28,8 +28,8 @@ export interface StreamingParseResult {
   emptyCurrencyRows: number
 }
 
-/** Rows to process per scheduler tick to keep the UI responsive. */
-const CHUNK_SIZE = 5000
+/** Characters per Papa stream chunk; bounds peak memory while parsing. */
+const CHUNK_SIZE = 4 * 1024 * 1024
 
 function isEmptyCsvRow(values: string[]): boolean {
   return values.every((cell) => !cell.trim())
@@ -265,69 +265,117 @@ export async function parseCSVContentStreaming(
     phase: 'tokenizing',
   })
 
-  const parsed = Papa.parse<string[]>(stripBOM(csvContent), {
-    delimiter: '',
-    skipEmptyLines: false,
-  })
-  const records = (parsed.data ?? []).map((row) =>
-    Array.isArray(row) ? row.map((cell) => String(cell ?? '')) : [String(row ?? '')],
-  )
+  const content = stripBOM(csvContent)
 
-  const firstNonEmpty = records.findIndex((row) => !isEmptyCsvRow(row))
-  if (firstNonEmpty === -1) {
-    return { transactions: [], uniqueArtists: [], errors: [], skipped: [], emptyCurrencyRows: 0 }
+  // Line count is an upper-bound estimate (quoted newlines inflate it); good
+  // enough for the progress denominator while streaming.
+  let totalRows = 0
+  for (let i = 0; i < content.length; i++) {
+    if (content.charCodeAt(i) === 10) totalRows++
   }
-
-  const headers = records[firstNonEmpty].map((header) => header.trim())
-
-  if (headers.length === 0 || headers.every((header) => !header)) {
-    return {
-      transactions: [],
-      uniqueArtists: [],
-      errors: [{ row: 1, reason: 'Empty header row', data: '' }],
-      skipped: [],
-      emptyCurrencyRows: 0,
-    }
-  }
-
-  const mapping = columnMapping ?? mapCSVHeadersToModel(headers, customAliases)
-  const dataRows = records.slice(firstNonEmpty + 1)
-  const totalRows = dataRows.length
-  let processedRows = 0
 
   // Short random tag to make transaction IDs unique across multiple parse calls.
   const parseTag = `${source}-${Math.random().toString(36).slice(2, 8)}`
 
-  for (let i = 0; i < dataRows.length; i += CHUNK_SIZE) {
-    const chunk = dataRows.slice(i, i + CHUNK_SIZE)
+  // True streaming: Papa feeds the string in CHUNK_SIZE pieces and drops each
+  // piece after the callback, so we never materialize the full row array.
+  return await new Promise<StreamingParseResult>((resolve, reject) => {
+    let headers: string[] | null = null
+    let mapping: Record<string, string> | null = null
+    let sawHeader = false
+    let sawAnyRow = false
+    let processedRows = 0
 
-    // Yield to the event loop between chunks
-    await new Promise<void>(resolve => setTimeout(resolve, 0))
+    Papa.parse<string[]>(content, {
+      delimiter: '',
+      skipEmptyLines: false,
+      chunkSize: CHUNK_SIZE,
+      chunk: (results: ParseResult<string[]>, papa: Parser) => {
+        const rows = (results.data ?? []).map((row) =>
+          Array.isArray(row) ? row.map((cell) => String(cell ?? '')) : [String(row ?? '')],
+        )
 
-    const result = processChunk(chunk, headers, mapping, source, processedRows, parseTag)
+        const dataRows: string[][] = []
+        for (const row of rows) {
+          // Leading blank lines before the header are ignored, like the old
+          // findIndex(!isEmptyCsvRow) behaviour.
+          if (!sawAnyRow && isEmptyCsvRow(row)) continue
 
-    for (const t of result.transactions) allTransactions.push(t)
-    result.artists.forEach(a => uniqueArtistsSet.add(a))
-    for (const e of result.errors) allErrors.push(e)
-    for (const skip of result.skipped) allSkipped.push(skip)
-    emptyCurrencyRows += result.emptyCurrencyRows
+          if (!sawHeader) {
+            sawAnyRow = true
+            const headerCells = row.map((header) => header.trim())
+            headers = headerCells
+            sawHeader = true
+            if (headerCells.length === 0 || headerCells.every((header) => !header)) {
+              papa.abort()
+              // abort from inside the chunk callback skips `complete`, so settle here.
+              resolve({
+                transactions: [],
+                uniqueArtists: [],
+                errors: [{ row: 1, reason: 'Empty header row', data: '' }],
+                skipped: [],
+                emptyCurrencyRows: 0,
+              })
+              return
+            }
+            mapping = columnMapping ?? mapCSVHeadersToModel(headerCells, customAliases)
+            continue
+          }
 
-    processedRows += chunk.length
+          sawAnyRow = true
+          dataRows.push(row)
+        }
 
-    onProgress?.({
-      processedRows,
-      totalRows,
-      percentage: totalRows > 0 ? Math.round((processedRows / totalRows) * 100) : 100,
-      isComplete: processedRows >= totalRows,
-      phase: 'parsing',
+        if (!sawHeader || !headers || !mapping || dataRows.length === 0) return
+
+        const result = processChunk(dataRows, headers, mapping, source, processedRows, parseTag)
+
+        for (const t of result.transactions) allTransactions.push(t)
+        result.artists.forEach((a) => uniqueArtistsSet.add(a))
+        for (const e of result.errors) allErrors.push(e)
+        for (const skip of result.skipped) allSkipped.push(skip)
+        emptyCurrencyRows += result.emptyCurrencyRows
+
+        processedRows += dataRows.length
+
+        onProgress?.({
+          processedRows,
+          totalRows,
+          percentage:
+            totalRows > 0 ? Math.min(99, Math.round((processedRows / totalRows) * 100)) : 0,
+          isComplete: false,
+          phase: 'parsing',
+        })
+      },
+      complete: () => {
+        if (!sawHeader) {
+          resolve({
+            transactions: [],
+            uniqueArtists: [],
+            errors: [],
+            skipped: [],
+            emptyCurrencyRows: 0,
+          })
+          return
+        }
+
+        onProgress?.({
+          processedRows,
+          totalRows: Math.max(totalRows, processedRows),
+          percentage: 100,
+          isComplete: true,
+          phase: 'parsing',
+        })
+
+        resolve({
+          transactions: allTransactions,
+          uniqueArtists: Array.from(uniqueArtistsSet).sort(),
+          errors: allErrors,
+          skipped: allSkipped,
+          emptyCurrencyRows,
+        })
+      },
+      error: (err: Error) => reject(err instanceof Error ? err : new Error(String(err))),
     })
-  }
-
-  return {
-    transactions: allTransactions,
-    uniqueArtists: Array.from(uniqueArtistsSet).sort(),
-    errors: allErrors,
-    skipped: allSkipped,
-    emptyCurrencyRows,
-  }
+  })
 }
