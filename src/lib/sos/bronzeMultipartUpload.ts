@@ -3,7 +3,6 @@ import {
   AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
-  UploadPartCommand,
 } from '@aws-sdk/client-s3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getImportBatchById } from '@/lib/api/distributorImportBatches'
@@ -60,26 +59,6 @@ export async function initBronzeMultipartUpload(
   )
   if (!result.UploadId) throw new ApiError(500, 'Failed to start multipart upload')
   return result.UploadId
-}
-
-export async function uploadBronzeMultipartPart(
-  ctx: BronzeMultipartR2Context,
-  r2Key: string,
-  uploadId: string,
-  partNumber: number,
-  body: Buffer,
-): Promise<string> {
-  const result = await ctx.s3.send(
-    new UploadPartCommand({
-      Bucket: ctx.bucket,
-      Key: r2Key,
-      UploadId: uploadId,
-      PartNumber: partNumber,
-      Body: body,
-    }),
-  )
-  if (!result.ETag) throw new ApiError(500, 'Missing ETag from upload part')
-  return result.ETag
 }
 
 export async function completeBronzeMultipartUpload(

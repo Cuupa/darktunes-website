@@ -606,3 +606,9 @@ Server-Proxy-Einzelrequest ≤ 4 MB ohne Multipart (`src/lib/sos/bronzeUploadLim
 | 2026-09-21 | Berechnung: Sampler bleibt in der Auszahlung; Ignorieren entfernt Zeilen; Track-Split nur bei 100 %; globale Believe/Bandcamp-Splits schlagen Künstler-Digital-% ohne `sourceOverrides`. Referenztests: `calculationReference.test.ts` |
 | 2026-09-21 | Excel-Export: max. 1 Build; Raw ohne Worker-Blob nicht als Summary herunterladen; `inputRevision` verwirft veraltete Workbooks; ZIP abbrechbar |
 | 2026-09-17 | Erstfassung auf Basis main `701155a3` (Review-Basis `5e2abf0a`); Status-/Aktionsvertrag, Bildschirmzustände, Invalidierung, Berechtigungen, Zahlungen, Leistung |
+| 2026-09-24 | `record_invoice_payment`/`record_statement_view` sind service-role-only (REVOKE von PUBLIC/anon/authenticated, GRANT an service_role); Aufrufer nutzen den Service-Client (§D.3) |
+| 2026-09-24 | Periodenabschluss idempotent: eine bereits archivierte Periode wird nicht erneut abgeschlossen, genau ein `carry_out` je `(from_period, artist)` (§A.5) |
+| 2026-09-24 | Partieller Unique-Index `artist_settlement_ledger_carry_unique` auf Carry-Zeilen macht auch zwei gleichzeitige Abschluss-Requests idempotent (DB statt nur App-Logik) (§A.5) |
+| 2026-09-24 | Rechnungsnummer (MAX+1) wird bei Unique-Kollision neu vergeben; Nummern-Constraint wird vom Statement-Index unterschieden (§A.4) |
+| 2026-09-24 | `received` nur aus `sent` (§A.4) |
+| 2026-09-24 | CSV-Parsing läuft echt gestreamt (Papa-Chunk statt vollständigem Row-Array); Carry-forward-Berechnung lädt je Periode gebündelt statt je Künstler (§F) |

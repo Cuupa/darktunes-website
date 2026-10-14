@@ -37,6 +37,17 @@ export interface PromoTrack {
   createdAt: string
 }
 
+/** True when the track must not be streamed or listed for press yet. */
+export function isPromoEmbargoActive(
+  embargoUntil: string | null | undefined,
+  nowMs = Date.now(),
+): boolean {
+  if (!embargoUntil) return false
+  const at = Date.parse(embargoUntil)
+  if (Number.isNaN(at)) return true
+  return at > nowMs
+}
+
 function rowToPromoTrack(row: PromoTrackRow): PromoTrack {
   const r = row as PromoTrackRow & {
     genre?: string | null

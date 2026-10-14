@@ -891,7 +891,7 @@
     "selectArtistPlaceholder": "Sélectionner un artiste…",
     "enterArtistManually": "Saisir manuellement…",
     "artistNamePlaceholder": "Nom de l’artiste",
-    "trackTitleRequired": "Saisissez une sous-chaîne de titre de piste ou de release à faire correspondre.",
+    "trackTitleRequired": "Saisissez le titre complet de la piste ou de la release à faire correspondre.",
     "trackOwnerRequired": "Ajoutez au moins un artiste propriétaire.",
     "trackPercentLabel": "Part %",
     "pdfTopCountriesLabel": "Max. de pays affichés",

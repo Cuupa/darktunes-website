@@ -235,6 +235,11 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-10-09 — A regex is not a sanitizer, and a key string is not a permission
+
+- **Finding:** The server HTML cleaner searched for ` onload=` with a space in front. `<svg/onload=alert(1)>` survived into the first HTML, and the browser ran it before React started. Press actions then signed whatever R2 key the caller sent, so a journalist could request an invoice key.
+- **Rule:** Run DOMPurify on the server render too. `linkedom` is not enough for DOMPurify 3 (it returns the dirty string). Use jsdom, registered at startup so the client bundle does not import it. If that window is missing, escape `<` and `>`. Sign a stored key, never the caller string.
+
 ### 2026-09-22 — “Fail closed” still needs a way out
 
 - **Finding:** Raw-on Excel failed closed on `EXCEL_WORKER_DATA_MISSING` / `EXCEL_ARTIST_NOT_IN_WORKER`, but the operator only got an error toast — no file and no retry path, even though the worker rows are rebuilt by re-processing the loaded files.
@@ -531,6 +536,16 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 **Summing `assets.size_bytes` is not R2 usage:** Cover art, statements, invoices, bronze CSVs and orphans live outside the catalog. A storage bar must list the bucket (`ListObjectsV2`) and cache a snapshot. Garbage collection must collect keys from URL columns and HTML/JSON, not only `r2_key`, or it will delete live cover art. Overwrite the same object key when recompressing so published URLs stay valid.
 
+### 2026-09-24 — SECURITY DEFINER defaults to PUBLIC EXECUTE
+
+**A `SECURITY DEFINER` function is world-callable until you revoke it:** Postgres grants `EXECUTE` on new functions to `PUBLIC`, and PostgREST exposes `public` RPCs, so `record_invoice_payment` and `record_statement_view` could be called with the public anon key — bypassing RLS to mark arbitrary invoices paid or spoof statement views. Every privileged RPC must `REVOKE ... FROM PUBLIC, anon, authenticated` and `GRANT ... TO service_role`, and the calling route must authorize the user then call it with the service-role client.
+
+**A retried money operation must be idempotent at the ledger, not only the status:** Archiving a period twice re-appended the `carry_out` row because only the next period's `carry_in` was guarded. Guard each bookkeeping row per `(period, artist)`, return early for an already-final state, and back the guard with a partial unique index — a status read followed by a write is a race, so two concurrent requests both read "open" and both post.
+
+**MAX+1 invoice numbers race under concurrency:** Two creates read the same maximum; the loser must retry with a fresh number, and the unique-violation handler must tell the invoice-number constraint apart from the "one invoice per statement" index instead of mislabelling one as the other.
+
+**"Streaming" that builds the whole array first is not streaming:** `parseCSVContentStreaming` called `Papa.parse(content)` (no chunk callback), so a 68 MB export materialized every row before processing. Papa's `chunk` callback works for string input once `chunkSize` is set — use it so only the current chunk is retained.
+
 ---
 
-*Last updated: 2026-09-23*
+*Last updated: 2026-09-24*

@@ -6,6 +6,7 @@ import { getBillingProfile, isBillingProfileComplete } from '@/lib/api/artistBil
 import {
   createArtistInvoice,
   createSosLinkedInvoice,
+  DuplicateInvoiceNumberError,
   DuplicateStatementInvoiceError,
   getAdminInvoiceById,
   getArtistInvoiceByStatementId,
@@ -338,9 +339,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   // A recovered row keeps its persisted number so PDF, mails and ledger stay consistent.
   const artistInvoiceNumber =
     recoveredInvoice?.artistInvoiceNumber ?? input.artist_invoice_number
-  const internalInvoiceNumber = recoveredInvoice
-    ? recoveredInvoice.invoiceNumber
-    : await write('artist_invoices', 'select', (db) => generateInvoiceNumber(db, artist.id))
   const taxStatus = billingProfile.taxStatus
   const effectiveTaxRate = taxRateForStatus(taxStatus, input.tax_rate_pct)
 
@@ -366,7 +364,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const invoicePayload = {
     artistId: artist.id,
-    invoiceNumber: internalInvoiceNumber,
     artistInvoiceNumber: input.artist_invoice_number,
     clientName,
     clientEmail,
@@ -407,27 +404,39 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }
   }
 
-  let invoice: ArtistInvoice
-  if (recoveredInvoice) {
-    invoice = recoveredInvoice
-  } else {
-    try {
-      invoice = statement
-        ? await write('artist_invoices', 'insert', (db) =>
-            createSosLinkedInvoice(db, {
-              ...invoicePayload,
-              statementId: statement.id,
-              settlementPeriodId,
-            }),
-          )
-        : await write('artist_invoices', 'insert', (db) => createArtistInvoice(db, invoicePayload))
-    } catch (err) {
-      if (err instanceof DuplicateStatementInvoiceError) {
-        throw new ApiError(409, err.message)
+  // The internal DT-YEAR-NNNN number is MAX+1, so two concurrent creates can
+  // pick the same number. Retry with a fresh number on a number collision
+  // instead of failing the artist's request (#621).
+  const MAX_NUMBER_ATTEMPTS = 3
+  const insertInvoice = async (): Promise<ArtistInvoice> => {
+    for (let attempt = 1; ; attempt++) {
+      const internalInvoiceNumber = await write('artist_invoices', 'select', (db) =>
+        generateInvoiceNumber(db, artist.id),
+      )
+      try {
+        return statement
+          ? await write('artist_invoices', 'insert', (db) =>
+              createSosLinkedInvoice(db, {
+                ...invoicePayload,
+                invoiceNumber: internalInvoiceNumber,
+                statementId: statement.id,
+                settlementPeriodId,
+              }),
+            )
+          : await write('artist_invoices', 'insert', (db) =>
+              createArtistInvoice(db, { ...invoicePayload, invoiceNumber: internalInvoiceNumber }),
+            )
+      } catch (err) {
+        if (err instanceof DuplicateStatementInvoiceError) {
+          throw new ApiError(409, err.message)
+        }
+        if (err instanceof DuplicateInvoiceNumberError && attempt < MAX_NUMBER_ATTEMPTS) continue
+        throw err
       }
-      throw err
     }
   }
+
+  const invoice: ArtistInvoice = recoveredInvoice ?? (await insertInvoice())
 
   // A recovered invoice keeps its persisted stand: the PDF must never mix the
   // stored document with values from the retry request (#621).

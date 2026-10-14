@@ -433,8 +433,8 @@ export interface RevenueOwner {
  * A rule that assigns revenue from a specific track/release to one or more
  * owner artists, regardless of the artist name stored in the CSV.
  *
- * Matching is a case-insensitive substring check against both `release_title`
- * and `track_title` of every transaction.  When a match is found the
+ * Matching is an exact case-insensitive title check against `release_title`
+ * or `track_title`. A short title does not match a longer one. When a match is found the
  * transaction is re-attributed — exclusively to the single ownerArtist (legacy)
  * or split proportionally among multiple owners (new) — before any roster
  * filtering or grouping happens.
@@ -442,8 +442,8 @@ export interface RevenueOwner {
 export interface TrackRevenueAssignment {
   id: string
   /**
-   * Substring of the release or track title to match (case-insensitive).
-   * The first matching rule wins.
+   * Full release or track title to match (case-insensitive, extra spaces ignored).
+   * The longer exact rule wins. Equal length prefers the track title.
    */
   trackTitle: string
   /**

@@ -69,7 +69,7 @@ describe('useSettlementCenter', () => {
 
   it('keeps a load error instead of looking empty', async () => {
     vi.mocked(monthToPeriodDate).mockReturnValue('2026-01-01')
-    vi.mocked(fetchSettlementRegister).mockRejectedValueOnce(new Error('register down'))
+    vi.mocked(fetchSettlementRegister).mockRejectedValue(new Error('register down'))
 
     const { result } = renderHook(() => useSettlementCenter({
       revenues: [],

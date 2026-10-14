@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { getPromoStreamUrl } from '../../../app/press/dashboard/promo-pool/_actions/stream'
+import { acceptPromoTrackNda, getPromoTrackStreamUrl } from '@/actions/promoTrack'
 import { getJournalistDownloadUrl } from '../../../app/press/dashboard/_actions/download'
 import type { PromoTrack } from '@/lib/api/promoTracks'
 
@@ -53,7 +53,7 @@ export function PromoTrackPlayer({ track, audioPreviewEnabled = true }: PromoTra
         audioRef.current.pause()
         audioRef.current = null
       }
-      const { url } = await getPromoStreamUrl(track.r2Key)
+      const { url } = await getPromoTrackStreamUrl(track.r2Key)
       if (!url) {
         toast.error(t('streamError'))
         return
@@ -81,7 +81,16 @@ export function PromoTrackPlayer({ track, audioPreviewEnabled = true }: PromoTra
   const doDownload = async () => {
     setLoadingDownload(true)
     try {
-      const { url } = await getJournalistDownloadUrl(track.r2Key, null)
+      let ndaToken: string | undefined
+      if (track.ndaRequired) {
+        const accepted = await acceptPromoTrackNda(track.r2Key)
+        if (!accepted.token) {
+          toast.error(t('streamError'))
+          return
+        }
+        ndaToken = accepted.token
+      }
+      const { url } = await getJournalistDownloadUrl(track.r2Key, null, undefined, ndaToken)
       if (url) window.open(url, '_blank', 'noopener,noreferrer')
     } finally {
       setLoadingDownload(false)

@@ -9,9 +9,7 @@ import { reportClientError } from '@/lib/clientErrorReporter'
 
 export const ErrorFallback = ({ error, resetErrorBoundary }: FallbackProps) => {
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'development') {
-      reportClientError('ui', error, { boundary: 'ErrorFallback' })
-    }
+    reportClientError('ui', error, { boundary: 'ErrorFallback' })
   }, [error])
 
   if (process.env.NODE_ENV === 'development') throw error;

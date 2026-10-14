@@ -345,7 +345,7 @@ export function reconcileMerchTransactions(
     /** Map: artistName → accumulated net revenue */
     const artistNetMap = new Map<string, number>()
     /** Map: artistName → release titles (for transaction description) */
-    const artistReleasesMap = new Map<string, string[]>()
+    const artistReleasesMap = new Map<string, Set<string>>()
 
     for (const lineItem of order.lineItems) {
       const artist = extractArtistFromLineItem(lineItem.lineItemName) ?? LABEL_REVENUE_ARTIST
@@ -361,16 +361,15 @@ export function reconcileMerchTransactions(
 
       const releaseTitle = extractReleaseTitleFromLineItem(lineItem.lineItemName)
       if (releaseTitle) {
-        const existing = artistReleasesMap.get(artist) ?? []
-        if (!existing.includes(releaseTitle)) {
-          artistReleasesMap.set(artist, [...existing, releaseTitle])
-        }
+        const existing = artistReleasesMap.get(artist) ?? new Set<string>()
+        existing.add(releaseTitle)
+        artistReleasesMap.set(artist, existing)
       }
     }
 
     // ── Produce one SalesTransaction per artist per order ─────────────────
     for (const [artist, netRevenue] of artistNetMap.entries()) {
-      const releases = artistReleasesMap.get(artist) ?? []
+      const releases = [...(artistReleasesMap.get(artist) ?? [])]
       const releaseTitle = formatReleaseSummary(releases, order.orderId)
 
       transactions.push({

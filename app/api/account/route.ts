@@ -6,13 +6,10 @@
  *
  * Behaviour:
  *   - Validates the user is not an admin (admins must be deleted manually)
- *   - Sets profiles.deleted_at = NOW()
- *   - Anonymises the stored email to deleted-{userId}@anonymized.local
- *   - Bans the auth user to prevent further sign-ins (grace period)
- *   - Logs the deletion request in app_logs
- *
- * The actual auth.users row is intentionally kept during the grace period
- * (7 days). A scheduled job or manual admin action removes it afterwards.
+ *   - Anonymises the login email and display name
+ *   - Bans the auth user so they cannot sign in
+ *   - Keeps invoices, statements, and the auth user row
+ *   - Logs the request in app_logs
  */
 
 import { NextResponse } from 'next/server'
@@ -42,7 +39,7 @@ export const DELETE = withErrorHandler(async (): Promise<NextResponse> => {
     throw new ApiError(403, 'Admin accounts cannot be deleted via self-service. Contact your system administrator.')
   }
   if (profile.deleted_at) {
-    throw new ApiError(409, 'Account is already scheduled for deletion.')
+    throw new ApiError(409, 'This account is already closed.')
   }
 
   // 2. Perform soft-delete (requires service-role to update auth user)
@@ -58,5 +55,5 @@ export const DELETE = withErrorHandler(async (): Promise<NextResponse> => {
     details: { role: profile.role },
   })
 
-  return NextResponse.json({ success: true, message: 'Your account has been scheduled for deletion. You will be signed out shortly.' })
+  return NextResponse.json({ success: true, message: 'Your login email and display name are anonymised. You will be signed out shortly. Invoices and statements are kept.' })
 })

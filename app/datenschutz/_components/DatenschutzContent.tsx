@@ -18,9 +18,8 @@ function isHtml(str: string) {
  * Supports both HTML (produced by TiptapEditor) and legacy Markdown.
  * Isolated as a minimal 'use client' leaf so the parent RSC stays server-rendered.
  *
- * sanitizeHtml() runs a regex-based sanitizer on the server (SSR) and delegates
- * to DOMPurify on the client for comprehensive XSS protection on both render paths.
- * suppressHydrationWarning silences any minor attribute diff between the two passes.
+ * sanitizeHtml() runs DOMPurify on the server and in the browser.
+ * suppressHydrationWarning silences any minor attribute diff between the two DOMs.
  */
 export function DatenschutzContent({ content }: DatenschutzContentProps) {
   const html = useMemo(() => {

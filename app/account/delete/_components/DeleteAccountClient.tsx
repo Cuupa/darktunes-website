@@ -38,7 +38,7 @@ export function DeleteAccountClient({ email }: Props) {
         const err = (await res.json()) as { error?: string }
         throw new Error(err.error ?? 'Deletion failed')
       }
-      toast.success('Your account has been scheduled for deletion. Signing you out…')
+      toast.success('Your login is closed. Signing you out…')
       // Sign out from Supabase session
       const supabase = createBrowserSupabaseClient()
       await supabase.auth.signOut()
@@ -64,13 +64,12 @@ export function DeleteAccountClient({ email }: Props) {
 
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Deleting your account will:
+            Closing your login will:
           </p>
           <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-            <li>Anonymise your personal information</li>
-            <li>Prevent you from signing in immediately</li>
-            <li>Schedule permanent removal after a 7-day grace period</li>
-            <li>Retain audit records with your identity anonymised</li>
+            <li>Anonymise your login email and display name</li>
+            <li>Block sign-in immediately</li>
+            <li>Keep invoices and statements</li>
           </ul>
 
           <Separator />
@@ -84,11 +83,10 @@ export function DeleteAccountClient({ email }: Props) {
             />
             <div>
               <Label htmlFor="understood" className="text-sm font-medium cursor-pointer">
-                I understand this is permanent
+                I understand sign-in will be blocked
               </Label>
               <p id="understood-desc" className="text-xs text-muted-foreground mt-0.5">
-                This action cannot be undone. All your data will be anonymised and your
-                account will be permanently deleted.
+                Your login email and display name are anonymised. Invoices and statements stay.
               </p>
             </div>
           </div>

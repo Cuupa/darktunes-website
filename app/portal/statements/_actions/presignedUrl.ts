@@ -12,7 +12,7 @@
  *   - URL expires in 300 seconds (5 minutes) to limit exposure window
  */
 
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getArtistByUserId } from '@/lib/api/artistProfiles'
 import { getSalesStatementsByArtistId, recordStatementView } from '@/lib/api/salesStatements'
 import { createR2Client } from '@/lib/r2Utils'
@@ -55,7 +55,10 @@ export async function getStatementPresignedUrl(statementId: string): Promise<Pre
     }
 
     try {
-      await recordStatementView(supabase, statementId, artist.id)
+      // record_statement_view is service-role only (see reset.sql); membership
+      // was already verified above via getArtistByUserId + the RLS-scoped list.
+      const serviceDb = await createServiceRoleSupabaseClient()
+      await recordStatementView(serviceDb, statementId, artist.id)
     } catch (viewErr) {
       console.warn('[getStatementPresignedUrl] View tracking failed:', viewErr)
     }

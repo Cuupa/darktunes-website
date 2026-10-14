@@ -28,6 +28,7 @@ import { RATE_LIMIT_JOB_COOLDOWN_MS, isRateLimitedSyncError } from '@/lib/sync/r
 import { extractBearerToken, verifySyncTrigger } from '@/lib/adminAuth'
 import { withErrorHandler } from '@/lib/errors'
 import { getSyncCredentials } from '@/lib/secrets/getExternalCredentials'
+import { publishScheduledNewsPosts } from '@/lib/api/news'
 import {
   revalidatePublicContent,
   RELEASE_SYNC_TAGS,
@@ -138,6 +139,11 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     serverEnv.SUPABASE_SERVICE_ROLE_KEY,
     { auth: { persistSession: false } },
   )
+
+  // The public anon client cannot update news. This tick already has the service role.
+  await publishScheduledNewsPosts(db).catch((err) => {
+    console.error('[sync] scheduled news publish failed:', err)
+  })
 
   const syncCredentials = await getSyncCredentials(db)
 

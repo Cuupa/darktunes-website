@@ -10,6 +10,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(projectRoot, 'src'),
+      'darktunes-sanitize-html-server': resolve(projectRoot, 'src/lib/sanitizeHtml.server.ts'),
     },
   },
   test: {

@@ -8,6 +8,7 @@ import { ConsentBanner } from '@/components/ConsentBanner'
 import { PWAInstallPrompt } from '@/components/PWAInstallPrompt'
 import { ThemeBroadcastListener } from '@/components/ThemeBroadcastListener'
 import { ErrorFallback } from '@/ErrorFallback'
+import { ClientErrorReporter } from '@/components/ClientErrorReporter'
 import { PageTracker } from '@/components/PageTracker'
 import { BrandProvider } from '@/components/brand/BrandProvider'
 import type { BrandContext } from '@/lib/brand'
@@ -28,20 +29,24 @@ interface ProvidersProps {
  * - ThemeBroadcastListener: refreshes CSS vars when admin saves theme in another tab
  * - Toaster: global toast notifications
  * - ErrorBoundary: catches client-side render errors
+ * - ClientErrorReporter: window.onerror / unhandledrejection → /api/log-error
  */
 export function Providers({ children, brand }: ProvidersProps) {
   return (
-    <ErrorBoundary FallbackComponent={ErrorFallback}>
-      <BrandProvider brand={brand}>
-        <LenisProvider>
-          <PageTracker />
-          {children}
-          <ConsentBanner />
-          <PWAInstallPrompt />
-          <ThemeBroadcastListener />
-          <Toaster position="bottom-right" theme="dark" />
-        </LenisProvider>
-      </BrandProvider>
-    </ErrorBoundary>
+    <>
+      <ClientErrorReporter />
+      <ErrorBoundary FallbackComponent={ErrorFallback}>
+        <BrandProvider brand={brand}>
+          <LenisProvider>
+            <PageTracker />
+            {children}
+            <ConsentBanner />
+            <PWAInstallPrompt />
+            <ThemeBroadcastListener />
+            <Toaster position="bottom-right" theme="dark" />
+          </LenisProvider>
+        </BrandProvider>
+      </ErrorBoundary>
+    </>
   )
 }

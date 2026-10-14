@@ -20,7 +20,8 @@ export function PromoDownloads({ releases, promoTracks, audioPreviewEnabled = tr
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
   const download = async (release: Release) => {
-    const key = release.coverArt || release.previewUrl || release.id
+    const key = release.coverArt || release.previewUrl
+    if (!key) return
     setLoadingId(release.id)
     try {
       const result = await getJournalistDownloadUrl(key, release.id)
@@ -45,7 +46,11 @@ export function PromoDownloads({ releases, promoTracks, audioPreviewEnabled = tr
                 <p className="font-medium">{release.title}</p>
                 <p className="text-sm text-muted-foreground">{release.artistName}</p>
               </div>
-              <Button size="sm" onClick={() => void download(release)} disabled={loadingId === release.id}>
+              <Button
+                size="sm"
+                onClick={() => void download(release)}
+                disabled={loadingId === release.id || !(release.coverArt || release.previewUrl)}
+              >
                 {loadingId === release.id ? t('player.preparing') : t('player.download')}
               </Button>
             </CardContent>

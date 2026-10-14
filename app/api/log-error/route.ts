@@ -2,7 +2,8 @@
  * app/api/log-error/route.ts — Log application errors to the app_logs table.
  *
  * POST /api/log-error
- * Auth: any authenticated user (public-facing errors can be logged by users too)
+ * Auth: optional (session attached when present). Public so crashes on
+ * login/public pages still persist. Always 204 — never retry-loop.
  *
  * Body: { source, level?, message, details? }
  *   source  — short origin tag (e.g. ui, sos.bronze.upload, admin.health)
@@ -10,11 +11,8 @@
  *   message — human-readable error message
  *   details — optional JSON object with extra context
  *
- * Returns: { ok: true }
- *
- * Zammad auto-tickets: only for exact source `ui` (client crash reports).
- * Never rewrite unknown sources to `ui` — that would open support tickets for
- * operational SOS/admin logs.
+ * Zammad auto-tickets: only for exact source `ui` when a user is signed in.
+ * Never rewrite unknown sources to `ui`.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -22,14 +20,14 @@ import { z } from 'zod'
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { resolveUserProfile } from '@/lib/api/zammadSupport'
 import { writeAppLog } from '@/lib/appLog'
-import { withErrorHandler, ApiError } from '@/lib/errors'
+import { withErrorHandler } from '@/lib/errors'
 import { submitAutoErrorTicket } from '@/lib/zammad/submitTicket'
 import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { getClientIp } from '@/lib/ipRateLimit'
 import { PORTAL_LOG_ERROR_RATE } from '@/lib/uploads/portalUploadLimits'
 
-/** Client UI crash reports only — excludes operational admin/SOS monitoring sources. */
 const AUTO_ZAMMAD_SOURCES = new Set(['ui'])
+const maxBodyLength = 20_000
 
 const bodySchema = z.object({
   source: z.string().min(1).max(64),
@@ -38,7 +36,6 @@ const bodySchema = z.object({
   details: z.record(z.string(), z.unknown()).optional(),
 })
 
-/** Keep tags readable; strip control / injection characters. Never rewrite to `ui`. */
 function sanitizeSource(raw: string): string {
   const cleaned = raw
     .trim()
@@ -47,54 +44,64 @@ function sanitizeSource(raw: string): string {
   return cleaned || 'unknown'
 }
 
+function noContent(): NextResponse {
+  return new NextResponse(null, { status: 204 })
+}
+
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
   const supabase = await createServerSupabaseClient()
-
-  // Require an authenticated user (prevents abuse from anonymous callers)
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    throw new ApiError(401, 'Unauthorized')
-  }
 
   const ip = getClientIp(request)
+  const rlKey = user ? `log-error:${user.id}:${ip}` : `log-error:anon:${ip}`
   const rl = await checkDistributedRateLimit(
-    `log-error:${user.id}:${ip}`,
+    rlKey,
     PORTAL_LOG_ERROR_RATE.max,
     PORTAL_LOG_ERROR_RATE.windowMs,
   )
   if (rl.limited) {
-    throw new ApiError(429, 'Too many error reports. Please wait and try again.')
+    return noContent()
+  }
+
+  let rawText: string
+  try {
+    rawText = await request.text()
+  } catch {
+    return noContent()
+  }
+  if (!rawText || rawText.length > maxBodyLength) {
+    return noContent()
   }
 
   let raw: unknown
   try {
-    raw = await request.json()
+    raw = JSON.parse(rawText)
   } catch {
-    throw new ApiError(400, 'Invalid JSON body')
+    return noContent()
   }
 
   const parsed = bodySchema.safeParse(raw)
   if (!parsed.success) {
-    throw new ApiError(400, 'Invalid log payload', 'VALIDATION_ERROR')
+    return noContent()
   }
 
   const { source: rawSource, message, level, details } = parsed.data
   const source = sanitizeSource(rawSource)
   const resolvedLevel = level ?? 'error'
   const resolvedDetails = details ?? {}
+  const viewPath =
+    typeof resolvedDetails.path === 'string' ? resolvedDetails.path : null
 
   await writeAppLog({
     source,
     level: resolvedLevel,
     message,
     details: resolvedDetails,
-    userId: user.id,
+    userId: user?.id ?? null,
+    routePath: viewPath,
   })
 
-  if (resolvedLevel === 'error' && AUTO_ZAMMAD_SOURCES.has(source)) {
-    const viewPath =
-      typeof resolvedDetails.path === 'string' ? resolvedDetails.path : null
-
+  if (user && resolvedLevel === 'error' && AUTO_ZAMMAD_SOURCES.has(source)) {
     void (async () => {
       try {
         const db = await createServiceRoleSupabaseClient()
@@ -120,5 +127,5 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     })()
   }
 
-  return NextResponse.json({ ok: true }, { status: 201 })
+  return noContent()
 })

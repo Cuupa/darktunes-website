@@ -269,7 +269,7 @@ export function useSettlementCenter({
         artistId: row.artistId,
         ledgerBalanceEur: row.ledgerBalanceEur,
       })),
-      register.kpis.openBalanceEur,
+      register.kpis?.openBalanceEur ?? 0,
     )
   }, [register])
 

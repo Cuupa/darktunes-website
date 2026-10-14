@@ -6,6 +6,7 @@ import { generatePresignedDownloadUrl } from '@/lib/portal/presignedUrl'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { isPressZipDownloadEnabled } from '@/lib/pressAccess'
+import { authorizePressObject } from '@/lib/api/pressObjectAccess'
 import { logDownload } from '@/lib/api/journalistDownloads'
 
 export async function getPressKitUrls(r2Keys: string[]): Promise<{ urls: Array<{ key: string; url: string }>; error?: string }> {
@@ -32,24 +33,28 @@ export async function getPressKitUrls(r2Keys: string[]): Promise<{ urls: Array<{
     const urls: Array<{ key: string; url: string }> = []
     for (const key of r2Keys) {
       try {
-        let url = key
-        let isExternal = false
-        try {
-          const parsed = new URL(key)
-          isExternal = parsed.protocol === 'http:' || parsed.protocol === 'https:'
-        } catch {
-          isExternal = false
-        }
+        const grant = await authorizePressObject(supabase, key, {
+          intent: 'download',
+          journalistId: user.id,
+        })
+        if (!grant) continue
 
-        if (!isExternal) {
-          url = await generatePresignedDownloadUrl(key, {
-            getSignedUrl,
-            s3Client: s3,
-            bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
+        const url = grant.sign
+          ? await generatePresignedDownloadUrl(grant.stored, {
+              getSignedUrl,
+              s3Client: s3,
+              bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
+            })
+          : grant.stored
+        urls.push({ key: grant.stored, url })
+        if (!grant.alreadyLogged) {
+          await logDownload(supabase, {
+            journalist_id: user.id,
+            release_id: grant.releaseId,
+            asset_id: grant.assetId,
+            asset_key: grant.stored,
           })
         }
-        urls.push({ key, url })
-        await logDownload(supabase, { journalist_id: user.id, release_id: null, asset_key: key })
       } catch {
         // skip individual failures
       }

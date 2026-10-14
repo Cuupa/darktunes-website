@@ -188,3 +188,7 @@ Shared primitives in `src/components/notifications/` (`NotificationBellTrigger`,
 **Portal:** `PortalNotificationBell` + composite feed (`portalNotifications`): messages, interviews, statements, plus durable platform rows (`kind: platform`, e.g. fan-page decisions). Badge field `alerts` counts unread platform rows. `PortalNotificationProvider` refreshes on messages, interviews, statements, and `notifications`.
 
 **History + preferences:** Shared `NotificationCenter` and `NotificationPreferencesForm` under `src/components/notifications/`. Routes: `/admin/notifications` (+ `/preferences`), `/portal/notifications` (+ `/preferences`).
+
+## Client error reporting
+
+`ClientErrorReporter` in `Providers` (outside the React error boundary) listens for `window.onerror` and `unhandledrejection`. Window errors are reported only when `filename` is this site, and `ResizeObserver loop` is ignored. `app/error.tsx`, `app/global-error.tsx`, and `ErrorFallback` call `reportClientError` (`sendBeacon`, else keepalive `fetch`). Ingest is `POST /api/log-error` (session optional, always 204). Do not debounce crash reports.

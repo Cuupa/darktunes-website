@@ -1,8 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getLedgerEntriesForArtist } from './settlementLedger'
-import { buildSettlementRegister, computeCarryForwardBalances } from './settlementRegister'
+import { archiveSettlementPeriod, getSettlementPeriodById } from './settlementPeriods'
+import { appendLedgerEntry, createPeriodCarryForwards } from './settlementLedger'
+import {
+  archivePeriodWithCarryForward,
+  buildSettlementRegister,
+  computeCarryForwardBalances,
+} from './settlementRegister'
 
 type DbClient = SupabaseClient<Database>
 
@@ -17,6 +22,8 @@ const mockPeriod = {
 vi.mock('@/lib/api/settlementPeriods', () => ({
   getSettlementPeriodByDates: vi.fn(async () => mockPeriod),
   getOrCreateSettlementPeriod: vi.fn(async () => mockPeriod),
+  getSettlementPeriodById: vi.fn(async () => mockPeriod),
+  archiveSettlementPeriod: vi.fn(async () => mockPeriod),
 }))
 
 vi.mock('@/lib/api/salesStatements', () => ({
@@ -60,13 +67,8 @@ vi.mock('@/lib/api/settlementLedger', async (importOriginal) => {
   return {
     ...actual,
     getOutstandingBalancesForPeriod: vi.fn(async () => new Map([['artist-1', 120]])),
-    getLedgerEntriesForArtist: vi.fn(async (_db: unknown, artistId: string) => {
-      if (artistId === 'artist-1') return [{ amountEur: 120 }]
-      return []
-    }),
-    sumLedgerBalance: vi.fn((entries: Array<{ amountEur: number }>) =>
-      entries.reduce((sum, entry) => sum + entry.amountEur, 0),
-    ),
+    createPeriodCarryForwards: vi.fn(async () => undefined),
+    appendLedgerEntry: vi.fn(async () => ({ id: 'entry-1' })),
   }
 })
 
@@ -79,6 +81,8 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     eq: vi.fn().mockReturnThis(),
     in: vi.fn().mockReturnThis(),
     neq: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
     then: p.then.bind(p),
     catch: p.catch.bind(p),
     finally: p.finally.bind(p),
@@ -180,25 +184,54 @@ describe('computeCarryForwardBalances', () => {
   })
 
   it('does not fall back to statement activity when ledger rows exist and sum to 0', async () => {
-    vi.mocked(getLedgerEntriesForArtist).mockResolvedValueOnce([
-      { amountEur: 80 },
-      { amountEur: -80 },
-    ] as never)
-
     const db = makeDb({
       sales_statements: [
         { id: 'stmt-1', artist_id: 'artist-1', amount_eur: 80, status: 'label_approved' },
       ],
       artist_invoices: [],
+      artist_settlement_ledger: [
+        { artist_id: 'artist-1', entry_type: 'statement_payout', amount_eur: 80 },
+        { artist_id: 'artist-1', entry_type: 'payment', amount_eur: -80 },
+      ],
     })
 
     const balances = await computeCarryForwardBalances(db, 'period-1')
     expect(balances).toHaveLength(0)
   })
 
-  it('uses outstanding_amount_cents instead of recomputed VAT gross', async () => {
-    vi.mocked(getLedgerEntriesForArtist).mockResolvedValueOnce([])
+  it('keeps the incoming carry_in in the balance carried to the next period', async () => {
+    const db = makeDb({
+      sales_statements: [{ id: 'stmt-1', artist_id: 'artist-1', amount_eur: 0, status: 'paid' }],
+      artist_invoices: [],
+      artist_settlement_ledger: [
+        { artist_id: 'artist-1', entry_type: 'carry_in', amount_eur: 100 },
+      ],
+    })
 
+    const balances = await computeCarryForwardBalances(db, 'period-1')
+    expect(balances).toHaveLength(1)
+    expect(balances[0]?.breakdown.statementBalanceEur).toBe(100)
+    expect(balances[0]?.openingBalanceEur).toBe(100)
+  })
+
+  it('ignores a previously posted carry_out so a retried close stays stable', async () => {
+    const db = makeDb({
+      sales_statements: [
+        { id: 'stmt-1', artist_id: 'artist-1', amount_eur: 100, status: 'label_approved' },
+      ],
+      artist_invoices: [],
+      artist_settlement_ledger: [
+        { artist_id: 'artist-1', entry_type: 'statement_payout', amount_eur: 100 },
+        { artist_id: 'artist-1', entry_type: 'carry_out', amount_eur: -100 },
+      ],
+    })
+
+    const balances = await computeCarryForwardBalances(db, 'period-1')
+    expect(balances).toHaveLength(1)
+    expect(balances[0]?.breakdown.statementBalanceEur).toBe(100)
+  })
+
+  it('uses outstanding_amount_cents instead of recomputed VAT gross', async () => {
     const db = makeDb({
       sales_statements: [
         { id: 'stmt-1', artist_id: 'artist-1', amount_eur: 0, status: 'invoiced' },
@@ -219,5 +252,53 @@ describe('computeCarryForwardBalances', () => {
     const balances = await computeCarryForwardBalances(db, 'period-1')
     expect(balances[0]?.breakdown.unpaidInvoiceCents).toBe(5000)
     expect(balances[0]?.openingBalanceEur).toBe(50)
+  })
+})
+
+describe('archivePeriodWithCarryForward', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('returns without posting carries when the period is already archived', async () => {
+    vi.mocked(getSettlementPeriodById).mockResolvedValueOnce({
+      ...mockPeriod,
+      status: 'archived',
+    } as never)
+
+    await archivePeriodWithCarryForward(
+      makeDb({}),
+      'period-1',
+      'actor-1',
+      '2025-04-01',
+      '2025-06-30',
+    )
+
+    expect(createPeriodCarryForwards).not.toHaveBeenCalled()
+    expect(archiveSettlementPeriod).not.toHaveBeenCalled()
+  })
+
+  it('posts carries and archives an open period', async () => {
+    const db = makeDb({})
+
+    await archivePeriodWithCarryForward(db, 'period-1', 'actor-1', '2025-04-01', '2025-06-30')
+
+    expect(createPeriodCarryForwards).toHaveBeenCalledWith(db, 'period-1', [], 'actor-1')
+    expect(archiveSettlementPeriod).toHaveBeenCalledWith(db, 'period-1', 'actor-1')
+  })
+
+  it('swallows a duplicate carry_in from a concurrent close and still archives', async () => {
+    vi.mocked(getSettlementPeriodById).mockResolvedValueOnce({ ...mockPeriod, status: 'open' } as never)
+    vi.mocked(appendLedgerEntry).mockRejectedValueOnce({ code: '23505', message: 'duplicate key' })
+    const db = makeDb({
+      sales_statements: [
+        { id: 'stmt-1', artist_id: 'artist-1', amount_eur: 50, status: 'label_approved' },
+      ],
+    })
+
+    await archivePeriodWithCarryForward(db, 'period-1', 'actor-1', '2025-04-01', '2025-06-30')
+
+    expect(appendLedgerEntry).toHaveBeenCalled()
+    expect(archiveSettlementPeriod).toHaveBeenCalledWith(db, 'period-1', 'actor-1')
   })
 })

@@ -4,7 +4,7 @@
  * src/components/admin/sos/TrackRevenueAssignmentManager.tsx
  *
  * UI for creating and managing TrackRevenueAssignment rules.
- * Each rule matches a track/release title substring and redistributes
+ * Each rule matches a full track or release title and redistributes
  * the revenue among one or more co-owner artists (sum must equal 100%).
  */
 
@@ -162,7 +162,7 @@ export function TrackRevenueAssignmentManager({
           <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
           <p className="text-sm text-muted-foreground">
             Assign all revenue from a track or release to specific artists with custom splits.
-            Matching is a case-insensitive substring match against release and track title.
+            Matching is the full title, ignoring case and extra spaces. A short title does not match a longer one.
             Owner percentages must sum to exactly 100%.
           </p>
         </div>
@@ -173,7 +173,7 @@ export function TrackRevenueAssignmentManager({
         <h4 className="text-sm font-semibold">Add Assignment Rule</h4>
 
         <div className="space-y-2">
-          <Label htmlFor="track-title-input">Track / Release Title (substring)</Label>
+          <Label htmlFor="track-title-input">Track / Release title (full title)</Label>
           <Input
             id="track-title-input"
             value={trackTitle}

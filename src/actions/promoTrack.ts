@@ -16,6 +16,8 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { isPressAudioPreviewEnabled, isPromoPoolEnabled } from '@/lib/pressAccess'
+import { authorizePressObject, recordPromoNdaAcceptance } from '@/lib/api/pressObjectAccess'
+import { mintPromoNdaToken } from '@/lib/press/promoNdaToken'
 import { createR2Client } from '@/lib/r2Utils'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { GetObjectCommand } from '@aws-sdk/client-s3'
@@ -44,6 +46,13 @@ export async function getPromoTrackStreamUrl(r2Key: string): Promise<{ url: stri
     throw new Error('Forbidden')
   }
 
+  const grant = await authorizePressObject(supabase, r2Key, {
+    intent: 'stream',
+    journalistId: user.id,
+  })
+  if (!grant) throw new Error('Forbidden')
+  if (!grant.sign) return { url: grant.stored }
+
   const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID ?? ''
   const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ?? ''
   const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY ?? ''
@@ -54,8 +63,27 @@ export async function getPromoTrackStreamUrl(r2Key: string): Promise<{ url: stri
   }
 
   const s3 = createR2Client(accountId, accessKeyId, secretAccessKey)
-  const command = new GetObjectCommand({ Bucket: bucket, Key: r2Key })
+  const command = new GetObjectCommand({ Bucket: bucket, Key: grant.stored })
   const url = await getSignedUrl(s3, command, { expiresIn: STREAM_EXPIRY_SECONDS })
 
   return { url }
+}
+
+export async function acceptPromoTrackNda(r2Key: string): Promise<{ token: string | null }> {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
+  const role = await getUserRoleWithClient(supabase, user.id)
+  if (!role || !['journalist', 'admin'].includes(role)) {
+    throw new Error('Forbidden')
+  }
+
+  const secret = process.env.API_CREDENTIALS_ENCRYPTION_KEY
+  if (!secret) return { token: null }
+  const ok = await recordPromoNdaAcceptance(supabase, r2Key, user.id)
+  if (!ok) return { token: null }
+  return { token: mintPromoNdaToken(secret, user.id, r2Key.trim()) }
 }

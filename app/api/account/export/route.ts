@@ -6,7 +6,8 @@
  *
  * Sections included:
  *   - profile (email, role, created_at)
- *   - If artist role: linked artist profile, releases, messages, concerts
+ *   - If artist role: linked artist profile, releases, messages, concerts,
+ *     invoices, billing profile, and statements (own artist memberships)
  *   - If journalist role: accreditation requests, promo downloads
  *
  * Returns: application/json download attachment.
@@ -83,6 +84,51 @@ export const GET = withErrorHandler(async (): Promise<NextResponse> => {
       exportData.messages = messagesResult.data ?? []
       exportData.concerts = concertsResult.data ?? []
       exportData.message_replies = repliesResult.data ?? []
+    }
+
+    const { data: memberships, error: membershipsError } = await supabase
+      .from('artist_members')
+      .select('artist_id')
+      .eq('user_id', user.id)
+    if (membershipsError) {
+      throw new ApiError(500, 'Could not export artist memberships', 'DB_ERROR')
+    }
+    const artistIds = [
+      ...new Set(
+        [artist?.id, ...(memberships ?? []).map((row) => row.artist_id)].filter(
+          (id): id is string => Boolean(id),
+        ),
+      ),
+    ]
+    if (artistIds.length > 0) {
+      const [invoicesResult, billingResult, statementsResult] = await Promise.all([
+        supabase
+          .from('artist_invoices')
+          .select(
+            'id, artist_id, invoice_number, statement_id, client_name, client_email, client_address, line_items, currency, tax_rate_pct, status, due_date, issued_date, notes, paid_amount_cents, outstanding_amount_cents, payment_method, payment_reference, created_at',
+          )
+          .in('artist_id', artistIds)
+          .order('issued_date', { ascending: false }),
+        supabase
+          .from('artist_billing_profiles')
+          .select(
+            'id, artist_id, legal_name, street, postal_code, city, country, tax_number, vat_id, tax_status, iban, bic, paypal_email, created_at',
+          )
+          .in('artist_id', artistIds),
+        supabase
+          .from('sales_statements')
+          .select(
+            'id, artist_id, filename, period, period_start, period_end, amount_eur, status, document_type, reporting_currency, amount_reporting, created_at',
+          )
+          .in('artist_id', artistIds)
+          .order('period_start', { ascending: false }),
+      ])
+      if (invoicesResult.error) throw new ApiError(500, 'Could not export invoices', 'DB_ERROR')
+      if (billingResult.error) throw new ApiError(500, 'Could not export the billing profile', 'DB_ERROR')
+      if (statementsResult.error) throw new ApiError(500, 'Could not export statements', 'DB_ERROR')
+      exportData.invoices = invoicesResult.data ?? []
+      exportData.billing_profiles = billingResult.data ?? []
+      exportData.statements = statementsResult.data ?? []
     }
   }
 

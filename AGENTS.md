@@ -97,6 +97,7 @@ Read the relevant file before working in that area:
 | Portal write auth (JWT vs service role) | [portal-write-auth.md](docs/agent/portal-write-auth.md) |
 | Portal (analytics split, feedback, Bandsintown, press, EPK, PWA) | [features.md](docs/agent/features.md) |
 | Legacy / hardcode / security residual inventory | [debt-inventory.md](docs/agent/debt-inventory.md) |
+| Compliance / certification readiness (SOC 2, ISO 27001) | [docs/compliance/README.md](docs/compliance/README.md) |
 
 After introducing new patterns, update the relevant `docs/agent/*.md` file.
 
@@ -104,7 +105,7 @@ After introducing new patterns, update the relevant `docs/agent/*.md` file.
 
 ## External docs
 
-[PRD.md](PRD.md) · [README.md](README.md) · [DEPLOYMENT.md](DEPLOYMENT.md) · [docs/RELEASING.md](docs/RELEASING.md) · [ADMIN.md](ADMIN.md) · [SECURITY.md](SECURITY.md) · [INTEGRATION-SUMMARY.md](INTEGRATION-SUMMARY.md) · [CHANGELOG.md](CHANGELOG.md) · [LESSONS_LEARNED.md](LESSONS_LEARNED.md) · [QA_CHECKLIST.md](QA_CHECKLIST.md) · [supabase/DB_REQUIREMENTS.md](supabase/DB_REQUIREMENTS.md)
+[PRD.md](PRD.md) · [README.md](README.md) · [DEPLOYMENT.md](DEPLOYMENT.md) · [docs/RELEASING.md](docs/RELEASING.md) · [ADMIN.md](ADMIN.md) · [SECURITY.md](SECURITY.md) · [INTEGRATION-SUMMARY.md](INTEGRATION-SUMMARY.md) · [CHANGELOG.md](CHANGELOG.md) · [LESSONS_LEARNED.md](LESSONS_LEARNED.md) · [QA_CHECKLIST.md](QA_CHECKLIST.md) · [supabase/DB_REQUIREMENTS.md](supabase/DB_REQUIREMENTS.md) · [docs/compliance/README.md](docs/compliance/README.md)
 
 <!-- BEGIN:nextjs-agent-rules -->
 

@@ -426,7 +426,8 @@ Create the token in Zammad → **Profile → Token Access** with `ticket.agent` 
 ### Behaviour
 
 - **Manual tickets:** Admin → Support → New Ticket (attributed to the admin's email/name).
-- **Auto error tickets:** Client errors reported via `POST /api/log-error` (level `error`)
-  create background tickets with `[SYSTEM ERROR REPORT — darkTunes]` prefix.
+- **Auto error tickets:** Client errors reported via `POST /api/log-error` (level `error`,
+  source `ui`, signed-in user) create background tickets with
+  `[SYSTEM ERROR REPORT — darkTunes]` prefix. Anonymous reports still persist to `app_logs`.
 - **Deduplication:** Same error fingerprint + user within 24 h → no duplicate Zammad ticket.
 - **Known errors:** Admin can block fingerprints in Support → Known Errors.

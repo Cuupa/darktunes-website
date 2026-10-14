@@ -320,7 +320,7 @@ export const ACCOUNTING_FALLBACK = {
   selectArtistPlaceholder: 'Select artist…',
   enterArtistManually: 'Enter manually…',
   artistNamePlaceholder: 'Artist name',
-  trackTitleRequired: 'Enter a track or release title substring to match.',
+  trackTitleRequired: 'Enter the full track or release title to match.',
   trackOwnerRequired: 'Add at least one owner artist.',
   trackPercentLabel: 'Share %',
   trackRemoveOwner: 'Remove owner',

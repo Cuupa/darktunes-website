@@ -6,7 +6,7 @@
  *
  * Repeated logs with the same fingerprint are aggregated into one row with an
  * `occurrences` counter (via the `upsert_app_log` RPC). Details are redacted
- * before persistence. Never throws to the caller.
+ * before persistence. Never throws to the caller; persist failures go to console.
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
@@ -71,8 +71,15 @@ function clampMessage(message: string): string {
 
 export async function writeAppLog(opts: WriteAppLogOptions): Promise<void> {
   try {
+    if (process.env.APP_ERROR_LOG_DISABLED === 'true') return
+
     const db = getLogClient()
-    if (!db) return
+    if (!db) {
+      console.error(
+        'error log persist skipped: missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY',
+      )
+      return
+    }
 
     const source = opts.source
     const level: AppLogLevel = opts.level ?? 'error'
@@ -85,8 +92,11 @@ export async function writeAppLog(opts: WriteAppLogOptions): Promise<void> {
     const fingerprint =
       opts.fingerprint ??
       buildSimpleFingerprint(source, level, message, routePath)
+    const environment = environmentName()
+    const version = appVersion()
 
     let persisted = false
+    let rpcFailed: unknown = null
     try {
       if (typeof db.rpc === 'function') {
         const { error } = await db.rpc('upsert_app_log', {
@@ -96,39 +106,50 @@ export async function writeAppLog(opts: WriteAppLogOptions): Promise<void> {
           p_message: message,
           p_details: details,
           p_user_id: userId,
-          p_environment: environmentName(),
-          p_app_version: appVersion(),
+          p_environment: environment,
+          p_app_version: version,
           p_request_id: requestId,
           p_route_path: routePath,
           p_method: method,
         })
-        persisted = !error
+        if (error) {
+          rpcFailed = error
+        } else {
+          persisted = true
+        }
       }
-    } catch {
-      // RPC unavailable (pre-migration DB or test double) — fall back to insert
+    } catch (error) {
+      rpcFailed = error
     }
 
     if (persisted) return
 
-    const row: {
-      source: string
-      level: AppLogLevel
-      message: string
-      details: Record<string, unknown>
-      user_id?: string
-    } = {
+    if (rpcFailed) {
+      console.error('error log rpc failed', rpcFailed)
+    }
+
+    // Unique fingerprint would drop the next identical crash if this insert is the fallback.
+    const row: Database['public']['Tables']['app_logs']['Insert'] = {
       source,
       level,
       message,
       details,
+      fingerprint: null,
+      environment,
+      app_version: version,
+      request_id: requestId,
+      route_path: routePath,
+      method,
     }
-
     if (userId) {
       row.user_id = userId
     }
 
-    await db.from('app_logs').insert(row)
-  } catch {
-    // Never throw from the logger — silently ignore any DB failures
+    const { error: insertError } = await db.from('app_logs').insert(row)
+    if (insertError) {
+      console.error('error log persist failed', insertError)
+    }
+  } catch (error) {
+    console.error('error log persist failed', error)
   }
 }

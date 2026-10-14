@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getPromoTracks, createPromoTrack, deletePromoTrack } from './promoTracks'
+import { getPromoTracks, createPromoTrack, deletePromoTrack, isPromoEmbargoActive } from './promoTracks'
 
 type DbClient = SupabaseClient<Database>
 type PromoTrackRow = Database['public']['Tables']['promo_tracks']['Row']
@@ -45,6 +45,15 @@ const mockTrackRow: PromoTrackRow = {
   embargo_until: '2024-07-01T12:00:00Z',
   created_at: '2024-06-01T00:00:00Z',
 }
+
+describe('isPromoEmbargoActive', () => {
+  it('hides a future embargo and an unreadable date', () => {
+    expect(isPromoEmbargoActive('2026-12-01T00:00:00Z', Date.parse('2026-06-01T00:00:00Z'))).toBe(true)
+    expect(isPromoEmbargoActive('2026-01-01T00:00:00Z', Date.parse('2026-06-01T00:00:00Z'))).toBe(false)
+    expect(isPromoEmbargoActive(null)).toBe(false)
+    expect(isPromoEmbargoActive('not-a-date')).toBe(true)
+  })
+})
 
 describe('getPromoTracks', () => {
   it('returns empty array when no tracks exist', async () => {

@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 import type { Metadata } from 'next'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { getPromoTracks } from '@/lib/api/promoTracks'
+import { getPromoTracks, isPromoEmbargoActive } from '@/lib/api/promoTracks'
 import { isPressAudioPreviewEnabled } from '@/lib/pressAccess'
 import { PromoPoolClient } from './_components/PromoPoolClient'
 import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
@@ -25,7 +25,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function PromoPoolPage() {
   const supabase = await createServerSupabaseClient()
   const [tracks, audioPreviewEnabled] = await Promise.all([
-    getPromoTracks(supabase).catch(() => []),
+    getPromoTracks(supabase)
+      .then((rows) => rows.filter((track) => !isPromoEmbargoActive(track.embargoUntil)))
+      .catch(() => []),
     isPressAudioPreviewEnabled(supabase),
   ])
 

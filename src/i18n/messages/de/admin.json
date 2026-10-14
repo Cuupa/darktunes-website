@@ -891,7 +891,7 @@
     "selectArtistPlaceholder": "Künstler wählen…",
     "enterArtistManually": "Manuell eingeben…",
     "artistNamePlaceholder": "Künstlername",
-    "trackTitleRequired": "Gib einen Track- oder Release-Titel (Teilstring) zum Zuordnen ein.",
+    "trackTitleRequired": "Gib den vollständigen Track- oder Release-Titel zum Zuordnen ein.",
     "trackOwnerRequired": "Mindestens einen Eigentümer-Künstler hinzufügen.",
     "trackPercentLabel": "Anteil %",
     "pdfTopCountriesLabel": "Max. angezeigte Länder",

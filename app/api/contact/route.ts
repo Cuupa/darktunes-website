@@ -10,7 +10,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
-import { checkRateLimit, getClientIp } from '@/lib/ipRateLimit'
+import { getClientIp } from '@/lib/ipRateLimit'
+import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getEmailCredentials } from '@/lib/secrets/getExternalCredentials'
 
@@ -22,12 +23,14 @@ const contactSchema = z.object({
   topic: z.string().min(1, 'Topic is required').max(100),
   message: z.string().min(20, 'Message must be at least 20 characters'),
   gdprConsent: z.literal(true, { error: 'GDPR consent is required' }),
-  website: z.string().max(0, 'Honeypot triggered').optional(),
+  website: z.string().max(200).optional(),
 })
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
-  // 5 requests per 10 minutes per IP
-  if (checkRateLimit(getClientIp(request), 5, 10 * 60_000).limited) {
+  // 5 requests per 10 minutes per IP, shared across servers when Upstash is set.
+  const ip = getClientIp(request)
+  const rl = await checkDistributedRateLimit(`contact:${ip}`, 5, 10 * 60_000)
+  if (rl.limited) {
     throw new ApiError(429, 'Too many requests. Please try again later.', 'RATE_LIMITED')
   }
 
