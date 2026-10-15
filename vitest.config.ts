@@ -15,6 +15,9 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // https origin so Secure cookies are accepted (production is https); jsdom's
+    // default http://localhost rejects them. jsdom 26 is pinned in package.json.
+    environmentOptions: { jsdom: { url: 'https://localhost/' } },
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}', 'tests/unit/**/*.{test,spec}.{ts,tsx}'],
