@@ -25,6 +25,8 @@ vi.mock('@/lib/i18n/accountingFallbacks', () => ({
     ingestArchiving: 'Archiving',
     ingestArchiveNoPeriod: 'No period',
     ingestArchiveRetryNoData: 'No data',
+    ingestOperationId: 'Import {id}',
+    ingestConfirmFailed: 'Confirm needs retry',
   }),
 }))
 
@@ -116,5 +118,58 @@ describe('useFileManager', () => {
 
     await waitFor(() => expect(result.current.files).toHaveLength(1))
     expect(uploadBronzeDistributorCsv).toHaveBeenCalledTimes(1)
+  })
+
+  it('reuses the persisted operation ID when retrying one failed archive', async () => {
+    const ids: string[] = []
+    const { result } = renderHook(() =>
+      useFileManager('believe', { onFileAdded: (file) => ids.push(file.id) }),
+    )
+    vi.mocked(uploadBronzeDistributorCsv)
+      .mockResolvedValueOnce({ ok: false, message: 'network timeout' })
+      .mockResolvedValueOnce({ ok: true, batchId: 'batch-retry', r2Key: 'key-retry' })
+
+    await act(async () => {
+      await result.current.addFiles([new File(['a,b\n1,2'], 'retry.csv', { type: 'text/csv' })])
+    })
+    await act(async () => {
+      result.current.applyParseResult(stats(ids[0]))
+    })
+
+    await waitFor(() => expect(result.current.fileStates[ids[0]]?.bronzeStatus).toBe('error'))
+    const firstOperationId = vi.mocked(uploadBronzeDistributorCsv).mock.calls[0]?.[0].operationId
+    expect(firstOperationId).toMatch(/^[0-9a-f-]{36}$/i)
+
+    await act(async () => {
+      result.current.retryArchive(ids[0])
+    })
+
+    await waitFor(() => expect(result.current.fileStates[ids[0]]?.bronzeStatus).toBe('done'))
+    expect(vi.mocked(uploadBronzeDistributorCsv).mock.calls[1]?.[0].operationId).toBe(
+      firstOperationId,
+    )
+  })
+
+  it('shows a specific confirmation error and its operation reference', async () => {
+    const ids: string[] = []
+    const { result } = renderHook(() =>
+      useFileManager('believe', { onFileAdded: (file) => ids.push(file.id) }),
+    )
+    vi.mocked(uploadBronzeDistributorCsv).mockResolvedValue({
+      ok: false,
+      message: 'Archive confirm failed after upload',
+      phase: 'confirm',
+    })
+
+    await act(async () => {
+      await result.current.addFiles([new File(['a,b\n1,2'], 'confirm.csv', { type: 'text/csv' })])
+    })
+    await act(async () => {
+      result.current.applyParseResult(stats(ids[0]))
+    })
+
+    await waitFor(() => expect(result.current.fileStates[ids[0]]?.bronzeStatus).toBe('error'))
+    expect(result.current.fileStates[ids[0]]?.bronzeError).toBe('Confirm needs retry')
+    expect(result.current.fileStates[ids[0]]?.operationId).toMatch(/^[0-9a-f-]{36}$/i)
   })
 })

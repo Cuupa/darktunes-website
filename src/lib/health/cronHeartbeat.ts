@@ -39,6 +39,8 @@ export interface CronHealthSummary {
 
 export interface CronHealthContext {
   heartbeats: HealthHeartbeats
+  /** Kinds whose tick read failed — freshness is unknown, not "never ran". */
+  readErrors?: HealthHeartbeatKey[]
   syncQueue: SyncQueueHealth | null
   cronSecretConfigured: boolean
   youtubeConfigured: boolean
@@ -325,6 +327,15 @@ export function deriveCronHealth(ctx: CronHealthContext): CronHealthSummary {
       operationalState: 'failing',
       statusLabel: 'Cron failure',
       statusDetail: failing.map((j) => j.statusLabel).join(' · '),
+    }
+  }
+
+  if (ctx.readErrors && ctx.readErrors.length > 0) {
+    return {
+      jobs,
+      operationalState: 'degraded',
+      statusLabel: 'Cron status unknown',
+      statusDetail: `Cannot read cron heartbeats (${ctx.readErrors.join(', ')}) — job freshness is unknown, not "never ran".`,
     }
   }
 

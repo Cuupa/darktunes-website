@@ -12,6 +12,7 @@ import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   createImportBatch,
   DuplicateImportBatchError,
+  getImportBatchByOperationId,
   findImportBatchByFileHash,
   listImportBatches,
   updateImportBatchStatus,
@@ -46,6 +47,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     distributor?: string
     filename?: string
     file_hash?: string
+    operation_id?: string
     row_count?: number
     file_size?: number
   }
@@ -56,14 +58,42 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     distributor,
     filename,
     file_hash,
+    operation_id,
     row_count,
   } = body
 
   if (!period_start || !period_end || !distributor || !filename) {
     throw new ApiError(400, 'period_start, period_end, distributor, and filename are required')
   }
+  if (!operation_id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(operation_id)) {
+    throw new ApiError(400, 'operation_id must be a UUID')
+  }
 
   const serviceSupabase = await createServiceRoleSupabaseClient()
+
+  const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const existingOperation = await getImportBatchByOperationId(serviceSupabase, operation_id)
+  if (existingOperation) {
+    if (
+      existingOperation.periodStart !== period_start ||
+      existingOperation.periodEnd !== period_end ||
+      existingOperation.distributor !== distributor ||
+      existingOperation.rowCount !== (row_count ?? 0) ||
+      !existingOperation.r2Key.endsWith(`_${safeName}`)
+    ) {
+      throw new ApiError(409, 'operation_id was already used for a different import')
+    }
+    if (existingOperation.status === 'completed') {
+      return NextResponse.json({ batch: existingOperation, duplicate: true }, { status: 200 })
+    }
+    if (existingOperation.status === 'failed') {
+      throw new ApiError(409, 'This import attempt is marked failed; start a new upload attempt')
+    }
+    return NextResponse.json(
+      { batch: existingOperation, r2Key: existingOperation.r2Key },
+      { status: 200 },
+    )
+  }
 
   if (file_hash && /^[a-f0-9]{64}$/i.test(file_hash)) {
     const existing = await findImportBatchByFileHash(serviceSupabase, file_hash)
@@ -78,7 +108,6 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   }
 
   const batchId = randomUUID()
-  const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, '_')
   const hashPrefix = file_hash?.slice(0, 12) ?? createHash('sha256').update(`${batchId}-${filename}`).digest('hex').slice(0, 12)
   const r2Key = `sos-imports/${batchId}/${hashPrefix}_${safeName}`
 
@@ -93,6 +122,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
       periodEnd: period_end,
       distributor,
       r2Key,
+      operationId: operation_id,
       // Hash is a duplicate-lookup key at register; persist only after confirm.
       fileHash: null,
       rowCount: row_count ?? 0,
@@ -101,6 +131,26 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
 
     return NextResponse.json({ batch, r2Key }, { status: 201 })
   } catch (err) {
+    if (err instanceof DuplicateImportBatchError) {
+      const operationBatch = await getImportBatchByOperationId(serviceSupabase, operation_id)
+      if (operationBatch) {
+        if (
+          operationBatch.periodStart !== period_start ||
+          operationBatch.periodEnd !== period_end ||
+          operationBatch.distributor !== distributor ||
+          operationBatch.rowCount !== (row_count ?? 0) ||
+          !operationBatch.r2Key.endsWith(`_${safeName}`)
+        ) {
+          throw new ApiError(409, 'operation_id was already used for a different import')
+        }
+        return NextResponse.json(
+          operationBatch.status === 'completed'
+            ? { batch: operationBatch, duplicate: true }
+            : { batch: operationBatch, r2Key: operationBatch.r2Key },
+          { status: 200 },
+        )
+      }
+    }
     if (err instanceof DuplicateImportBatchError && normalizedHash) {
       const existing = await findImportBatchByFileHash(serviceSupabase, normalizedHash)
       if (existing) {

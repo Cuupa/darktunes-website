@@ -1,8 +1,10 @@
 import type { S3Client } from '@aws-sdk/client-s3'
 import {
   AbortMultipartUploadCommand,
+  CopyObjectCommand,
   CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getImportBatchById } from '@/lib/api/distributorImportBatches'
@@ -83,6 +85,41 @@ export async function completeBronzeMultipartUpload(
   )
 }
 
+export function buildConfirmedBronzeKey(batchId: string, stagingKey: string): string {
+  const filename = stagingKey.split('/').at(-1) ?? `${batchId}.csv`
+  return `sos-imports/${batchId}/confirmed/${filename}`
+}
+
+export async function copyBronzeObjectToConfirmedKey(
+  ctx: BronzeMultipartR2Context,
+  sourceKey: string,
+  destinationKey: string,
+): Promise<void> {
+  const encodedSource = sourceKey.split('/').map(encodeURIComponent).join('/')
+  await ctx.s3.send(
+    new CopyObjectCommand({
+      Bucket: ctx.bucket,
+      CopySource: `${ctx.bucket}/${encodedSource}`,
+      Key: destinationKey,
+      MetadataDirective: 'COPY',
+    }),
+  )
+}
+
+export async function bronzeObjectExists(
+  ctx: BronzeMultipartR2Context,
+  key: string,
+): Promise<boolean> {
+  try {
+    await ctx.s3.send(new HeadObjectCommand({ Bucket: ctx.bucket, Key: key }))
+    return true
+  } catch (error) {
+    const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
+    if (status === 404 || (error as { name?: string }).name === 'NotFound') return false
+    throw error
+  }
+}
+
 export async function abortBronzeMultipartUpload(
   ctx: BronzeMultipartR2Context,
   r2Key: string,
@@ -96,7 +133,9 @@ export async function abortBronzeMultipartUpload(
         UploadId: uploadId,
       }),
     )
-  } catch {
-    // best effort
+  } catch (error) {
+    const name = (error as { name?: string }).name
+    const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
+    if (name !== 'NoSuchUpload' && status !== 404) throw error
   }
 }

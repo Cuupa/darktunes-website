@@ -15,6 +15,18 @@ Distilled anti-patterns from project history. **Append session findings before o
 | `has_permission(auth.uid(), …)` | ✅ `has_permission('can_manage_releases')` — one arg only |
 | `CREATE TYPE IF NOT EXISTS` in Supabase SQL Editor | Use `DO $$ … IF NOT EXISTS (pg_type) …` blocks |
 
+## Observability & logs
+
+| Anti-pattern | Rule |
+|--------------|------|
+| A log viewer `catch {}` that renders an empty table | A failed log read must show the error. "No logs" and "the query failed" must never look the same (one `LogsPanel` shell for every tab) |
+| Fire-and-forget `db.from('sync_logs').insert(...)` | Use `recordSyncLog` — a dropped PostgREST error means the run is invisible everywhere |
+| Probing `sync_logs` for DB liveness | A broken log table then reports as a database outage. Probe `artists`; report log-store readability separately (`checkLogStore`) |
+| Reading log tables with `count: 'exact'` from the browser | Exact `count(*)` on an unbounded table can time out and answer 500. Use `estimated`; prune via a dashboard pg_cron job (owner decision) |
+| `DELETE … RETURNING id` for "clear logs" | Count in the database (`clear_log_table` RPC); returning every id loads the table into memory |
+| A browser INSERT policy on `app_logs` | Writes are service-role only. An authenticated insert policy lets any user forge/spam log rows past the rate limit |
+| Assuming "not applied" means "not attempted" | A green app build says nothing about the DB. Check the Deploy Supabase workflow result before trusting a schema-dependent feature |
+
 ## UI stacking & overlays
 
 | Anti-pattern | Rule |
@@ -551,6 +563,12 @@ Distilled anti-patterns from project history. **Append session findings before o
 **"Small enough for one request" is the wrong test for a browser upload:** files ≤ 100 MB used one presigned PUT while only > 100 MB got multipart, so the 60–70 MB Believe exports — the ones most likely to lose a connection mid-transfer — had no resume and no cheap retry. Retry *cost* is the real metric, not size: split large files into parts (16 MB) so one dropped part costs one part, not the whole file, and re-sign the presigned URL on every attempt because the 900 s signature can expire mid-transfer (a stale URL makes the retry fail too).
 
 **Concurrent large uploads starve the uplink:** several CSVs archiving at once (one per parsed file, no queue) made every PUT slower and fed the same failures. Serialize archives through one queue so only one large file competes for bandwidth. A `TypeError: Failed to fetch` on a browser → R2 PUT cannot be told apart from offline/expired/CORS in the message — fix the transport, do not trust the wording.
+
+### 2026-10-15 — A completed flag is not immutable storage
+
+**A database status cannot revoke an already-issued presigned URL:** a valid PUT can still overwrite its object until the signature expires. Upload to a temporary key, hash the server-side final copy, then point the completed record at that final key. Also persist multipart IDs before returning them; on failure or deletion abort them, and use the stale-upload scan to clean legacy sessions.
+
+**A browser count is not an archive manifest:** optional `sourceFileCount` and `archivedFileCount` let an omitted request pass. Read the saved workspace source IDs on the server, compare them with the request, and verify each completed batch and hash before statement creation.
 
 ---
 

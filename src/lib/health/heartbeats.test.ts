@@ -24,13 +24,14 @@ function makeDb(
 
 describe('getHealthHeartbeats', () => {
   it('returns the latest tick per kind', async () => {
-    const heartbeats = await getHealthHeartbeats(makeDb())
+    const { heartbeats, readErrors } = await getHealthHeartbeats(makeDb())
     expect(heartbeats.worker).toBe('2026-09-20T00:00:00.000Z')
     expect(heartbeats.scheduler).toBe('2026-09-20T00:00:00.000Z')
+    expect(readErrors).toEqual([])
   })
 
-  it('never throws when a kind read fails (telemetry must not break health)', async () => {
-    const heartbeats = await getHealthHeartbeats(makeDb({ failRead: true }))
+  it('never throws when a kind read fails and reports the read error', async () => {
+    const { heartbeats, readErrors } = await getHealthHeartbeats(makeDb({ failRead: true }))
     expect(heartbeats).toEqual({
       scheduler: null,
       worker: null,
@@ -38,6 +39,7 @@ describe('getHealthHeartbeats', () => {
       youtube: null,
       health_alert: null,
     })
+    expect(readErrors).toHaveLength(5)
   })
 })
 

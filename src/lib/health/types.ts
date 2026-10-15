@@ -102,6 +102,8 @@ export interface HealthResponse {
 export interface HealthLivenessResponse {
   status: 'ok' | 'offline'
   database: DatabaseHealth
+  /** Log-table readability probe (schema drift / read failures). */
+  logs: { readable: boolean; detail: string }
   checkedAt: string
 }
 

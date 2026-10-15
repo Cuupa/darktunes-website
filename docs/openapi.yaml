@@ -2490,9 +2490,35 @@ paths:
     get:
       operationId: getadmin_rbac-audit
       tags: [Admin]
-      summary: Retrieve /api/admin/rbac-audit
+      summary: List RBAC audit log entries (role and permission changes)
       security:
         - AdminBearer: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: targetType
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
       responses:
         '200':
           description: Success
@@ -3252,7 +3278,7 @@ paths:
     get:
       operationId: getadmin_sos_import-batches
       tags: [Admin]
-      summary: list bronze import batches
+      summary: register a bronze import batch for an idempotent archive upload
       security:
         - AdminBearer: []
       responses:
@@ -3270,7 +3296,7 @@ paths:
     post:
       operationId: postadmin_sos_import-batches
       tags: [Admin]
-      summary: list bronze import batches
+      summary: register a bronze import batch for an idempotent archive upload
       security:
         - AdminBearer: []
       requestBody:
@@ -3279,14 +3305,43 @@ paths:
           application/json:
             schema:
               type: object
-              additionalProperties: true
+              required: [operation_id, period_start, period_end, distributor, filename]
+              properties:
+                operation_id: { type: string, format: uuid }
+                period_start: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+                period_end: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
+                distributor: { type: string }
+                filename: { type: string }
+                file_hash: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
+                row_count: { type: integer, minimum: 0 }
+                file_size: { type: integer, minimum: 0 }
       responses:
         '200':
-          description: Success
+          description: Existing completed batch returned for a duplicate file or operation replay
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessResponse"
+                type: object
+                required: [batch]
+                properties:
+                  batch: { type: object, additionalProperties: true }
+                  duplicate: { type: boolean }
+                  r2Key: { type: string }
+        '201':
+          description: Import batch registered
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [batch, r2Key]
+                properties:
+                  batch: { type: object, additionalProperties: true }
+                  r2Key: { type: string, description: Temporary upload key until confirm succeeds }
+        '409':
+          description: operation_id conflicts with an existing import
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -3373,7 +3428,7 @@ paths:
     patch:
       operationId: patchadmin_sos_import-batches_ById_confirm
       tags: [Admin]
-      summary: verify R2 content and store file hash
+      summary: verify and finalize the uploaded R2 object
       security:
         - AdminBearer: []
       parameters:
@@ -3388,15 +3443,29 @@ paths:
           application/json:
             schema:
               type: object
-              additionalProperties: true
+              required: [file_hash]
+              properties:
+                operation_id: { type: string, format: uuid }
+                file_hash: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
       responses:
         '200':
           description: Success
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessResponse"
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+                  r2Key: { type: string }
+                  duplicate: { type: boolean }
+                  batch: { type: object, additionalProperties: true }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: batch is already completed or operation_id does not match
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -3439,20 +3508,30 @@ paths:
           schema:
             type: string
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
               type: object
-              additionalProperties: true
+              properties:
+                upload_id: { type: string }
       responses:
         '200':
           description: Success
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessResponse"
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+                  already_aborted: { type: boolean }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: upload ID does not match the active batch
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -3482,7 +3561,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessResponse"
+                type: object
+                required: [ok, r2Key]
+                properties:
+                  ok: { type: boolean }
+                  r2Key: { type: string }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -3513,7 +3596,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessResponse"
+                type: object
+                required: [uploadId]
+                properties:
+                  uploadId: { type: string }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -5060,6 +5146,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
+        '503':
+          description: Log store rejected the write (missing columns/RPC or database error).
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }

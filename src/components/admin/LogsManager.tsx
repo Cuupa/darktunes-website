@@ -9,11 +9,14 @@
  *   3. App Errors   — app_logs entries (UI, R2, upload, Vercel, Supabase errors)
  *   4. RBAC Audit   — rbac_audit_log (role/permission changes)
  *   5. Admin Actions — admin_audit_log (general admin actions)
+ *
+ * All tabs share one panel shell (`LogsPanel`) that owns pagination, loading and
+ * the error state. A failed query shows the real message instead of an empty
+ * table — "no logs" must never be indistinguishable from "the read failed".
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import Link from 'next/link'
-import type { ColumnDef, PaginationState } from '@tanstack/react-table'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -25,19 +28,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Warning,
-  CheckCircle,
-  XCircle,
-  MagnifyingGlass,
-  Info,
-} from '@phosphor-icons/react'
+import { Warning, CheckCircle, XCircle, MagnifyingGlass, Info } from '@phosphor-icons/react'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import {
   ADMIN_TABLE_PAGE_SIZE,
   AdminDataTable,
   AdminTablePagination,
   useAdminTable,
+  type ColumnDef,
+  type PaginationState,
+  type Row,
 } from '@/components/admin/DataTable'
 import type { Database } from '@/types/database'
 
@@ -45,6 +45,11 @@ type RbacAuditRow = Database['public']['Tables']['rbac_audit_log']['Row']
 type AdminAuditRow = Database['public']['Tables']['admin_audit_log']['Row']
 type SyncLogRow = Database['public']['Tables']['sync_logs']['Row']
 type AppLogRow = Database['public']['Tables']['app_logs']['Row']
+
+/** Strip PostgREST filter grammar so a stray , ( ) % cannot break an `.or()`. */
+function sanitizeSearch(value: string): string {
+  return value.replace(/[%(),]/g, '').trim()
+}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('de-DE', {
@@ -118,73 +123,157 @@ const RBAC_ACTION_LABELS: Record<string, string> = {
   custom_permission_deleted: 'Custom permission deleted',
 }
 
-function useManualPagination() {
+interface LogPageResult<T> {
+  rows: T[]
+  total: number
+}
+
+interface LogsPanelProps<T extends { id: string }> {
+  columns: ColumnDef<T>[]
+  /** Loads one page; must throw on failure so the shell can display the reason. */
+  loadPage: (pageIndex: number) => Promise<LogPageResult<T>>
+  toolbar: ReactNode
+  renderSubRow?: (row: Row<T>) => ReactNode
+  emptyMessage?: string
+}
+
+/**
+ * Shared shell for every log tab: pagination, loading, error banner and table.
+ * Error message is shown (never swallowed) so a 500 or RLS failure is visible.
+ */
+function LogsPanel<T extends { id: string }>({
+  columns,
+  loadPage,
+  toolbar,
+  renderSubRow,
+  emptyMessage,
+}: LogsPanelProps<T>) {
+  const [rows, setRows] = useState<T[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: ADMIN_TABLE_PAGE_SIZE,
   })
-  const resetPage = useCallback(() => {
-    setPagination((prev) => ({ ...prev, pageIndex: 0 }))
-  }, [])
-  return { pagination, setPagination, resetPage }
+
+  // A new filter set (new loadPage identity) starts again on page 0.
+  useEffect(() => {
+    setPagination((prev) => (prev.pageIndex === 0 ? prev : { ...prev, pageIndex: 0 }))
+  }, [loadPage])
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    loadPage(pagination.pageIndex)
+      .then((result) => {
+        if (cancelled) return
+        setRows(result.rows)
+        setTotal(result.total)
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setRows([])
+        setTotal(0)
+        setError(err instanceof Error ? err.message : String(err))
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [loadPage, pagination.pageIndex])
+
+  const table = useAdminTable<T>({
+    data: rows,
+    columns,
+    enableSorting: false,
+    getRowId: (row) => row.id,
+    manualPagination: true,
+    pageCount: Math.max(1, Math.ceil(total / ADMIN_TABLE_PAGE_SIZE)),
+    rowCount: total,
+    onPaginationChange: setPagination,
+    state: { pagination },
+  })
+
+  return (
+    <div className="space-y-4">
+      {toolbar}
+
+      <AdminTablePagination
+        pageIndex={pagination.pageIndex}
+        totalCount={total}
+        onPageChange={(pageIndex) => setPagination((prev) => ({ ...prev, pageIndex }))}
+      />
+
+      {error && (
+        <div
+          role="alert"
+          className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive break-all"
+        >
+          Could not load logs: {error}
+        </div>
+      )}
+
+      <AdminDataTable
+        table={table}
+        loading={loading}
+        emptyMessage={emptyMessage}
+        renderSubRow={renderSubRow}
+      />
+    </div>
+  )
 }
 
-interface SyncLogsPanelProps {
-  errorsOnly?: boolean
-}
+const SYNC_LOG_SOURCES = [
+  'itunes',
+  'spotify',
+  'discogs',
+  'youtube',
+  'odesli',
+  'songkick',
+  'bandsintown',
+  'lastfm',
+  'soundcharts',
+  'apify',
+] as const
 
-function SyncLogsPanel({ errorsOnly = false }: SyncLogsPanelProps) {
+function SyncLogsPanel({ errorsOnly = false }: { errorsOnly?: boolean }) {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
-  const [logs, setLogs] = useState<SyncLogRow[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [source, setSource] = useState('all')
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
-  const { pagination, setPagination, resetPage } = useManualPagination()
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true)
-    try {
+  const loadPage = useCallback(
+    async (pageIndex: number): Promise<LogPageResult<SyncLogRow>> => {
       let query = supabase
         .from('sync_logs')
-        .select('*', { count: 'exact' })
+        .select('*', { count: 'estimated' })
         .order('created_at', { ascending: false })
         .range(
-          pagination.pageIndex * ADMIN_TABLE_PAGE_SIZE,
-          pagination.pageIndex * ADMIN_TABLE_PAGE_SIZE + ADMIN_TABLE_PAGE_SIZE - 1,
+          pageIndex * ADMIN_TABLE_PAGE_SIZE,
+          pageIndex * ADMIN_TABLE_PAGE_SIZE + ADMIN_TABLE_PAGE_SIZE - 1,
         )
 
       if (errorsOnly) {
         query = query.in('status', ['partial', 'error'])
       }
-      if (source && source !== 'all') {
+      if (source !== 'all') {
         query = query.eq('api_source', source)
       }
-      if (search.trim()) {
-        query = query.or(
-          `message.ilike.%${search.trim()}%,api_source.ilike.%${search.trim()}%`,
-        )
+      const term = sanitizeSearch(search)
+      if (term) {
+        query = query.or(`message.ilike.%${term}%,api_source.ilike.%${term}%`)
       }
 
       const { data, count, error } = await query
-      if (error) throw error
-      setLogs(data ?? [])
-      setTotal(count ?? 0)
-    } catch {
-      setLogs([])
-    } finally {
-      setLoading(false)
-    }
-  }, [supabase, pagination.pageIndex, errorsOnly, source, search])
-
-  useEffect(() => {
-    resetPage()
-  }, [search, source, resetPage])
-
-  useEffect(() => {
-    void fetchLogs()
-  }, [fetchLogs])
+      if (error) throw new Error(error.message)
+      return { rows: data ?? [], total: count ?? 0 }
+    },
+    [supabase, errorsOnly, source, search],
+  )
 
   const columns = useMemo<ColumnDef<SyncLogRow>[]>(() => {
     const base: ColumnDef<SyncLogRow>[] = [
@@ -213,6 +302,15 @@ function SyncLogsPanel({ errorsOnly = false }: SyncLogsPanelProps) {
         accessorKey: 'releases_synced',
         header: 'Releases synced',
         cell: ({ row }) => <span className="text-xs">{row.original.releases_synced}</span>,
+      },
+      {
+        accessorKey: 'duration_ms',
+        header: 'Duration',
+        cell: ({ row }) => (
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {row.original.duration_ms != null ? `${row.original.duration_ms} ms` : '—'}
+          </span>
+        ),
       },
       {
         accessorKey: 'rate_limited',
@@ -252,93 +350,72 @@ function SyncLogsPanel({ errorsOnly = false }: SyncLogsPanelProps) {
     return base
   }, [errorsOnly, expandedRow])
 
-  const table = useAdminTable({
-    data: logs,
-    columns,
-    enableSorting: false,
-    getRowId: (row) => row.id,
-    manualPagination: true,
-    pageCount: Math.max(1, Math.ceil(total / ADMIN_TABLE_PAGE_SIZE)),
-    rowCount: total,
-    onPaginationChange: setPagination,
-    state: { pagination },
-  })
-
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[180px]">
-          <MagnifyingGlass
-            size={14}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <Input
-            placeholder="Search message or API…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-8 text-sm"
-          />
+    <LogsPanel<SyncLogRow>
+      columns={columns}
+      loadPage={loadPage}
+      emptyMessage="No sync log entries found."
+      toolbar={
+        <div className="flex flex-wrap gap-2">
+          <div className="relative flex-1 min-w-[180px]">
+            <MagnifyingGlass
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              placeholder="Search message or API…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 h-8 text-sm"
+            />
+          </div>
+          <Select value={source} onValueChange={setSource}>
+            <SelectTrigger className="h-8 w-[160px] text-sm">
+              <SelectValue placeholder="All sources" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All sources</SelectItem>
+              {SYNC_LOG_SOURCES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={source} onValueChange={setSource}>
-          <SelectTrigger className="h-8 w-[150px] text-sm">
-            <SelectValue placeholder="All sources" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All sources</SelectItem>
-            <SelectItem value="itunes">iTunes</SelectItem>
-            <SelectItem value="spotify">Spotify</SelectItem>
-            <SelectItem value="discogs">Discogs</SelectItem>
-            <SelectItem value="youtube">YouTube</SelectItem>
-            <SelectItem value="odesli">Odesli</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <AdminTablePagination
-        pageIndex={pagination.pageIndex}
-        totalCount={total}
-        onPageChange={(pageIndex) => setPagination((prev) => ({ ...prev, pageIndex }))}
-      />
-
-      <AdminDataTable
-        table={table}
-        loading={loading}
-        renderSubRow={
-          errorsOnly
-            ? (row) => {
-                const errors = parseErrors(row.original.errors)
-                const isExpanded = expandedRow === row.original.id
-                if (!isExpanded || errors.length === 0) return null
-                return (
-                  <TableRow>
-                    <TableCell colSpan={columns.length} className="bg-destructive/5 pb-3 pt-0">
-                      <ul className="space-y-1 pl-2">
-                        {errors.map((err, i) => (
-                          <li
-                            key={i}
-                            className="text-xs text-destructive font-mono break-all bg-destructive/10 rounded px-2 py-1"
-                          >
-                            {err}
-                          </li>
-                        ))}
-                      </ul>
-                    </TableCell>
-                  </TableRow>
-                )
-              }
-            : undefined
-        }
-      />
-    </div>
+      }
+      renderSubRow={
+        errorsOnly
+          ? (row) => {
+              const errors = parseErrors(row.original.errors)
+              const isExpanded = expandedRow === row.original.id
+              if (!isExpanded || errors.length === 0) return null
+              return (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="bg-destructive/5 pb-3 pt-0">
+                    <ul className="space-y-1 pl-2">
+                      {errors.map((err, i) => (
+                        <li
+                          key={i}
+                          className="text-xs text-destructive font-mono break-all bg-destructive/10 rounded px-2 py-1"
+                        >
+                          {err}
+                        </li>
+                      ))}
+                    </ul>
+                  </TableCell>
+                </TableRow>
+              )
+            }
+          : undefined
+      }
+    />
   )
 }
 
 function AppLogsPanel() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
-  const [logs, setLogs] = useState<AppLogRow[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [source, setSource] = useState('all')
   const [level, setLevel] = useState('all')
@@ -347,30 +424,29 @@ function AppLogsPanel() {
   const [hideIgnored, setHideIgnored] = useState(true)
   const [mutatingId, setMutatingId] = useState<string | null>(null)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
-  const { pagination, setPagination, resetPage } = useManualPagination()
+  const [reloadKey, setReloadKey] = useState(0)
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true)
-    try {
+  const loadPage = useCallback(
+    async (pageIndex: number): Promise<LogPageResult<AppLogRow>> => {
+      void reloadKey // refetch signal after resolve/ignore
       let query = supabase
         .from('app_logs')
-        .select('*', { count: 'exact' })
+        .select('*', { count: 'estimated' })
         .order('last_seen_at', { ascending: false })
         .range(
-          pagination.pageIndex * ADMIN_TABLE_PAGE_SIZE,
-          pagination.pageIndex * ADMIN_TABLE_PAGE_SIZE + ADMIN_TABLE_PAGE_SIZE - 1,
+          pageIndex * ADMIN_TABLE_PAGE_SIZE,
+          pageIndex * ADMIN_TABLE_PAGE_SIZE + ADMIN_TABLE_PAGE_SIZE - 1,
         )
 
-      if (source && source !== 'all') {
+      if (source !== 'all') {
         query = query.eq('source', source)
       }
-      if (level && level !== 'all') {
+      if (level !== 'all') {
         query = query.eq('level', level as 'error' | 'warn' | 'info')
       }
-      if (search.trim()) {
-        query = query.or(
-          `message.ilike.%${search.trim()}%,source.ilike.%${search.trim()}%`,
-        )
+      const term = sanitizeSearch(search)
+      if (term) {
+        query = query.or(`message.ilike.%${term}%,source.ilike.%${term}%`)
       }
       if (userErrorsOnly) {
         query = query.not('user_id', 'is', null)
@@ -383,15 +459,11 @@ function AppLogsPanel() {
       }
 
       const { data, count, error } = await query
-      if (error) throw error
-      setLogs(data ?? [])
-      setTotal(count ?? 0)
-    } catch {
-      setLogs([])
-    } finally {
-      setLoading(false)
-    }
-  }, [supabase, pagination.pageIndex, source, level, search, userErrorsOnly, unresolvedOnly, hideIgnored])
+      if (error) throw new Error(error.message)
+      return { rows: data ?? [], total: count ?? 0 }
+    },
+    [supabase, source, level, search, userErrorsOnly, unresolvedOnly, hideIgnored, reloadKey],
+  )
 
   const updateLog = useCallback(
     async (id: string, patch: { resolved?: boolean; ignored?: boolean }) => {
@@ -411,23 +483,15 @@ function AppLogsPanel() {
           body: JSON.stringify(patch),
         })
         if (!res.ok) throw new Error('Failed to update log entry')
-        await fetchLogs()
+        setReloadKey((k) => k + 1)
       } catch {
         // Best-effort — the table simply keeps its previous state
       } finally {
         setMutatingId(null)
       }
     },
-    [supabase, fetchLogs],
+    [supabase],
   )
-
-  useEffect(() => {
-    resetPage()
-  }, [search, source, level, userErrorsOnly, unresolvedOnly, hideIgnored, resetPage])
-
-  useEffect(() => {
-    void fetchLogs()
-  }, [fetchLogs])
 
   const columns = useMemo<ColumnDef<AppLogRow>[]>(
     () => [
@@ -572,132 +636,110 @@ function AppLogsPanel() {
     [expandedRow, mutatingId, updateLog],
   )
 
-  const table = useAdminTable({
-    data: logs,
-    columns,
-    enableSorting: false,
-    getRowId: (row) => row.id,
-    manualPagination: true,
-    pageCount: Math.max(1, Math.ceil(total / ADMIN_TABLE_PAGE_SIZE)),
-    rowCount: total,
-    onPaginationChange: setPagination,
-    state: { pagination },
-  })
-
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[180px]">
-          <MagnifyingGlass
-            size={14}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <Input
-            placeholder="Search message or source…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-8 text-sm"
-          />
+    <LogsPanel<AppLogRow>
+      columns={columns}
+      loadPage={loadPage}
+      emptyMessage="No app error entries found."
+      toolbar={
+        <div className="flex flex-wrap gap-2">
+          <div className="relative flex-1 min-w-[180px]">
+            <MagnifyingGlass
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              placeholder="Search message or source…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 h-8 text-sm"
+            />
+          </div>
+          <Select value={source} onValueChange={setSource}>
+            <SelectTrigger className="h-8 w-[140px] text-sm">
+              <SelectValue placeholder="All sources" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All sources</SelectItem>
+              <SelectItem value="r2">R2 / Storage</SelectItem>
+              <SelectItem value="supabase">Supabase</SelectItem>
+              <SelectItem value="upload">Upload</SelectItem>
+              <SelectItem value="ui">UI</SelectItem>
+              <SelectItem value="api">API</SelectItem>
+              <SelectItem value="server_action">Server Actions</SelectItem>
+              <SelectItem value="vercel">Vercel</SelectItem>
+              <SelectItem value="sync">Sync</SelectItem>
+            </SelectContent>
+          </Select>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={userErrorsOnly}
+              onChange={(e) => setUserErrorsOnly(e.target.checked)}
+              className="rounded border-border"
+            />
+            User errors only
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={unresolvedOnly}
+              onChange={(e) => setUnresolvedOnly(e.target.checked)}
+              className="rounded border-border"
+            />
+            Unresolved only
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={hideIgnored}
+              onChange={(e) => setHideIgnored(e.target.checked)}
+              className="rounded border-border"
+            />
+            Hide ignored
+          </label>
+          <Select value={level} onValueChange={setLevel}>
+            <SelectTrigger className="h-8 w-[120px] text-sm">
+              <SelectValue placeholder="All levels" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All levels</SelectItem>
+              <SelectItem value="error">Error</SelectItem>
+              <SelectItem value="warn">Warning</SelectItem>
+              <SelectItem value="info">Info</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={source} onValueChange={setSource}>
-          <SelectTrigger className="h-8 w-[140px] text-sm">
-            <SelectValue placeholder="All sources" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All sources</SelectItem>
-            <SelectItem value="r2">R2 / Storage</SelectItem>
-            <SelectItem value="supabase">Supabase</SelectItem>
-            <SelectItem value="upload">Upload</SelectItem>
-            <SelectItem value="ui">UI</SelectItem>
-            <SelectItem value="api">API</SelectItem>
-            <SelectItem value="server_action">Server Actions</SelectItem>
-            <SelectItem value="vercel">Vercel</SelectItem>
-          </SelectContent>
-        </Select>
-        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={userErrorsOnly}
-            onChange={(e) => setUserErrorsOnly(e.target.checked)}
-            className="rounded border-border"
-          />
-          User errors only
-        </label>
-        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={unresolvedOnly}
-            onChange={(e) => setUnresolvedOnly(e.target.checked)}
-            className="rounded border-border"
-          />
-          Unresolved only
-        </label>
-        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={hideIgnored}
-            onChange={(e) => setHideIgnored(e.target.checked)}
-            className="rounded border-border"
-          />
-          Hide ignored
-        </label>
-        <Select value={level} onValueChange={setLevel}>
-          <SelectTrigger className="h-8 w-[120px] text-sm">
-            <SelectValue placeholder="All levels" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All levels</SelectItem>
-            <SelectItem value="error">Error</SelectItem>
-            <SelectItem value="warn">Warning</SelectItem>
-            <SelectItem value="info">Info</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <AdminTablePagination
-        pageIndex={pagination.pageIndex}
-        totalCount={total}
-        onPageChange={(pageIndex) => setPagination((prev) => ({ ...prev, pageIndex }))}
-      />
-
-      <AdminDataTable
-        table={table}
-        loading={loading}
-        renderSubRow={(row) => {
-          const hasDetails =
-            row.original.details &&
-            typeof row.original.details === 'object' &&
-            Object.keys(row.original.details).length > 0
-          const isExpanded = expandedRow === row.original.id
-          if (!isExpanded || !hasDetails) return null
-          return (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="bg-muted/30 pb-3 pt-0">
-                <pre className="text-xs font-mono break-all whitespace-pre-wrap bg-muted/50 rounded px-3 py-2">
-                  {JSON.stringify(row.original.details, null, 2)}
-                </pre>
-              </TableCell>
-            </TableRow>
-          )
-        }}
-      />
-    </div>
+      }
+      renderSubRow={(row) => {
+        const hasDetails =
+          row.original.details &&
+          typeof row.original.details === 'object' &&
+          Object.keys(row.original.details).length > 0
+        const isExpanded = expandedRow === row.original.id
+        if (!isExpanded || !hasDetails) return null
+        return (
+          <TableRow>
+            <TableCell colSpan={columns.length} className="bg-muted/30 pb-3 pt-0">
+              <pre className="text-xs font-mono break-all whitespace-pre-wrap bg-muted/50 rounded px-3 py-2">
+                {JSON.stringify(row.original.details, null, 2)}
+              </pre>
+            </TableCell>
+          </TableRow>
+        )
+      }}
+    />
   )
 }
 
 function RbacAuditPanel() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
-  const [entries, setEntries] = useState<RbacAuditRow[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
-  const { pagination, setPagination, resetPage } = useManualPagination()
 
-  const fetchEntries = useCallback(async () => {
-    setLoading(true)
-    try {
+  const loadPage = useCallback(
+    async (pageIndex: number): Promise<LogPageResult<RbacAuditRow>> => {
       const {
         data: { session },
       } = await supabase.auth.getSession()
@@ -705,39 +747,20 @@ function RbacAuditPanel() {
         ? { Authorization: 'Bearer ' + session.access_token }
         : {}
       const params = new URLSearchParams({
-        page: String(pagination.pageIndex),
+        page: String(pageIndex),
         pageSize: String(ADMIN_TABLE_PAGE_SIZE),
       })
+      if (search.trim()) params.set('search', search.trim())
+
       const res = await fetch(`/api/admin/rbac-audit?${params.toString()}`, { headers })
-      if (!res.ok) throw new Error('Failed to load RBAC audit log')
+      if (!res.ok) {
+        throw new Error(`Failed to load RBAC audit log (${res.status})`)
+      }
       const body = (await res.json()) as { data: RbacAuditRow[]; total: number }
-      setEntries(body.data)
-      setTotal(body.total)
-    } catch {
-      setEntries([])
-    } finally {
-      setLoading(false)
-    }
-  }, [supabase, pagination.pageIndex])
-
-  useEffect(() => {
-    resetPage()
-  }, [search, resetPage])
-
-  useEffect(() => {
-    void fetchEntries()
-  }, [fetchEntries])
-
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase()
-    if (!q) return entries
-    return entries.filter(
-      (e) =>
-        e.action.toLowerCase().includes(q) ||
-        e.target_type.toLowerCase().includes(q) ||
-        (e.target_id ?? '').toLowerCase().includes(q),
-    )
-  }, [entries, search])
+      return { rows: body.data, total: body.total }
+    },
+    [supabase, search],
+  )
 
   const columns = useMemo<ColumnDef<RbacAuditRow>[]>(
     () => [
@@ -797,129 +820,94 @@ function RbacAuditPanel() {
     [expanded],
   )
 
-  const table = useAdminTable({
-    data: filtered,
-    columns,
-    enableSorting: false,
-    getRowId: (row) => row.id,
-    manualPagination: true,
-    pageCount: Math.max(1, Math.ceil(total / ADMIN_TABLE_PAGE_SIZE)),
-    rowCount: total,
-    onPaginationChange: setPagination,
-    state: { pagination },
-  })
-
   return (
-    <div className="space-y-4">
-      <div className="relative">
-        <MagnifyingGlass
-          size={14}
-          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-          aria-hidden="true"
-        />
-        <Input
-          placeholder="Search action, target type, target id…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-8 h-8 text-sm"
-        />
-      </div>
-
-      <AdminTablePagination
-        pageIndex={pagination.pageIndex}
-        totalCount={total}
-        onPageChange={(pageIndex) => setPagination((prev) => ({ ...prev, pageIndex }))}
-      />
-
-      <AdminDataTable
-        table={table}
-        loading={loading}
-        emptyMessage="No RBAC audit entries found."
-        renderSubRow={(row) => {
-          const hasChanges = !!(row.original.old_value || row.original.new_value)
-          const isExpanded = expanded === row.original.id
-          if (!isExpanded || !hasChanges) return null
-          return (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="bg-muted/30 pb-3 pt-0">
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  {row.original.old_value && (
-                    <div>
-                      <p className="text-[10px] font-medium text-muted-foreground mb-1 uppercase tracking-wider">
-                        Before
-                      </p>
-                      <pre className="text-xs font-mono bg-muted/50 rounded px-2 py-1.5 break-all whitespace-pre-wrap">
-                        {JSON.stringify(row.original.old_value, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                  {row.original.new_value && (
-                    <div>
-                      <p className="text-[10px] font-medium text-muted-foreground mb-1 uppercase tracking-wider">
-                        After
-                      </p>
-                      <pre className="text-xs font-mono bg-muted/50 rounded px-2 py-1.5 break-all whitespace-pre-wrap">
-                        {JSON.stringify(row.original.new_value, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              </TableCell>
-            </TableRow>
-          )
-        }}
-      />
-    </div>
+    <LogsPanel<RbacAuditRow>
+      columns={columns}
+      loadPage={loadPage}
+      emptyMessage="No RBAC audit entries found."
+      toolbar={
+        <div className="relative">
+          <MagnifyingGlass
+            size={14}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            placeholder="Search action, target type, target id…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
+      }
+      renderSubRow={(row) => {
+        const hasChanges = !!(row.original.old_value || row.original.new_value)
+        const isExpanded = expanded === row.original.id
+        if (!isExpanded || !hasChanges) return null
+        return (
+          <TableRow>
+            <TableCell colSpan={columns.length} className="bg-muted/30 pb-3 pt-0">
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                {row.original.old_value && (
+                  <div>
+                    <p className="text-[10px] font-medium text-muted-foreground mb-1 uppercase tracking-wider">
+                      Before
+                    </p>
+                    <pre className="text-xs font-mono bg-muted/50 rounded px-2 py-1.5 break-all whitespace-pre-wrap">
+                      {JSON.stringify(row.original.old_value, null, 2)}
+                    </pre>
+                  </div>
+                )}
+                {row.original.new_value && (
+                  <div>
+                    <p className="text-[10px] font-medium text-muted-foreground mb-1 uppercase tracking-wider">
+                      After
+                    </p>
+                    <pre className="text-xs font-mono bg-muted/50 rounded px-2 py-1.5 break-all whitespace-pre-wrap">
+                      {JSON.stringify(row.original.new_value, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </TableCell>
+          </TableRow>
+        )
+      }}
+    />
   )
 }
 
 function AdminActionsPanel() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
-  const [logs, setLogs] = useState<AdminAuditRow[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [resource, setResource] = useState('all')
   const [expanded, setExpanded] = useState<string | null>(null)
-  const { pagination, setPagination, resetPage } = useManualPagination()
 
-  const fetchLogs = useCallback(async () => {
-    setLoading(true)
-    try {
+  const loadPage = useCallback(
+    async (pageIndex: number): Promise<LogPageResult<AdminAuditRow>> => {
       let query = supabase
         .from('admin_audit_log')
-        .select('*', { count: 'exact' })
+        .select('*', { count: 'estimated' })
         .order('created_at', { ascending: false })
         .range(
-          pagination.pageIndex * ADMIN_TABLE_PAGE_SIZE,
-          pagination.pageIndex * ADMIN_TABLE_PAGE_SIZE + ADMIN_TABLE_PAGE_SIZE - 1,
+          pageIndex * ADMIN_TABLE_PAGE_SIZE,
+          pageIndex * ADMIN_TABLE_PAGE_SIZE + ADMIN_TABLE_PAGE_SIZE - 1,
         )
 
-      if (resource && resource !== 'all') query = query.eq('resource', resource)
-      if (search.trim()) {
+      if (resource !== 'all') query = query.eq('resource', resource)
+      const term = sanitizeSearch(search)
+      if (term) {
         query = query.or(
-          `action.ilike.%${search.trim()}%,resource.ilike.%${search.trim()}%,resource_id.ilike.%${search.trim()}%`,
+          `action.ilike.%${term}%,resource.ilike.%${term}%,resource_id.ilike.%${term}%`,
         )
       }
 
       const { data, count, error } = await query
-      if (error) throw error
-      setLogs(data ?? [])
-      setTotal(count ?? 0)
-    } catch {
-      setLogs([])
-    } finally {
-      setLoading(false)
-    }
-  }, [supabase, pagination.pageIndex, resource, search])
-
-  useEffect(() => {
-    resetPage()
-  }, [search, resource, resetPage])
-
-  useEffect(() => {
-    void fetchLogs()
-  }, [fetchLogs])
+      if (error) throw new Error(error.message)
+      return { rows: data ?? [], total: count ?? 0 }
+    },
+    [supabase, resource, search],
+  )
 
   const columns = useMemo<ColumnDef<AdminAuditRow>[]>(
     () => [
@@ -982,79 +970,60 @@ function AdminActionsPanel() {
     [expanded],
   )
 
-  const table = useAdminTable({
-    data: logs,
-    columns,
-    enableSorting: false,
-    getRowId: (row) => row.id,
-    manualPagination: true,
-    pageCount: Math.max(1, Math.ceil(total / ADMIN_TABLE_PAGE_SIZE)),
-    rowCount: total,
-    onPaginationChange: setPagination,
-    state: { pagination },
-  })
-
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[180px]">
-          <MagnifyingGlass
-            size={14}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <Input
-            placeholder="Search action or resource…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 h-8 text-sm"
-          />
+    <LogsPanel<AdminAuditRow>
+      columns={columns}
+      loadPage={loadPage}
+      emptyMessage="No admin action entries found."
+      toolbar={
+        <div className="flex flex-wrap gap-2">
+          <div className="relative flex-1 min-w-[180px]">
+            <MagnifyingGlass
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              placeholder="Search action or resource…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 h-8 text-sm"
+            />
+          </div>
+          <Select value={resource} onValueChange={setResource}>
+            <SelectTrigger className="h-8 w-[160px] text-sm">
+              <SelectValue placeholder="All resources" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All resources</SelectItem>
+              <SelectItem value="artists">Artists</SelectItem>
+              <SelectItem value="releases">Releases</SelectItem>
+              <SelectItem value="news">News</SelectItem>
+              <SelectItem value="videos">Videos</SelectItem>
+              <SelectItem value="users">Users</SelectItem>
+              <SelectItem value="settings">Settings</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={resource} onValueChange={setResource}>
-          <SelectTrigger className="h-8 w-[160px] text-sm">
-            <SelectValue placeholder="All resources" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All resources</SelectItem>
-            <SelectItem value="artists">Artists</SelectItem>
-            <SelectItem value="releases">Releases</SelectItem>
-            <SelectItem value="news">News</SelectItem>
-            <SelectItem value="videos">Videos</SelectItem>
-            <SelectItem value="users">Users</SelectItem>
-            <SelectItem value="settings">Settings</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <AdminTablePagination
-        pageIndex={pagination.pageIndex}
-        totalCount={total}
-        onPageChange={(pageIndex) => setPagination((prev) => ({ ...prev, pageIndex }))}
-      />
-
-      <AdminDataTable
-        table={table}
-        loading={loading}
-        emptyMessage="No admin action entries found."
-        renderSubRow={(row) => {
-          const hasDetails =
-            row.original.details &&
-            typeof row.original.details === 'object' &&
-            Object.keys(row.original.details).length > 0
-          const isExpanded = expanded === row.original.id
-          if (!isExpanded || !hasDetails) return null
-          return (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="bg-muted/30 pb-3 pt-0">
-                <pre className="text-xs font-mono break-all whitespace-pre-wrap bg-muted/50 rounded px-3 py-2">
-                  {JSON.stringify(row.original.details, null, 2)}
-                </pre>
-              </TableCell>
-            </TableRow>
-          )
-        }}
-      />
-    </div>
+      }
+      renderSubRow={(row) => {
+        const hasDetails =
+          row.original.details &&
+          typeof row.original.details === 'object' &&
+          Object.keys(row.original.details).length > 0
+        const isExpanded = expanded === row.original.id
+        if (!isExpanded || !hasDetails) return null
+        return (
+          <TableRow>
+            <TableCell colSpan={columns.length} className="bg-muted/30 pb-3 pt-0">
+              <pre className="text-xs font-mono break-all whitespace-pre-wrap bg-muted/50 rounded px-3 py-2">
+                {JSON.stringify(row.original.details, null, 2)}
+              </pre>
+            </TableCell>
+          </TableRow>
+        )
+      }}
+    />
   )
 }
 

@@ -69,16 +69,16 @@ function clampMessage(message: string): string {
     : message
 }
 
-export async function writeAppLog(opts: WriteAppLogOptions): Promise<void> {
+export async function writeAppLog(opts: WriteAppLogOptions): Promise<boolean> {
   try {
-    if (process.env.APP_ERROR_LOG_DISABLED === 'true') return
+    if (process.env.APP_ERROR_LOG_DISABLED === 'true') return true
 
     const db = getLogClient()
     if (!db) {
       console.error(
         'error log persist skipped: missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY',
       )
-      return
+      return false
     }
 
     const source = opts.source
@@ -122,7 +122,7 @@ export async function writeAppLog(opts: WriteAppLogOptions): Promise<void> {
       rpcFailed = error
     }
 
-    if (persisted) return
+    if (persisted) return true
 
     if (rpcFailed) {
       console.error('error log rpc failed', rpcFailed)
@@ -148,8 +148,11 @@ export async function writeAppLog(opts: WriteAppLogOptions): Promise<void> {
     const { error: insertError } = await db.from('app_logs').insert(row)
     if (insertError) {
       console.error('error log persist failed', insertError)
+      return false
     }
+    return true
   } catch (error) {
     console.error('error log persist failed', error)
+    return false
   }
 }

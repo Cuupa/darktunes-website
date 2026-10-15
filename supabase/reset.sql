@@ -2485,6 +2485,9 @@ CREATE TABLE IF NOT EXISTS public.distributor_import_batches (
   distributor     TEXT        NOT NULL,
   r2_key          TEXT        NOT NULL UNIQUE,
   file_hash       TEXT,
+  operation_id    UUID,
+  multipart_upload_id TEXT,
+  multipart_started_at TIMESTAMPTZ,
   row_count       INTEGER     NOT NULL DEFAULT 0,
   status          TEXT        NOT NULL DEFAULT 'uploaded'
                   CHECK (status IN ('uploaded', 'processing', 'completed', 'failed')),
@@ -2492,6 +2495,15 @@ CREATE TABLE IF NOT EXISTS public.distributor_import_batches (
   uploaded_by     UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.distributor_import_batches
+  ADD COLUMN IF NOT EXISTS operation_id UUID,
+  ADD COLUMN IF NOT EXISTS multipart_upload_id TEXT,
+  ADD COLUMN IF NOT EXISTS multipart_started_at TIMESTAMPTZ;
+
+CREATE UNIQUE INDEX IF NOT EXISTS distributor_import_batches_operation_id_unique
+  ON public.distributor_import_batches (operation_id)
+  WHERE operation_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_distributor_import_batches_period
   ON public.distributor_import_batches (period_start DESC);
@@ -3132,6 +3144,31 @@ $$;
 
 REVOKE ALL ON FUNCTION public.upsert_app_log(TEXT, TEXT, TEXT, TEXT, JSONB, UUID, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.upsert_app_log(TEXT, TEXT, TEXT, TEXT, JSONB, UUID, TEXT, TEXT, TEXT, TEXT, TEXT) TO service_role;
+
+-- Admin maintenance: delete every row of one allowlisted log table and return
+-- the deleted count, instead of shipping every deleted id to the client.
+CREATE OR REPLACE FUNCTION public.clear_log_table(p_table TEXT)
+RETURNS BIGINT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  deleted BIGINT;
+BEGIN
+  IF p_table NOT IN ('app_logs', 'sync_logs', 'rbac_audit_log', 'admin_audit_log') THEN
+    RAISE EXCEPTION 'table % is not a clearable log table', p_table
+      USING ERRCODE = '22023';
+  END IF;
+
+  EXECUTE format('DELETE FROM public.%I', p_table);
+  GET DIAGNOSTICS deleted = ROW_COUNT;
+  RETURN deleted;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.clear_log_table(TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.clear_log_table(TEXT) TO service_role;
 
 -- ---------------------------------------------------------------------------
 -- TABLE: support_known_errors  (fingerprints excluded from Zammad auto-tickets)
@@ -3969,14 +4006,13 @@ CREATE POLICY "sync_logs: editor+ read" ON public.sync_logs
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "app_logs: admin read"   ON public.app_logs;
 DROP POLICY IF EXISTS "app_logs: admin insert" ON public.app_logs;
+DROP POLICY IF EXISTS "app_logs: authenticated insert" ON public.app_logs;
 
--- Any authenticated user can write (so the UI can report its own errors)
+-- Read: admins and editors. Writes go exclusively through the service role
+-- (server-side src/lib/appLog.ts) — there is intentionally no browser INSERT
+-- policy, so clients cannot forge or spam aggregated error rows.
 CREATE POLICY "app_logs: admin read" ON public.app_logs
   FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
-
--- Allows any authenticated user to write error logs from the UI
-CREATE POLICY "app_logs: authenticated insert" ON public.app_logs
-  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 -- ---------------------------------------------------------------------------
 -- RLS: support_known_errors

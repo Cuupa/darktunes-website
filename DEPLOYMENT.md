@@ -149,7 +149,9 @@ Admin bronze distributor CSVs (SOS Accounting) upload and download **directly** 
 
 Most uploads are handled server-side at Next.js Route Handlers (`app/api/upload/route.ts` for admin assets, portal routes like `app/api/portal/upload-photo/route.ts`). This avoids R2 CORS. SOS bronze CSVs are the exception: they use presigned browser → R2 URLs (see section 3). No Supabase Edge Functions are needed for uploads.
 
-**SOS bronze CSV limits** (see `src/lib/sos/bronzeUploadLimits.ts`): presigned single PUT ≤ 32 MB; presigned multipart up to 1 GB with 16 MB parts (non-final parts ≥ 5 MiB); server-proxy fallback ≤ 4 MB. Every direct PUT retries up to 4 attempts with a freshly signed URL on a dropped connection or an expired signature; each attempt is bounded by a timeout scaled to the file size (2–14 minutes) so a stalled connection cannot hang the queue and a slow-but-working link is not cut off. Bronze archives are queued one at a time so concurrent large uploads cannot starve the uplink.
+**SOS bronze CSV limits** (see `src/lib/sos/bronzeUploadLimits.ts`): presigned single PUT ≤ 32 MB; presigned multipart up to 1 GB with 16 MB parts (non-final parts ≥ 5 MiB); server-proxy fallback ≤ 4 MB. Every file uses one `operation_id` for registration, retries, and phase logs. Direct PUTs retry up to 4 times with a fresh signed URL and a size-scaled timeout (2–14 minutes). Register, multipart control, abort, and confirm requests also have deadlines. Bronze archives run one at a time. Confirm copies the staged object to a final key, verifies its SHA-256, then stores the final key and completed status. A valid old PUT URL can only write to the staged key.
+
+**Recover stuck multipart uploads:** Admin → System → Maintenance → R2 scan lists and aborts incomplete multipart uploads older than 24 hours. Run a complete scan after deploying multipart changes to remove old abandoned parts. The snapshot reports `multipart_aborted_count`. New sessions store their upload ID before the browser receives it; retries reuse that ID and resend parts. Failure and batch deletion abort the tracked ID. Incomplete sessions younger than 24 hours remain available to avoid aborting an active upload.
 
 The Route Handler:
 1. Verifies the Bearer token and requires an `admin` or `editor` role
@@ -327,6 +329,13 @@ silently in production and was removed):
 | `app-logs-cleanup` | `30 4 * * *` | SQL | Prunes `app_logs` rows not seen for 90 days |
 
 `/api/sync/execute` is an alias of `/api/sync`; do not schedule both.
+
+> **Log retention:** the jobs above prune `cron_ticks` (14d), `sync_runs` (30d)
+> and `app_logs` (90d). `sync_logs`, `rbac_audit_log` and `admin_audit_log` have
+> **no retention job** and grow unbounded — the admin log tabs only request an
+> estimated count so a large table stays usable. If you want a retention window
+> there, add a dashboard SQL job (owner decision) or clear a table manually from
+> Admin → System → Maintenance.
 
 > **Odesli note:** The Odesli / song.link `v1-alpha.1` public API was sunset on
 > 2026-07-31 (it now returns `401 PUBLIC_API_ACCESS_DEPRECATED`). Add an

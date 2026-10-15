@@ -66,22 +66,108 @@ describe('validateStatementUploadPeriod', () => {
 })
 
 describe('validateStatementSourceArchive', () => {
-  it('allows publishes with no session files', () => {
-    expect(validateStatementSourceArchive({})).toEqual({ ok: true })
-    expect(validateStatementSourceArchive({ sourceFileCount: 0, archivedFileCount: 0 })).toEqual({
-      ok: true,
-    })
+  const completedBatch = {
+    id: 'batch-1',
+    periodStart: '2026-01-01',
+    periodEnd: '2026-03-31',
+    status: 'completed',
+    fileHash: 'ab'.repeat(32),
+  }
+
+  it('allows the explicit PDF-only path when no source batches are saved', () => {
+    expect(
+      validateStatementSourceArchive({
+        sourceMode: 'manual',
+        sourceBatchIds: [],
+        workspaceBatchIds: [],
+        batches: [],
+        periodStart: '2026-01-01',
+        periodEnd: '2026-03-31',
+      }),
+    ).toEqual({ ok: true })
   })
 
-  it('rejects when session files outnumber archives', () => {
+  it('rejects a missing server-side archive manifest', () => {
     expect(
-      validateStatementSourceArchive({ sourceFileCount: 2, archivedFileCount: 1 }),
+      validateStatementSourceArchive({
+        sourceMode: 'bronze',
+        sourceBatchIds: ['batch-1'],
+        workspaceBatchIds: [],
+        batches: [completedBatch],
+        periodStart: '2026-01-01',
+        periodEnd: '2026-03-31',
+      }),
     ).toMatchObject({ ok: false, error: 'source_archive_incomplete' })
   })
 
-  it('accepts when every session file is archived', () => {
+  it('rejects omitted or changed bronze source IDs against the persisted workspace', () => {
     expect(
-      validateStatementSourceArchive({ sourceFileCount: 2, archivedFileCount: 2 }),
+      validateStatementSourceArchive({
+        sourceMode: 'bronze',
+        sourceBatchIds: ['batch-1', 'batch-2'],
+        workspaceBatchIds: ['batch-1'],
+        batches: [completedBatch],
+        periodStart: '2026-01-01',
+        periodEnd: '2026-03-31',
+      }),
+      ).toMatchObject({ ok: false, error: 'source_manifest_mismatch' })
+
+    expect(
+      validateStatementSourceArchive({
+        sourceMode: 'bronze',
+        sourceBatchIds: ['batch-2'],
+        workspaceBatchIds: ['batch-1'],
+        batches: [completedBatch],
+        periodStart: '2026-01-01',
+        periodEnd: '2026-03-31',
+      }),
+      ).toMatchObject({ ok: false, error: 'source_manifest_mismatch' })
+
+    expect(
+      validateStatementSourceArchive({
+        sourceMode: 'manual',
+        sourceBatchIds: [],
+        workspaceBatchIds: ['batch-1'],
+        batches: [completedBatch],
+        periodStart: '2026-01-01',
+        periodEnd: '2026-03-31',
+      }),
     ).toEqual({ ok: true })
+  })
+
+  it('accepts only completed, hashed batches from the exact period', () => {
+    expect(
+      validateStatementSourceArchive({
+        sourceMode: 'bronze',
+        sourceBatchIds: ['batch-1'],
+        workspaceBatchIds: ['batch-1'],
+        batches: [completedBatch],
+        primaryBatchId: 'batch-1',
+        periodStart: '2026-01-01',
+        periodEnd: '2026-03-31',
+      }),
+    ).toEqual({ ok: true })
+
+    expect(
+      validateStatementSourceArchive({
+        sourceMode: 'bronze',
+        sourceBatchIds: ['batch-1'],
+        workspaceBatchIds: ['batch-1'],
+        batches: [{ ...completedBatch, status: 'uploaded' }],
+        periodStart: '2026-01-01',
+        periodEnd: '2026-03-31',
+      }),
+    ).toMatchObject({ ok: false, error: 'source_batch_invalid' })
+
+    expect(
+      validateStatementSourceArchive({
+        sourceMode: 'bronze',
+        sourceBatchIds: ['batch-1'],
+        workspaceBatchIds: ['batch-1'],
+        batches: [{ ...completedBatch, periodStart: '2025-10', periodEnd: '2025-12' }],
+        periodStart: '2026-01-01',
+        periodEnd: '2026-03-31',
+      }),
+    ).toMatchObject({ ok: false, error: 'source_batch_invalid' })
   })
 })

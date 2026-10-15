@@ -104,7 +104,7 @@ Admin/editor only. One linear flow: `AccountingGuidedWizard` (**Files → Checks
 
 ## Bronze CSV import
 
-Client: `bronzeUpload.ts`. Multipart: `bronzeMultipartUpload.ts`. Limits: `bronzeUploadLimits.ts`. Decision tree in `AGENTS.md` / `features.md`. Register may send `file_hash` for duplicate lookup; persist hash only at confirm. Pending batches stay writable until `status === 'completed'`.
+Client: `bronzeUpload.ts`. Multipart: `bronzeMultipartUpload.ts`. Limits: `bronzeUploadLimits.ts`. Uploads use a stable `operation_id`; timeouts and phase durations are logged with the same ID. Multipart IDs and start times are stored before the init response. Retries reuse the active ID and resend parts. Failure and batch deletion abort known sessions. Register may send `file_hash` for duplicate lookup; persist the verified hash only at confirm. Confirm copies to a final R2 key and stores that key only after hashing the copied object. The full R2 storage scan aborts incomplete uploads older than 24 hours and clears matching SOS batch IDs. Pending batches stay writable until `status === 'completed'`.
 
 ## SOS upload (portal + admin)
 
@@ -276,10 +276,20 @@ Pipeline:
 1. **Global catch** — `instrumentation.ts` (`onRequestError`) captures every unhandled server error (RSC, route handler, server action, proxy) and calls `captureError` (`src/lib/observability/captureError.ts`). Node persists; Edge only logs to console.
 2. **Route errors** — `withErrorHandler` (`src/lib/errors.ts`) persists handled route errors via `writeAppLog` (`src/lib/appLog.ts`).
 3. **Server actions / background** — `logServerActionError` delegates to `captureError`.
-4. **Client** — `reportClientError` (`src/lib/clientErrorReporter.ts`) → `POST /api/log-error` → `writeAppLog`.
+4. **Client** — `reportClientError` (`src/lib/clientErrorReporter.ts`) → `POST /api/log-error` → `writeAppLog`. The route returns **503** when the write was rejected, and `logClientAppEvent` warns on that status.
 5. **Structured logs** — `src/lib/observability/logger.ts` emits JSON lines with PII redaction (email, bearer tokens, long digit runs, sensitive keys). `app_logs.details` is redacted before persistence.
 
+**`writeAppLog` returns a boolean** (was void): `true` when the row was persisted or logging is intentionally disabled, `false` when the RPC and the fallback insert both failed. The fallback path reports to the console; nothing else can be persisted when the log store itself is down.
+
+**Reading is not swallowing:** the admin viewer `src/components/admin/LogsManager.tsx` runs all five tabs through one `LogsPanel` shell that shows the real PostgREST error above the table. A failed query must never render as "no logs". Writes are never issued from the browser (`app_logs: authenticated insert` is removed; only the service role writes).
+
+**Sync logs are written through one helper:** `recordSyncLog` (`src/lib/api/syncLogs.ts`) wraps the insert and, on failure, reports to `app_logs` + console instead of dropping the PostgREST error. Use it for every `sync_logs` insert.
+
 **Aggregation:** rows with the same `fingerprint` (`src/lib/observability/fingerprint.ts`, FNV-1a over event + name + normalized message + first stack frame) are upserted by the `upsert_app_log` RPC into **one row** with an `occurrences` counter and `first_seen_at`/`last_seen_at`. Admins resolve/ignore rows via `PATCH /api/admin/app-logs/{id}`. Retention: pg_cron `app-logs-cleanup` deletes rows not seen for 90 days (`DEPLOYMENT.md`).
+
+**Log-store health:** `/api/health` (lite) includes a `logs` probe (`checkLogStore` in `src/lib/health/healthLiveness.ts`) that selects the newest `app_logs`/`sync_logs` columns, so schema drift shows up as `logs.readable = false` instead of a silent gap. The full snapshot adds a "Log tables unreadable" alert. `checkDatabaseLiveness` probes `artists`, never a log table — a broken log table is not a database outage.
+
+**Maintenance:** `POST /api/admin/maintenance/clear-logs` calls the service-role `clear_log_table(p_table)` RPC (internal table allowlist, `DELETE` + row count) — it never ships every deleted id to the client. `verify:schema-columns` covers `app_logs`, `sync_logs` and `cron_ticks`.
 
 **Not an audit log:** business changes belong in `admin_audit_log` (see below).
 

@@ -13,11 +13,13 @@ import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   deleteImportBatch,
   getImportBatchById,
+  setImportBatchMultipartUpload,
   updateImportBatchStatus,
 } from '@/lib/api/distributorImportBatches'
 import { logAdminActionForRequest } from '@/lib/adminAuditLog'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createR2Client, deleteObjectFromR2 } from '@/lib/r2Utils'
+import { abortBronzeMultipartUpload } from '@/lib/sos/bronzeMultipartUpload'
 
 function extractBatchIdFromPath(pathname: string): string | null {
   const match = pathname.match(/\/import-batches\/([^/]+)\/?$/)
@@ -71,6 +73,26 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
     throw new ApiError(409, 'Cannot mark a confirmed batch as failed')
   }
 
+  const { serverEnv } = await import('@/lib/env.server')
+  const s3 = createR2Client(
+    serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
+    serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
+    serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+  )
+  if (batch.multipartUploadId) {
+    await abortBronzeMultipartUpload(
+      { s3, bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME },
+      batch.r2Key,
+      batch.multipartUploadId,
+    )
+    await setImportBatchMultipartUpload(serviceSupabase, id, null)
+  }
+  try {
+    await deleteObjectFromR2(batch.r2Key, s3, serverEnv.CLOUDFLARE_R2_BUCKET_NAME)
+  } catch {
+    // The storage scan reports unreferenced objects left by a failed cleanup.
+  }
+
   await updateImportBatchStatus(serviceSupabase, id, 'failed')
   return NextResponse.json({ ok: true })
 })
@@ -90,6 +112,17 @@ export const DELETE = withErrorHandler(async (req: NextRequest): Promise<NextRes
     serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
     serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
   )
+  if (batch.multipartUploadId) {
+    try {
+      await abortBronzeMultipartUpload(
+        { s3, bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME },
+        batch.r2Key,
+        batch.multipartUploadId,
+      )
+    } catch (err) {
+      console.warn('[import-batches] multipart abort best-effort failed for batch', id, err)
+    }
+  }
   try {
     await deleteObjectFromR2(batch.r2Key, s3, serverEnv.CLOUDFLARE_R2_BUCKET_NAME)
   } catch (err) {

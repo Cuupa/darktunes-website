@@ -109,5 +109,7 @@ limiter (per serverless instance). Pair public routes with a Vercel WAF for defe
 | Bronze CSV direct (presigned multipart) | 1 GB total, 16 MB parts (non-final parts ≥ 5 MiB) |
 | Bronze CSV with `NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD=false` | ≤ 4 MB only (`src/lib/sos/bronzeUploadLimits.ts`) |
 
+Bronze presigned PUT URLs target a temporary key. Confirm verifies the copied final object and changes the batch to `completed` only after the hash matches. An unexpired URL cannot modify the final key. R2 multipart upload IDs are stored server-side and stale incomplete sessions are aborted by the Admin → System → Maintenance R2 scan.
+
 
 - Press inquiries from authenticated journalists are stored as internal app log entries; promo track previews/downloads continue to use short-lived signed R2 URLs and journalist download logging.

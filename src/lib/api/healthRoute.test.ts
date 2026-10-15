@@ -95,15 +95,23 @@ function mockSupabaseClientOnline(): void {
           }
         }
         if (table === 'artists') {
-          const countResult = { count: 0, error: null }
+          const countResult = { data: [], count: 0, error: null }
           const countPromise = Promise.resolve(countResult)
           return {
             select: vi.fn().mockReturnThis(),
             not: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockReturnThis(),
             then: countPromise.then.bind(countPromise),
             catch: countPromise.catch.bind(countPromise),
             finally: countPromise.finally.bind(countPromise),
           }
+        }
+        if (table === 'app_logs') {
+          return makeThenableBuilder([])
+        }
+        if (table === 'cron_ticks') {
+          return makeThenableBuilder(null)
         }
         return makeThenableBuilder(null)
       }),

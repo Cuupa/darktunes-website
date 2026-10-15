@@ -23,6 +23,10 @@ import { explainSosError } from '@/lib/sos/explainSosError'
 
 const AUTO_SAVE_DEBOUNCE_MS = 2_000
 
+function workspaceFingerprint(settings: SosAccountingSettings, bronzeBatchIds: string[]): string {
+  return JSON.stringify({ settings: settingsFingerprint(settings), bronzeBatchIds })
+}
+
 export interface PeriodKey {
   start: string
   end: string
@@ -74,6 +78,10 @@ export function useSosWorkspaceSync({
   const [reloadConfirmOpen, setReloadConfirmOpen] = useState(false)
   const [workspaceConflict, setWorkspaceConflict] = useState(false)
   const [serverBronzeBatchIds, setServerBronzeBatchIds] = useState<string[]>([])
+  const bronzeBatchIdsRef = useRef(bronzeBatchIds)
+  bronzeBatchIdsRef.current = bronzeBatchIds
+  const serverBronzeBatchIdsRef = useRef(serverBronzeBatchIds)
+  serverBronzeBatchIdsRef.current = serverBronzeBatchIds
 
   const t = useAccountingLabels()
   const lastSavedFingerprintRef = useRef<string | null>(null)
@@ -104,8 +112,11 @@ export function useSosWorkspaceSync({
       nextSettings: SosAccountingSettings,
       updatedAt: string | null,
       updatedBy: string | null,
+      savedBronzeBatchIds: string[],
     ) => {
-      lastSavedFingerprintRef.current = settingsFingerprint(nextSettings)
+      lastSavedFingerprintRef.current = workspaceFingerprint(nextSettings, bronzeBatchIdsRef.current)
+      serverBronzeBatchIdsRef.current = savedBronzeBatchIds
+      setServerBronzeBatchIds(savedBronzeBatchIds)
       setIsSettingsDirty(false)
       setWorkspaceLoadedAt(updatedAt)
       setWorkspaceUpdatedBy(updatedBy)
@@ -127,6 +138,9 @@ export function useSosWorkspaceSync({
       if (workspaceConflictRef.current) return false
       setIsWorkspaceSaving(true)
       try {
+        const savedBronzeBatchIds = [
+          ...new Set([...serverBronzeBatchIdsRef.current, ...bronzeBatchIdsRef.current]),
+        ]
         const res = await fetch('/api/admin/sos/workspaces', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -134,7 +148,7 @@ export function useSosWorkspaceSync({
             period_start: periodKey.start,
             period_end: periodKey.end,
             config: nextSettings,
-            bronze_batch_ids: bronzeBatchIds,
+            bronze_batch_ids: savedBronzeBatchIds,
             expected_revision: workspaceRevisionRef.current,
           }),
         })
@@ -164,6 +178,7 @@ export function useSosWorkspaceSync({
           nextSettings,
           ws?.updated_at ?? new Date().toISOString(),
           ws?.updated_by ?? null,
+          savedBronzeBatchIds,
         )
         return true
       } catch (e) {
@@ -179,7 +194,7 @@ export function useSosWorkspaceSync({
         setIsWorkspaceSaving(false)
       }
     },
-    [bronzeBatchIds, markSynced, setConflict, t],
+    [markSynced, setConflict, t],
   )
 
   const saveWorkspaceRef = useRef(saveWorkspace)
@@ -266,6 +281,7 @@ export function useSosWorkspaceSync({
           setWorkspaceLoadedAt(null)
           setWorkspaceUpdatedBy(null)
           workspaceRevisionRef.current = null
+          serverBronzeBatchIdsRef.current = []
           setServerBronzeBatchIds([])
           clearSavedFingerprint()
           return
@@ -276,7 +292,9 @@ export function useSosWorkspaceSync({
         const ws = json.workspace
         setConflict(false)
         workspaceRevisionRef.current = ws?.revision ?? null
-        setServerBronzeBatchIds(ws?.bronzeBatchIds ?? [])
+        const loadedBatchIds = ws?.bronzeBatchIds ?? []
+        serverBronzeBatchIdsRef.current = loadedBatchIds
+        setServerBronzeBatchIds(loadedBatchIds)
         if (ws?.config) {
           const incomingHasRules =
             (ws.config.splitFees?.length ?? 0) > 0 ||
@@ -299,6 +317,7 @@ export function useSosWorkspaceSync({
             ws.config,
             ws.updated_at ?? new Date().toISOString(),
             ws.updated_by ?? null,
+            ws.bronzeBatchIds ?? [],
           )
         } else {
           suppressAutoSaveRef.current = true
@@ -370,14 +389,14 @@ export function useSosWorkspaceSync({
     [currentPeriodKey, saveDefaultPreset, saveWorkspace, t.workspaceDefaultSaveSuccess, t.workspaceSaveSuccess],
   )
 
-  const saveCurrentWorkspace = useCallback(async (): Promise<boolean> => {
+  const saveCurrentWorkspace = useCallback(async (options?: { silent?: boolean }): Promise<boolean> => {
     if (!currentPeriodKey) {
       const ok = await saveDefaultPreset(settings)
-      if (ok) toast.success(t.workspaceDefaultSaveSuccess)
+      if (ok && !options?.silent) toast.success(t.workspaceDefaultSaveSuccess)
       return ok
     }
     const ok = await saveWorkspace(settings, currentPeriodKey)
-    if (ok) toast.success(t.workspaceSaveSuccess)
+    if (ok && !options?.silent) toast.success(t.workspaceSaveSuccess)
     return ok
   }, [currentPeriodKey, settings, saveDefaultPreset, saveWorkspace, t.workspaceDefaultSaveSuccess, t.workspaceSaveSuccess])
 
@@ -449,7 +468,7 @@ export function useSosWorkspaceSync({
     if (!settingsReady || disabled) return
 
     const fingerprint = currentPeriodKey
-      ? settingsFingerprint(settings)
+      ? workspaceFingerprint(settings, bronzeBatchIds)
       : settingsFingerprint(durableAccountingSettings(settings))
     const saved = lastSavedFingerprintRef.current
 
@@ -497,6 +516,7 @@ export function useSosWorkspaceSync({
     disabled,
     saveDefaultPreset,
     saveWorkspace,
+    bronzeBatchIds,
   ])
 
   return {

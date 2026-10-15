@@ -726,10 +726,26 @@ const schemaOverrides = {
       responses: { 200: { schema: 'AppLogEntry' } },
     },
   },
+  '/api/admin/rbac-audit': {
+    GET: {
+      summary: 'List RBAC audit log entries (role and permission changes)',
+      parameters: [
+        { name: 'page', in: 'query', schema: { type: 'integer', minimum: 0, default: 0 } },
+        { name: 'pageSize', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 } },
+        { name: 'action', in: 'query', schema: { type: 'string' } },
+        { name: 'targetType', in: 'query', schema: { type: 'string' } },
+        { name: 'search', in: 'query', schema: { type: 'string' } },
+      ],
+    },
+  },
   '/api/log-error': {
     POST: {
       summary:
         'Ingest a client error/warning; persists an aggregated app_logs row (source "ui" may open a Zammad ticket)',
+      responses: {
+        200: { schema: 'SuccessResponse' },
+        503: { description: 'Log store rejected the write (missing columns/RPC or database error).' },
+      },
     },
   },
   '/api/vitals': {

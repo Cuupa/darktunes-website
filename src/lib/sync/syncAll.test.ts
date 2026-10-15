@@ -384,7 +384,24 @@ describe('syncSingleArtist', () => {
           error: null,
         }
       }
-      if (table === 'sync_logs') return { data: null, error: null }
+      if (table === 'sync_logs') {
+        return {
+          data: {
+            id: 'sync-log-1',
+            artist_id: null,
+            status: 'success',
+            message: null,
+            releases_synced: 0,
+            errors: [],
+            api_source: 'odesli',
+            rate_limited: false,
+            duration_ms: null,
+            metadata: {},
+            created_at: '2024-01-01T00:00:00Z',
+          },
+          error: null,
+        }
+      }
       return { data: [], error: null }
     })
 

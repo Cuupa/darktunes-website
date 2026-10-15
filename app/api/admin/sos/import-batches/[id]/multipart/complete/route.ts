@@ -9,6 +9,7 @@ import type { NextRequest } from 'next/server'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import {
   completeBronzeMultipartUpload,
+  bronzeObjectExists,
   createBronzeMultipartR2Context,
   getWritableImportBatch,
   type BronzeMultipartPartRef,
@@ -58,7 +59,18 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   const serviceSupabase = await createServiceRoleSupabaseClient()
   const batch = await getWritableImportBatch(serviceSupabase, id)
   const ctx = await createBronzeMultipartR2Context()
-  await completeBronzeMultipartUpload(ctx, batch.r2Key, uploadId, parts)
+  if (batch.multipartUploadId !== uploadId) {
+    if (await bronzeObjectExists(ctx, batch.r2Key)) {
+      return NextResponse.json({ ok: true, r2Key: batch.r2Key })
+    }
+    throw new ApiError(409, 'Multipart upload is no longer active; restart the archive')
+  }
+
+  try {
+    await completeBronzeMultipartUpload(ctx, batch.r2Key, uploadId, parts)
+  } catch (error) {
+    if (!(await bronzeObjectExists(ctx, batch.r2Key))) throw error
+  }
 
   return NextResponse.json({ ok: true, r2Key: batch.r2Key })
 })

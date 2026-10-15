@@ -95,6 +95,13 @@ const CRITICAL_TABLES = {
   epk_share_links: { mode: 'create-once' },
   epk_versions: { mode: 'create-once' },
   portal_messages: { mode: 'create-once' },
+  // Log tables drifted silently — they evolve via ADD COLUMN guards too.
+  app_logs: { mode: 'full', extraStructural: ['source', 'level', 'message', 'details', 'user_id'] },
+  sync_logs: {
+    mode: 'full',
+    extraStructural: ['artist_id', 'status', 'message', 'releases_synced', 'errors'],
+  },
+  cron_ticks: { mode: 'full', extraStructural: ['kind', 'status', 'detail'] },
 }
 
 function extractCreateTableBody(sql, table) {

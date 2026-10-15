@@ -24,6 +24,9 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
   const pageSize  = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') ?? '20', 10)))
   const action    = searchParams.get('action')     ?? ''
   const targetType = searchParams.get('targetType') ?? ''
+  // Strip PostgREST filter grammar characters so a stray , ( ) or % cannot break
+  // the .or() expression (which would otherwise return an empty page).
+  const search = (searchParams.get('search') ?? '').replace(/[%(),]/g, '').trim()
 
   const supabase = await createServerSupabaseClient()
 
@@ -35,6 +38,11 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
 
   if (action)     query = query.eq('action', action)
   if (targetType) query = query.eq('target_type', targetType)
+  if (search) {
+    query = query.or(
+      `action.ilike.%${search}%,target_type.ilike.%${search}%,target_id.ilike.%${search}%`,
+    )
+  }
 
   const { data, count, error } = await query
   if (error) throw new Error(error.message)

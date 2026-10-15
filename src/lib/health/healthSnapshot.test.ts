@@ -127,11 +127,13 @@ function createMockDb(
         }
       }
       if (table === 'artists' || table === 'artist_private_data') {
-        const countResult = { count: 0, error: null }
+        const countResult = { data: [], count: 0, error: null }
         const countPromise = Promise.resolve(countResult)
         return {
           select: vi.fn().mockReturnThis(),
           not: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnThis(),
           then: countPromise.then.bind(countPromise),
           catch: countPromise.catch.bind(countPromise),
           finally: countPromise.finally.bind(countPromise),
@@ -177,7 +179,7 @@ describe('buildHealthSnapshot', () => {
     expect(snapshot.app.version).toMatch(/^\d+\.\d+\.\d+/)
   })
 
-  it('queries sync_logs for liveness, per-api latest, and 24h stats', async () => {
+  it('queries sync_logs for the log-store probe, per-api latest, and 24h stats', async () => {
     const db = createMockDb()
     await buildHealthSnapshot({
       db,
@@ -187,7 +189,7 @@ describe('buildHealthSnapshot', () => {
 
     const fromCalls = (db.from as ReturnType<typeof vi.fn>).mock.calls
     const syncLogsCall = fromCalls.filter(([t]) => t === 'sync_logs')
-    // ping + latest itunes + latest odesli + 24h stats (≥4)
+    // log-store probe + latest itunes + latest odesli + 24h stats (≥4)
     expect(syncLogsCall.length).toBeGreaterThanOrEqual(4)
   })
 

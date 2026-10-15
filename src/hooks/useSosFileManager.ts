@@ -48,8 +48,8 @@ interface FileEventCallbacks {
  * This avoids storing hundreds of MB of text in the browser's storage.
  */
 const FILE_FALLBACK = {
-  fileUploadSuccess: '"{filename}" uploaded successfully',
-  filesUploadSuccess: '{count} file(s) uploaded successfully',
+  fileUploadSuccess: '"{filename}" added; parsing and archiving continue',
+  filesUploadSuccess: '{count} file(s) added; processing continues',
   filesUploadFailed: '{count} file(s) failed to upload',
   fileProcessFailed: 'Failed to process "{filename}"',
   fileReplaceSuccess: '"{filename}" replaced successfully',
@@ -64,6 +64,8 @@ const FILE_FALLBACK = {
   ingestArchiveNoPeriod:
     'No reporting period detected in the file — archiving skipped. Fix the source dates and re-add the file.',
   ingestArchiveRetryNoData: 'Data not in memory — re-upload the file to archive it.',
+  ingestConfirmFailed: 'The source archive could not be verified after upload. Retry the archive to finish confirmation.',
+  ingestOperationId: 'Import reference: {id}',
 } as const
 
 export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
@@ -132,16 +134,26 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
         })
         return
       }
+      const operationId = meta.bronzeOperationId ?? crypto.randomUUID()
+      if (!meta.bronzeOperationId) {
+        setFileMetas((current) =>
+          (current ?? []).map((file) =>
+            file.id === id ? { ...file, bronzeOperationId: operationId } : file,
+          ),
+        )
+      }
       setFileState(id, {
         bronzeStatus: 'uploading',
         phase: 'archiving',
         detail: t.ingestArchiving,
+        operationId,
       })
       const bronze = await enqueueBronzeArchive(async () => {
         // The file may have been removed while it waited in the queue — do not
         // archive a file the admin no longer sees (would leave an orphan batch).
         if (!(fileMetasRef.current ?? []).some((file) => file.id === id)) return null
         return uploadBronzeDistributorCsv({
+          operationId,
           distributor: type,
           filename: meta.name,
           uploadBody: data,
@@ -162,17 +174,19 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
           bronzeError: undefined,
           phase: 'done',
           detail: undefined,
+          operationId,
         })
       } else {
         setFileState(id, {
           bronzeStatus: 'error',
-          bronzeError: bronze.message,
+          bronzeError: bronze.phase === 'confirm' ? t.ingestConfirmFailed : bronze.message,
           phase: 'done',
           detail: undefined,
+          operationId,
         })
       }
     },
-    [setFileMetas, setFileState, t.ingestArchiving, t.ingestArchiveNoPeriod, t.ingestArchiveRetryNoData, type],
+    [setFileMetas, setFileState, t.ingestArchiving, t.ingestArchiveNoPeriod, t.ingestArchiveRetryNoData, t.ingestConfirmFailed, type],
   )
 
   const retryArchive = useCallback(
@@ -302,6 +316,7 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
       // Optimistically show placeholders while reading/parsing.
       const placeholders: UploadedFileMeta[] = rawFiles.map((f, i) => ({
         id: ids[i],
+        bronzeOperationId: crypto.randomUUID(),
         name: f.name,
         size: f.size,
         type,
@@ -374,7 +389,13 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
       setFileMetas(current =>
         (current ?? []).map(f =>
           f.id === id
-            ? { ...f, name: rawFile.name, size: rawFile.size, bronzeBatchId: undefined }
+          ? {
+              ...f,
+              name: rawFile.name,
+              size: rawFile.size,
+              bronzeBatchId: undefined,
+              bronzeOperationId: crypto.randomUUID(),
+            }
             : f
         )
       )

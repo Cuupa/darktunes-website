@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
-const mockWriteAppLog = vi.fn().mockResolvedValue(undefined)
+const mockWriteAppLog = vi.fn().mockResolvedValue(true)
 const mockSubmitAutoErrorTicket = vi.fn()
 const mockGetUser = vi.fn()
 const mockResolveUserProfile = vi.fn()
@@ -88,6 +88,12 @@ describe('POST /api/log-error', () => {
     const res = await postLogError({ source: '', message: '' })
     expect(res.status).toBe(204)
     expect(mockWriteAppLog).not.toHaveBeenCalled()
+  })
+
+  it('returns 503 when the log store rejects the write', async () => {
+    mockWriteAppLog.mockResolvedValueOnce(false)
+    const res = await postLogError({ source: 'ui', message: 'x' })
+    expect(res.status).toBe(503)
   })
 
   it('queues Zammad auto ticket only for signed-in ui source errors', async () => {

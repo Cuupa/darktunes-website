@@ -25,7 +25,7 @@ import {
   type ApiOperationalState,
 } from './apiStatus'
 import { HEALTH_LOG_STATS_FETCH_LIMIT, HEALTH_LOG_STATS_LOOKBACK_MS } from './thresholds'
-import { checkDatabaseLiveness, deriveDatabaseHealth } from './healthLiveness'
+import { checkDatabaseLiveness, checkLogStore, deriveDatabaseHealth } from './healthLiveness'
 import type { CronHealthSummary } from './cronHeartbeat'
 import type {
   ApiHealthStatus,
@@ -226,10 +226,12 @@ export async function buildHealthSnapshot(
   let apis: Record<string, ApiHealthStatus> = buildUnavailableApis(knownApis)
   let syncQueueHealth: SyncQueueHealth | null = null
   let cronHealth: CronHealthSummary | null = null
+  let logStore: { readable: boolean; detail: string } | null = null
 
   if (deps.db) {
     try {
       database = await checkDatabaseLiveness(deps.db)
+      logStore = await checkLogStore(deps.db)
       const dbOnline = database.status !== 'offline'
 
       if (dbOnline) {
@@ -284,9 +286,10 @@ export async function buildHealthSnapshot(
           statusDetail: queueDerived.statusDetail,
         }
 
-        const heartbeats = await getHealthHeartbeats(deps.db)
+        const { heartbeats, readErrors } = await getHealthHeartbeats(deps.db)
         cronHealth = deriveCronHealth({
           heartbeats,
+          readErrors,
           syncQueue: syncQueueHealth,
           cronSecretConfigured: Boolean(process.env.CRON_SECRET),
           youtubeConfigured: knownApis.youtube ?? false,
@@ -328,6 +331,15 @@ export async function buildHealthSnapshot(
 
   const kpis = computeKpiSummary(apis)
   const alerts = buildHealthAlerts(database, apis, syncQueueHealth, kpis, cronHealth)
+  if (logStore && !logStore.readable) {
+    alerts.push({
+      id: 'log-store-unreadable',
+      severity: 'warning',
+      title: 'Log tables unreadable',
+      message: logStore.detail,
+      source: 'system',
+    })
+  }
   const healthScore = computeHealthScore(database, apis, syncQueueHealth, cronHealth)
   const appInfo = getAppVersionInfo()
 
