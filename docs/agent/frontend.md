@@ -185,6 +185,12 @@ Shared primitives in `src/components/notifications/` (`NotificationBellTrigger`,
 
 **Admin nav badges (sidebar counts + push badge):** Single owner `AdminNavBadgesProvider` in `AdminClientLayout` → `useAdminNavBadges` once. Consumers (`AdminSidebarNav`, `AdminPushBootstrap`) read `useAdminNavBadgesContext()` — never mount the subscription hook twice against the singleton browser Supabase client. Realtime rules: all `.on('postgres_changes', …)` **before** `.subscribe()`; unique channel topics per instance (`useId`); keep refresh callbacks in a **ref** so effect re-runs do not re-attach listeners after subscribe. Same dual-mount class of bug hit `EditorNotificationBell` / `DashboardNotificationBell` historically.
 
+**Mobile + desktop layouts are both mounted.** `AdminSidebarNav` renders a mobile header *and* a desktop column at once (CSS hides one). Render a realtime widget (`DashboardNotificationBell`, etc.) in exactly one slot — gate one copy with `useMediaQuery('(min-width: 768px)')` — otherwise it opens two channels and runs its mount queries twice.
+
+**Badge refresh is coalesced.** `useAdminNavBadges` subscribes only to tables it counts (`portal_messages`, `release_submissions`, `video_submissions`, `artist_landing_pages`, `portal_feedback`) and debounces refresh (~800 ms) so a write burst does not fire six count queries per event. It does **not** subscribe to `notifications` (no badge depends on it). The durable feed for the bell is separate.
+
+**Never fetch one row per item.** When a list needs child rows, batch the ids into one query — e.g. `getRepliesForMessages(db, ids)`, `getPrivateDataByStopIds(db, ids, artistId)`, and `getDownloadsByArtistId` (chunked `.in(…)`). Do not `.map((item) => getOne(item.id))`; that is N round-trips per render. Avoid a single `.or()` with hundreds of ids — the filter URL exceeds PostgREST/browser limits; chunk it.
+
 **Portal:** `PortalNotificationBell` + composite feed (`portalNotifications`): messages, interviews, statements, plus durable platform rows (`kind: platform`, e.g. fan-page decisions). Badge field `alerts` counts unread platform rows. `PortalNotificationProvider` refreshes on messages, interviews, statements, and `notifications`.
 
 **History + preferences:** Shared `NotificationCenter` and `NotificationPreferencesForm` under `src/components/notifications/`. Routes: `/admin/notifications` (+ `/preferences`), `/portal/notifications` (+ `/preferences`).

@@ -71,8 +71,20 @@ export function useUsers() {
 
   const updateRole = useCallback(
     async (userId: string, role: UserRole): Promise<void> => {
-      // Optimistic update
-      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role } : u)))
+      // Optimistic update (both the primary role and the role badge list).
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === userId
+            ? {
+                ...u,
+                role,
+                roles: Array.from(
+                  new Set((u.roles?.length ? u.roles : [u.role]).map((r) => (r === u.role ? role : r))),
+                ),
+              }
+            : u,
+        ),
+      )
       try {
         const res = await fetch(`/api/admin/users/${userId}`, {
           method: 'PATCH',
@@ -84,7 +96,6 @@ export function useUsers() {
           throw new Error(err.error ?? 'Failed to update role')
         }
         toast.success('Role updated')
-        await load()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to update role')
         await load() // Revert optimistic update
@@ -106,12 +117,23 @@ export function useUsers() {
           throw new Error(err.error ?? 'Failed to update ban status')
         }
         toast.success(ban ? 'User banned' : 'User unbanned')
-        await load()
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === userId
+              ? {
+                  ...u,
+                  banned_until: ban
+                    ? new Date(Date.now() + 876000 * 60 * 60 * 1000).toISOString()
+                    : null,
+                }
+              : u,
+          ),
+        )
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to update ban status')
       }
     },
-    [authHeaders, load],
+    [authHeaders],
   )
 
   const deleteUser = useCallback(
@@ -171,7 +193,6 @@ export function useUsers() {
           throw new Error(err.error ?? 'Failed to update display name')
         }
         toast.success('Display name updated')
-        await load()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to update display name')
         await load()

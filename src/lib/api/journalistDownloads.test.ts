@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { logDownload, getDownloadHistory } from './journalistDownloads'
+import { logDownload, getDownloadHistory, getDownloadsByArtistId } from './journalistDownloads'
 
 type DbClient = SupabaseClient<Database>
 
@@ -50,5 +50,45 @@ describe('journalistDownloads DAL', () => {
     const db = makeMockDb([row])
     const items = await getDownloadHistory(db, 'user-1')
     expect(items).toHaveLength(1)
+  })
+
+  it('batches ids and de-duplicates rows across batches', async () => {
+    const inCalls: Array<{ column: string; ids: string[] }> = []
+    const db = {
+      from: vi.fn((table: string) => {
+        if (table === 'release_artists') {
+          return {
+            select: () => ({
+              eq: vi.fn().mockResolvedValue({
+                data: Array.from({ length: 120 }, (_, i) => ({ release_id: `rel-${i}` })),
+                error: null,
+              }),
+            }),
+          }
+        }
+        if (table === 'assets' || table === 'asset_artists') {
+          return { select: () => ({ eq: vi.fn().mockResolvedValue({ data: [], error: null }) }) }
+        }
+        return {
+          select: () => ({
+            in: vi.fn((column: string, ids: string[]) => {
+              inCalls.push({ column, ids })
+              return {
+                order: () => ({
+                  limit: vi.fn().mockResolvedValue({ data: [row], error: null }),
+                }),
+              }
+            }),
+          }),
+        }
+      }),
+    } as unknown as DbClient
+
+    const items = await getDownloadsByArtistId(db, 'artist-1')
+
+    expect(inCalls.length).toBeGreaterThan(1)
+    expect(inCalls.every((c) => c.ids.length <= 50)).toBe(true)
+    expect(inCalls.every((c) => c.column === 'release_id')).toBe(true)
+    expect(items).toHaveLength(1) // same row in every batch collapses to one
   })
 })

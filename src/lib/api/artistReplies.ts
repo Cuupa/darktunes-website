@@ -28,6 +28,34 @@ export async function getRepliesForMessage(db: DbClient, messageId: string): Pro
   return (data ?? []).map(rowToArtistReply)
 }
 
+/**
+ * One query for many messages (avoids one request per message).
+ * Returns replies keyed by message_id; message ids with no replies are absent.
+ */
+export async function getRepliesForMessages(
+  db: DbClient,
+  messageIds: string[],
+): Promise<Record<string, ArtistReply[]>> {
+  if (messageIds.length === 0) return {}
+
+  const { data, error } = await db
+    .from('artist_replies')
+    .select('*')
+    .in('message_id', messageIds)
+    .is('deleted_at', null)
+    .order('sent_at', { ascending: true })
+  if (error) throw new Error(error.message)
+
+  const byMessage: Record<string, ArtistReply[]> = {}
+  for (const row of data ?? []) {
+    const reply = rowToArtistReply(row)
+    const list = byMessage[reply.messageId] ?? []
+    list.push(reply)
+    byMessage[reply.messageId] = list
+  }
+  return byMessage
+}
+
 export async function sendArtistReply(
   db: DbClient,
   messageId: string,

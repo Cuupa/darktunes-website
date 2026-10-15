@@ -39,7 +39,11 @@ export function AdminSystemWrapper() {
           <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
         </TabsList>
         <TabsContent value="health">
-          <SystemHealthWidget bearerToken={session?.access_token ?? ''} />
+          {session ? (
+            <SystemHealthWidget bearerToken={session.access_token} />
+          ) : (
+            <div className="p-8 text-muted-foreground text-sm">Loading…</div>
+          )}
         </TabsContent>
         <TabsContent value="logs">
           <LogsManager />
