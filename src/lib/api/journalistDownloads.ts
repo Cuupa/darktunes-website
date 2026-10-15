@@ -78,6 +78,9 @@ async function collectArtistAssetAndReleaseIds(
 
 /**
  * Press-kit downloads linked to an artist via releases or assets.
+ *
+ * Ids are batched into separate `.in()` queries instead of one giant `.or()`
+ * string: a filter URL with hundreds of ids exceeds the PostgREST/browser limit.
  */
 export async function getDownloadsByArtistId(
   db: DbClient,
@@ -85,20 +88,40 @@ export async function getDownloadsByArtistId(
   limit = 100,
 ): Promise<JournalistDownload[]> {
   const { releaseIds, assetIds } = await collectArtistAssetAndReleaseIds(db, artistId)
-  const orParts: string[] = []
-  if (releaseIds.length > 0) orParts.push(`release_id.in.(${releaseIds.join(',')})`)
-  if (assetIds.length > 0) orParts.push(`asset_id.in.(${assetIds.join(',')})`)
-  if (orParts.length === 0) return []
 
-  const { data, error } = await db
-    .from('journalist_downloads')
-    .select('*')
-    .or(orParts.join(','))
-    .order('downloaded_at', { ascending: false })
-    .limit(limit)
+  const ID_BATCH_SIZE = 50
+  const batches: Array<{ column: 'release_id' | 'asset_id'; ids: string[] }> = []
+  const queue = (column: 'release_id' | 'asset_id', ids: string[]) => {
+    for (let i = 0; i < ids.length; i += ID_BATCH_SIZE) {
+      batches.push({ column, ids: ids.slice(i, i + ID_BATCH_SIZE) })
+    }
+  }
+  queue('release_id', releaseIds)
+  queue('asset_id', assetIds)
+  if (batches.length === 0) return []
 
-  if (error) throw new Error(error.message)
-  return (data ?? []).map(rowToDownload)
+  const results = await Promise.all(
+    batches.map(({ column, ids }) =>
+      db
+        .from('journalist_downloads')
+        .select('*')
+        .in(column, ids)
+        .order('downloaded_at', { ascending: false })
+        .limit(limit),
+    ),
+  )
+  const byId = new Map<string, JournalistDownload>()
+  for (const res of results) {
+    if (res.error) throw new Error(res.error.message)
+    for (const row of res.data ?? []) {
+      const download = rowToDownload(row)
+      if (!byId.has(download.id)) byId.set(download.id, download)
+    }
+  }
+
+  return [...byId.values()]
+    .sort((a, b) => Date.parse(b.downloadedAt) - Date.parse(a.downloadedAt))
+    .slice(0, limit)
 }
 
 export async function getAllJournalistDownloads(

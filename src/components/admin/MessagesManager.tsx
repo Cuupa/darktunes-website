@@ -17,7 +17,7 @@ import { toast } from 'sonner'
 import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getArtists } from '@/lib/api/artists'
-import { getRepliesForMessage } from '@/lib/api/artistReplies'
+import { getRepliesForMessages } from '@/lib/api/artistReplies'
 import {
   getAllLabelMessages,
   searchLabelMessages,
@@ -164,13 +164,15 @@ async function loadReplies(
   supabase: ReturnType<typeof createBrowserSupabaseClient>,
   messages: LabelMessage[],
 ): Promise<Record<string, ArtistReply[]>> {
-  const entries = await Promise.allSettled(
-    messages.map(async (m) => [m.id, await getRepliesForMessage(supabase, m.id)] as const),
-  )
-  return entries.reduce<Record<string, ArtistReply[]>>((acc, r) => {
-    if (r.status === 'fulfilled') acc[r.value[0]] = r.value[1]
-    return acc
-  }, {})
+  if (messages.length === 0) return {}
+  try {
+    return await getRepliesForMessages(
+      supabase,
+      messages.map((m) => m.id),
+    )
+  } catch {
+    return {}
+  }
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────

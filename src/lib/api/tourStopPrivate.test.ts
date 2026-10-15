@@ -51,4 +51,24 @@ describe('tourStopPrivate', () => {
     expect(result.privateNotes).toBe('updated')
     expect(result.version).toBe(3)
   })
+
+  it('loads private data for many stops with a single query', async () => {
+    const rows = [
+      { ...privateRow, stop_id: 'stop-1' },
+      { ...privateRow, stop_id: 'stop-2', private_notes: 'second' },
+    ]
+    const chain = {
+      select: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockResolvedValue({ data: rows, error: null }),
+    }
+    const db = { from: vi.fn(() => chain) } as unknown as SupabaseClient<Database>
+    const { getPrivateDataByStopIds } = await import('@/lib/api/tourStopPrivate')
+
+    const byStop = await getPrivateDataByStopIds(db, ['stop-1', 'stop-2'], 'artist-1')
+
+    expect(byStop.get('stop-1')?.privateNotes).toBe('secret')
+    expect(byStop.get('stop-2')?.privateNotes).toBe('second')
+    expect(chain.in).toHaveBeenCalledTimes(1)
+  })
 })

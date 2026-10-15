@@ -71,7 +71,7 @@ export function useUsers() {
 
   const updateRole = useCallback(
     async (userId: string, role: UserRole): Promise<void> => {
-      // Optimistic update
+      // Optimistic update for the primary role.
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role } : u)))
       try {
         const res = await fetch(`/api/admin/users/${userId}`, {
@@ -84,6 +84,8 @@ export function useUsers() {
           throw new Error(err.error ?? 'Failed to update role')
         }
         toast.success('Role updated')
+        // The legacy endpoint updates users.role only; the multi-role badge list
+        // is rebuilt from user_roles server-side, so re-sync the row.
         await load()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to update role')
@@ -106,12 +108,23 @@ export function useUsers() {
           throw new Error(err.error ?? 'Failed to update ban status')
         }
         toast.success(ban ? 'User banned' : 'User unbanned')
-        await load()
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === userId
+              ? {
+                  ...u,
+                  banned_until: ban
+                    ? new Date(Date.now() + 876000 * 60 * 60 * 1000).toISOString()
+                    : null,
+                }
+              : u,
+          ),
+        )
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to update ban status')
       }
     },
-    [authHeaders, load],
+    [authHeaders],
   )
 
   const deleteUser = useCallback(
@@ -171,7 +184,6 @@ export function useUsers() {
           throw new Error(err.error ?? 'Failed to update display name')
         }
         toast.success('Display name updated')
-        await load()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to update display name')
         await load()

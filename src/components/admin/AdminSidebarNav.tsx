@@ -25,6 +25,7 @@ import { useAuthContext } from '@/contexts/AuthContext'
 import { useTranslations } from 'next-intl'
 import { LocaleFlagSwitcher } from '@/components/LocaleFlagSwitcher'
 import { isAdminNavActive } from '@/components/admin/adminNavActive'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { isStandaloneDisplayMode, requestPwaInstallPrompt } from '@/lib/pwa/installPrompt'
 import {
   SquaresFour,
@@ -215,6 +216,9 @@ export function AdminSidebarNav() {
   const badges = useAdminNavBadgesContext()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [pwaInstalled, setPwaInstalled] = useState(false)
+  // Mount the notification bell in exactly one layout (mobile header vs desktop
+  // sidebar); both are in the DOM and would otherwise open two realtime channels.
+  const isDesktop = useMediaQuery('(min-width: 768px)')
 
   useEffect(() => {
     setPwaInstalled(isStandaloneDisplayMode())
@@ -327,7 +331,7 @@ export function AdminSidebarNav() {
         <p className="text-sm font-bold tracking-wide">{brandTitle}</p>
         <div className="flex items-center gap-2">
           <LocaleFlagSwitcher align="end" />
-          {showNotificationBell && notificationUserId && (
+          {showNotificationBell && notificationUserId && !isDesktop && (
             <DashboardNotificationBell userId={notificationUserId} />
           )}
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -369,7 +373,7 @@ export function AdminSidebarNav() {
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <LocaleFlagSwitcher align="end" />
-            {showNotificationBell && notificationUserId && (
+            {showNotificationBell && notificationUserId && isDesktop && (
               <DashboardNotificationBell userId={notificationUserId} />
             )}
           </div>

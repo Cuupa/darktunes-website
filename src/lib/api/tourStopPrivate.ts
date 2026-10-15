@@ -48,6 +48,31 @@ export async function getStopPrivateData(
   return data ? rowToPrivate(data) : null
 }
 
+/**
+ * One query for many stops (avoids one request per stop when listing a tour).
+ * Keyed by stop_id; stops with no private row for this artist are absent.
+ */
+export async function getPrivateDataByStopIds(
+  db: DbClient,
+  stopIds: string[],
+  artistId: string,
+): Promise<Map<string, TourStopPrivateData>> {
+  const byStop = new Map<string, TourStopPrivateData>()
+  if (stopIds.length === 0) return byStop
+
+  const { data, error } = await db
+    .from('tour_stop_artist_private')
+    .select('*')
+    .in('stop_id', stopIds)
+    .eq('artist_id', artistId)
+
+  if (error) throw new Error(error.message)
+  for (const row of data ?? []) {
+    byStop.set(row.stop_id, rowToPrivate(row))
+  }
+  return byStop
+}
+
 export async function upsertStopPrivateData(
   db: DbClient,
   stopId: string,

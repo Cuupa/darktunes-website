@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { getRepliesForMessage, sendArtistReply } from './artistReplies'
+import { getRepliesForMessages, sendArtistReply } from './artistReplies'
 
 type DbClient = SupabaseClient<Database>
 
@@ -36,15 +36,32 @@ const row = {
 }
 
 describe('artistReplies DAL', () => {
-  it('gets replies for message', async () => {
-    const db = makeMockDb([row])
-    const items = await getRepliesForMessage(db, 'msg-1')
-    expect(items[0].messageId).toBe('msg-1')
-  })
-
   it('sends artist reply', async () => {
     const db = makeMockDb(row)
     const reply = await sendArtistReply(db, 'msg-1', 'artist-1', 'Thanks!')
     expect(reply.artistId).toBe('artist-1')
+  })
+
+  it('gets replies for many messages with a single query', async () => {
+    const builder = {
+      select: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({
+        data: [
+          { ...row, id: 'reply-1', message_id: 'msg-1' },
+          { ...row, id: 'reply-2', message_id: 'msg-1' },
+          { ...row, id: 'reply-3', message_id: 'msg-2' },
+        ],
+        error: null,
+      }),
+    }
+    const db = { from: vi.fn().mockReturnValue(builder) } as unknown as DbClient
+
+    const byMessage = await getRepliesForMessages(db, ['msg-1', 'msg-2'])
+
+    expect(byMessage['msg-1']).toHaveLength(2)
+    expect(byMessage['msg-2']).toHaveLength(1)
+    expect(builder.in).toHaveBeenCalledTimes(1)
   })
 })

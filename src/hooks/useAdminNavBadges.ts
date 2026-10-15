@@ -1,11 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import type { RealtimePostgresInsertPayload } from '@supabase/supabase-js'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getIncomingToLabelUnreadCount } from '@/lib/api/portalMessages'
 import { safeCount } from '@/lib/api/safeCount'
-import type { Database } from '@/types/database'
 
 export type AdminBadgeKey =
   | 'messages'
@@ -24,10 +22,8 @@ export const EMPTY_ADMIN_NAV_BADGES: AdminNavBadges = {
   portalFeedback: 0,
 }
 
-type NotificationRow = Database['public']['Tables']['notifications']['Row']
-
 /**
- * Live admin nav badge counts (portal inbox, submissions, feedback, notifications).
+ * Live admin nav badge counts (portal inbox, submissions, feedback).
  *
  * Supabase Realtime forbids adding `postgres_changes` after `subscribe()`. The browser
  * client is a singleton, so:
@@ -37,7 +33,7 @@ type NotificationRow = Database['public']['Tables']['notifications']['Row']
  * - Keep `refresh` out of the subscribe effect deps (ref) so identity churn does not
  *   re-subscribe onto a channel still leaving the client registry.
  */
-export function useAdminNavBadges(userId: string | null, enabled: boolean) {
+export function useAdminNavBadges(_userId: string | null, enabled: boolean) {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
   const instanceId = useId().replace(/:/g, '')
   const [badges, setBadges] = useState<AdminNavBadges>(EMPTY_ADMIN_NAV_BADGES)
@@ -86,15 +82,33 @@ export function useAdminNavBadges(userId: string | null, enabled: boolean) {
   const refreshRef = useRef(refresh)
   refreshRef.current = refresh
 
+  // Realtime writes often arrive in bursts (a submission plus its notification).
+  // Coalesce them so one change does not fire six count queries per event.
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null
+      void refreshRef.current()
+    }, 800)
+  }, [])
+
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(
+    () => () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+    },
+    [],
+  )
 
   useEffect(() => {
     if (!enabled) return
 
     const onChange = () => {
-      void refreshRef.current()
+      scheduleRefresh()
     }
 
     // Unique topics per instance: singleton client returns an already-subscribed
@@ -136,31 +150,7 @@ export function useAdminNavBadges(userId: string | null, enabled: boolean) {
       void supabase.removeChannel(portalChannel)
       void supabase.removeChannel(submissionChannel)
     }
-  }, [enabled, instanceId, supabase])
-
-  useEffect(() => {
-    if (!enabled || !userId) return
-
-    const channel = supabase
-      .channel(`admin-nav-notifications-${userId}-${instanceId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`,
-        },
-        (_payload: RealtimePostgresInsertPayload<NotificationRow>) => {
-          void refreshRef.current()
-        },
-      )
-      .subscribe()
-
-    return () => {
-      void supabase.removeChannel(channel)
-    }
-  }, [enabled, instanceId, supabase, userId])
+  }, [enabled, instanceId, scheduleRefresh, supabase])
 
   return badges
 }

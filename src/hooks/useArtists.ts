@@ -42,7 +42,7 @@ export function useArtists() {
       entityName: createdArtist.name,
       changes: data,
     })
-    await load()
+    setArtists((prev) => [createdArtist, ...prev.filter((a) => a.id !== createdArtist.id)])
     void revalidateContentCache(['artists'])
     return createdArtist
   }
@@ -56,7 +56,7 @@ export function useArtists() {
       entityName: updated.name,
       changes: data,
     })
-    await load()
+    setArtists((prev) => prev.map((a) => (a.id === id ? updated : a)))
     void revalidateContentCache(['artists'])
   }
 
@@ -69,7 +69,7 @@ export function useArtists() {
       entityId: id,
       entityName: target?.name,
     })
-    await load()
+    setArtists((prev) => prev.filter((a) => a.id !== id))
     void revalidateContentCache(['artists'])
   }
 
