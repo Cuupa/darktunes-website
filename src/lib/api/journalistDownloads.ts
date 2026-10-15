@@ -120,7 +120,7 @@ export async function getDownloadsByArtistId(
   }
 
   return [...byId.values()]
-    .sort((a, b) => (a.downloadedAt < b.downloadedAt ? 1 : a.downloadedAt > b.downloadedAt ? -1 : 0))
+    .sort((a, b) => Date.parse(b.downloadedAt) - Date.parse(a.downloadedAt))
     .slice(0, limit)
 }
 

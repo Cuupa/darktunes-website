@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { getLabelMessages } from '@/lib/api/labelMessages'
-import { getRepliesForMessage } from '@/lib/api/artistReplies'
+import { getRepliesForMessages } from '@/lib/api/artistReplies'
 import {
   getFromArtistMessages,
   getInboxMessages,
@@ -58,18 +58,15 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
         )
 
         const labelMessages = await getLabelMessages(db, artistId)
-        const repliesEntries = await Promise.allSettled(
-          labelMessages.map(
-            async (message) =>
-              [message.id, await getRepliesForMessage(db, message.id)] as const,
-          ),
-        )
-        const labelReplies = repliesEntries.reduce<
-          Record<string, Awaited<ReturnType<typeof getRepliesForMessage>>>
-        >((acc, result) => {
-          if (result.status === 'fulfilled') acc[result.value[0]] = result.value[1]
-          return acc
-        }, {})
+        let labelReplies: Awaited<ReturnType<typeof getRepliesForMessages>> = {}
+        try {
+          labelReplies = await getRepliesForMessages(
+            db,
+            labelMessages.map((message) => message.id),
+          )
+        } catch {
+          // Replies are best-effort; still return the mailbox without them.
+        }
         return { messages, labelMessages, labelReplies }
       }
 

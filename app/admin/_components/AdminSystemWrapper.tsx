@@ -27,7 +27,7 @@ const InviteSettingsManager = lazy(() =>
 )
 
 export function AdminSystemWrapper() {
-  const { session } = useAuthContext()
+  const { session, loading } = useAuthContext()
 
   return (
     <Suspense fallback={<div className="p-8 text-muted-foreground text-sm">Loading…</div>}>
@@ -42,7 +42,9 @@ export function AdminSystemWrapper() {
           {session ? (
             <SystemHealthWidget bearerToken={session.access_token} />
           ) : (
-            <div className="p-8 text-muted-foreground text-sm">Loading…</div>
+            <div className="p-8 text-muted-foreground text-sm">
+              {loading ? 'Loading…' : 'Sign in to view system health.'}
+            </div>
           )}
         </TabsContent>
         <TabsContent value="logs">

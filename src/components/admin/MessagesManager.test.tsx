@@ -8,7 +8,7 @@ const {
   mockGetArtists,
   mockGetAllLabelMessages,
   mockSearchLabelMessages,
-  mockGetRepliesForMessage,
+  mockGetRepliesForMessages,
   mockSetSession,
   mockSupabase,
 } = vi.hoisted(() => {
@@ -16,7 +16,7 @@ const {
   const mockGetArtists = vi.fn()
   const mockGetAllLabelMessages = vi.fn()
   const mockSearchLabelMessages = vi.fn()
-  const mockGetRepliesForMessage = vi.fn()
+  const mockGetRepliesForMessages = vi.fn()
   const mockChannel = {
     on: vi.fn().mockReturnThis(),
     subscribe: vi.fn().mockReturnThis(),
@@ -33,7 +33,7 @@ const {
     mockGetArtists,
     mockGetAllLabelMessages,
     mockSearchLabelMessages,
-    mockGetRepliesForMessage,
+    mockGetRepliesForMessages,
     mockSetSession,
     mockSupabase,
   }
@@ -158,7 +158,7 @@ vi.mock('@/lib/api/artists', () => ({
 }))
 
 vi.mock('@/lib/api/artistReplies', () => ({
-  getRepliesForMessage: mockGetRepliesForMessage,
+  getRepliesForMessages: mockGetRepliesForMessages,
 }))
 
 vi.mock('@/lib/api/labelMessages', () => ({
@@ -222,7 +222,7 @@ describe('MessagesManager', () => {
     mockGetArtists.mockResolvedValue([])
     mockGetAllLabelMessages.mockResolvedValue([])
     mockSearchLabelMessages.mockResolvedValue([])
-    mockGetRepliesForMessage.mockResolvedValue([])
+    mockGetRepliesForMessages.mockResolvedValue({})
   })
 
   it('syncs the authenticated session into the local client before loading messages', async () => {

@@ -71,20 +71,8 @@ export function useUsers() {
 
   const updateRole = useCallback(
     async (userId: string, role: UserRole): Promise<void> => {
-      // Optimistic update (both the primary role and the role badge list).
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === userId
-            ? {
-                ...u,
-                role,
-                roles: Array.from(
-                  new Set((u.roles?.length ? u.roles : [u.role]).map((r) => (r === u.role ? role : r))),
-                ),
-              }
-            : u,
-        ),
-      )
+      // Optimistic update for the primary role.
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role } : u)))
       try {
         const res = await fetch(`/api/admin/users/${userId}`, {
           method: 'PATCH',
@@ -96,6 +84,9 @@ export function useUsers() {
           throw new Error(err.error ?? 'Failed to update role')
         }
         toast.success('Role updated')
+        // The legacy endpoint updates users.role only; the multi-role badge list
+        // is rebuilt from user_roles server-side, so re-sync the row.
+        await load()
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to update role')
         await load() // Revert optimistic update

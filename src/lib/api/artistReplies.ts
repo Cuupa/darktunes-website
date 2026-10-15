@@ -17,17 +17,6 @@ function rowToArtistReply(row: ArtistReplyRow): ArtistReply {
   }
 }
 
-export async function getRepliesForMessage(db: DbClient, messageId: string): Promise<ArtistReply[]> {
-  const { data, error } = await db
-    .from('artist_replies')
-    .select('*')
-    .eq('message_id', messageId)
-    .is('deleted_at', null)
-    .order('sent_at', { ascending: true })
-  if (error) throw new Error(error.message)
-  return (data ?? []).map(rowToArtistReply)
-}
-
 /**
  * One query for many messages (avoids one request per message).
  * Returns replies keyed by message_id; message ids with no replies are absent.

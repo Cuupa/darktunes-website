@@ -5,6 +5,7 @@ import { useAdminNavBadges } from '@/hooks/useAdminNavBadges'
 const portalMessageHandlers: Array<() => void> = []
 const channelNames: string[] = []
 const removeChannelMock = vi.fn()
+let portalQueryCount = 0
 
 vi.mock('@/lib/supabase/client', () => ({
   createBrowserSupabaseClient: () => ({
@@ -14,7 +15,10 @@ vi.mock('@/lib/supabase/client', () => ({
           select: () => ({
             eq: () => ({
               is: () => ({
-                is: () => Promise.resolve({ count: 2, error: null }),
+                is: () => {
+                  portalQueryCount += 1
+                  return Promise.resolve({ count: 2, error: null })
+                },
               }),
             }),
           }),
@@ -67,6 +71,7 @@ describe('useAdminNavBadges', () => {
   beforeEach(() => {
     portalMessageHandlers.length = 0
     channelNames.length = 0
+    portalQueryCount = 0
     removeChannelMock.mockClear()
   })
 
@@ -76,13 +81,14 @@ describe('useAdminNavBadges', () => {
     await waitFor(() => {
       expect(result.current.messages).toBe(2)
     })
-
     expect(portalMessageHandlers.length).toBeGreaterThan(0)
 
+    const callsBefore = portalQueryCount
     portalMessageHandlers[0]?.()
-
+    // Debounced: the recount must not run synchronously with the event.
+    expect(portalQueryCount).toBe(callsBefore)
     await waitFor(() => {
-      expect(result.current.messages).toBe(2)
+      expect(portalQueryCount).toBeGreaterThan(callsBefore)
     })
   })
 
