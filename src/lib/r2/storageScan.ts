@@ -15,6 +15,7 @@ import {
 } from '@/lib/r2/constants'
 import { isOlderThan, objectPrefix } from '@/lib/r2/keys'
 import { collectReferencedKeys } from '@/lib/r2/referencedKeys'
+import { clearTrackedMultipartUpload } from '@/lib/api/distributorImportBatches'
 
 type ServiceDb = SupabaseClient<Database>
 type SnapshotRow = Database['public']['Tables']['r2_storage_snapshots']['Row']
@@ -66,7 +67,8 @@ export function isOrphanObject(
   return isOlderThan(object.lastModified, R2_ORPHAN_GRACE_MS, now)
 }
 
-async function abortStaleMultiparts(
+export async function abortStaleMultiparts(
+  db: ServiceDb,
   s3: S3Client,
   bucket: string,
   now = Date.now(),
@@ -78,6 +80,13 @@ async function abortStaleMultiparts(
     try {
       await abortMultipartUpload(s3, bucket, upload.key, upload.uploadId)
       aborted += 1
+      if (upload.key.startsWith('sos-imports/')) {
+        try {
+          await clearTrackedMultipartUpload(db, upload.key, upload.uploadId)
+        } catch {
+          // The multipart is already aborted; the batch is reconciled on the next retry.
+        }
+      }
     } catch {
       // Best-effort; remaining uploads show up on the next scan.
     }
@@ -183,7 +192,7 @@ export async function runStorageScan(options: {
 
     let multipartAborted = snapshot.multipart_aborted_count
     if (!truncated) {
-      multipartAborted += await abortStaleMultiparts(options.s3, options.bucket, now)
+      multipartAborted += await abortStaleMultiparts(options.db, options.s3, options.bucket, now)
     }
 
     const patch = {

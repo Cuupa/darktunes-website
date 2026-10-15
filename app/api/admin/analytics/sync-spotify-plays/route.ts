@@ -22,6 +22,7 @@ import {
   syncSpotifyPlayCounts,
   type SpotifyPlaySyncScope,
 } from '@/lib/analytics/syncSpotifyPlayCounts'
+import { recordSyncLog } from '@/lib/api/syncLogs'
 
 export const maxDuration = 300
 
@@ -101,7 +102,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
           ? 'success'
           : 'error'
 
-  await serviceSupabase.from('sync_logs').insert({
+  await recordSyncLog(serviceSupabase, {
     artist_id: null,
     status,
     message: result.errors[0]?.message ?? null,

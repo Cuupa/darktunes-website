@@ -100,7 +100,7 @@ A modern alternative music label platform that combines:
 | i18n | User-facing EN/DE; no raw toast English hardcoding for new features |
 | Schema | Idempotent `reset.sql` only; types in `database.ts` |
 | Brand | No hardcoded tenant names in app code (`check:brand`) |
-| Bronze CSV | Never browser→presigned R2 for SOS imports |
+| Bronze CSV | Browser→R2 presigned upload by default; R2 CORS is configured for each admin origin |
 
 ---
 
@@ -119,7 +119,7 @@ A modern alternative music label platform that combines:
 
 - Full ticketing / artist↔admin reply thread on product feedback.
 - Third-party IBAN lookup APIs (explicitly forbidden).
-- Browser direct upload to SOS bronze R2.
+- Server-proxy multipart upload for SOS bronze R2.
 - Global state libraries (Redux etc.) — RSC + local state preferred.
 
 ---

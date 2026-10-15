@@ -7,10 +7,13 @@ import { requireAdminFromRequest } from '@/lib/adminAuth'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { getImportBatchById, setImportBatchMultipartUpload } from '@/lib/api/distributorImportBatches'
 import { MAX_BRONZE_CSV_BYTES } from '@/lib/sos/bronzeUploadLimits'
 import {
   createBronzeMultipartR2Context,
   getWritableImportBatch,
+  abortBronzeMultipartUpload,
+  bronzeObjectExists,
   initBronzeMultipartUpload,
 } from '@/lib/sos/bronzeMultipartUpload'
 import { ApiError, withErrorHandler } from '@/lib/errors'
@@ -41,7 +44,44 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   const serviceSupabase = await createServiceRoleSupabaseClient()
   const batch = await getWritableImportBatch(serviceSupabase, id)
   const ctx = await createBronzeMultipartR2Context()
+
+  if (batch.multipartUploadId) {
+    if (await bronzeObjectExists(ctx, batch.r2Key)) {
+      await setImportBatchMultipartUpload(serviceSupabase, id, null)
+      return NextResponse.json({ uploadId: null, completed: true })
+    }
+    return NextResponse.json({ uploadId: batch.multipartUploadId })
+  }
+
   const uploadId = await initBronzeMultipartUpload(ctx, batch.r2Key, contentType)
+  let saved: boolean
+  try {
+    saved = await setImportBatchMultipartUpload(
+      serviceSupabase,
+      id,
+      uploadId,
+      new Date().toISOString(),
+      true,
+    )
+  } catch (error) {
+    try {
+      await abortBronzeMultipartUpload(ctx, batch.r2Key, uploadId)
+    } catch (abortError) {
+      console.warn('[bronze multipart init] cleanup failed after database error', {
+        batchId: id,
+        abortError,
+      })
+    }
+    throw error
+  }
+  if (!saved) {
+    await abortBronzeMultipartUpload(ctx, batch.r2Key, uploadId)
+    const latest = await getImportBatchById(serviceSupabase, id)
+    if (latest?.multipartUploadId) {
+      return NextResponse.json({ uploadId: latest.multipartUploadId })
+    }
+    throw new ApiError(409, 'Multipart upload changed while it was starting; retry the archive')
+  }
 
   return NextResponse.json({ uploadId })
 })

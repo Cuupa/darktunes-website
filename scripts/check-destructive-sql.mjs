@@ -51,7 +51,11 @@ function main() {
     violations.push(match[0].trim().split('\n')[0])
   }
 
-  for (const match of sql.matchAll(/\bDELETE\s+FROM\s+([a-zA-Z0-9_."]+)/gi)) {
+  for (const match of sql.matchAll(/\bDELETE\s+FROM\s+([a-zA-Z0-9_."%]+)/gi)) {
+    // Dynamic identifier (format('%I', …)) — e.g. clear_log_table(), which
+    // enforces its own table allowlist before deleting. Literal table names here
+    // are still checked against the allowlist below.
+    if (match[1].includes('%')) continue
     const table = normalizeTable(match[1])
     if (!DELETE_ALLOWLIST.has(table)) {
       violations.push(`DELETE FROM ${match[1]}`)

@@ -217,8 +217,14 @@ async function detectCSVSource(
 
 function FileStatusIcon({ state, hasData }: { state: FileProcessingState | undefined; hasData: boolean }) {
   if (state?.status === 'error') return <WarningCircle size={16} className="text-destructive flex-shrink-0" />
-  if (state?.status === 'uploading' || state?.status === 'processing')
+  if (
+    state?.status === 'uploading' ||
+    state?.status === 'processing' ||
+    state?.bronzeStatus === 'uploading'
+  )
     return <Spinner size={16} className="text-primary animate-spin flex-shrink-0" />
+  if (state?.bronzeStatus === 'error')
+    return <Warning size={16} className="text-amber-400 flex-shrink-0" />
   if (!hasData && !state) return <Warning size={16} className="text-amber-400 flex-shrink-0" />
   return <CheckCircle size={16} className="text-green-500 flex-shrink-0" />
 }
@@ -269,7 +275,14 @@ function FileProgressBar({ state }: { state: FileProcessingState | undefined }) 
       )}
       {label ? <p className="text-xs text-muted-foreground">{label}</p> : null}
       {state.bronzeStatus === 'error' && state.bronzeError ? (
-        <p className="text-xs text-amber-400 leading-relaxed">{state.bronzeError}</p>
+        <div className="space-y-0.5">
+          <p className="text-xs text-amber-400 leading-relaxed">{state.bronzeError}</p>
+          {state.operationId ? (
+            <p className="text-xs text-muted-foreground">
+              {interpolate(t('ingestOperationId'), { id: state.operationId })}
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </div>
   )

@@ -26,6 +26,7 @@ const MAX_REGISTRATION_JSON_BYTES = 8_192
 export type BronzeDistributor = 'believe' | 'bandcamp' | 'shopify' | 'printful' | 'darkmerch'
 
 export interface BronzeUploadParams {
+  operationId?: string
   distributor: BronzeDistributor
   filename: string
   /** Raw bytes to archive in R2 (CSV text or converted XLSX output). */
@@ -43,7 +44,7 @@ export interface BronzeUploadResult {
 
 export type BronzeUploadOutcome =
   | { ok: true; batchId: string; r2Key: string }
-  | { ok: false; message: string }
+  | { ok: false; message: string; phase?: 'confirm' }
 
 export function isBronzeDirectUploadEnabled(): boolean {
   return process.env.NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD !== 'false'
@@ -87,7 +88,7 @@ export function isTransientBronzeFetchError(error: unknown): boolean {
   return TRANSIENT_FETCH_RE.test(message)
 }
 
-export function humanizeBronzeUploadError(message: string): string {
+export function humanizeBronzeUploadError(message: unknown): string {
   return explainSosError(message)
 }
 
@@ -102,39 +103,79 @@ export async function sha256Hex(text: string): Promise<string> {
 
 const CONFIRM_MAX_ATTEMPTS = 3
 const CONFIRM_RETRY_DELAY_MS = 500
+const API_REQUEST_TIMEOUT_MS = 60_000
+const ABORT_REQUEST_TIMEOUT_MS = 15_000
+const CONFIRM_MIN_TIMEOUT_MS = 30_000
+const CONFIRM_MAX_TIMEOUT_MS = 5 * 60_000
 
-async function logBronzeError(message: string, details?: Record<string, unknown>): Promise<void> {
+async function logBronzeError(
+  message: string,
+  operationId: string,
+  details?: Record<string, unknown>,
+): Promise<void> {
   console.error('[bronzeUpload]', message, details ?? '')
-  await logClientAppEvent('sos.bronze.upload', message, 'error', details)
+  await logClientAppEvent(`sos.bronze.upload.${operationId}`, message, 'error', {
+    ...details,
+    operation_id: operationId,
+  })
 }
 
-async function abandonBronzeImportBatch(batchId: string): Promise<void> {
+export async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs = API_REQUEST_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const res = await fetch(`/api/admin/sos/import-batches/${batchId}`, { method: 'DELETE' })
-    if (!res.ok) {
-      await logBronzeError('failed to abandon orphan batch', { batchId, status: res.status })
-    }
-  } catch (err) {
-    await logBronzeError('abandon orphan batch error', {
-      batchId,
-      error: err instanceof Error ? err.message : String(err),
-    })
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timer)
   }
 }
 
-async function markBronzeUploadFailed(batchId: string): Promise<void> {
+function confirmTimeoutMs(fileSize: number): number {
+  return Math.min(CONFIRM_MAX_TIMEOUT_MS, Math.max(CONFIRM_MIN_TIMEOUT_MS, 30_000 + fileSize / 100_000))
+}
+
+async function logBronzePhase(
+  operationId: string,
+  batchId: string | undefined,
+  phase: 'register' | 'upload' | 'confirm',
+  startedAt: number,
+  outcome: 'completed' | 'failed',
+  details: Record<string, unknown>,
+): Promise<void> {
+  await logClientAppEvent(
+    `sos.bronze.upload.${operationId}`,
+    `Bronze ${phase} ${outcome}`,
+    outcome === 'failed' ? 'error' : 'info',
+    {
+      operation_id: operationId,
+      batch_id: batchId,
+      phase,
+      duration_ms: Math.max(0, Math.round(performance.now() - startedAt)),
+      ...details,
+    },
+  )
+}
+
+async function abandonBronzeImportBatch(batchId: string, operationId: string): Promise<void> {
   try {
-    const res = await fetch(`/api/admin/sos/import-batches/${batchId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'failed' }),
-    })
+    const res = await fetchWithTimeout(
+      `/api/admin/sos/import-batches/${batchId}`,
+      { method: 'DELETE' },
+      ABORT_REQUEST_TIMEOUT_MS,
+    )
     if (!res.ok) {
-      await logBronzeError('failed to mark batch as failed', { batchId, status: res.status })
+      await logBronzeError('failed to abandon orphan batch', operationId, {
+        batch_id: batchId,
+        status: res.status,
+      })
     }
   } catch (err) {
-    await logBronzeError('mark batch failed error', {
-      batchId,
+    await logBronzeError('abandon orphan batch error', operationId, {
+      batch_id: batchId,
       error: err instanceof Error ? err.message : String(err),
     })
   }
@@ -154,15 +195,22 @@ async function readApiErrorMessage(res: Response): Promise<string> {
   return res.statusText || `HTTP ${res.status}`
 }
 
-async function abortBronzeMultipartUpload(batchId: string, uploadId: string): Promise<void> {
+async function abortBronzeMultipartUpload(batchId: string, operationId: string): Promise<void> {
   try {
-    await fetch(`/api/admin/sos/import-batches/${batchId}/multipart/abort`, {
+    const res = await fetchWithTimeout(`/api/admin/sos/import-batches/${batchId}/multipart/abort`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ upload_id: uploadId }),
-    })
+    }, ABORT_REQUEST_TIMEOUT_MS)
+    if (!res.ok) {
+      await logBronzeError('multipart abort request failed', operationId, {
+        batch_id: batchId,
+        status: res.status,
+      })
+    }
   } catch (err) {
-    console.error('[bronzeUpload] multipart abort error:', err)
+    await logBronzeError('multipart abort request error', operationId, {
+      batch_id: batchId,
+      error: err instanceof Error ? err.message : String(err),
+    })
   }
 }
 
@@ -320,6 +368,7 @@ async function uploadBronzeCsvDirectSingle(
 
 async function uploadBronzeCsvDirectMultipart(
   batchId: string,
+  operationId: string,
   uploadBlob: Blob,
   contentType: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -327,12 +376,12 @@ async function uploadBronzeCsvDirectMultipart(
 
   /** Abort the multipart session on every failure path — no orphaned UploadId. */
   const fail = async (message: string): Promise<{ ok: false; message: string }> => {
-    if (uploadId) await abortBronzeMultipartUpload(batchId, uploadId)
+    await abortBronzeMultipartUpload(batchId, operationId)
     return { ok: false, message }
   }
 
   try {
-    const initRes = await fetch(`/api/admin/sos/import-batches/${batchId}/multipart/init`, {
+    const initRes = await fetchWithTimeout(`/api/admin/sos/import-batches/${batchId}/multipart/init`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content_type: contentType, file_size: uploadBlob.size }),
@@ -341,8 +390,9 @@ async function uploadBronzeCsvDirectMultipart(
       return fail(await readApiErrorMessage(initRes))
     }
 
-    const initJson = (await initRes.json()) as { uploadId?: string }
-    uploadId = initJson.uploadId
+    const initJson = (await initRes.json()) as { uploadId?: string | null; completed?: boolean }
+    if (initJson.completed) return { ok: true }
+    uploadId = typeof initJson.uploadId === 'string' ? initJson.uploadId : undefined
     if (!uploadId) return fail('Missing multipart upload ID')
 
     const parts: { partNumber: number; etag: string }[] = []
@@ -366,7 +416,7 @@ async function uploadBronzeCsvDirectMultipart(
       parts.push({ partNumber, etag })
     }
 
-    const completeRes = await fetch(`/api/admin/sos/import-batches/${batchId}/multipart/complete`, {
+    const completeRes = await fetchWithTimeout(`/api/admin/sos/import-batches/${batchId}/multipart/complete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ upload_id: uploadId, parts }),
@@ -377,20 +427,21 @@ async function uploadBronzeCsvDirectMultipart(
 
     return { ok: true }
   } catch (err) {
-    if (uploadId) await abortBronzeMultipartUpload(batchId, uploadId)
+    await abortBronzeMultipartUpload(batchId, operationId)
     return { ok: false, message: toBronzeMessage(err) }
   }
 }
 
 async function uploadBronzeCsvDirect(
   batchId: string,
+  operationId: string,
   uploadBlob: Blob,
   contentType: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   if (uploadBlob.size <= BRONZE_SINGLE_PUT_MAX_BYTES) {
     return uploadBronzeCsvDirectSingle(batchId, uploadBlob, contentType)
   }
-  return uploadBronzeCsvDirectMultipart(batchId, uploadBlob, contentType)
+  return uploadBronzeCsvDirectMultipart(batchId, operationId, uploadBlob, contentType)
 }
 
 /** Server proxy fallback: one request, only for small files. */
@@ -401,7 +452,7 @@ async function uploadBronzeCsvProxySingle(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const uploadForm = new FormData()
   uploadForm.append('file', uploadBlob, uploadFilename)
-  const uploadRes = await fetch(`/api/admin/sos/import-batches/${batchId}/upload`, {
+  const uploadRes = await fetchWithTimeout(`/api/admin/sos/import-batches/${batchId}/upload`, {
     method: 'POST',
     body: uploadForm,
   })
@@ -413,6 +464,7 @@ async function uploadBronzeCsvProxySingle(
 
 async function uploadBronzeCsvToR2(
   batchId: string,
+  operationId: string,
   uploadBlob: Blob,
   uploadFilename: string,
   contentType: string,
@@ -420,7 +472,7 @@ async function uploadBronzeCsvToR2(
   if (isBronzeDirectUploadEnabled()) {
     // No silent proxy fallback: a failing direct route (usually missing R2
     // CORS) must surface its error instead of hiding behind a broken path.
-    return uploadBronzeCsvDirect(batchId, uploadBlob, contentType)
+    return uploadBronzeCsvDirect(batchId, operationId, uploadBlob, contentType)
   }
 
   if (uploadBlob.size > MAX_BRONZE_CSV_SERVER_BYTES) {
@@ -435,24 +487,50 @@ async function uploadBronzeCsvToR2(
   return uploadBronzeCsvProxySingle(batchId, uploadBlob, uploadFilename)
 }
 
-async function confirmBronzeUpload(batchId: string, fileHash: string): Promise<boolean> {
+async function confirmBronzeUpload(
+  batchId: string,
+  operationId: string,
+  fileHash: string,
+  fileSize: number,
+): Promise<{
+  confirmed: boolean
+  attempts: number
+  duplicateBatch?: { id: string; r2Key?: string }
+  confirmedR2Key?: string
+}> {
+  const deadline = performance.now() + confirmTimeoutMs(fileSize)
   for (let attempt = 1; attempt <= CONFIRM_MAX_ATTEMPTS; attempt++) {
+    const remainingMs = Math.floor(deadline - performance.now())
+    if (remainingMs <= 0) return { confirmed: false, attempts: attempt - 1 }
     try {
-      const res = await fetch(`/api/admin/sos/import-batches/${batchId}/confirm`, {
+      const res = await fetchWithTimeout(`/api/admin/sos/import-batches/${batchId}/confirm`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_hash: fileHash }),
-      })
-      if (res.ok) return true
+        body: JSON.stringify({ file_hash: fileHash, operation_id: operationId }),
+      }, remainingMs)
+      if (res.ok) {
+        const result = ((await res.json?.().catch(() => ({}))) ?? {}) as {
+          duplicate?: boolean
+          batch?: { id: string; r2Key?: string }
+          r2Key?: string
+        }
+        return {
+          confirmed: true,
+          attempts: attempt,
+          duplicateBatch: result.duplicate ? result.batch : undefined,
+          confirmedR2Key: result.r2Key,
+        }
+      }
       console.error('[bronzeUpload] confirm attempt failed:', attempt, res.status)
     } catch (err) {
       console.error('[bronzeUpload] confirm attempt error:', attempt, err)
     }
     if (attempt < CONFIRM_MAX_ATTEMPTS) {
-      await new Promise((resolve) => setTimeout(resolve, CONFIRM_RETRY_DELAY_MS * attempt))
+      const delay = Math.min(CONFIRM_RETRY_DELAY_MS * attempt, Math.max(0, deadline - performance.now()))
+      if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
     }
   }
-  return false
+  return { confirmed: false, attempts: CONFIRM_MAX_ATTEMPTS }
 }
 
 /**
@@ -462,12 +540,27 @@ async function confirmBronzeUpload(batchId: string, fileHash: string): Promise<b
 export async function uploadBronzeDistributorCsv(
   params: BronzeUploadParams,
 ): Promise<BronzeUploadOutcome> {
+  const operationId = params.operationId ?? crypto.randomUUID()
+  let batchId: string | undefined
+  let currentPhase: 'register' | 'upload' | 'confirm' = 'register'
+  let phaseStartedAt = performance.now()
+  let fileSizeBytes = 0
   try {
     const contentType = params.contentType ?? 'text/csv; charset=utf-8'
     const uploadBlob = toUploadBlob(params.uploadBody, contentType)
+    fileSizeBytes = uploadBlob.size
     const uploadFilename = params.filename.toLowerCase().endsWith('.xlsx')
       ? params.filename.replace(/\.xlsx$/i, '.csv')
       : params.filename
+
+    if (uploadBlob.size > MAX_BRONZE_CSV_BYTES) {
+      const message = `CSV exceeds upload limit (max ${MAX_BRONZE_CSV_BYTES} bytes)`
+      await logBronzeError('CSV exceeds upload limit', operationId, {
+        size_bytes: uploadBlob.size,
+        max_bytes: MAX_BRONZE_CSV_BYTES,
+      })
+      return { ok: false, message }
+    }
 
     // shortcut: the whole file is buffered once to hash it (WebCrypto has no
     // streaming digest); fine for the ~60-70 MB reference CSVs, revisit if the
@@ -475,6 +568,7 @@ export async function uploadBronzeDistributorCsv(
     const fileHash = await sha256HexFromBuffer(await uploadBlob.arrayBuffer())
 
     const registerPayload = JSON.stringify({
+      operation_id: operationId,
       period_start: params.periodStart,
       period_end: params.periodEnd,
       distributor: params.distributor,
@@ -486,11 +580,13 @@ export async function uploadBronzeDistributorCsv(
 
     if (registerPayload.length > MAX_REGISTRATION_JSON_BYTES) {
       const message = 'registration metadata too large'
-      await logBronzeError(message)
+      await logBronzeError(message, operationId, { phase: 'register' })
       return { ok: false, message }
     }
 
-    const registerRes = await fetch('/api/admin/sos/import-batches', {
+    const registerStartedAt = performance.now()
+    phaseStartedAt = registerStartedAt
+    const registerRes = await fetchWithTimeout('/api/admin/sos/import-batches', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: registerPayload,
@@ -498,7 +594,12 @@ export async function uploadBronzeDistributorCsv(
 
     if (!registerRes.ok) {
       const message = await readApiErrorMessage(registerRes)
-      await logBronzeError('batch registration failed', { message })
+      await logBronzePhase(operationId, undefined, 'register', registerStartedAt, 'failed', {
+        file_size_bytes: uploadBlob.size,
+        row_count: params.rowCount,
+        status: registerRes.status,
+      })
+      await logBronzeError('batch registration failed', operationId, { message, status: registerRes.status })
       return { ok: false, message }
     }
 
@@ -509,6 +610,11 @@ export async function uploadBronzeDistributorCsv(
     }
 
     if (registerJson.duplicate) {
+      await logBronzePhase(operationId, registerJson.batch?.id, 'register', registerStartedAt, 'completed', {
+        file_size_bytes: uploadBlob.size,
+        row_count: params.rowCount,
+        duplicate: true,
+      })
       return {
         ok: true,
         batchId: registerJson.batch.id,
@@ -519,40 +625,75 @@ export async function uploadBronzeDistributorCsv(
     const { batch, r2Key } = registerJson
     if (!batch?.id || !r2Key) {
       const message = 'invalid register response'
-      await logBronzeError(message)
+      await logBronzeError(message, operationId, { phase: 'register' })
       return { ok: false, message }
     }
+    batchId = batch.id
+    await logBronzePhase(operationId, batchId, 'register', registerStartedAt, 'completed', {
+      file_size_bytes: uploadBlob.size,
+      row_count: params.rowCount,
+      duplicate: false,
+    })
 
-    if (uploadBlob.size > MAX_BRONZE_CSV_BYTES) {
-      const message = `CSV exceeds upload limit (max ${MAX_BRONZE_CSV_BYTES} bytes)`
-      await logBronzeError('CSV exceeds upload limit', {
-        size: uploadBlob.size,
-        max: MAX_BRONZE_CSV_BYTES,
-      })
-      await abandonBronzeImportBatch(batch.id)
-      return { ok: false, message }
-    }
-
-    const uploadResult = await uploadBronzeCsvToR2(batch.id, uploadBlob, uploadFilename, contentType)
+    currentPhase = 'upload'
+    const uploadStartedAt = performance.now()
+    phaseStartedAt = uploadStartedAt
+    const uploadResult = await uploadBronzeCsvToR2(
+      batch.id,
+      operationId,
+      uploadBlob,
+      uploadFilename,
+      contentType,
+    )
+    await logBronzePhase(operationId, batch.id, 'upload', uploadStartedAt, uploadResult.ok ? 'completed' : 'failed', {
+      file_size_bytes: uploadBlob.size,
+      row_count: params.rowCount,
+      transport: isBronzeDirectUploadEnabled() ? 'direct-r2' : 'server-proxy',
+    })
     if (!uploadResult.ok) {
-      await logBronzeError('upload failed', { message: uploadResult.message, batchId: batch.id })
-      await abandonBronzeImportBatch(batch.id)
+      await logBronzeError('upload failed', operationId, {
+        message: uploadResult.message,
+        batch_id: batch.id,
+      })
+      await abandonBronzeImportBatch(batch.id, operationId)
       return { ok: false, message: uploadResult.message }
     }
 
-    const confirmed = await confirmBronzeUpload(batch.id, fileHash)
-    if (!confirmed) {
+    currentPhase = 'confirm'
+    const confirmStartedAt = performance.now()
+    phaseStartedAt = confirmStartedAt
+    const confirmResult = await confirmBronzeUpload(batch.id, operationId, fileHash, uploadBlob.size)
+    await logBronzePhase(operationId, batch.id, 'confirm', confirmStartedAt, confirmResult.confirmed ? 'completed' : 'failed', {
+      file_size_bytes: uploadBlob.size,
+      row_count: params.rowCount,
+      attempts: confirmResult.attempts,
+    })
+    if (!confirmResult.confirmed) {
       const message = 'Archive confirm failed after upload'
-      await logBronzeError('hash confirm failed after R2 upload', { batchId: batch.id })
-      await markBronzeUploadFailed(batch.id)
-      return { ok: false, message }
+      await logBronzeError('hash confirm failed after R2 upload', operationId, { batch_id: batch.id })
+      return { ok: false, message, phase: 'confirm' }
     }
 
-    return { ok: true, batchId: batch.id, r2Key }
+    return {
+      ok: true,
+      batchId: confirmResult.duplicateBatch?.id ?? batch.id,
+      r2Key: confirmResult.duplicateBatch?.r2Key ?? confirmResult.confirmedR2Key ?? r2Key,
+    }
   } catch (err) {
-    const raw = err instanceof Error ? err.message : String(err)
-    const message = humanizeBronzeUploadError(raw)
-    await logBronzeError('unexpected error', { error: message, raw })
+    const message = humanizeBronzeUploadError(err)
+    await logBronzePhase(operationId, batchId, currentPhase, phaseStartedAt, 'failed', {
+      file_size_bytes: fileSizeBytes,
+      row_count: params.rowCount,
+    })
+    await logBronzeError('unexpected error', operationId, {
+      batch_id: batchId,
+      phase: currentPhase,
+      error: message,
+    })
+    if (batchId && currentPhase === 'upload') {
+      await abortBronzeMultipartUpload(batchId, operationId)
+      await abandonBronzeImportBatch(batchId, operationId)
+    }
     return { ok: false, message }
   }
 }

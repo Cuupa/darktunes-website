@@ -5,6 +5,7 @@ const requireAdminFromRequestMock = vi.fn()
 const createServiceRoleSupabaseClientMock = vi.fn()
 const createImportBatchMock = vi.fn()
 const findImportBatchByFileHashMock = vi.fn()
+const getImportBatchByOperationIdMock = vi.fn()
 const updateImportBatchStatusMock = vi.fn()
 const assertSettlementPeriodWritableMock = vi.fn()
 
@@ -19,6 +20,7 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/api/distributorImportBatches', () => ({
   createImportBatch: (...args: unknown[]) => createImportBatchMock(...args),
+  getImportBatchByOperationId: (...args: unknown[]) => getImportBatchByOperationIdMock(...args),
   findImportBatchByFileHash: (...args: unknown[]) => findImportBatchByFileHashMock(...args),
   updateImportBatchStatus: (...args: unknown[]) => updateImportBatchStatusMock(...args),
   listImportBatches: vi.fn(),
@@ -35,6 +37,7 @@ async function loadRoute() {
 }
 
 const FILE_HASH = 'ab'.repeat(32)
+const OPERATION_ID = 'a15b2f59-9aec-478d-91b8-8be8b0dc9a12'
 
 describe('POST /api/admin/sos/import-batches', () => {
   beforeEach(() => {
@@ -42,6 +45,7 @@ describe('POST /api/admin/sos/import-batches', () => {
     requireAdminFromRequestMock.mockResolvedValue({ userId: 'admin-1', role: 'admin' })
     createServiceRoleSupabaseClientMock.mockResolvedValue({ kind: 'service' })
     findImportBatchByFileHashMock.mockResolvedValue(null)
+    getImportBatchByOperationIdMock.mockResolvedValue(null)
     updateImportBatchStatusMock.mockResolvedValue(undefined)
     assertSettlementPeriodWritableMock.mockResolvedValue(undefined)
     createImportBatchMock.mockResolvedValue({
@@ -67,6 +71,7 @@ describe('POST /api/admin/sos/import-batches', () => {
           period_end: '2026-03',
           distributor: 'believe',
           filename: 'Believe_Q1_2026.csv',
+          operation_id: OPERATION_ID,
           file_hash: FILE_HASH,
           row_count: 397003,
         },
@@ -78,10 +83,45 @@ describe('POST /api/admin/sos/import-batches', () => {
       expect.anything(),
       expect.objectContaining({
         fileHash: null,
+        operationId: OPERATION_ID,
         distributor: 'believe',
         rowCount: 397003,
       }),
     )
+  })
+
+  it('replays a pending registration for the same operation_id instead of creating another batch', async () => {
+    getImportBatchByOperationIdMock.mockResolvedValue({
+      id: 'batch-new',
+      periodStart: '2025-10',
+      periodEnd: '2026-03',
+      distributor: 'believe',
+      r2Key: 'sos-imports/batch-new/abc_Believe_Q1_2026.csv',
+      rowCount: 397003,
+      status: 'uploaded',
+    })
+    const { POST } = await loadRoute()
+    const { status, body } = await readJson<{ batch: { id: string }; r2Key: string }>(
+      await POST(
+        jsonRequest('/api/admin/sos/import-batches', {
+          method: 'POST',
+          bearer: 'tok',
+          body: {
+            operation_id: OPERATION_ID,
+            period_start: '2025-10',
+            period_end: '2026-03',
+            distributor: 'believe',
+            filename: 'Believe_Q1_2026.csv',
+            row_count: 397003,
+          },
+        }),
+      ),
+    )
+
+    expect(status).toBe(200)
+    expect(body.batch.id).toBe('batch-new')
+    expect(body.r2Key).toContain('batch-new')
+    expect(createImportBatchMock).not.toHaveBeenCalled()
   })
 
   it('returns the existing completed batch as a duplicate without inserting', async () => {
@@ -102,6 +142,7 @@ describe('POST /api/admin/sos/import-batches', () => {
             period_end: '2026-03',
             distributor: 'believe',
             filename: 'Believe_Q1_2026.csv',
+            operation_id: OPERATION_ID,
             file_hash: FILE_HASH,
           },
         }),
@@ -130,6 +171,7 @@ describe('POST /api/admin/sos/import-batches', () => {
           period_end: '2026-03',
           distributor: 'believe',
           filename: 'Believe_Q1_2026.csv',
+          operation_id: OPERATION_ID,
           file_hash: FILE_HASH,
         },
       }),

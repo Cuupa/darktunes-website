@@ -23,6 +23,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { getArtistPrivateByArtistIds } from '@/lib/api/artistPrivateData'
 import { syncReleaseFromExternalSource } from '@/lib/api/releases'
+import { recordSyncLog } from '@/lib/api/syncLogs'
 import { fetchSpotifyArtistReleases } from './spotifyApi'
 import { fetchDiscogsArtistReleases } from './discogsApi'
 import { fetchSongkickArtistCalendar } from './songkickApi'
@@ -929,7 +930,7 @@ async function writeSyncLog(
         ? 'partial'
         : 'error'
 
-  await db.from('sync_logs').insert({
+  await recordSyncLog(db, {
     artist_id: options?.artistId ?? null,
     status,
     message: result.errors[0] ?? null,

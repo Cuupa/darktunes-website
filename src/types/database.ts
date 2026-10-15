@@ -1783,6 +1783,9 @@ export interface Database {
           distributor: string
           r2_key: string
           file_hash: string | null
+          operation_id: string | null
+          multipart_upload_id: string | null
+          multipart_started_at: string | null
           row_count: number
           status: 'uploaded' | 'processing' | 'completed' | 'failed'
           rules_preset_id: string | null
@@ -1796,6 +1799,9 @@ export interface Database {
           distributor: string
           r2_key: string
           file_hash?: string | null
+          operation_id?: string | null
+          multipart_upload_id?: string | null
+          multipart_started_at?: string | null
           row_count?: number
           status?: 'uploaded' | 'processing' | 'completed' | 'failed'
           rules_preset_id?: string | null
@@ -1809,6 +1815,9 @@ export interface Database {
           distributor?: string
           r2_key?: string
           file_hash?: string | null
+          operation_id?: string | null
+          multipart_upload_id?: string | null
+          multipart_started_at?: string | null
           row_count?: number
           status?: 'uploaded' | 'processing' | 'completed' | 'failed'
           rules_preset_id?: string | null
@@ -5584,6 +5593,12 @@ export interface Database {
           p_method: string | null
         }
         Returns: undefined
+      }
+      clear_log_table: {
+        Args: {
+          p_table: string
+        }
+        Returns: number
       }
     }
     Enums: {

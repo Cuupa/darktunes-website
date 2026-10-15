@@ -162,9 +162,23 @@ MUSS-Regeln:
 ### A.6 Import batch states
 
 `uploaded → processing → completed | failed`. MUSS: `file_hash` wird ausschließlich beim
-Confirm nach SHA-256 des R2-Objekts persistiert; aktive Hashes sind eindeutig; identische
-Datei wird wiederverwendet statt erneut verarbeitet; `failed` gibt den Hash für einen Retry
-frei; Wiederholungen erzeugen keine doppelten Umsätze (#618/#631).
+Confirm nach SHA-256 des endgültigen R2-Objekts persistiert; aktive Hashes sind eindeutig;
+identische Datei wird wiederverwendet statt erneut verarbeitet; `failed` gibt den Hash für
+einen Retry frei; Wiederholungen erzeugen keine doppelten Umsätze (#618/#631).
+
+Jeder Bronze-Upload erhält vor der Registrierung eine stabile UUID `operation_id`. Ein Retry
+desselben Dateivorgangs verwendet dieselbe ID. Registrierung und Bestätigung sind dadurch
+wiederholbar, ohne einen zweiten Batch anzulegen. Die Batch-Zeile speichert
+`multipart_upload_id` und `multipart_started_at`, bevor die Init-Antwort an den Browser geht.
+Fehler und Batch-Löschung brechen bekannte Multipart-Sitzungen ab. Der vollständige R2-Scan
+bricht verwaiste Sitzungen ab, die älter als 24 Stunden sind, und zeigt die Anzahl im
+Speicherbericht.
+
+Presigned PUTs schreiben nur auf den temporären Schlüssel der Batch-Zeile. Confirm kopiert
+die Bytes auf einen endgültigen Schlüssel, prüft dessen SHA-256 und aktualisiert erst danach
+`r2_key`, `file_hash` und `status` gemeinsam. Alte URLs können den temporären Schlüssel
+ändern, nicht das bestätigte Archiv. Ein fehlgeschlagener Confirm lässt den Batch
+wiederholbar und `uploaded`.
 
 ### A.7 Fehlersemantik (HTTP)
 
@@ -350,8 +364,12 @@ Owner issues: #616, #617, #618, #620, #631. Mirror into those issues.
     eine verspätete Antwort für Periode A darf Periode B nicht überschreiben
     (`periodLoadSeqRef`, Register-`refreshSeqRef`).
 3. Worker-Ergebnisse tragen eine Sequenz; nur das Ergebnis der letzten Konfiguration darf
-   angewendet werden (`process` `requestId` / `processSeqRef`).
-4. Bei Konflikt gewinnt der Serverzustand; die UI zeigt „Neu laden“ statt zu raten.
+    angewendet werden (`process` `requestId` / `processSeqRef`).
+4. Änderungen an `bronze_batch_ids` sind Workspace-Änderungen und werden ebenfalls
+   gespeichert. Statements werden erst erstellt, wenn das serverseitige Workspace-Manifest
+   jede übermittelte Quelle enthält und jeder Batch `completed`, gehasht und für den Zeitraum
+   relevant ist. PDF-only-Statements übermitteln keine Quellen.
+5. Bei Konflikt gewinnt der Serverzustand; die UI zeigt „Neu laden“ statt zu raten.
 
 ### C.6 Persistenz und Fortsetzen
 
@@ -359,7 +377,7 @@ Owner issues: #616, #617, #618, #620, #631. Mirror into those issues.
 |---|---|---|
 | Einstellungen/Regeln je Periode (inkl. Manual/Ausgaben/Ignore) | `sos_accounting_workspaces.config` | ja |
 | Standard-/Namens-Preset (ohne Perioden-Einmalposten) | `sos_rules_presets` | ja |
-| Bronze-Archiv + Hash | `distributor_import_batches` + R2 | ja |
+| Bronze-Archiv + Hash + `operation_id` + aktive Multipart-ID | `distributor_import_batches` + R2 | ja |
 | Datei-Metadaten (Name, Zeilen, `bronzeBatchId`) | IndexedDB je Quelle | ja |
 | Roh-CSV, Parse-Zustand, Worker-Cache | Speicher | nein (Re-Upload oder Bronze-Load) |
 | Berechnete Ergebnisse | Speicher | nein |
@@ -558,6 +576,11 @@ Verbindungsabbruch oder abgelaufener Signatur.
    Rohdateien in Logs.
 4. Die Vorgangs-ID wird in UI, Log und (soweit vorhanden) Audit referenzierbar angezeigt.
 
+Bronze-Uploads protokollieren Registrierung, Transfer und Confirm mit derselben
+`operation_id`, Dauer, Dateigröße, Zeilenzahl und Ergebnis. CSV-Inhalte und Finanzzeilen
+bleiben aus Logs ausgeschlossen. Ein Confirm-Fehler lässt die ID und den Batch für einen
+idempotenten Retry bestehen.
+
 ### F.4 Abbruch und lange Aufgaben
 
 1. Import/Export sind abbrechbar; ein Abbruch hinterlässt keinen halb gespeicherten
@@ -614,3 +637,4 @@ Verbindungsabbruch oder abgelaufener Signatur.
 | 2026-09-24 | Rechnungsnummer (MAX+1) wird bei Unique-Kollision neu vergeben; Nummern-Constraint wird vom Statement-Index unterschieden (§A.4) |
 | 2026-09-24 | `received` nur aus `sent` (§A.4) |
 | 2026-09-24 | CSV-Parsing läuft echt gestreamt (Papa-Chunk statt vollständigem Row-Array); Carry-forward-Berechnung lädt je Periode gebündelt statt je Künstler (§F) |
+| 2026-10-15 | Bronze-Uploads erhalten eine persistierte `operation_id`, begrenzte Request-Zeiten und serverseitige Quellenprüfung. Confirm prüft den Hash am endgültigen R2-Schlüssel. Multipart-IDs werden gespeichert und bei Fehler, Löschung oder stale R2-Scan abgebrochen. |

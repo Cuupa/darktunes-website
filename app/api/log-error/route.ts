@@ -92,7 +92,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
   const viewPath =
     typeof resolvedDetails.path === 'string' ? resolvedDetails.path : null
 
-  await writeAppLog({
+  const persisted = await writeAppLog({
     source,
     level: resolvedLevel,
     message,
@@ -100,6 +100,12 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     userId: user?.id ?? null,
     routePath: viewPath,
   })
+
+  if (!persisted) {
+    // The log store rejected the write (missing columns/RPC, DB error). Report it
+    // so the reporting client can surface the gap instead of believing it logged.
+    return new NextResponse(null, { status: 503 })
+  }
 
   if (user && resolvedLevel === 'error' && AUTO_ZAMMAD_SOURCES.has(source)) {
     void (async () => {

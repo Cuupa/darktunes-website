@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { logClientAppEvent } from '@/lib/sos/clientAppLog'
 import {
   extractPeriodBounds,
+  fetchWithTimeout,
   humanizeBronzeUploadError,
   uploadBronzeDistributorCsv,
 } from './bronzeUpload'
@@ -37,11 +39,13 @@ describe('uploadBronzeDistributorCsv', () => {
 
   beforeEach(() => {
     fetchMock.mockReset()
+    vi.mocked(logClientAppEvent).mockClear()
     vi.stubGlobal('fetch', fetchMock)
     vi.stubEnv('NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD', 'false')
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
     vi.unstubAllEnvs()
   })
@@ -80,6 +84,25 @@ describe('uploadBronzeDistributorCsv', () => {
     expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: 'DELETE' })
   })
 
+  it('aborts a stalled API request at its deadline', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockImplementation((_url: string, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted', 'AbortError'))
+        })
+      }),
+    )
+
+    const pending = expect(
+      fetchWithTimeout('/stalled', { method: 'POST' }, 60_000),
+    ).rejects.toMatchObject({ name: 'AbortError' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(60_000)
+    await pending
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('retries confirm and returns batch metadata on success', async () => {
     fetchMock
       .mockResolvedValueOnce({
@@ -94,6 +117,7 @@ describe('uploadBronzeDistributorCsv', () => {
       .mockResolvedValueOnce({ ok: true })
 
     const result = await uploadBronzeDistributorCsv({
+      operationId: 'a15b2f59-9aec-478d-91b8-8be8b0dc9a12',
       distributor: 'bandcamp',
       filename: 'report.csv',
       uploadBody: 'header\nvalue',
@@ -107,6 +131,18 @@ describe('uploadBronzeDistributorCsv', () => {
       (call) => typeof call[0] === 'string' && call[0].includes('/confirm'),
     )
     expect(confirmCalls).toHaveLength(2)
+    expect(logClientAppEvent).toHaveBeenCalledWith(
+      'sos.bronze.upload.a15b2f59-9aec-478d-91b8-8be8b0dc9a12',
+      'Bronze upload completed',
+      'info',
+      expect.objectContaining({
+        operation_id: 'a15b2f59-9aec-478d-91b8-8be8b0dc9a12',
+        phase: 'upload',
+        file_size_bytes: expect.any(Number),
+        row_count: 1,
+        duration_ms: expect.any(Number),
+      }),
+    )
   })
 
   it('reports a clear error when direct upload is disabled and the file exceeds the proxy limit', async () => {
@@ -264,13 +300,13 @@ describe('uploadBronzeDistributorCsv', () => {
         call[0] === '/api/admin/sos/import-batches/batch-abort/multipart/abort',
     )
     expect(abortCall).toBeTruthy()
-    expect(abortCall?.[1]?.body).toBe(JSON.stringify({ upload_id: 'upload-2' }))
+    expect(abortCall?.[1]?.body).toBeUndefined()
 
     vi.doUnmock('./bronzeUploadLimits')
     vi.resetModules()
   })
 
-  it('marks the batch failed when confirm never succeeds', async () => {
+  it('keeps the batch retryable when confirmation never succeeds', async () => {
     fetchMock
       .mockResolvedValueOnce({
         ok: true,
@@ -294,11 +330,26 @@ describe('uploadBronzeDistributorCsv', () => {
       periodEnd: '2024-03',
     })
 
-    expect(result).toEqual({ ok: false, message: 'Archive confirm failed after upload' })
-    const failCall = fetchMock.mock.calls.find(
-      (call) => call[0] === '/api/admin/sos/import-batches/batch-3' && call[1]?.method === 'PATCH',
-    )
-    expect(failCall?.[1]?.body).toBe(JSON.stringify({ status: 'failed' }))
+    expect(result).toEqual({
+      ok: false,
+      message: 'Archive confirm failed after upload',
+      phase: 'confirm',
+    })
+    expect(
+      fetchMock.mock.calls.some(
+        (call) =>
+          call[0] === '/api/admin/sos/import-batches/batch-3' &&
+          (call[1]?.method === 'PATCH' || call[1]?.method === 'DELETE'),
+      ),
+    ).toBe(false)
+    const registerBody = JSON.parse(
+      String(fetchMock.mock.calls[0]?.[1]?.body),
+    ) as { operation_id: string }
+    const confirmBody = JSON.parse(
+      String(fetchMock.mock.calls[2]?.[1]?.body),
+    ) as { operation_id: string }
+    expect(registerBody.operation_id).toMatch(/^[0-9a-f-]{36}$/i)
+    expect(confirmBody.operation_id).toBe(registerBody.operation_id)
   })
 
   it('uses presigned direct upload when enabled', async () => {

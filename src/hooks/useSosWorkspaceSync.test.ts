@@ -136,7 +136,7 @@ describe('useSosWorkspaceSync', () => {
       currentPeriodKey: periodKey,
       settings: { version: 1, splitFees: [], compilationFilters: [], artistMappings: [] } as never,
       applySettings,
-      bronzeBatchIds: [],
+      bronzeBatchIds: ['batch-2'],
       disabled: true,
     }))
 
@@ -160,8 +160,10 @@ describe('useSosWorkspaceSync', () => {
     )
     const body = JSON.parse(String((postCall?.[1] as RequestInit).body)) as {
       expected_revision?: number
+      bronze_batch_ids?: string[]
     }
     expect(body.expected_revision).toBe(3)
+    expect(body.bronze_batch_ids).toEqual(['batch-1', 'batch-2'])
   })
 
   it('keeps local changes dirty and blocks further saves after a 409 conflict', async () => {

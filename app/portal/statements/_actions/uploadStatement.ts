@@ -15,7 +15,9 @@
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { getArtistById } from '@/lib/api/artists'
+import { getImportBatchesByIds } from '@/lib/api/distributorImportBatches'
 import { createSalesStatement, DuplicateDraftStatementError } from '@/lib/api/salesStatements'
+import { getWorkspaceForPeriod } from '@/lib/api/sosAccountingWorkspaces'
 import {
   assertSettlementPeriodWritable,
   getOrCreateSettlementPeriod,
@@ -60,8 +62,8 @@ export interface UploadStatementInput {
   pdfBase64: string
   /** When true, sends the artist notification email immediately. Defaults to false. */
   notifyArtist?: boolean
-  sourceFileCount?: number
-  archivedFileCount?: number
+  sourceMode: 'bronze' | 'manual'
+  sourceBatchIds: string[]
 }
 
 export interface UploadStatementResult {
@@ -106,11 +108,34 @@ export async function uploadStatement(
     if (!periodValidation.ok) {
       return { success: false, error: periodValidation.message }
     }
-    const archiveValidation = validateStatementSourceArchive(input)
+    if (
+      (input.sourceMode !== 'bronze' && input.sourceMode !== 'manual') ||
+      !Array.isArray(input.sourceBatchIds) ||
+      input.sourceBatchIds.some((id) => typeof id !== 'string' || !id.trim())
+    ) {
+      return { success: false, error: 'A valid source manifest is required to publish this statement.' }
+    }
+    const { periodStart, periodEnd, period } = periodValidation
+
+    const workspace = await getWorkspaceForPeriod(
+      serviceSupabase,
+      periodStart.slice(0, 7),
+      periodEnd.slice(0, 7),
+    )
+    const workspaceBatchIds = workspace?.bronzeBatchIds ?? []
+    const batches = await getImportBatchesByIds(serviceSupabase, input.sourceBatchIds)
+    const archiveValidation = validateStatementSourceArchive({
+      sourceMode: input.sourceMode,
+      sourceBatchIds: input.sourceBatchIds,
+      workspaceBatchIds,
+      batches,
+      primaryBatchId: input.batchId,
+      periodStart,
+      periodEnd,
+    })
     if (!archiveValidation.ok) {
       return { success: false, error: archiveValidation.message }
     }
-    const { periodStart, periodEnd, period } = periodValidation
 
     await assertSettlementPeriodWritable(serviceSupabase, periodStart, periodEnd)
 

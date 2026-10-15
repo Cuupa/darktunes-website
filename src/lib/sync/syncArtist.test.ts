@@ -106,6 +106,20 @@ function makeGenericBuilder(data: unknown = null, error: unknown = null) {
 const ARTIST_ID = 'artist-uuid-1'
 const ARTIST_ROW: ArtistRow = { id: ARTIST_ID, name: 'Test Artist' }
 
+const SYNC_LOG_ROW = {
+  id: 'sync-log-1',
+  artist_id: ARTIST_ID,
+  status: 'success',
+  message: null,
+  releases_synced: 0,
+  errors: [],
+  api_source: 'itunes',
+  rate_limited: false,
+  duration_ms: null,
+  metadata: {},
+  created_at: '2024-01-01T00:00:00Z',
+}
+
 const DEFAULT_RELEASE_ROW = {
   id: 'r1',
   title: 'Test Album',
@@ -338,7 +352,7 @@ describe('syncArtist', () => {
       if (table === 'artists') return makeArtistBuilder(ARTIST_ROW)
       if (table === 'releases') return makeReleasesTableBuilder()
       if (table === 'sync_logs') {
-        const b = makeGenericBuilder()
+        const b = makeGenericBuilder(SYNC_LOG_ROW)
         b.insert = syncLogInsert
         return b
       }
@@ -365,7 +379,7 @@ describe('syncArtist', () => {
     const fromFn = vi.fn((table: string) => {
       if (table === 'artists') return makeArtistBuilder(ARTIST_ROW)
       if (table === 'sync_logs') {
-        const b = makeGenericBuilder()
+        const b = makeGenericBuilder(SYNC_LOG_ROW)
         b.insert = syncLogInsert
         return b
       }

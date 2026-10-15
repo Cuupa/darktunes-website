@@ -181,6 +181,7 @@ export function useExports(
     args: SosExcelBuildArgs,
     onProgress?: (phase: string, rows?: number) => void,
   ) => Promise<Blob | null>,
+  preparePublish?: () => Promise<boolean>,
 ) {
   const t = useMergedAccountingLabels(exportFallback)
   const zipAbortRef = useRef<AbortController | null>(null)
@@ -305,6 +306,7 @@ export function useExports(
             downloadBlob(blob, `${createSafeFilename(artist)}_statement.pdf`)
             return
           }
+          if (preparePublish && !(await preparePublish())) return
           const filename = `${createSafeFilename(artist)}_statement.pdf`
 
           toast.loading(t.exportPortalUploading, { id: 'sos-upload' })
@@ -324,12 +326,12 @@ export function useExports(
             pdfBase64,
             rulesFingerprint: persistContext?.rulesFingerprint,
             fxSnapshot: persistContext?.fxSnapshot,
-            calculationSnapshot: buildCalculationSnapshot(
-              artistData,
-              analyticsPayload.totalStreams,
-            ),
-            sourceFileCount: persistContext?.sourceFileCount,
-            archivedFileCount: persistContext?.archivedFileCount,
+            calculationSnapshot: {
+              ...buildCalculationSnapshot(artistData, analyticsPayload.totalStreams),
+              sourceBatchIds: batchIds,
+            },
+            sourceMode: (persistContext?.sourceFileCount ?? 0) > 0 ? 'bronze' : 'manual',
+            sourceBatchIds: batchIds,
           })
 
           if (result.success) {
@@ -372,7 +374,7 @@ export function useExports(
         console.error('PDF export error:', err)
       }
     },
-    [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, artistInfoMap, compilationFilters, autoUploadToPortal, persistContext, labelArtists, t, requirePeriod, requireArchive]
+    [processedData, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, artistInfoMap, compilationFilters, autoUploadToPortal, persistContext, labelArtists, t, requirePeriod, requireArchive, preparePublish]
   )
 
   const handleDownloadExcel = useCallback(
@@ -696,6 +698,7 @@ export function useExports(
       }
       if (!requirePeriod()) return
       if (!requireArchive()) return
+      if (preparePublish && !(await preparePublish())) return
 
       const artistInfo = artistInfoMap.get(artist.toLowerCase())
 
@@ -737,12 +740,12 @@ export function useExports(
           pdfBase64,
           rulesFingerprint: persistContext?.rulesFingerprint,
           fxSnapshot: persistContext?.fxSnapshot,
-          calculationSnapshot: buildCalculationSnapshot(
-            artistData,
-            analyticsPayload.totalStreams,
-          ),
-          sourceFileCount: persistContext?.sourceFileCount,
-          archivedFileCount: persistContext?.archivedFileCount,
+          calculationSnapshot: {
+            ...buildCalculationSnapshot(artistData, analyticsPayload.totalStreams),
+            sourceBatchIds: batchIds,
+          },
+          sourceMode: (persistContext?.sourceFileCount ?? 0) > 0 ? 'bronze' : 'manual',
+          sourceBatchIds: batchIds,
         })
 
         if (!result.success) {
@@ -773,7 +776,7 @@ export function useExports(
         toast.error(t.exportPublishFailed, { description: explainSosError(err, t) })
       }
     },
-    [processedData, artistInfoMap, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters, persistContext, labelArtists, t, requirePeriod, requireArchive]
+    [processedData, artistInfoMap, labelInfo, periodStart, periodEnd, pdfSettings, emailOptions, compilationFilters, persistContext, labelArtists, t, requirePeriod, requireArchive, preparePublish]
   )
 
   const buildCorrectionPdfBase64 = useCallback(

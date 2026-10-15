@@ -27,6 +27,12 @@ export type HealthHeartbeatKey =
 
 export type HealthHeartbeats = Record<HealthHeartbeatKey, string | null>
 
+export interface HealthHeartbeatsResult {
+  heartbeats: HealthHeartbeats
+  /** Kinds whose tick could not be read — distinct from "never ran". */
+  readErrors: HealthHeartbeatKey[]
+}
+
 const HEARTBEAT_KINDS: HealthHeartbeatKey[] = [
   'scheduler',
   'worker',
@@ -45,7 +51,7 @@ const EMPTY_HEARTBEATS: HealthHeartbeats = {
 
 export async function getHealthHeartbeats(
   db: SupabaseClient<Database>,
-): Promise<HealthHeartbeats> {
+): Promise<HealthHeartbeatsResult> {
   const entries = await Promise.all(
     HEARTBEAT_KINDS.map(async (kind) => {
       try {
@@ -58,24 +64,27 @@ export async function getHealthHeartbeats(
           .maybeSingle()
 
         if (error) throw new Error(error.message)
-        return [kind, data?.created_at ?? null] as const
+        return [kind, data?.created_at ?? null, false] as const
       } catch (err) {
         // Telemetry must never take down the health snapshot (e.g. before the
-        // cron_ticks table is applied). Treat an unreadable kind as "no tick".
+        // cron_ticks table is applied). Report the read failure explicitly so it
+        // is not mistaken for "this job never ran".
         console.warn(
           `[getHealthHeartbeats] ${kind} read failed:`,
           err instanceof Error ? err.message : err,
         )
-        return [kind, null] as const
+        return [kind, null, true] as const
       }
     }),
   )
 
-  const result = { ...EMPTY_HEARTBEATS }
-  for (const [kind, at] of entries) {
-    result[kind] = at
+  const heartbeats = { ...EMPTY_HEARTBEATS }
+  const readErrors: HealthHeartbeatKey[] = []
+  for (const [kind, at, errored] of entries) {
+    heartbeats[kind] = at
+    if (errored) readErrors.push(kind)
   }
-  return result
+  return { heartbeats, readErrors }
 }
 
 /**

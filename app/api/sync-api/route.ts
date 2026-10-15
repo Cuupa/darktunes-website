@@ -30,10 +30,14 @@ import {
 } from '@/lib/api/syncQueue'
 import { kickSyncExecutorAfterEnqueue } from '@/lib/sync/queueExecutor'
 import { syncAll } from '@/lib/sync/syncAll'
+import { recordSyncLog } from '@/lib/api/syncLogs'
 import { createR2Client, uploadUrlToR2 } from '@/lib/r2Utils'
-import { fetchYouTubeChannelVideos, isYouTubeShort } from '@/lib/api/youtubeApi'
-import { createArtistMatcher, resolveVideoArtist } from '@/lib/api/videoAttribution'
 import { recordHealthHeartbeat } from '@/lib/health/heartbeats'
+import {
+  syncYouTubeChannel,
+  YouTubeSyncError,
+  MAX_YOUTUBE_CHANNEL_VIDEOS,
+} from '@/lib/sync/syncYouTubeChannel'
 import {
   getSyncCredentials,
   getYouTubeCredentials,
@@ -87,79 +91,50 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
 
     const { apiKey: youtubeApiKey, channelId: youtubeChannelId } =
       await getYouTubeCredentials(db)
-    if (!youtubeApiKey) throw buildApiError('CONFIG_ERROR', 500)
-    if (!youtubeChannelId) throw buildApiError('CONFIG_ERROR', 500)
-
-    let videos
-    try {
-      videos = await fetchYouTubeChannelVideos(youtubeChannelId, youtubeApiKey, 20)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'YouTube fetch failed'
-      await db.from('sync_logs').insert({
+    if (!youtubeApiKey) {
+      await recordSyncLog(db, {
         artist_id: null,
         status: 'error',
-        message: msg,
+        message: 'YouTube API key is not configured in Admin → API Keys',
         releases_synced: 0,
-        errors: [msg],
-        api_source: 'youtube',
-        rate_limited: /quota|429|rate/i.test(msg),
-      })
-      throw buildApiError('EXTERNAL_API_ERROR', 502)
-    }
-
-    if (videos.length === 0) {
-      await db.from('sync_logs').insert({
-        artist_id: null,
-        status: 'success',
-        message: 'No videos returned from YouTube',
-        releases_synced: 0,
-        errors: [],
+        errors: ['YouTube API key is not configured in Admin → API Keys'],
         api_source: 'youtube',
         rate_limited: false,
       })
-      return NextResponse.json({ synced: 0, message: 'No videos returned from YouTube' })
+      throw buildApiError('CONFIG_ERROR', 500)
+    }
+    if (!youtubeChannelId) {
+      await recordSyncLog(db, {
+        artist_id: null,
+        status: 'error',
+        message: 'YouTube channel ID is not configured in Admin → API Keys',
+        releases_synced: 0,
+        errors: ['YouTube channel ID is not configured in Admin → API Keys'],
+        api_source: 'youtube',
+        rate_limited: false,
+      })
+      throw buildApiError('CONFIG_ERROR', 500)
     }
 
-    const { data: artists } = await db
-      .from('artists')
-      .select('id, name')
-      .eq('is_visible', true)
-
-    const artistMatchers = (artists ?? [])
-      .map(createArtistMatcher)
-      .filter((m): m is NonNullable<typeof m> => Boolean(m))
-
-    const rows = videos.map((v) => {
-      const { artistId } = resolveVideoArtist(v.title, v.channelTitle, artistMatchers)
-      return {
-        artist_id: artistId,
-        youtube_id: v.youtubeId,
-        title: v.title,
-        thumbnail_url: v.thumbnailUrl,
-        published_at: v.publishedAt,
-        is_short: isYouTubeShort(v.durationSeconds, v.title),
-        // is_visible omitted — preserve admin-hidden rows (same as /api/sync-youtube)
+    // Same implementation + same cap as /api/sync-youtube (shared lib).
+    let result
+    try {
+      result = await syncYouTubeChannel(db, {
+        apiKey: youtubeApiKey,
+        channelId: youtubeChannelId,
+        maxVideos: MAX_YOUTUBE_CHANNEL_VIDEOS,
+      })
+    } catch (err) {
+      if (err instanceof YouTubeSyncError) {
+        throw err.kind === 'db'
+          ? buildApiError('DB_ERROR', 500)
+          : buildApiError('EXTERNAL_API_ERROR', 502)
       }
-    })
-
-    const { error } = await db
-      .from('videos')
-      .upsert(rows, { onConflict: 'youtube_id', ignoreDuplicates: false })
-    if (error) throw buildApiError('DB_ERROR', 500)
-
-    // Write a sync_log entry so the health dashboard reflects the last YouTube sync time
-    await db.from('sync_logs').insert({
-      artist_id: null,
-      status: 'success',
-      message: null,
-      releases_synced: videos.length,
-      errors: [],
-      api_source: 'youtube',
-      rate_limited: false,
-    })
+      throw err
+    }
 
     revalidatePublicContent(VIDEO_SYNC_TAGS)
-    return NextResponse.json({ synced: videos.length })
+    return NextResponse.json(result)
   }
 
   // APIs that do not require R2 (no image uploads): odesli, songkick, bandsintown

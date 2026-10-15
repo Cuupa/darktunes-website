@@ -16,6 +16,9 @@ export interface DistributorImportBatch {
   distributor: string
   r2Key: string
   fileHash: string | undefined
+  operationId: string | undefined
+  multipartUploadId: string | undefined
+  multipartStartedAt: string | undefined
   rowCount: number
   status: BatchStatus
   rulesPresetId: string | undefined
@@ -28,6 +31,7 @@ export interface CreateImportBatchData {
   periodEnd: string
   distributor: string
   r2Key: string
+  operationId?: string | null
   fileHash?: string | null
   rowCount?: number
   status?: BatchStatus
@@ -43,6 +47,9 @@ function rowToBatch(row: Row): DistributorImportBatch {
     distributor: row.distributor,
     r2Key: row.r2_key,
     fileHash: row.file_hash ?? undefined,
+    operationId: row.operation_id ?? undefined,
+    multipartUploadId: row.multipart_upload_id ?? undefined,
+    multipartStartedAt: row.multipart_started_at ?? undefined,
     rowCount: row.row_count,
     status: row.status,
     rulesPresetId: row.rules_preset_id ?? undefined,
@@ -70,6 +77,7 @@ export async function createImportBatch(
       distributor: data.distributor,
       r2_key: data.r2Key,
       file_hash: data.fileHash ?? null,
+      operation_id: data.operationId ?? null,
       row_count: data.rowCount ?? 0,
       status: data.status ?? 'uploaded',
       rules_preset_id: data.rulesPresetId ?? null,
@@ -84,6 +92,20 @@ export async function createImportBatch(
   }
   if (!row) throw new Error('No data returned from createImportBatch')
   return rowToBatch(row as Row)
+}
+
+export async function getImportBatchByOperationId(
+  db: DbClient,
+  operationId: string,
+): Promise<DistributorImportBatch | null> {
+  const { data, error } = await db
+    .from('distributor_import_batches')
+    .select('*')
+    .eq('operation_id', operationId)
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return data ? rowToBatch(data as Row) : null
 }
 
 export async function findImportBatchByFileHash(
@@ -221,6 +243,67 @@ export async function updateImportBatchStatus(
     .eq('id', id)
 
   if (error) throw new Error(error.message)
+}
+
+export async function setImportBatchMultipartUpload(
+  db: DbClient,
+  id: string,
+  uploadId: string | null,
+  startedAt: string | null = null,
+  onlyIfEmpty = false,
+): Promise<boolean> {
+  let query = db
+    .from('distributor_import_batches')
+    .update({
+      multipart_upload_id: uploadId,
+      multipart_started_at: uploadId ? startedAt : null,
+    })
+    .eq('id', id)
+    .neq('status', 'completed')
+  if (onlyIfEmpty) query = query.is('multipart_upload_id', null)
+  const { data, error } = await query
+    .select('id')
+    .maybeSingle()
+
+  if (error) throw new Error(error.message)
+  return data != null
+}
+
+export async function clearTrackedMultipartUpload(
+  db: DbClient,
+  r2Key: string,
+  uploadId: string,
+): Promise<void> {
+  const { error } = await db
+    .from('distributor_import_batches')
+    .update({ multipart_upload_id: null, multipart_started_at: null })
+    .eq('r2_key', r2Key)
+    .eq('multipart_upload_id', uploadId)
+
+  if (error) throw new Error(error.message)
+}
+
+export async function finalizeImportBatch(
+  db: DbClient,
+  input: { id: string; r2Key: string; fileHash: string },
+): Promise<boolean> {
+  const { data, error } = await db
+    .from('distributor_import_batches')
+    .update({
+      r2_key: input.r2Key,
+      file_hash: input.fileHash,
+      status: 'completed',
+      multipart_upload_id: null,
+      multipart_started_at: null,
+    })
+    .eq('id', input.id)
+    .neq('status', 'completed')
+    .is('file_hash', null)
+    .select('id')
+    .maybeSingle()
+
+  if (error) throw error
+  return data != null
 }
 
 /** Delete an import batch row (and its bronze archive) unconditionally. */

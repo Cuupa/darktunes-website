@@ -656,6 +656,8 @@ function SosGeneratorPanel() {
     ],
   )
 
+  const preparePublishRef = useRef<() => Promise<boolean>>(async () => true)
+
   const {
     handleDownloadPDF,
     handleDownloadExcel,
@@ -678,6 +680,7 @@ function SosGeneratorPanel() {
       false,
       exportPersistContext,
       requestExcelBlob,
+      () => preparePublishRef.current(),
     )
 
   const openExcelDialog = useCallback((
@@ -748,6 +751,7 @@ function SosGeneratorPanel() {
     bronzeBatchIds,
     disabled: isProcessing,
   })
+  preparePublishRef.current = () => saveCurrentWorkspace({ silent: true })
   persistImportedSettingsRef.current = persistImportedSettings
 
   const confirmWorkspaceDelete = useCallback(async () => {

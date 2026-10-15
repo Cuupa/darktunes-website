@@ -13,7 +13,6 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "api_credentials_admin_only",
   "apify_usage_months: admin all",
   "app_logs: admin read",
-  "app_logs: authenticated insert",
   "artist_assets_admin_all",
   "artist_assets_delete_own",
   "artist_assets_insert_own",
@@ -444,7 +443,6 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   ],
   "app_logs": [
     "app_logs: admin read",
-    "app_logs: authenticated insert",
   ],
   "artist_assets": [
     "artist_assets_admin_all",

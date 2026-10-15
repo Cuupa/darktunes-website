@@ -69,9 +69,13 @@ Bronze limits: SSOT `src/lib/sos/bronzeUploadLimits.ts` only.
 
 **SOS financial tables (additive groundwork):** `settlement_operations` (operation journal for financial idempotency: `operation_type`, `resource_type`, `resource_id`, `payload_hash`, `status`, `result`; unique replay index), `sepa_payment_orders` (versioned orders with `message_id`, `control_sum_cents`, `entries`), `artist_invoices.delivery_status|delivery_attempted_at|delivery_error`, `sales_statements.rules_fingerprint|fx_snapshot|calculation_snapshot|revision`. Admin-only RLS.
 
+`distributor_import_batches.operation_id` is a nullable unique UUID for retry-safe bronze registration. `multipart_upload_id` and `multipart_started_at` track an active R2 multipart session. `r2_key` points to the temporary object until confirm, then to the hash-verified final object. Add these columns in both the table definition and `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in `reset.sql`.
+
 ## Operational logs (`app_logs`)
 
-Aggregated error/operational log. Columns: `source`, `level`, `message`, `details` (redacted JSON), `user_id`, plus observability columns `fingerprint` (unique index), `occurrences`, `first_seen_at`, `last_seen_at`, `resolved`/`resolved_at`/`resolved_by`, `ignored`, `environment`, `app_version`, `request_id`, `route_path`, `method`. Writes go through `writeAppLog` → `upsert_app_log` RPC (dedup + counter); see [backend.md](backend.md#error-logging--observability). Retention via pg_cron `app-logs-cleanup` (90 days).
+Aggregated error/operational log. Columns: `source`, `level`, `message`, `details` (redacted JSON), `user_id`, plus observability columns `fingerprint` (unique index), `occurrences`, `first_seen_at`, `last_seen_at`, `resolved`/`resolved_at`/`resolved_by`, `ignored`, `environment`, `app_version`, `request_id`, `route_path`, `method`. Writes go through `writeAppLog` → `upsert_app_log` RPC (dedup + counter); see [backend.md](backend.md#error-logging--observability). There is **no browser INSERT policy** — only the service role writes (any authenticated insert could forge/spam rows). Retention via pg_cron `app-logs-cleanup` (90 days).
+
+`sync_logs` (audit) and `admin_audit_log`/`rbac_audit_log` have **no retention job**; clear them manually via Admin → System → Maintenance (`clear_log_table` RPC) or add a dashboard pg_cron job. `app_logs`, `sync_logs` and `cron_ticks` are in `verify:schema-columns`, so evolved columns need `ADD COLUMN IF NOT EXISTS` guards.
 
 ## Schema management
 

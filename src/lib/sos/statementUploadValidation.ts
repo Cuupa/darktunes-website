@@ -53,17 +53,103 @@ export function validateStatementUploadPeriod(
   return { ok: true, periodStart, periodEnd, period }
 }
 
+export interface StatementSourceBatch {
+  id: string
+  periodStart: string
+  periodEnd: string
+  status: string
+  fileHash?: string
+}
+
+export type StatementSourceArchiveError =
+  | 'source_archive_incomplete'
+  | 'source_manifest_mismatch'
+  | 'source_batch_invalid'
+  | 'source_primary_batch_invalid'
+
 export function validateStatementSourceArchive(input: {
-  sourceFileCount?: number
-  archivedFileCount?: number
-}): { ok: true } | { ok: false; error: 'source_archive_incomplete'; message: string } {
-  const sourceFileCount = input.sourceFileCount ?? 0
-  const archivedFileCount = input.archivedFileCount ?? 0
-  if (sourceFileCount <= 0) return { ok: true }
-  if (archivedFileCount >= sourceFileCount) return { ok: true }
-  return {
+  sourceMode: 'bronze' | 'manual'
+  sourceBatchIds: string[]
+  workspaceBatchIds: string[]
+  batches: StatementSourceBatch[]
+  primaryBatchId?: string
+  periodStart: string
+  periodEnd: string
+}): { ok: true } | { ok: false; error: StatementSourceArchiveError; message: string } {
+  const requestedIds = [...new Set(input.sourceBatchIds)]
+  const workspaceIds = [...new Set(input.workspaceBatchIds)]
+  const reject = (
+    error: StatementSourceArchiveError,
+    message: string,
+  ): { ok: false; error: StatementSourceArchiveError; message: string } => ({
     ok: false,
-    error: 'source_archive_incomplete',
-    message: 'All uploaded source files must be archived before creating a statement.',
+    error,
+    message,
+  })
+
+  if (input.sourceMode === 'manual') {
+    if (requestedIds.length || input.primaryBatchId) {
+      return reject(
+        'source_manifest_mismatch',
+        'This statement uses the manual PDF-only path and cannot link distributor sources.',
+      )
+    }
+    return { ok: true }
   }
+
+  if (requestedIds.length === 0 || workspaceIds.length === 0) {
+    return reject(
+      'source_archive_incomplete',
+      'Save and archive all source files before creating a statement.',
+    )
+  }
+  if (
+    requestedIds.length !== input.sourceBatchIds.length ||
+    workspaceIds.length !== input.workspaceBatchIds.length ||
+    requestedIds.some((id) => !workspaceIds.includes(id))
+  ) {
+    return reject(
+      'source_manifest_mismatch',
+      'Save the source list to this workspace before publishing the statement.',
+    )
+  }
+  if (input.batches.length !== requestedIds.length) {
+    return reject(
+      'source_archive_incomplete',
+      'One or more source archives are missing. Load or archive them before publishing.',
+    )
+  }
+
+  const periodStartMonth = input.periodStart.slice(0, 7)
+  const periodEndMonth = input.periodEnd.slice(0, 7)
+  const batchById = new Map(input.batches.map((batch) => [batch.id, batch]))
+  for (const id of requestedIds) {
+    const batch = batchById.get(id)
+    const sourceStartMonth = batch?.periodStart.slice(0, 7) ?? ''
+    const sourceEndMonth = batch?.periodEnd.slice(0, 7) ?? ''
+    const sourcePeriodOverlaps =
+      /^\d{4}-(0[1-9]|1[0-2])$/.test(sourceStartMonth) &&
+      /^\d{4}-(0[1-9]|1[0-2])$/.test(sourceEndMonth) &&
+      sourceStartMonth <= periodEndMonth &&
+      sourceEndMonth >= periodStartMonth
+    if (
+      !batch ||
+      batch.status !== 'completed' ||
+      !batch.fileHash ||
+      !sourcePeriodOverlaps
+    ) {
+      return reject(
+        'source_batch_invalid',
+        'A source archive is incomplete, unverified, or belongs to another period.',
+      )
+    }
+  }
+
+  if (input.primaryBatchId && !requestedIds.includes(input.primaryBatchId)) {
+    return reject(
+      'source_primary_batch_invalid',
+      'The statement source link does not match the saved source list.',
+    )
+  }
+  return { ok: true }
 }

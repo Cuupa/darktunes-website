@@ -19,6 +19,7 @@ import type { Database } from '@/types/database'
 import { ITUNES_COLLECTION_HARD_CAP, searchItunesArtist } from '@/lib/itunesApi'
 import { cacheReleaseCoverArt } from '@/lib/sync/coverArtUpload'
 import { syncReleaseFromExternalSource } from '@/lib/api/releases'
+import { recordSyncLog } from '@/lib/api/syncLogs'
 import { mapWithConcurrency } from '@/lib/mapWithConcurrency'
 import { withApiRetry } from '@/lib/sync/retryPolicy'
 import { stripReleaseSuffix, type CrossSourceReleaseRow } from '@/lib/sync/deduplication'
@@ -226,7 +227,7 @@ export async function syncArtist(artistId: string, deps: SyncDeps): Promise<Sync
     const status: 'success' | 'partial' | 'error' =
       errors.length === 0 ? 'success' : releasesUpserted > 0 ? 'partial' : 'error'
 
-    await db.from('sync_logs').insert({
+    await recordSyncLog(db, {
       artist_id: artistId,
       status,
       message: errors[0] ?? null,

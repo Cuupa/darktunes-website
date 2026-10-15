@@ -7,6 +7,7 @@ import { requireAdminFromRequest } from '@/lib/adminAuth'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
+import { setImportBatchMultipartUpload } from '@/lib/api/distributorImportBatches'
 import {
   abortBronzeMultipartUpload,
   createBronzeMultipartR2Context,
@@ -29,14 +30,22 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   const raw = await req.text()
   if (raw.length > ABORT_BODY_MAX_BYTES) throw new ApiError(413, 'Abort payload too large')
 
-  const body = JSON.parse(raw) as { upload_id?: string }
-  const uploadId = body.upload_id?.trim()
-  if (!uploadId) throw new ApiError(400, 'upload_id is required')
+  const body = raw.trim() ? (JSON.parse(raw) as { upload_id?: string }) : {}
+  const requestedUploadId = body.upload_id?.trim()
 
   const serviceSupabase = await createServiceRoleSupabaseClient()
   const batch = await getWritableImportBatch(serviceSupabase, id)
+  if (requestedUploadId && batch.multipartUploadId && requestedUploadId !== batch.multipartUploadId) {
+    throw new ApiError(409, 'Multipart upload ID does not match this batch')
+  }
+  const uploadId = batch.multipartUploadId ?? requestedUploadId
+  if (!uploadId) return NextResponse.json({ ok: true, already_aborted: true })
+
   const ctx = await createBronzeMultipartR2Context()
   await abortBronzeMultipartUpload(ctx, batch.r2Key, uploadId)
+  if (batch.multipartUploadId === uploadId) {
+    await setImportBatchMultipartUpload(serviceSupabase, id, null)
+  }
 
   return NextResponse.json({ ok: true })
 })

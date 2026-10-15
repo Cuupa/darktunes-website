@@ -63,7 +63,9 @@ export async function checkDatabaseLiveness(
 
   try {
     const start = Date.now()
-    const { error } = await db.from('sync_logs').select('id').limit(1)
+    // Probe a neutral core table, never the log tables — a broken log table must
+    // not be reported as "database offline" (see checkLogStore).
+    const { error } = await db.from('artists').select('id').limit(1)
     const latencyMs = Date.now() - start
     return deriveDatabaseHealth(!error, latencyMs)
   } catch {
@@ -71,13 +73,52 @@ export async function checkDatabaseLiveness(
   }
 }
 
+export interface LogStoreHealth {
+  readable: boolean
+  detail: string
+}
+
+/**
+ * Probes the log tables for schema drift (missing columns) or read failures.
+ * Never throws — a broken log store must not take down the health endpoint.
+ */
+export async function checkLogStore(
+  db: SupabaseClient<Database> | null,
+): Promise<LogStoreHealth> {
+  if (!db) return { readable: false, detail: 'Database client unavailable.' }
+
+  try {
+    const appLogs = await db
+      .from('app_logs')
+      .select('fingerprint, last_seen_at, route_path')
+      .limit(1)
+    if (appLogs.error) {
+      return { readable: false, detail: `app_logs unreadable: ${appLogs.error.message}` }
+    }
+
+    const syncLogs = await db.from('sync_logs').select('duration_ms, metadata').limit(1)
+    if (syncLogs.error) {
+      return { readable: false, detail: `sync_logs unreadable: ${syncLogs.error.message}` }
+    }
+
+    return { readable: true, detail: 'Log tables readable.' }
+  } catch (error) {
+    return {
+      readable: false,
+      detail: `Log store probe failed: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+}
+
 export async function buildHealthLivenessResponse(
   db: SupabaseClient<Database> | null,
 ): Promise<HealthLivenessResponse> {
   const database = await checkDatabaseLiveness(db)
+  const logs = await checkLogStore(db)
   return {
     status: database.status === 'offline' ? 'offline' : 'ok',
     database,
+    logs,
     checkedAt: new Date().toISOString(),
   }
 }

@@ -46,18 +46,13 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
 
   const db = await createServiceRoleSupabaseClient()
 
-  // Delete all rows. PostgREST requires at least one filter on DELETE;
-  // `not('id', 'is', null)` is equivalent to `WHERE id IS NOT NULL` which
-  // matches every row since `id` is declared NOT NULL in all log tables.
-  const { data, error } = await db
-    .from(table)
-    .delete()
-    .not('id', 'is', null)
-    .select('id')
+  // Deleted count comes from the DB (clear_log_table), so the response never
+  // has to materialise every deleted id — safe on very large log tables.
+  const { data, error } = await db.rpc('clear_log_table', { p_table: table })
 
   if (error) throw new ApiError(500, `Failed to clear ${table}: ${error.message}`)
 
-  const deleted = (data ?? []).length
+  const deleted = typeof data === 'number' ? data : Number(data ?? 0)
 
   await logAdminActionForRequest(req, db, {
     actorId,

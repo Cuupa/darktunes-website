@@ -8,6 +8,7 @@ import { requireAdminFromRequest } from '@/lib/adminAuth'
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceRoleSupabaseClient } from '@/lib/supabase/server'
 import { syncListenerMetricsForArtists } from '@/lib/analytics/syncListenerMetrics'
+import { recordSyncLog } from '@/lib/api/syncLogs'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { getListenerAnalyticsCredentials } from '@/lib/secrets/getExternalCredentials'
 
@@ -49,7 +50,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     const lastfmStatus =
       lastfmErrors.length === 0 ? 'success' : result.lastfmRows > 0 ? 'partial' : 'error'
 
-    await serviceSupabase.from('sync_logs').insert({
+    await recordSyncLog(serviceSupabase, {
       artist_id: null,
       status: lastfmStatus,
       message: lastfmErrors[0] ?? null,
@@ -76,7 +77,7 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
           ? 'partial'
           : 'error'
 
-    await serviceSupabase.from('sync_logs').insert({
+    await recordSyncLog(serviceSupabase, {
       artist_id: null,
       status: soundchartsStatus,
       message: soundchartsErrors[0] ?? null,

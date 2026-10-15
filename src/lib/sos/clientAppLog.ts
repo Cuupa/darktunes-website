@@ -11,11 +11,14 @@ export async function logClientAppEvent(
   details?: Record<string, unknown>,
 ): Promise<void> {
   try {
-    await fetch('/api/log-error', {
+    const res = await fetch('/api/log-error', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ source, level, message, details }),
     })
+    if (!res.ok) {
+      console.warn(`[logClientAppEvent] /api/log-error returned ${res.status} for ${source}`)
+    }
   } catch {
     // Never throw from logging
   }

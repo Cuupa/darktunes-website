@@ -37,6 +37,9 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
 
   const serviceSupabase = await createServiceRoleSupabaseClient()
   const batch = await getWritableImportBatch(serviceSupabase, id)
+  if (batch.multipartUploadId !== uploadId) {
+    throw new ApiError(409, 'Multipart upload is no longer active; restart the archive')
+  }
   const uploadUrl = await generateBronzePresignedPartUrl(batch.r2Key, uploadId, partNumber)
 
   return NextResponse.json({ uploadUrl, partNumber })
