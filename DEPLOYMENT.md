@@ -125,7 +125,7 @@ To make this a real access control (not just link hygiene), the `invoices/` pref
 
 ### 3. Configure CORS (required for SOS bronze CSVs)
 
-Admin bronze distributor CSVs (SOS Accounting) upload and download **directly** between the browser and R2 via presigned URLs (single PUT ≤ 100 MB, or multipart with 64 MB parts). This requires a bucket CORS policy for every origin that runs the admin UI:
+Admin bronze distributor CSVs (SOS Accounting) upload and download **directly** between the browser and R2 via presigned URLs (single PUT ≤ 32 MB, or multipart with 16 MB parts). This requires a bucket CORS policy for every origin that runs the admin UI:
 
 ```json
 [
@@ -149,7 +149,7 @@ Admin bronze distributor CSVs (SOS Accounting) upload and download **directly** 
 
 Most uploads are handled server-side at Next.js Route Handlers (`app/api/upload/route.ts` for admin assets, portal routes like `app/api/portal/upload-photo/route.ts`). This avoids R2 CORS. SOS bronze CSVs are the exception: they use presigned browser → R2 URLs (see section 3). No Supabase Edge Functions are needed for uploads.
 
-**SOS bronze CSV limits** (see `src/lib/sos/bronzeUploadLimits.ts`): presigned single PUT ≤ 100 MB; presigned multipart up to 1 GB with 64 MB parts (non-final parts ≥ 5 MiB); server-proxy fallback ≤ 4 MB.
+**SOS bronze CSV limits** (see `src/lib/sos/bronzeUploadLimits.ts`): presigned single PUT ≤ 32 MB; presigned multipart up to 1 GB with 16 MB parts (non-final parts ≥ 5 MiB); server-proxy fallback ≤ 4 MB. Every direct PUT retries up to 4 attempts with a freshly signed URL on a dropped connection or an expired signature; each attempt is bounded by a timeout scaled to the file size (2–14 minutes) so a stalled connection cannot hang the queue and a slow-but-working link is not cut off. Bronze archives are queued one at a time so concurrent large uploads cannot starve the uplink.
 
 The Route Handler:
 1. Verifies the Bearer token and requires an `admin` or `editor` role

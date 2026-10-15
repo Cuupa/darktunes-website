@@ -343,6 +343,87 @@ describe('uploadBronzeDistributorCsv', () => {
     expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: 'PUT' })
   })
 
+  it('retries the direct PUT with a fresh presigned URL after a dropped connection', async () => {
+    vi.stubEnv('NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD', 'true')
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          batch: { id: 'batch-retry' },
+          r2Key: 'sos-imports/batch-retry/file.csv',
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ uploadUrl: 'https://r2.example/put-1' }),
+      })
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ uploadUrl: 'https://r2.example/put-2' }),
+      })
+      .mockResolvedValueOnce({ ok: true, headers: { get: () => '"etag-1"' } })
+      .mockResolvedValueOnce({ ok: true })
+
+    const result = await uploadBronzeDistributorCsv({
+      distributor: 'believe',
+      filename: 'retry.csv',
+      uploadBody: 'a,b\n1,2',
+      rowCount: 1,
+      periodStart: '2024-06',
+      periodEnd: '2024-06',
+    })
+
+    expect(result).toEqual({
+      ok: true,
+      batchId: 'batch-retry',
+      r2Key: 'sos-imports/batch-retry/file.csv',
+    })
+    const putUrls = fetchMock.mock.calls
+      .filter((call) => call[1]?.method === 'PUT')
+      .map((call) => call[0])
+    expect(putUrls).toEqual(['https://r2.example/put-1', 'https://r2.example/put-2'])
+    const presignCalls = fetchMock.mock.calls.filter(
+      (call) => typeof call[0] === 'string' && call[0].includes('/presign-upload'),
+    )
+    expect(presignCalls).toHaveLength(2)
+  })
+
+  it('gives up after the retry limit and reports the dropped connection', async () => {
+    vi.stubEnv('NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD', 'true')
+
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url === '/api/admin/sos/import-batches') {
+        return {
+          ok: true,
+          json: async () => ({
+            batch: { id: 'batch-exhaust' },
+            r2Key: 'sos-imports/batch-exhaust/file.csv',
+          }),
+        }
+      }
+      if (typeof url === 'string' && url.includes('/presign-upload')) {
+        return { ok: true, json: async () => ({ uploadUrl: 'https://r2.example/put' }) }
+      }
+      if (init?.method === 'PUT') throw new TypeError('Failed to fetch')
+      return { ok: true }
+    })
+
+    const result = await uploadBronzeDistributorCsv({
+      distributor: 'believe',
+      filename: 'exhaust.csv',
+      uploadBody: 'a,b\n1,2',
+      rowCount: 1,
+      periodStart: '2024-07',
+      periodEnd: '2024-07',
+    })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.message).toMatch(/could not reach the server/i)
+    expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'PUT')).toHaveLength(4)
+  })
+
   it('skips R2 upload when register reports a completed duplicate', async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,

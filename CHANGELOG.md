@@ -11,6 +11,7 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 ## [Unreleased]
 
 ### Fixed
+- **Bronze CSV uploads of 60–100 MB failed and could not recover:** files above 32 MB now use direct multipart (16 MB parts) instead of one non-resumable PUT, every PUT retries up to 4 attempts with a freshly signed URL after a dropped connection or an expired signature (each attempt capped by a size-scaled timeout, 2–14 minutes, so a stalled connection cannot hang the queue and a slow-but-working link is not cut off), and bronze archives run one at a time so concurrent large CSVs no longer starve the uplink. A file removed while it waited in the queue is no longer archived. The presigned single-PUT cap drops from 100 MB to 32 MB (`bronzeUploadLimits.ts`).
 - **Browser noise opened support tickets:** window errors from other origins and `ResizeObserver loop` are not sent to `/api/log-error`.
 - **Repeat crashes vanished when log aggregation failed:** the fallback insert no longer sets a unique fingerprint, so the next identical crash is still stored.
 - **A failed membership read looked like an empty export:** the artist download fails if `artist_members` cannot be read.
