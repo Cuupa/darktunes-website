@@ -538,12 +538,14 @@ bleibt untracked; Ablage und Zugriff werden in #626 dokumentiert).
 | Listenladen (50 Vorgänge/100 Künstler) | ≤ 2 s p95 |
 | Sammelaktion 200 Einträge | ≤ 60 s mit Einzelergebnis je Eintrag |
 | UI-Blockade | keine Long Task > 500 ms ohne Yield während Import/Export |
-| Parallelität | max. 1 Excel-Build, max. 2 Bronze-Uploads gleichzeitig |
+| Parallelität | max. 1 Excel-Build, Bronze-Uploads laufen streng seriell (eine Warteschlange, `enqueueBronzeArchive`) |
 
 Bestehende harte Grenzen bleiben: 1,5 Mio. Rohzeilen (Excel-Abbruch), 1 Mio. Zeilen je
 Sheet, 500 Breakdown-Zeilen je PDF, 5-min-Worker-Timeout, 1 GB maximale Bronze-Datei,
-100 MB Single-PUT, 64 MB Direkt-Multipart-Teile (Nicht-Endteile ≥ 5 MiB) und ein
+32 MB Single-PUT, 16 MB Direkt-Multipart-Teile (Nicht-Endteile ≥ 5 MiB) und ein
 Server-Proxy-Einzelrequest ≤ 4 MB ohne Multipart (`src/lib/sos/bronzeUploadLimits.ts`).
+Jeder direkte PUT wiederholt sich bis zu 4-mal mit frisch signierter URL bei
+Verbindungsabbruch oder abgelaufener Signatur.
 
 ### F.3 Diagnose und Instrumentierung
 

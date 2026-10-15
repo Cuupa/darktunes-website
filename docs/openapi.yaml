@@ -3578,7 +3578,7 @@ paths:
     post:
       operationId: postadmin_sos_import-batches_ById_presign-upload
       tags: [Admin]
-      summary: presigned PUT URL for direct browser → R2 upload (single object ≤ 100 MB; requires bucket CORS)
+      summary: presigned PUT URL for direct browser → R2 upload (single object ≤ 32 MB; requires bucket CORS)
       security:
         - AdminBearer: []
       parameters:

@@ -546,6 +546,12 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 **"Streaming" that builds the whole array first is not streaming:** `parseCSVContentStreaming` called `Papa.parse(content)` (no chunk callback), so a 68 MB export materialized every row before processing. Papa's `chunk` callback works for string input once `chunkSize` is set — use it so only the current chunk is retained.
 
+### 2026-10-15 — The single non-resumable PUT is the fragile path
+
+**"Small enough for one request" is the wrong test for a browser upload:** files ≤ 100 MB used one presigned PUT while only > 100 MB got multipart, so the 60–70 MB Believe exports — the ones most likely to lose a connection mid-transfer — had no resume and no cheap retry. Retry *cost* is the real metric, not size: split large files into parts (16 MB) so one dropped part costs one part, not the whole file, and re-sign the presigned URL on every attempt because the 900 s signature can expire mid-transfer (a stale URL makes the retry fail too).
+
+**Concurrent large uploads starve the uplink:** several CSVs archiving at once (one per parsed file, no queue) made every PUT slower and fed the same failures. Serialize archives through one queue so only one large file competes for bandwidth. A `TypeError: Failed to fetch` on a browser → R2 PUT cannot be told apart from offline/expired/CORS in the message — fix the transport, do not trust the wording.
+
 ---
 
-*Last updated: 2026-09-24*
+*Last updated: 2026-10-15*

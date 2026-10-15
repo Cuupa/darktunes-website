@@ -11,11 +11,18 @@ export const MAX_BRONZE_CSV_SERVER_BYTES = 4 * 1024 * 1024
 /** Maximum bronze CSV size (direct R2 upload via presigned URLs). */
 export const MAX_BRONZE_CSV_BYTES = 1024 * 1024 * 1024
 
-/** Presigned multipart part size for browser → R2 direct upload. */
-export const BRONZE_DIRECT_UPLOAD_PART_BYTES = 64 * 1024 * 1024
+/**
+ * Presigned multipart part size for browser → R2 direct upload.
+ * Kept small so a dropped connection only costs one part, not the whole file.
+ */
+export const BRONZE_DIRECT_UPLOAD_PART_BYTES = 16 * 1024 * 1024
 
-/** Files at or below this size use a single presigned PUT (browser → R2). */
-export const BRONZE_SINGLE_PUT_MAX_BYTES = 100 * 1024 * 1024
+/**
+ * Files at or below this size use a single presigned PUT (browser → R2).
+ * Kept small on purpose: a single PUT cannot resume, so only genuinely small
+ * files take it; every larger file uses resumable-by-part multipart.
+ */
+export const BRONZE_SINGLE_PUT_MAX_BYTES = 32 * 1024 * 1024
 
 /** R2 requires every non-final multipart part to be at least 5 MiB. */
 export const BRONZE_R2_MIN_PART_BYTES = 5 * 1024 * 1024

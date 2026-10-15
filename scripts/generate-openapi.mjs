@@ -823,7 +823,7 @@ const schemaOverrides = {
   '/api/admin/sos/import-batches/{id}/presign-upload': {
     POST: {
       summary:
-        'presigned PUT URL for direct browser → R2 upload (single object ≤ 100 MB; requires bucket CORS)',
+        'presigned PUT URL for direct browser → R2 upload (single object ≤ 32 MB; requires bucket CORS)',
     },
   },
   '/api/admin/sos/import-batches/{id}/upload': {

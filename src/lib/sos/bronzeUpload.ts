@@ -1,8 +1,10 @@
 /**
  * Client-side Bronze layer upload: raw distributor CSV → R2.
  *
- * Primary (supported) route: presigned direct browser → R2 (single PUT or
- * multipart with 64 MB parts). Requires R2 bucket CORS — see DEPLOYMENT.md.
+ * Primary (supported) route: presigned direct browser → R2 (single PUT for
+ * small files, multipart with 16 MB parts above). Requires R2 bucket CORS —
+ * see DEPLOYMENT.md. Every PUT retries with a freshly signed URL on a dropped
+ * connection.
  * Small-file fallback when direct is disabled: server proxy single request
  * (≤ 4 MB). There is deliberately no server-proxy multipart path: R2 rejects
  * non-final parts below 5 MiB.
@@ -164,29 +166,142 @@ async function abortBronzeMultipartUpload(batchId: string, uploadId: string): Pr
   }
 }
 
+/**
+ * `final` messages are already user-facing (a server problem detail); anything
+ * else is a transport level failure and goes through `humanizeBronzeUploadError`.
+ */
+class BronzeUploadError extends Error {
+  readonly final: boolean
+  constructor(message: string, final = false) {
+    super(message)
+    this.name = 'BronzeUploadError'
+    this.final = final
+  }
+}
+
+function toBronzeMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : 'Direct R2 upload failed'
+  return err instanceof BronzeUploadError && err.final ? raw : humanizeBronzeUploadError(raw)
+}
+
 function normalizeEtag(etag: string | null): string {
-  if (!etag) throw new Error('Missing ETag from R2 upload')
+  // Non-final: explained as a storage/CORS problem (no internals leaked).
+  if (!etag) throw new BronzeUploadError('R2 PUT failed (missing ETag)')
   return etag.replace(/"/g, '')
 }
 
-async function putToPresignedUrl(url: string, body: Blob, contentType: string): Promise<string> {
-  const attempt = async (): Promise<string> => {
+const PUT_MAX_ATTEMPTS = 4
+const PUT_RETRY_BASE_DELAY_MS = 300
+const PUT_ATTEMPT_MIN_TIMEOUT_MS = 2 * 60 * 1000
+const PUT_ATTEMPT_MAX_TIMEOUT_MS = 14 * 60 * 1000
+/** Throughput we assume before giving up on one attempt (~160 kbps). */
+const PUT_ASSUMED_MIN_BYTES_PER_SEC = 20_000
+
+/**
+ * Per-attempt cap, scaled to the body so a slow-but-working link is not cut
+ * off, but bounded below the 900 s presign lifetime.
+ */
+function putAttemptTimeoutMs(bodySize: number): number {
+  const scaled = (bodySize / PUT_ASSUMED_MIN_BYTES_PER_SEC) * 1000
+  return Math.min(PUT_ATTEMPT_MAX_TIMEOUT_MS, Math.max(PUT_ATTEMPT_MIN_TIMEOUT_MS, scaled))
+}
+
+function isRetryableR2PutError(error: unknown): boolean {
+  if (isTransientBronzeFetchError(error)) return true
+  if (error instanceof Error && error.name === 'AbortError') return true
+  const message = error instanceof Error ? error.message : String(error)
+  if (/abort/i.test(message)) return true
+  // 403 = presign expired mid-transfer; 4xx/5xx = R2 or proxy hiccup.
+  return /R2 PUT failed \((403|408|425|429|5\d\d)\)/.test(message)
+}
+
+async function putOnce(url: string, body: Blob, contentType: string): Promise<string> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), putAttemptTimeoutMs(body.size))
+  try {
     const res = await fetch(url, {
       method: 'PUT',
       body,
       headers: { 'Content-Type': contentType },
+      signal: controller.signal,
     })
-    if (!res.ok) {
-      throw new Error(`R2 PUT failed (${res.status})`)
-    }
+    if (!res.ok) throw new BronzeUploadError(`R2 PUT failed (${res.status})`)
     return normalizeEtag(res.headers.get('ETag') ?? res.headers.get('etag'))
+  } finally {
+    clearTimeout(timer)
   }
+}
+
+/**
+ * Uploads `body` to a presigned R2 PUT URL, retrying on a dropped connection or
+ * an expired signature with a **freshly signed** URL each time. Each attempt is
+ * bounded by a timeout so a stalled connection cannot hang the archive queue.
+ */
+async function putToPresignedUrl(
+  initialUrl: string,
+  body: Blob,
+  contentType: string,
+  resign: () => Promise<string>,
+): Promise<string> {
+  let url = initialUrl
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await putOnce(url, body, contentType)
+    } catch (err) {
+      if (attempt >= PUT_MAX_ATTEMPTS || !isRetryableR2PutError(err)) throw err
+      await new Promise((resolve) => setTimeout(resolve, PUT_RETRY_BASE_DELAY_MS * attempt))
+      url = await resign()
+    }
+  }
+}
+
+const PRESIGN_TIMEOUT_MS = 60_000
+
+async function postBronzePresignUrl(
+  path: string,
+  body: Record<string, unknown>,
+  missingMessage: string,
+): Promise<string> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), PRESIGN_TIMEOUT_MS)
   try {
-    return await attempt()
-  } catch (err) {
-    if (!isTransientBronzeFetchError(err)) throw err
-    return await attempt()
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    if (!res.ok) throw new BronzeUploadError(await readApiErrorMessage(res), true)
+    const json = (await res.json()) as { uploadUrl?: string }
+    if (!json.uploadUrl) throw new BronzeUploadError(missingMessage, true)
+    return json.uploadUrl
+  } finally {
+    clearTimeout(timer)
   }
+}
+
+function requestBronzePresignedUploadUrl(
+  batchId: string,
+  contentType: string,
+  fileSize: number,
+): Promise<string> {
+  return postBronzePresignUrl(
+    `/api/admin/sos/import-batches/${batchId}/presign-upload`,
+    { content_type: contentType, file_size: fileSize },
+    'Missing presigned upload URL',
+  )
+}
+
+function requestBronzePresignedPartUrl(
+  batchId: string,
+  uploadId: string,
+  partNumber: number,
+): Promise<string> {
+  return postBronzePresignUrl(
+    `/api/admin/sos/import-batches/${batchId}/multipart/presign-part`,
+    { upload_id: uploadId, part_number: partNumber },
+    'Missing presigned part URL',
+  )
 }
 
 async function uploadBronzeCsvDirectSingle(
@@ -194,24 +309,12 @@ async function uploadBronzeCsvDirectSingle(
   uploadBlob: Blob,
   contentType: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const presignRes = await fetch(`/api/admin/sos/import-batches/${batchId}/presign-upload`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content_type: contentType, file_size: uploadBlob.size }),
-  })
-  if (!presignRes.ok) {
-    return { ok: false, message: await readApiErrorMessage(presignRes) }
-  }
-
-  const presignJson = (await presignRes.json()) as { uploadUrl?: string }
-  if (!presignJson.uploadUrl) return { ok: false, message: 'Missing presigned upload URL' }
-
+  const sign = () => requestBronzePresignedUploadUrl(batchId, contentType, uploadBlob.size)
   try {
-    await putToPresignedUrl(presignJson.uploadUrl, uploadBlob, contentType)
+    await putToPresignedUrl(await sign(), uploadBlob, contentType, sign)
     return { ok: true }
   } catch (err) {
-    const raw = err instanceof Error ? err.message : 'Direct R2 upload failed'
-    return { ok: false, message: humanizeBronzeUploadError(raw) }
+    return { ok: false, message: toBronzeMessage(err) }
   }
 }
 
@@ -258,24 +361,8 @@ async function uploadBronzeCsvDirectMultipart(
         )
       }
 
-      const presignRes = await fetch(
-        `/api/admin/sos/import-batches/${batchId}/multipart/presign-part`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ upload_id: uploadId, part_number: partNumber }),
-        },
-      )
-      if (!presignRes.ok) {
-        return fail(await readApiErrorMessage(presignRes))
-      }
-
-      const presignJson = (await presignRes.json()) as { uploadUrl?: string }
-      if (!presignJson.uploadUrl) {
-        return fail('Missing presigned part URL')
-      }
-
-      const etag = await putToPresignedUrl(presignJson.uploadUrl, chunk, contentType)
+      const sign = () => requestBronzePresignedPartUrl(batchId, uploadId as string, partNumber)
+      const etag = await putToPresignedUrl(await sign(), chunk, contentType, sign)
       parts.push({ partNumber, etag })
     }
 
@@ -291,7 +378,7 @@ async function uploadBronzeCsvDirectMultipart(
     return { ok: true }
   } catch (err) {
     if (uploadId) await abortBronzeMultipartUpload(batchId, uploadId)
-    throw err
+    return { ok: false, message: toBronzeMessage(err) }
   }
 }
 

@@ -14,6 +14,21 @@ import type { FileProcessingState, UploadedFile } from '@/lib/sos/types'
 type FileType = 'believe' | 'bandcamp' | 'shopify' | 'printful' | 'darkmerch'
 
 /**
+ * Bronze archives run one at a time across every file manager. Concurrent
+ * large PUTs fight for the same uplink, which is what made big CSVs fail.
+ */
+let bronzeArchiveQueue: Promise<unknown> = Promise.resolve()
+
+function enqueueBronzeArchive<T>(task: () => Promise<T>): Promise<T> {
+  const run = bronzeArchiveQueue.then(task)
+  bronzeArchiveQueue = run.then(
+    () => undefined,
+    () => undefined,
+  )
+  return run
+}
+
+/**
  * Metadata stored in IndexedDB — excludes the raw CSV string to keep storage
  * footprint small. Raw data is held in React state (in-memory only).
  */
@@ -122,14 +137,20 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
         phase: 'archiving',
         detail: t.ingestArchiving,
       })
-      const bronze = await uploadBronzeDistributorCsv({
-        distributor: type,
-        filename: meta.name,
-        uploadBody: data,
-        rowCount: meta.rowsParsed ?? 0,
-        periodStart: bounds.periodStart,
-        periodEnd: bounds.periodEnd,
+      const bronze = await enqueueBronzeArchive(async () => {
+        // The file may have been removed while it waited in the queue — do not
+        // archive a file the admin no longer sees (would leave an orphan batch).
+        if (!(fileMetasRef.current ?? []).some((file) => file.id === id)) return null
+        return uploadBronzeDistributorCsv({
+          distributor: type,
+          filename: meta.name,
+          uploadBody: data,
+          rowCount: meta.rowsParsed ?? 0,
+          periodStart: bounds.periodStart,
+          periodEnd: bounds.periodEnd,
+        })
       })
+      if (!bronze) return
       if (bronze.ok) {
         setFileMetas((current) =>
           (current ?? []).map((file) =>
