@@ -323,7 +323,7 @@ silently in production and was removed):
 | `scheduler-heartbeat` | `* * * * *` | SQL | `INSERT INTO public.cron_ticks (kind, status) VALUES ('scheduler', 'ok');` |
 | `sync-worker` | `* * * * *` | HTTP | `POST https://www.darktunes.com/api/sync` — drains a bounded batch of `sync_queue` jobs |
 | `sync-enqueue-daily` | `0 3 * * *` | HTTP | `POST https://www.darktunes.com/api/sync/queue` — enqueue a full sync for every artist |
-| `sync-youtube-daily` | `0 * * * *` (hourly) | HTTP | `POST https://www.darktunes.com/api/sync-youtube` |
+| `sync-youtube-daily` | `2 * * * *` (hourly at :02, after :00 releases) | HTTP | `POST https://www.darktunes.com/api/sync-youtube` |
 | `Spotify Playzahlen` | `0 0 1 * *` | HTTP | `POST https://www.darktunes.com/api/admin/analytics/sync-spotify-plays` |
 | `sync-telemetry-cleanup` | `15 4 * * *` | SQL | Prunes `cron_ticks` (14d) and `sync_runs` (30d) |
 | `app-logs-cleanup` | `30 4 * * *` | SQL | Prunes `app_logs` rows not seen for 90 days |
