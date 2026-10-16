@@ -32,5 +32,6 @@
   "UPLOAD_FAILED_WITH_REASON": "Upload of “{filename}”: {reason}",
   "UPLOAD_UNREADABLE_RESPONSE": "Upload of “{filename}”: the server answered HTTP {status} without error details. Send the time of the upload to the label team.",
   "ERROR_REFERENCE": "Error ID: {errorId} (send it to the label team).",
-  "RESPONSE_UNREADABLE": "The server answered HTTP {status} without error details. Send the time of the request to the label team."
+  "RESPONSE_UNREADABLE": "The server answered HTTP {status} without error details. Send the time of the request to the label team.",
+  "ARTISTS_LOAD_FAILED": "The artist list could not be loaded from the database. Retry; if it keeps failing, check Admin → System → Log Manager."
 }

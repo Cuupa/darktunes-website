@@ -11,6 +11,12 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 ## [Unreleased]
 
 ### Fixed
+- **R2 orphan purge aborted on the first failed S3 delete and left stale stats:** one failing `DeleteObject` threw out of the batch (no retry, snapshot untouched). The response now separates `deleted`/`skipped`/`failed`, a failed object keeps its row so the next batch retries it, and the snapshot's `orphan_count`/`orphan_bytes`/`used_bytes`/`object_count` are updated to what was actually deleted (a failed stat write never fails the purge — the next scan reconciles). The Maintenance card reports the remaining/failed counts instead of a plain success toast when work is left.
+- **A failed artist list read looked like "no artists":** `ArtistsManager` now shows the load error with a Retry instead of an empty table.
+- **A sync run with failed jobs read as a clean success:** `/api/sync` writes `status: 'partial'` to `sync_runs` (and the worker `cron_ticks`) when jobs failed but the drain did not crash.
+- **Duplicate sync jobs could be enqueued:** the `enqueueArtistSyncJobs`/`enqueueOdesliSyncJob` dedupe reads now check the PostgREST error instead of treating a failed read as "nothing queued".
+- **Resolve/Ignore on a log row failed silently:** `LogsManager.updateLog` now toasts the real error (with error ID) instead of an empty catch.
+- **Persisted app-log messages could carry PII/tokens:** `writeAppLog` scrubs emails and tokens from the message before it reaches `app_logs`; long numbers are kept so metric/status logs stay readable.
 - **Admin Logs looked empty when the query failed:** every log tab (Sync Log, Sync Errors, App Errors, RBAC Audit, Admin Actions) swallowed read errors and rendered an empty table, so a 500/RLS failure was indistinguishable from "no logs". All five tabs now share one panel that shows the real error message and a retry, while a query failure no longer clears the page silently.
 - **Failed `sync_logs` writes disappeared:** the eight sync-log inserts (artist sync, multi-API sync, `/api/sync-api`, `/api/sync-youtube`, listener/Spotify analytics) dropped the PostgREST error. They now go through one `recordSyncLog` helper that reports a failed insert to `app_logs` and the console instead of losing it. The unused `getSyncLogsByArtist` DAL function is removed.
 - **`app_logs` write failures were invisible:** `writeAppLog` now returns whether the row was persisted, and `POST /api/log-error` returns 503 when the log store rejects the write (missing columns/RPC or DB error). Client log helpers surface that status.

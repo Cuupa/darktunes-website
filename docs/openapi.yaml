@@ -233,6 +233,7 @@ components:
       properties:
         deleted: { type: integer, minimum: 0 }
         skipped: { type: integer, minimum: 0 }
+        failed: { type: integer, minimum: 0 }
         remaining: { type: integer, minimum: 0 }
     AssetOptimizationResult:
       type: object

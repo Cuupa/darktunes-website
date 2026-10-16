@@ -50,6 +50,20 @@ describe('writeAppLog', () => {
     expect(mockInsert).not.toHaveBeenCalled()
   })
 
+  it('scrubs PII and tokens from the persisted message', async () => {
+    await writeAppLog({
+      source: 'api',
+      message: 'contact a@b.com Bearer secret-token ref 123456789',
+    })
+
+    expect(mockRpc).toHaveBeenCalledWith(
+      'upsert_app_log',
+      expect.objectContaining({
+        p_message: 'contact [redacted] Bearer [redacted] ref 123456789',
+      }),
+    )
+  })
+
   it('falls back to insert without fingerprint when rpc fails', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockRpc.mockResolvedValueOnce({ error: { message: 'function missing' } })

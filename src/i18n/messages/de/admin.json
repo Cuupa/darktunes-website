@@ -1407,6 +1407,7 @@
     "r2_scan_continued": "Bucket-Scan läuft noch — fortsetzen",
     "r2_scan_failed": "Bucket-Scan fehlgeschlagen",
     "r2_purge_complete": "{deleted} verwaiste(s) Objekt(e) gelöscht",
+    "r2_purge_incomplete": "{deleted} verwaiste(s) Objekt(e) gelöscht. {remaining} verbleiben, {failed} fehlgeschlagen. „Delete orphans“ erneut ausführen, um fortzufahren.",
     "r2_purge_failed": "Verwaiste Objekte konnten nicht gelöscht werden",
     "r2_optimize_complete": "{processed} Bild(er) optimiert, {saved} gespart",
     "r2_optimize_continued": "Bildoptimierung läuft noch — fortsetzen",

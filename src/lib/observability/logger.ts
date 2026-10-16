@@ -20,12 +20,19 @@ const sensitiveKeyPattern =
 const maxDepth = 4
 const maxEntries = 50
 
-/** Strips PII/token patterns from free text (error messages, stacks). */
-export function scrubLogText(value: string): string {
-  return value
+/**
+ * Strips PII/token patterns from free text (error messages, stacks).
+ * Long digit runs are redacted by default (ids, timestamps). Pass
+ * `redactNumbers: false` for metric messages where the number is the point.
+ */
+export function scrubLogText(
+  value: string,
+  options: { redactNumbers?: boolean } = {},
+): string {
+  const scrubbed = value
     .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, redactedValue)
     .replace(/\bBearer\s+\S+/gi, `Bearer ${redactedValue}`)
-    .replace(/\b\d{6,}\b/g, redactedValue)
+  return options.redactNumbers === false ? scrubbed : scrubbed.replace(/\b\d{6,}\b/g, redactedValue)
 }
 
 export function redactLogContext(context: LogContext, depth = 0): LogContext {

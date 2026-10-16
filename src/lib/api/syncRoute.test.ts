@@ -12,8 +12,11 @@ const releaseSyncWorkerLease = vi.fn(async () => {})
 const renewSyncWorkerLease = vi.fn(async () => true)
 const startSyncRun = vi.fn(async () => 'run-1')
 const finishSyncRun = vi.fn(async () => {})
-const claimSyncJobs = vi.fn(async () => [])
+const claimSyncJobs = vi.fn(async () => [] as Array<Record<string, unknown>>)
 const newWorkerLeaseToken = vi.fn(() => 'token-1')
+const markSyncJobFailed = vi.fn(async () => {})
+const markSyncJobDone = vi.fn(async () => {})
+const isSyncJobCancelRequested = vi.fn(async () => false)
 
 vi.mock('@vercel/functions', () => ({
   waitUntil: (p: Promise<unknown>) => {
@@ -50,6 +53,24 @@ vi.mock('@/lib/api/news', () => ({
   publishScheduledNewsPosts,
 }))
 
+vi.mock('@/lib/sync/syncAll', () => ({
+  syncSingleArtist: vi.fn(async () => {
+    throw new Error('api down')
+  }),
+  syncOdesliBatch: vi.fn(async () => ({ results: [] })),
+}))
+
+vi.mock('@/lib/sync/queueExecutor', () => ({
+  canClaimAnotherJob: () => true,
+  EXECUTOR_INTER_JOB_DELAY_MS: 0,
+  sleepMs: vi.fn(async () => {}),
+}))
+
+vi.mock('@/lib/sync/revalidatePublicContent', () => ({
+  revalidatePublicContent: vi.fn(() => {}),
+  RELEASE_SYNC_TAGS: ['releases', 'artists'],
+}))
+
 vi.mock('@/lib/api/syncQueue', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api/syncQueue')>()
   return {
@@ -62,6 +83,9 @@ vi.mock('@/lib/api/syncQueue', async (importOriginal) => {
     finishSyncRun,
     claimSyncJobs,
     newWorkerLeaseToken,
+    markSyncJobFailed,
+    markSyncJobDone,
+    isSyncJobCancelRequested,
   }
 })
 
@@ -120,6 +144,39 @@ describe('POST /api/sync', () => {
     expect(body).toEqual({ accepted: true, alreadyRunning: true, processed: 0 })
     expect(recordCronTick).toHaveBeenCalledWith(expect.anything(), 'worker', 'already_running')
     expect(startSyncRun).not.toHaveBeenCalled()
+  })
+
+  it('marks the run partial when a claimed job fails', async () => {
+    claimSyncJobs.mockResolvedValueOnce([
+      {
+        id: 'job-1',
+        artistId: 'artist-1',
+        artistName: null,
+        jobType: 'full',
+        status: 'running',
+        scheduledAt: '2026-07-29T00:00:00.000Z',
+        startedAt: '2026-07-29T00:01:00.000Z',
+        finishedAt: null,
+        lockedUntil: null,
+        cancelRequestedAt: null,
+        cancelledAt: null,
+        errorMessage: null,
+        attemptCount: 0,
+        createdAt: '2026-07-29T00:00:00.000Z',
+      },
+    ])
+
+    const { POST } = await loadSyncRoute()
+    await POST(cronRequest())
+    await waitUntilPromise
+
+    expect(markSyncJobFailed).toHaveBeenCalled()
+    expect(finishSyncRun).toHaveBeenCalledWith(
+      expect.anything(),
+      'run-1',
+      expect.objectContaining({ status: 'partial', claimed: 1, completed: 0, failed: 1 }),
+    )
+    expect(recordCronTick).toHaveBeenCalledWith(expect.anything(), 'worker', 'partial', undefined)
   })
 
   it('rejects an unauthenticated request', async () => {

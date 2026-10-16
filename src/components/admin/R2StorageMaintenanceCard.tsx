@@ -105,9 +105,21 @@ export function R2StorageMaintenanceCard() {
         credentials: 'include',
         body: JSON.stringify({ confirmation: R2_ORPHAN_PURGE_CONFIRMATION }),
       })
-      const json = (await res.json()) as { deleted?: number; error?: string }
+      const json = (await res.json()) as {
+        deleted?: number
+        failed?: number
+        remaining?: number
+        error?: string
+      }
       if (!res.ok) throw new Error(json.error ?? tToast('r2_purge_failed'))
-      toast.success(tToast('r2_purge_complete', { deleted: json.deleted ?? 0 }))
+      const deleted = json.deleted ?? 0
+      const failed = json.failed ?? 0
+      const remaining = json.remaining ?? 0
+      if (failed > 0 || remaining > 0) {
+        toast.warning(tToast('r2_purge_incomplete', { deleted, remaining, failed }))
+      } else {
+        toast.success(tToast('r2_purge_complete', { deleted }))
+      }
       await loadSnapshot()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tToast('r2_purge_failed'))

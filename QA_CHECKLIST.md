@@ -27,6 +27,10 @@
 - [ ] Admin → Assets: storage bar shows **Bucket storage** after a scan (not only catalog bytes); Optimize images checkbox is on by default and can be turned off for a print-master upload
 - [ ] Admin → Assets: **Optimize existing** recompresses catalog images; with a selection it only touches selected images; pixel size stays the same
 - [ ] Admin → System → Maintenance: Scan bucket completes (or Continue scan); stale multipart note; type `DELETE ORPHANS` to purge; Optimize catalog images runs without changing pixel dimensions
+- [ ] Admin → System → Maintenance: with more than one batch of orphans, `DELETE ORPHANS` reports how many remain (and failed) instead of a plain success; the storage bar drops to match the deleted objects
+- [ ] Admin → Artists: force a list-read failure (e.g. block the `artists` read) → the page shows an error with Retry, not an empty "No artists yet" table
+- [ ] Admin → System → Log Manager: a failed Resolve/Ignore shows an error toast with an error ID; a failed log read shows a Retry that reloads the page
+- [ ] Sync integrity: a `/api/sync` tick where a job fails stores `status: 'partial'` in the run ledger (visible in Admin → System Health)
 - [ ] Editor cannot POST `/api/admin/r2-orphan-purges` (403); editor may POST `/api/admin/asset-optimizations`; storage-stats GET still works for editor
 - [ ] Admin → Releases → New Release: **Release Date** calendar opens above the modal, day selectable, form can save with today’s date
 - [ ] Spot-check other modal date/month fields: Videos publish date, Expense date, Settlement period MonthField
