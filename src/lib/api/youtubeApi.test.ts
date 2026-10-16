@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
   fetchYouTubeChannelVideos,
-  fetchVideoDurations,
+  fetchVideoDetails,
   parseIso8601Duration,
   isYouTubeShort,
   type YouTubeVideoItem,
@@ -34,11 +34,15 @@ function mockFetchPage(items: ReturnType<typeof makeItem>[], nextPageToken?: str
   }
 }
 
-function mockVideoListPage(items: Array<{ id: string; duration: string }>) {
+function mockVideoListPage(
+  items: Array<{ id: string; duration: string; privacyStatus?: string; liveBroadcastContent?: string }>,
+) {
   return {
-    items: items.map(({ id, duration }) => ({
+    items: items.map(({ id, duration, privacyStatus = 'public', liveBroadcastContent = 'none' }) => ({
       id,
       contentDetails: { duration },
+      snippet: { liveBroadcastContent },
+      status: { privacyStatus },
     })),
   }
 }
@@ -99,8 +103,8 @@ describe('isYouTubeShort', () => {
 // fetchVideoDurations
 // ---------------------------------------------------------------------------
 
-describe('fetchVideoDurations', () => {
-  it('returns a map of videoId → seconds from a single batch', async () => {
+describe('fetchVideoDetails', () => {
+  it('returns a map of videoId → duration and release state from a single batch', async () => {
     const mockFetch = vi.fn().mockResolvedValueOnce(
       new Response(
         JSON.stringify(mockVideoListPage([
@@ -114,9 +118,9 @@ describe('fetchVideoDurations', () => {
     const origFetch = globalThis.fetch
     globalThis.fetch = mockFetch as typeof fetch
     try {
-      const result = await fetchVideoDurations(['abc1', 'def2'], 'api-key')
-      expect(result.get('abc1')).toBe(45)
-      expect(result.get('def2')).toBe(180)
+      const result = await fetchVideoDetails(['abc1', 'def2'], 'api-key')
+      expect(result.get('abc1')).toEqual({ durationSeconds: 45, isReleased: true })
+      expect(result.get('def2')?.durationSeconds).toBe(180)
       expect(mockFetch).toHaveBeenCalledOnce()
     } finally {
       globalThis.fetch = origFetch
@@ -139,7 +143,7 @@ describe('fetchVideoDurations', () => {
     const origFetch = globalThis.fetch
     globalThis.fetch = mockFetch as typeof fetch
     try {
-      const result = await fetchVideoDurations(ids, 'api-key')
+      const result = await fetchVideoDetails(ids, 'api-key')
       expect(mockFetch).toHaveBeenCalledTimes(2)
       expect(result.size).toBe(55)
     } finally {
@@ -148,11 +152,11 @@ describe('fetchVideoDurations', () => {
   })
 
   it('returns an empty map when ids is empty', async () => {
-    const result = await fetchVideoDurations([], 'api-key')
+    const result = await fetchVideoDetails([], 'api-key')
     expect(result.size).toBe(0)
   })
 
-  it('skips a batch silently on non-ok response', async () => {
+  it('throws on non-ok response (release state unknown)', async () => {
     const mockFetch = vi.fn().mockResolvedValueOnce(
       new Response('', { status: 500 }),
     )
@@ -160,8 +164,33 @@ describe('fetchVideoDurations', () => {
     const origFetch = globalThis.fetch
     globalThis.fetch = mockFetch as typeof fetch
     try {
-      const result = await fetchVideoDurations(['abc1'], 'api-key')
-      expect(result.size).toBe(0)
+      await expect(fetchVideoDetails(['abc1'], 'api-key')).rejects.toThrow(
+        'YouTube video status lookup failed: 500',
+      )
+    } finally {
+      globalThis.fetch = origFetch
+    }
+  })
+
+  it('marks private uploads and upcoming premieres as not released', async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify(mockVideoListPage([
+          { id: 'sched', duration: 'PT4M', privacyStatus: 'private' },
+          { id: 'prem', duration: 'PT4M', liveBroadcastContent: 'upcoming' },
+          { id: 'unl', duration: 'PT4M', privacyStatus: 'unlisted' },
+        ])),
+        { status: 200 },
+      ),
+    )
+
+    const origFetch = globalThis.fetch
+    globalThis.fetch = mockFetch as typeof fetch
+    try {
+      const result = await fetchVideoDetails(['sched', 'prem', 'unl'], 'api-key')
+      expect(result.get('sched')?.isReleased).toBe(false)
+      expect(result.get('prem')?.isReleased).toBe(false)
+      expect(result.get('unl')?.isReleased).toBe(false)
     } finally {
       globalThis.fetch = origFetch
     }
@@ -265,6 +294,33 @@ describe('fetchYouTubeChannelVideos', () => {
       await expect(
         fetchYouTubeChannelVideos('invalid-id', 'key', 10),
       ).rejects.toThrow('YouTube API bad request')
+    } finally {
+      globalThis.fetch = origFetch
+    }
+  })
+
+  it('drops scheduled, private and unreturned uploads', async () => {
+    const mockItems = [makeItem('live1'), makeItem('sched'), makeItem('gone')]
+    const mockFetch = vi.fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(mockFetchPage(mockItems)), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify(mockVideoListPage([
+            { id: 'live1', duration: 'PT4M' },
+            { id: 'sched', duration: 'PT4M', privacyStatus: 'private' },
+          ])),
+          { status: 200 },
+        ),
+      )
+
+    const origFetch = globalThis.fetch
+    globalThis.fetch = mockFetch as typeof fetch
+    try {
+      const result = await fetchYouTubeChannelVideos(CHANNEL_ID, 'key', 10)
+      expect(result.map((v) => v.youtubeId)).toEqual(['live1'])
+      expect(result[0].durationSeconds).toBe(240)
     } finally {
       globalThis.fetch = origFetch
     }
