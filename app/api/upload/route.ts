@@ -18,7 +18,7 @@ import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { extname } from 'path'
-import { createAssetRecord, getAssetByHash } from '@/lib/api/assets'
+import { createAssetRecord, getAssetByHash, getOrCreateArtistFolderId } from '@/lib/api/assets'
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { optimizeImage, parseOptimizeFlag } from '@/lib/images/optimizeImage'
@@ -78,17 +78,9 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
 
   const supabase = await createServerSupabaseClient()
 
-  // When uploading from an artist context (e.g. artist edit form), auto-resolve
-  // the artist's root folder so the asset lands in the right place immediately.
   let resolvedFolderId = folderId
   if (artistId && !folderId) {
-    const { data: rootFolder } = await supabase
-      .from('asset_folders')
-      .select('id')
-      .eq('artist_id', artistId)
-      .is('parent_id', null)
-      .maybeSingle()
-    if (rootFolder?.id) resolvedFolderId = rootFolder.id
+    resolvedFolderId = await getOrCreateArtistFolderId(supabase, artistId)
   }
 
   const existingAsset = await getAssetByHash(supabase, sha256Hash)

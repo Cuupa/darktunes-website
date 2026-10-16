@@ -24,6 +24,8 @@
 - [ ] `Portal → Spotify presence`: charts render crisp (no pixelated donut scaling), muted palette (no neon/rainbow), `role="img"`/`aria-label` present; KPI cards show uppercase titles + large values; tables have roomier padding and hover states on desktop and mobile
 - [ ] Validate newsletter submission flow and confirmation message
 - [ ] Validate media and upload features from admin/portal areas
+- [ ] News or Artist edit → Library: open an artist folder (e.g. `artists/Omnimar`) → band photos **and** logos in that folder are listed, not logos only. Search by photo filename still finds files at Root.
+- [ ] Artist edit → Upload a photo under 4 MB → file lands in `artists/{Artist}` in Admin → Assets (not at Root).
 - [ ] Admin → Assets: storage bar shows **Bucket storage** after a scan (not only catalog bytes); Optimize images checkbox is on by default and can be turned off for a print-master upload
 - [ ] Admin → Assets: **Optimize existing** recompresses catalog images; with a selection it only touches selected images; pixel size stays the same
 - [ ] Admin → System → Maintenance: Scan bucket completes (or Continue scan); stale multipart note; type `DELETE ORPHANS` to purge; Optimize catalog images runs without changing pixel dimensions

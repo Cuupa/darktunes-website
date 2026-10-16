@@ -40,3 +40,39 @@ export function buildFolderTree(folders: AssetFolder[], parentId: string | null 
       children: buildFolderTree(folders, folder.id),
     }))
 }
+
+/** Search > folder > artist. A selected folder must list that folder, not artist_id. */
+export function buildAssetPickerQuery(options: {
+  search: string
+  folderId: string | null
+  artistId?: string
+}): URLSearchParams {
+  const params = new URLSearchParams()
+  const search = options.search.trim()
+  if (search) {
+    params.set('search', search)
+  } else if (options.folderId) {
+    params.set('folderId', options.folderId)
+  } else if (options.artistId) {
+    params.set('artistId', options.artistId)
+  }
+  return params
+}
+
+export function findArtistPickerFolder(
+  folders: AssetFolder[],
+  artistId: string,
+): AssetFolder | undefined {
+  const owned = folders.filter((folder) => folder.artistId === artistId)
+  return owned.find((folder) => folder.name.toLowerCase() !== 'collabs') ?? owned[0]
+}
+
+export function folderAncestorIds(folders: AssetFolder[], folderId: string): string[] {
+  const ids: string[] = []
+  let current = folders.find((folder) => folder.id === folderId)
+  while (current) {
+    ids.push(current.id)
+    current = current.parentId ? folders.find((folder) => folder.id === current?.parentId) : undefined
+  }
+  return ids
+}

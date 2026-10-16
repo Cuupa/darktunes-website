@@ -11,6 +11,7 @@ import {
   getAssetsByArtist,
   getAssetsByFolder,
   getAssetsByIds,
+  getOrCreateArtistFolderId,
   getPressAssets,
   moveAsset,
   searchAssets,
@@ -150,6 +151,29 @@ describe('assets DAL', () => {
     const db = makeMockDb([{ data: [mockRow], error: null }])
     const result = await getAssetsByArtist(db, 'artist-1')
     expect(result[0].artistId).toBe('artist-1')
+  })
+
+  it('resolves a nested artist folder over collabs', async () => {
+    const db = makeMockDb([
+      {
+        data: [
+          { id: 'collabs-1', artist_id: 'artist-1', name: 'collabs', parent_id: 'artist-folder-1' },
+          { id: 'artist-folder-1', artist_id: 'artist-1', name: 'Omnimar', parent_id: 'artists-root' },
+        ],
+        error: null,
+      },
+    ])
+    await expect(getOrCreateArtistFolderId(db, 'artist-1')).resolves.toBe('artist-folder-1')
+  })
+
+  it('resolves an artist folder that is not at root', async () => {
+    const db = makeMockDb([
+      {
+        data: [{ id: 'artist-folder-1', artist_id: 'artist-1', name: 'Omnimar', parent_id: 'artists-root' }],
+        error: null,
+      },
+    ])
+    await expect(getOrCreateArtistFolderId(db, 'artist-1')).resolves.toBe('artist-folder-1')
   })
 
   it('batch deletes assets', async () => {
