@@ -91,7 +91,15 @@ interface VideoListPage {
   items: Array<{
     id: string
     contentDetails?: { duration?: string }
+    snippet?: { liveBroadcastContent?: string }
+    status?: { privacyStatus?: string }
   }>
+}
+
+export interface YouTubeVideoDetails {
+  durationSeconds: number
+  /** Public and not an upcoming premiere — scheduled/private uploads are false. */
+  isReleased: boolean
 }
 
 /**
@@ -108,14 +116,17 @@ export function parseIso8601Duration(duration: string): number {
 }
 
 /**
- * Fetches video durations for up to 50 IDs per batch via the YouTube Data API
- * `videos.list` endpoint (part=contentDetails). Returns a map of videoId → seconds.
+ * Fetches duration and release state for up to 50 IDs per batch via the
+ * YouTube Data API `videos.list` endpoint (part=contentDetails,snippet,status —
+ * still 1 quota unit per batch). IDs the API does not return (private, deleted)
+ * are absent from the map. Throws when a batch fails: without the status a
+ * scheduled upload cannot be told apart from a released one.
  */
-export async function fetchVideoDurations(
+export async function fetchVideoDetails(
   ids: string[],
   apiKey: string,
-): Promise<Map<string, number>> {
-  const result = new Map<string, number>()
+): Promise<Map<string, YouTubeVideoDetails>> {
+  const result = new Map<string, YouTubeVideoDetails>()
   if (ids.length === 0) return result
 
   // Batch in groups of 50 (YouTube API maximum)
@@ -124,15 +135,22 @@ export async function fetchVideoDurations(
     const url = new URL('https://www.googleapis.com/youtube/v3/videos')
     url.searchParams.set('key', apiKey)
     url.searchParams.set('id', batch.join(','))
-    url.searchParams.set('part', 'contentDetails')
+    url.searchParams.set('part', 'contentDetails,snippet,status')
 
     const res = await fetch(url.toString())
-    if (!res.ok) continue // skip batch on error; duration defaults to 0
+    if (!res.ok) {
+      throw new Error(`YouTube video status lookup failed: ${res.status} ${res.statusText}`)
+    }
 
     const page = await res.json() as VideoListPage
     for (const item of page.items ?? []) {
       const raw = item.contentDetails?.duration
-      result.set(item.id, raw ? parseIso8601Duration(raw) : 0)
+      result.set(item.id, {
+        durationSeconds: raw ? parseIso8601Duration(raw) : 0,
+        isReleased:
+          item.status?.privacyStatus === 'public' &&
+          item.snippet?.liveBroadcastContent !== 'upcoming',
+      })
     }
   }
 
@@ -153,7 +171,8 @@ export function isYouTubeShort(durationSeconds: number, title: string): boolean 
 
 /**
  * Fetches up to `maxVideos` videos from a YouTube channel's uploads playlist,
- * paging through results using the nextPageToken cursor.
+ * paging through results using the nextPageToken cursor. Only released
+ * (public, non-upcoming) videos are returned.
  *
  * @param channelId  - The YouTube channel ID (e.g. "UCxxxxxxxx")
  * @param apiKey     - YouTube Data API v3 key
@@ -197,14 +216,13 @@ export async function fetchYouTubeChannelVideos(
     pageToken = page.nextPageToken
   }
 
-  // Enrich with durations from the videos.list API (one batch call per 50 IDs)
-  if (results.length > 0) {
-    const ids = results.map((v) => v.youtubeId)
-    const durationsMap = await fetchVideoDurations(ids, apiKey)
-    for (const video of results) {
-      video.durationSeconds = durationsMap.get(video.youtubeId) ?? 0
-    }
-  }
-
-  return results
+  // Enrich with durations and drop scheduled/private uploads (one videos.list
+  // call per 50 IDs). Their playlist date is the upload date, so they would
+  // appear before release with a wrong date.
+  if (results.length === 0) return results
+  const details = await fetchVideoDetails(results.map((v) => v.youtubeId), apiKey)
+  return results.flatMap((video) => {
+    const d = details.get(video.youtubeId)
+    return d?.isReleased ? [{ ...video, durationSeconds: d.durationSeconds }] : []
+  })
 }
