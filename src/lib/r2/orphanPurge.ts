@@ -19,7 +19,7 @@ export async function purgeOrphanObjects(options: {
   bucket: string
   publicUrl: string
   now?: number
-}): Promise<{ deleted: number; skipped: number; remaining: number }> {
+}): Promise<{ deleted: number; skipped: number; failed: number; remaining: number }> {
   const now = options.now ?? Date.now()
   const snapshot = await getLatestStorageSnapshot(options.db)
   if (!snapshot || snapshot.status !== 'completed') {
@@ -29,7 +29,7 @@ export async function purgeOrphanObjects(options: {
   const referenced = await collectReferencedKeys(options.db, options.publicUrl)
   const { data, error } = await options.db
     .from('r2_orphan_objects')
-    .select('id, object_key, last_modified')
+    .select('id, object_key, size_bytes, last_modified')
     .eq('snapshot_id', snapshot.id)
     .order('object_key', { ascending: true })
     .limit(R2_DELETE_BATCH)
@@ -38,6 +38,8 @@ export async function purgeOrphanObjects(options: {
   const rows = data ?? []
   let deleted = 0
   let skipped = 0
+  let failed = 0
+  let deletedBytes = 0
   const removedIds: string[] = []
 
   for (const row of rows) {
@@ -47,9 +49,15 @@ export async function purgeOrphanObjects(options: {
       removedIds.push(row.id)
       continue
     }
-    await deleteObjectFromR2(row.object_key, options.s3, options.bucket)
-    deleted += 1
-    removedIds.push(row.id)
+    try {
+      await deleteObjectFromR2(row.object_key, options.s3, options.bucket)
+      deleted += 1
+      deletedBytes += row.size_bytes ?? 0
+      removedIds.push(row.id)
+    } catch {
+      // Keep the row so the next batch retries this object instead of losing it.
+      failed += 1
+    }
   }
 
   if (removedIds.length > 0) {
@@ -64,12 +72,22 @@ export async function purgeOrphanObjects(options: {
   if (countError) throw new Error(countError.message)
 
   const remaining = count ?? 0
-  await options.db
+  // Keep the snapshot's totals consistent with what was actually deleted, so the
+  // admin storage bar never shows orphan/used numbers from before the purge.
+  const { error: statsError } = await options.db
     .from('r2_storage_snapshots')
     .update({
       orphan_count: remaining,
+      orphan_bytes: Math.max(0, snapshot.orphan_bytes - deletedBytes),
+      used_bytes: Math.max(0, snapshot.used_bytes - deletedBytes),
+      object_count: Math.max(0, snapshot.object_count - deleted),
     })
     .eq('id', snapshot.id)
+  if (statsError) {
+    // The objects are already deleted and their rows removed; a failed stat
+    // write must not report the purge as failed. The next scan reconciles it.
+    console.warn('[orphanPurge] snapshot stat update failed:', statsError.message)
+  }
 
-  return { deleted, skipped, remaining }
+  return { deleted, skipped, failed, remaining }
 }

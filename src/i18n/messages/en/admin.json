@@ -1407,6 +1407,7 @@
     "r2_scan_continued": "Bucket scan still running — continue to finish",
     "r2_scan_failed": "Bucket scan failed",
     "r2_purge_complete": "Deleted {deleted} orphan object(s)",
+    "r2_purge_incomplete": "Deleted {deleted} orphan object(s). {remaining} remain, {failed} failed. Run Delete orphans again to continue.",
     "r2_purge_failed": "Failed to delete orphan objects",
     "r2_optimize_complete": "Optimized {processed} image(s), saved {saved}",
     "r2_optimize_continued": "Image optimization still running — continue to finish",

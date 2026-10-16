@@ -245,14 +245,16 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
         runError = err instanceof Error ? err.message : String(err)
         console.error('[sync] worker drain failed:', err)
       } finally {
+        // 'partial' keeps a run with some failed jobs from reading as a clean success.
+        const runStatus = runError ? 'error' : failed > 0 ? 'partial' : 'ok'
         await finishSyncRun(db, runId, {
-          status: runError ? 'error' : 'ok',
+          status: runStatus,
           claimed,
           completed,
           failed,
           error: runError,
         })
-        await recordCronTick(db, 'worker', runError ? 'error' : 'ok', runError ?? undefined)
+        await recordCronTick(db, 'worker', runStatus, runError ?? undefined)
         try {
           await releaseSyncWorkerLease(db, leaseToken)
         } catch (leaseErr) {

@@ -32,7 +32,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
 
   const db = await createServiceRoleSupabaseClient()
   const r2 = await createConfiguredR2Client()
-  let result: { deleted: number; skipped: number; remaining: number }
+  let result: { deleted: number; skipped: number; failed: number; remaining: number }
   try {
     result = await purgeOrphanObjects({
       db,

@@ -306,12 +306,16 @@ export async function enqueueArtistSyncJobs(
   if (artistIds.length === 0) return 0
 
   // Find artists already queued (pending or running) to avoid duplicates
-  const { data: existing } = await db
+  const { data: existing, error: existingError } = await db
     .from('sync_queue')
     .select('artist_id')
     .in('artist_id', artistIds)
     .in('status', ['pending', 'running'])
     .in('job_type', conflictingArtistJobTypes(jobType))
+
+  if (existingError) {
+    throw new Error(`Failed to read existing sync jobs: ${existingError.message}`)
+  }
 
   const alreadyQueued = new Set((existing ?? []).map((r) => r.artist_id))
   const toEnqueue = artistIds.filter((id) => !alreadyQueued.has(id))
@@ -337,13 +341,17 @@ export async function enqueueOdesliSyncJob(
   db: DbClient,
   cooldownMs = 0,
 ): Promise<number> {
-  const { data: existing } = await db
+  const { data: existing, error: existingError } = await db
     .from('sync_queue')
     .select('id')
     .eq('job_type', 'odesli')
     .is('artist_id', null)
     .in('status', ['pending', 'running'])
     .limit(1)
+
+  if (existingError) {
+    throw new Error(`Failed to read existing Odesli sync jobs: ${existingError.message}`)
+  }
 
   if (existing && existing.length > 0) return 0
 

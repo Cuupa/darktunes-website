@@ -17,6 +17,10 @@
 
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
+import { getResponseErrorMessage } from '@/lib/clientErrors'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -152,6 +156,7 @@ function LogsPanel<T extends { id: string }>({
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: ADMIN_TABLE_PAGE_SIZE,
@@ -163,6 +168,7 @@ function LogsPanel<T extends { id: string }>({
   }, [loadPage])
 
   useEffect(() => {
+    void reloadKey // explicit retry signal
     let cancelled = false
     setLoading(true)
     setError(null)
@@ -184,7 +190,7 @@ function LogsPanel<T extends { id: string }>({
     return () => {
       cancelled = true
     }
-  }, [loadPage, pagination.pageIndex])
+  }, [loadPage, pagination.pageIndex, reloadKey])
 
   const table = useAdminTable<T>({
     data: rows,
@@ -209,12 +215,18 @@ function LogsPanel<T extends { id: string }>({
       />
 
       {error && (
-        <div
-          role="alert"
-          className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive break-all"
-        >
-          Could not load logs: {error}
-        </div>
+        <Alert variant="destructive">
+          <AlertDescription className="flex flex-wrap items-center gap-3 break-all">
+            <span>Could not load logs: {error}</span>
+            <button
+              type="button"
+              onClick={() => setReloadKey((k) => k + 1)}
+              className="rounded border border-destructive/40 px-2 py-0.5 text-xs underline underline-offset-2 hover:bg-destructive/20"
+            >
+              Retry
+            </button>
+          </AlertDescription>
+        </Alert>
       )}
 
       <AdminDataTable
@@ -416,6 +428,7 @@ function SyncLogsPanel({ errorsOnly = false }: { errorsOnly?: boolean }) {
 
 function AppLogsPanel() {
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
+  const tErrors = useTranslations('errors')
   const [search, setSearch] = useState('')
   const [source, setSource] = useState('all')
   const [level, setLevel] = useState('all')
@@ -482,15 +495,15 @@ function AppLogsPanel() {
           },
           body: JSON.stringify(patch),
         })
-        if (!res.ok) throw new Error('Failed to update log entry')
+        if (!res.ok) throw new Error(await getResponseErrorMessage(res, tErrors))
         setReloadKey((k) => k + 1)
-      } catch {
-        // Best-effort — the table simply keeps its previous state
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
       } finally {
         setMutatingId(null)
       }
     },
-    [supabase],
+    [supabase, tErrors],
   )
 
   const columns = useMemo<ColumnDef<AppLogRow>[]>(

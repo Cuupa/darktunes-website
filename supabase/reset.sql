@@ -3298,7 +3298,7 @@ CREATE POLICY "cron_ticks: admin read" ON public.cron_ticks
 CREATE TABLE IF NOT EXISTS public.sync_runs (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   trigger     TEXT        NOT NULL,  -- 'cron' | 'admin' | 'self-chain' | 'enqueue-kick'
-  status      TEXT        NOT NULL,  -- 'ok' | 'error' | 'already_running'
+  status      TEXT        NOT NULL,  -- 'ok' | 'error' | 'partial' | 'already_running'
   claimed     INTEGER     NOT NULL DEFAULT 0,
   completed   INTEGER     NOT NULL DEFAULT 0,
   failed      INTEGER     NOT NULL DEFAULT 0,

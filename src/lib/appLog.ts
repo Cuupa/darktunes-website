@@ -11,7 +11,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { redactLogContext } from '@/lib/observability/logger'
+import { redactLogContext, scrubLogText } from '@/lib/observability/logger'
 import { buildSimpleFingerprint } from '@/lib/observability/fingerprint'
 
 export type AppLogLevel = 'error' | 'warn' | 'info'
@@ -83,7 +83,9 @@ export async function writeAppLog(opts: WriteAppLogOptions): Promise<boolean> {
 
     const source = opts.source
     const level: AppLogLevel = opts.level ?? 'error'
-    const message = clampMessage(opts.message)
+    // Scrub PII/tokens from the persisted message. Keep numbers: metric/status
+    // messages carry real values (durations, counts), so only redact emails and tokens.
+    const message = clampMessage(scrubLogText(opts.message, { redactNumbers: false }))
     const details = redactLogContext(opts.details ?? {})
     const userId = opts.userId ?? null
     const routePath = opts.routePath ?? null

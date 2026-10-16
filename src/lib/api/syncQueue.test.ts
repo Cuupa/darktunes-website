@@ -5,6 +5,7 @@ import {
   recoverStuckSyncJobs,
   requeueFailedSyncJobs,
   enqueueArtistSyncJobs,
+  enqueueOdesliSyncJob,
   markSyncJobFailed,
   markSyncJobDone,
   countStuckSyncJobs,
@@ -34,6 +35,7 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
     upsert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     in: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
     lt: vi.fn().mockReturnThis(),
     lte: vi.fn().mockReturnThis(),
     or: vi.fn().mockReturnThis(),
@@ -250,6 +252,22 @@ describe('enqueueArtistSyncJobs', () => {
     const db = makeSequentialMockDb([])
     const count = await enqueueArtistSyncJobs(db, [])
     expect(count).toBe(0)
+  })
+
+  it('throws when reading existing jobs fails instead of duplicating', async () => {
+    const db = makeSequentialMockDb([{ data: null, error: { message: 'boom' } }])
+    await expect(enqueueArtistSyncJobs(db, ['artist-1'])).rejects.toThrow(
+      'Failed to read existing sync jobs',
+    )
+  })
+})
+
+describe('enqueueOdesliSyncJob', () => {
+  it('throws when reading the existing Odesli job fails', async () => {
+    const db = makeSequentialMockDb([{ data: null, error: { message: 'boom' } }])
+    await expect(enqueueOdesliSyncJob(db)).rejects.toThrow(
+      'Failed to read existing Odesli sync jobs',
+    )
   })
 })
 

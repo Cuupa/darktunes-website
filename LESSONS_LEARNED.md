@@ -247,6 +247,11 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-10-16 — One failed external I/O is not a failed batch, and a logged request is not a finished one
+
+- **Finding:** `purgeOrphanObjects` awaited every `DeleteObject` unwrapped, so the first failing S3 delete threw out of the batch and skipped the snapshot bookkeeping, yet the admin card still toasted success because it read only `deleted`. `/api/sync` wrote `status: 'ok'` to `sync_runs` even when jobs failed, `enqueueArtistSyncJobs` made a write decision from a read whose PostgREST error it never checked, and `writeAppLog` persisted the raw message so PII/tokens in an API error string reached `app_logs`.
+- **Rule:** Wrap per-item external deletes; on failure keep the row so the next batch retries it, and report `deleted`/`skipped`/`failed`/`remaining`. Update the totals you actually changed (not just a count). A run with failed jobs is `partial`, never `ok`. Check the error of a read that gates a write. Scrub free text (`scrubLogText`) before persisting a log — redacting structured keys alone is not enough.
+
 ### 2026-10-09 — A regex is not a sanitizer, and a key string is not a permission
 
 - **Finding:** The server HTML cleaner searched for ` onload=` with a space in front. `<svg/onload=alert(1)>` survived into the first HTML, and the browser ran it before React started. Press actions then signed whatever R2 key the caller sent, so a journalist could request an invoice key.

@@ -11,6 +11,7 @@ import { useCmsPaths } from '@/hooks/useCmsPaths'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { ArtistForm, type ArtistFormData } from './forms/ArtistForm'
 import { AdminListShell } from '@/components/admin/AdminListShell'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -130,12 +131,13 @@ function formDataToInsert(data: ArtistFormData): ArtistInsert {
 
 export function ArtistsManager() {
   const tToast = useTranslations('admin.toast')
-
+  const tErrors = useTranslations('errors')
 
   const router = useRouter()
   const cms = useCmsPaths()
   const supabase = useMemo(() => createBrowserSupabaseClient(), [])
-  const { artists, isLoading, createArtist, updateArtist, deleteArtist, reload } = useArtists()
+  const { artists, isLoading, error, createArtist, updateArtist, deleteArtist, reload } =
+    useArtists()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Artist | null>(null)
   const [isMutating, setIsMutating] = useState(false)
@@ -464,12 +466,23 @@ export function ArtistsManager() {
           ) : null
         }
       >
-        <AdminDataTable
-          table={table}
-          loading={isLoading}
-          emptyMessage={emptyMessage}
-          stickyHeader
-        />
+        {error && !isLoading ? (
+          <Alert variant="destructive">
+            <AlertDescription className="flex flex-col items-start gap-3">
+              <span>{tErrors('ARTISTS_LOAD_FAILED')}</span>
+              <Button size="sm" variant="outline" onClick={() => void reload()}>
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <AdminDataTable
+            table={table}
+            loading={isLoading}
+            emptyMessage={emptyMessage}
+            stickyHeader
+          />
+        )}
       </AdminListShell>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
