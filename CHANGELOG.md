@@ -11,6 +11,7 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 ## [Unreleased]
 
 ### Fixed
+- **Scheduled YouTube videos appeared before release with their upload date:** the channel sync picked up scheduled/private uploads from the uploads playlist and stored the upload date (e.g. EXTIZE – Zero Gravity dated 19 Aug instead of its 16 Oct release), so they showed early and sorted far down. The sync now reads each video's status and skips anything not public or still an upcoming premiere; the Supabase cron `sync-youtube-daily` runs hourly so releases show within an hour.
 - **R2 orphan purge aborted on the first failed S3 delete and left stale stats:** one failing `DeleteObject` threw out of the batch (no retry, snapshot untouched). The response now separates `deleted`/`skipped`/`failed`, a failed object keeps its row so the next batch retries it, and the snapshot's `orphan_count`/`orphan_bytes`/`used_bytes`/`object_count` are updated to what was actually deleted (a failed stat write never fails the purge — the next scan reconciles). The Maintenance card reports the remaining/failed counts instead of a plain success toast when work is left.
 - **A failed artist list read looked like "no artists":** `ArtistsManager` now shows the load error with a Retry instead of an empty table.
 - **A sync run with failed jobs read as a clean success:** `/api/sync` writes `status: 'partial'` to `sync_runs` (and the worker `cron_ticks`) when jobs failed but the drain did not crash.
