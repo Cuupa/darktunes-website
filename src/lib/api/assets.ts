@@ -341,6 +341,12 @@ async function resolveArtistFolderIds(
   return result
 }
 
+/** Artist folder under `artists/` (not collabs). Creates it when missing. */
+export async function getOrCreateArtistFolderId(db: DbClient, artistId: string): Promise<string | null> {
+  const ids = await resolveArtistFolderIds(db, [artistId])
+  return ids.get(artistId) ?? null
+}
+
 async function ensureCollabsSubfolder(
   db: DbClient,
   parentFolderId: string,

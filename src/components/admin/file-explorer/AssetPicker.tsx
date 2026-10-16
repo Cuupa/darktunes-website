@@ -11,7 +11,14 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import type { Asset, AssetFolder } from '@/types'
-import { formatBytes, isAudioAsset, isImageAsset } from './utils'
+import {
+  buildAssetPickerQuery,
+  findArtistPickerFolder,
+  folderAncestorIds,
+  formatBytes,
+  isAudioAsset,
+  isImageAsset,
+} from './utils'
 
 interface AssetPickerProps {
   open: boolean
@@ -118,8 +125,8 @@ export function AssetPicker({ open, onClose, onSelect, mimeTypeFilter, artistId 
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
+  const [foldersReady, setFoldersReady] = useState(false)
 
-  // Fetch all folders once when the picker opens
   useEffect(() => {
     if (!open) return
     let cancelled = false
@@ -128,52 +135,62 @@ export function AssetPicker({ open, onClose, onSelect, mimeTypeFilter, artistId 
       try {
         const { data } = await supabase.auth.getSession()
         const token = data.session?.access_token
-        if (!token) return
+        if (!token) {
+          if (!cancelled) setFoldersReady(true)
+          return
+        }
         const res = await fetch('/api/admin/assets/folders', {
           headers: { Authorization: 'Bearer ' + token },
         })
-        if (!res.ok) return
+        if (!res.ok) {
+          if (!cancelled) setFoldersReady(true)
+          return
+        }
         const json = (await res.json()) as { folders: AssetFolder[] }
-        if (!cancelled) setFolders(json.folders)
+        if (cancelled) return
+        setFolders(json.folders)
+        if (artistId) {
+          const folder = findArtistPickerFolder(json.folders, artistId)
+          if (folder) {
+            setCurrentFolderId(folder.id)
+            setExpanded(new Set(folderAncestorIds(json.folders, folder.id)))
+          }
+        }
       } catch {
-        // non-critical — fall back to flat list
+        // fall back to artistId / root listing
+      } finally {
+        if (!cancelled) setFoldersReady(true)
       }
     }
     void loadFolders()
     return () => { cancelled = true }
-  }, [open, supabase])
+  }, [artistId, open, supabase])
 
-  // Reset folder selection when picker closes
   useEffect(() => {
     if (!open) {
       setCurrentFolderId(null)
       setSearch('')
       setExpanded(new Set())
+      setFoldersReady(false)
     }
   }, [open])
 
-  // Fetch assets whenever search, folderId or artistId changes
   useEffect(() => {
     if (!open) return
     let cancelled = false
 
     const load = async () => {
+      if (artistId && !foldersReady && !search.trim()) {
+        setLoading(true)
+        return
+      }
       setLoading(true)
       try {
         const { data } = await supabase.auth.getSession()
         const token = data.session?.access_token
         if (!token) throw new Error('Not authenticated')
 
-        const params = new URLSearchParams()
-        if (search.trim()) {
-          params.set('search', search.trim())
-        } else if (artistId) {
-          params.set('artistId', artistId)
-        } else if (currentFolderId) {
-          params.set('folderId', currentFolderId)
-        }
-        // When currentFolderId is null and no search/artistId, no folderId param
-        // is sent — the API then returns root-level assets (folder_id IS NULL)
+        const params = buildAssetPickerQuery({ search, folderId: currentFolderId, artistId })
         const response = await fetch(`/api/admin/assets?${params.toString()}`, {
           headers: { Authorization: 'Bearer ' + token },
         })
@@ -189,7 +206,7 @@ export function AssetPicker({ open, onClose, onSelect, mimeTypeFilter, artistId 
 
     const timeout = window.setTimeout(() => { void load() }, 200)
     return () => { cancelled = true; window.clearTimeout(timeout) }
-  }, [artistId, currentFolderId, mimeTypeFilter, open, search, supabase])
+  }, [artistId, currentFolderId, foldersReady, mimeTypeFilter, open, search, supabase])
 
   const folderTree = useMemo(() => buildTree(folders), [folders])
 

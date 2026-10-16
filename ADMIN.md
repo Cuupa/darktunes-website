@@ -129,7 +129,7 @@ Navigate to `/admin`. If not authenticated, you will be redirected to `/admin/lo
 - Duplicate uploads are detected server-side via SHA-256 and return the existing asset instead of storing a second copy
 - Browse uploaded assets with inline previews/audio playback and copy public URLs for use in content
 - Delete assets or folder subtrees — R2 objects are deleted before their database rows are removed
-- Reuse uploaded image/logo assets directly inside the Artist form via the built-in `AssetPicker`
+- Reuse uploaded image/logo assets via `AssetPicker` (Artist / News / Release). Opening with an artist starts in that artist’s folder and lists every file there, not only rows with `artist_id` set. Clicking a folder lists that folder.
 - Set press metadata on assets (category, caption, alt text, approval) and bulk-approve or add selected assets to a press kit via toolbar actions
 - Artist portal uploads can flag assets as "suggest for press kit review" (`press_suggested`) — admins see these in the explorer for curation
 

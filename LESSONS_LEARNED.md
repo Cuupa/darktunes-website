@@ -247,6 +247,11 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-10-16 — A folder sidebar is not a folder query
+
+- **Finding:** `AssetPicker` drew `Root > artists > Omnimar` but sent `artistId` whenever that prop was set, so File Explorer photos (`folder_id` set, `artist_id` null) never appeared — only logos tagged from the artist form. Admin upload used `.is('parent_id', null)` to find the artist folder; trigger-created folders sit under `artists/`, so form uploads never landed there.
+- **Rule:** If the UI lets you click a folder, the list query must use `folderId`. `artistId` is a default start folder, not a filter that overrides navigation. Resolve artist folders with the same helper that skips `collabs` (`getOrCreateArtistFolderId`); never assume `parent_id IS NULL`.
+
 ### 2026-10-16 — One failed external I/O is not a failed batch, and a logged request is not a finished one
 
 - **Finding:** `purgeOrphanObjects` awaited every `DeleteObject` unwrapped, so the first failing S3 delete threw out of the batch and skipped the snapshot bookkeeping, yet the admin card still toasted success because it read only `deleted`. `/api/sync` wrote `status: 'ok'` to `sync_runs` even when jobs failed, `enqueueArtistSyncJobs` made a write decision from a read whose PostgREST error it never checked, and `writeAppLog` persisted the raw message so PII/tokens in an API error string reached `app_logs`.
