@@ -52,6 +52,7 @@ import {
   Gear,
   Cpu,
   Key,
+  Sparkle,
   Lifebuoy,
   SignOut,
   List,
@@ -102,6 +103,7 @@ type NavItemKey =
   | 'colors'
   | 'settings'
   | 'apiKeys'
+  | 'aiAssistant'
   | 'support'
   | 'system'
 
@@ -186,6 +188,7 @@ const NAV_GROUPS: NavGroup[] = [
       { labelKey: 'colors', href: '/admin/colors', icon: Palette, adminOnly: true },
       { labelKey: 'settings', href: '/admin/settings', icon: Gear, adminOnly: true },
       { labelKey: 'apiKeys', href: '/admin/api-keys', icon: Key, adminOnly: true },
+      { labelKey: 'aiAssistant', href: '/admin/ai', icon: Sparkle, adminOnly: true },
       { labelKey: 'support', href: '/admin/support', icon: Lifebuoy, adminOnly: true },
       { labelKey: 'system', href: '/admin/system', icon: Cpu, adminOnly: true },
     ],

@@ -40,6 +40,7 @@ const REQUIRED_NAV_KEYS = [
   'colors',
   'settings',
   'apiKeys',
+  'aiAssistant',
   'support',
   'system',
   'signOut',

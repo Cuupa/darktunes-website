@@ -37,6 +37,7 @@ WHERE slug = 'artist-slug';
 ## Admin Features
 
 - **User Authentication**: Secure login/logout via Supabase Auth + `@supabase/ssr` cookie-based sessions
+- **AI Assistant** (`/admin/ai`, also `Ctrl+J` in admin/portal): NVIDIA NIM chat with token budgets and connection tests. Store the key under **API Keys → NVIDIA**. Apply `reset.sql` before enabling. See [docs/agent/ai-assistant.md](docs/agent/ai-assistant.md).
 - **Role-Based Access Control**: Admin and Editor roles with different permissions
 - **User Management** *(admin-only)*: View all registered users, change their roles (admin / editor / journalist / user), ban/unban accounts, delete users, and link/unlink artists — no raw SQL required. Accessible via `/admin/users` (only visible to admins).
 - **Artists Management**: Create, read, update, and delete artist profiles. The artist form includes social/shop URL fields (**Facebook**, **Twitter/X**, **TikTok**, **Bandcamp**, **Shop URL**), an **Assets** tab, and image/logo **Asset Picker** buttons. Editing an existing artist navigates to the dedicated `/admin/artists/[id]/edit` route. Creating a new artist opens a dialog on `/admin/artists`.

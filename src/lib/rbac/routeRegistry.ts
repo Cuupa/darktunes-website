@@ -17,6 +17,7 @@ export const ADMIN_ONLY_PATH_PREFIXES: readonly string[] = [
   '/admin/features',
   '/admin/analytics',
   '/admin/system',
+  '/admin/ai',
   '/admin/accounting',
   '/admin/messages',
   '/admin/support',

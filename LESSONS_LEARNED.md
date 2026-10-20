@@ -247,6 +247,11 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-10-20 — Read-then-write is not single-use, and `%` in LIKE is not a literal
+
+- **Finding:** AI confirmations checked `used_at` then updated; two concurrent Confirm requests both saw null and both executed. `drainZammadOutbox` selected pending rows then sent, so two serverless drains duplicated tickets. `POST /api/ai/diagnostic-reports` interpolated `error_id` into `ilike('%…%')`, so `%`/`_` matched other users’ logs. `get_recent_app_errors` returned `[]` on a PostgREST error, which looked like “no errors”.
+- **Rule:** Consume a one-shot row with `UPDATE … WHERE used_at IS NULL` (or `status IN ('pending','failed')`) and treat zero returned rows as already used. Claim outbox rows as `sending` before the side effect. Never put caller text in a LIKE pattern without rejecting `%`/`_`/`\`. A failed log read must not look like an empty list.
+
 ### 2026-10-16 — A folder sidebar is not a folder query
 
 - **Finding:** `AssetPicker` drew `Root > artists > Omnimar` but sent `artistId` whenever that prop was set, so File Explorer photos (`folder_id` set, `artist_id` null) never appeared — only logos tagged from the artist form. Admin upload used `.is('parent_id', null)` to find the artist folder; trigger-created folders sit under `artists/`, so form uploads never landed there.
@@ -582,4 +587,4 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ---
 
-*Last updated: 2026-10-15*
+*Last updated: 2026-10-20*

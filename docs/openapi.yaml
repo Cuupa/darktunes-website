@@ -25,6 +25,8 @@ servers:
     description: Local development
 
 tags:
+  - name: AI
+    description: Authenticated AI assistant for portal artists and label staff (session bearer).
   - name: Account
     description: "Authenticated user account management (GDPR export, display name, deletion)."
   - name: Admin
@@ -88,10 +90,6 @@ components:
           type: string
         code:
           type: string
-        error_id:
-          type: string
-          pattern: '^ERR-[0-9A-F]{8}$'
-          description: Present on 5xx only. Same ID prefixes the app_logs message (Admin → System → Log Manager search).
     Problem:
       type: object
       description: RFC 9457 problem+json body (legacy `error`/`code` kept as extensions).
@@ -109,10 +107,6 @@ components:
           type: string
         code:
           type: string
-        error_id:
-          type: string
-          pattern: '^ERR-[0-9A-F]{8}$'
-          description: Present on 5xx only. Same ID prefixes the app_logs message (Admin → System → Log Manager search).
     SuccessResponse:
       type: object
       properties:
@@ -233,7 +227,6 @@ components:
       properties:
         deleted: { type: integer, minimum: 0 }
         skipped: { type: integer, minimum: 0 }
-        failed: { type: integer, minimum: 0 }
         remaining: { type: integer, minimum: 0 }
     AssetOptimizationResult:
       type: object
@@ -457,6 +450,50 @@ components:
         territoryMetrics: { type: array, items: { type: object, additionalProperties: true } }
         listenerMetrics: { type: array, items: { type: object, additionalProperties: true } }
         statements: { type: array, items: { type: object, additionalProperties: true } }
+    AiActionConfirmationRequest:
+      type: object
+      required: [confirmation_token, action]
+      properties:
+        confirmation_token: { type: string, minLength: 16, maxLength: 200 }
+        action: { type: string, enum: [save_epk_text, save_profile_update, save_release_draft, create_support_ticket, save_error_report] }
+        artist_id: { type: string, format: uuid, nullable: true }
+    AiActionConfirmationResult:
+      type: object
+      required: [ok, detail]
+      properties:
+        ok: { type: boolean }
+        detail: { type: string }
+    AiDiagnosticReportRequest:
+      type: object
+      required: [error_id]
+      properties:
+        error_id: { type: string, minLength: 3, maxLength: 80, pattern: "^[A-Za-z0-9._:-]+$" }
+        fingerprint: { type: string, minLength: 3, maxLength: 200 }
+    AiDiagnosticReportResult:
+      type: object
+      required: [report]
+      properties:
+        report: { type: object, additionalProperties: true }
+    AdminAiDiagnosticsList:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items: { type: array, items: { type: object, additionalProperties: true } }
+        next_cursor: { type: string, nullable: true }
+    AdminAiUsage:
+      type: object
+      required: [today_tokens, month_tokens, by_model]
+      properties:
+        today_tokens: { type: integer, minimum: 0 }
+        month_tokens: { type: integer, minimum: 0 }
+        by_model:
+          type: array
+          items:
+            type: object
+            required: [model, total_tokens]
+            properties:
+              model: { type: string }
+              total_tokens: { type: integer, minimum: 0 }
 
   responses:
     BadRequest:
@@ -484,11 +521,6 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
-    InternalError:
-      description: Unexpected server or database failure. Body carries `error_id` for support.
-      content:
-        application/problem+json:
-          schema: { $ref: "#/components/schemas/Problem" }
 
 paths:
   /api/account:
@@ -548,6 +580,110 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/ai/connection-tests:
+    post:
+      operationId: postadmin_ai_connection-tests
+      tags: [Admin]
+      summary: Create or submit /api/admin/ai/connection-tests
+      security:
+        - AdminBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/ai/diagnostics:
+    get:
+      operationId: getadmin_ai_diagnostics
+      tags: [Admin]
+      summary: List recent AI diagnostic rows
+      security:
+        - AdminBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAiDiagnosticsList"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/ai/settings:
+    get:
+      operationId: getadmin_ai_settings
+      tags: [Admin]
+      summary: Retrieve /api/admin/ai/settings
+      security:
+        - AdminBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      operationId: patchadmin_ai_settings
+      tags: [Admin]
+      summary: Update /api/admin/ai/settings
+      security:
+        - AdminBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/ai/usage:
+    get:
+      operationId: getadmin_ai_usage
+      tags: [Admin]
+      summary: Sum AI token usage for today and this month
+      security:
+        - AdminBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAiUsage"
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -3279,7 +3415,7 @@ paths:
     get:
       operationId: getadmin_sos_import-batches
       tags: [Admin]
-      summary: register a bronze import batch for an idempotent archive upload
+      summary: list bronze import batches
       security:
         - AdminBearer: []
       responses:
@@ -3297,7 +3433,7 @@ paths:
     post:
       operationId: postadmin_sos_import-batches
       tags: [Admin]
-      summary: register a bronze import batch for an idempotent archive upload
+      summary: list bronze import batches
       security:
         - AdminBearer: []
       requestBody:
@@ -3306,43 +3442,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [operation_id, period_start, period_end, distributor, filename]
-              properties:
-                operation_id: { type: string, format: uuid }
-                period_start: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
-                period_end: { type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$' }
-                distributor: { type: string }
-                filename: { type: string }
-                file_hash: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
-                row_count: { type: integer, minimum: 0 }
-                file_size: { type: integer, minimum: 0 }
+              additionalProperties: true
       responses:
         '200':
-          description: Existing completed batch returned for a duplicate file or operation replay
+          description: Success
           content:
             application/json:
               schema:
-                type: object
-                required: [batch]
-                properties:
-                  batch: { type: object, additionalProperties: true }
-                  duplicate: { type: boolean }
-                  r2Key: { type: string }
-        '201':
-          description: Import batch registered
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [batch, r2Key]
-                properties:
-                  batch: { type: object, additionalProperties: true }
-                  r2Key: { type: string, description: Temporary upload key until confirm succeeds }
-        '409':
-          description: operation_id conflicts with an existing import
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Problem" }
+                $ref: "#/components/schemas/SuccessResponse"
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -3429,7 +3536,7 @@ paths:
     patch:
       operationId: patchadmin_sos_import-batches_ById_confirm
       tags: [Admin]
-      summary: verify and finalize the uploaded R2 object
+      summary: verify R2 content and store file hash
       security:
         - AdminBearer: []
       parameters:
@@ -3444,29 +3551,15 @@ paths:
           application/json:
             schema:
               type: object
-              required: [file_hash]
-              properties:
-                operation_id: { type: string, format: uuid }
-                file_hash: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
+              additionalProperties: true
       responses:
         '200':
           description: Success
           content:
             application/json:
               schema:
-                type: object
-                required: [ok]
-                properties:
-                  ok: { type: boolean }
-                  r2Key: { type: string }
-                  duplicate: { type: boolean }
-                  batch: { type: object, additionalProperties: true }
+                $ref: "#/components/schemas/SuccessResponse"
         '400': { $ref: '#/components/responses/BadRequest' }
-        '409':
-          description: batch is already completed or operation_id does not match
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Problem" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -3509,30 +3602,20 @@ paths:
           schema:
             type: string
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
             schema:
               type: object
-              properties:
-                upload_id: { type: string }
+              additionalProperties: true
       responses:
         '200':
           description: Success
           content:
             application/json:
               schema:
-                type: object
-                required: [ok]
-                properties:
-                  ok: { type: boolean }
-                  already_aborted: { type: boolean }
+                $ref: "#/components/schemas/SuccessResponse"
         '400': { $ref: '#/components/responses/BadRequest' }
-        '409':
-          description: upload ID does not match the active batch
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/Problem" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -3562,11 +3645,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [ok, r2Key]
-                properties:
-                  ok: { type: boolean }
-                  r2Key: { type: string }
+                $ref: "#/components/schemas/SuccessResponse"
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -3597,10 +3676,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [uploadId]
-                properties:
-                  uploadId: { type: string }
+                $ref: "#/components/schemas/SuccessResponse"
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -4792,6 +4868,274 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/ai/action-confirmations:
+    post:
+      operationId: postai_action-confirmations
+      tags: [AI]
+      summary: Confirm a prepared assistant write after a second authz check
+      security:
+        - SessionBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiActionConfirmationRequest"
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiActionConfirmationResult"
+        '409':
+          description: "Confirmation already used, wrong action, or payload mismatch."
+        '410':
+          description: Confirmation expired.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/ai/capabilities:
+    get:
+      operationId: getai_capabilities
+      tags: [AI]
+      summary: Retrieve /api/ai/capabilities
+      security:
+        - SessionBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/ai/conversations:
+    get:
+      operationId: getai_conversations
+      tags: [AI]
+      summary: list the caller's conversations
+      security:
+        - SessionBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: postai_conversations
+      tags: [AI]
+      summary: list the caller's conversations
+      security:
+        - SessionBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/ai/conversations/{id}:
+    get:
+      operationId: getai_conversations_ById
+      tags: [AI]
+      summary: "Retrieve /api/ai/conversations/{id}"
+      security:
+        - SessionBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: deleteai_conversations_ById
+      tags: [AI]
+      summary: "Delete /api/ai/conversations/{id}"
+      security:
+        - SessionBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/ai/conversations/{id}/cancellations:
+    post:
+      operationId: postai_conversations_ById_cancellations
+      tags: [AI]
+      summary: "Create or submit /api/ai/conversations/{id}/cancellations"
+      security:
+        - SessionBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/ai/conversations/{id}/messages:
+    post:
+      operationId: postai_conversations_ById_messages
+      tags: [AI]
+      summary: "Create or submit /api/ai/conversations/{id}/messages"
+      security:
+        - SessionBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/ai/diagnostic-reports:
+    post:
+      operationId: postai_diagnostic-reports
+      tags: [AI]
+      summary: Build and persist a developer error report from a log row (label staff)
+      security:
+        - SessionBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiDiagnosticReportRequest"
+      responses:
+        '201':
+          description: Report stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiDiagnosticReportResult"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/ai/diagnostics:
+    post:
+      operationId: postai_diagnostics
+      tags: [AI]
+      summary: classify a known error for the caller.
+      security:
+        - SessionBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/ai/usage:
+    get:
+      operationId: getai_usage
+      tags: [AI]
+      summary: remaining daily tokens for the caller (best-effort).
+      security:
+        - SessionBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -8152,15 +8496,8 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [file]
               properties:
-                file:
-                  type: string
-                  format: binary
-                  description: Max 4 MB per request (Vercel rejects bodies above 4.5 MB with a plain-text 413 before the handler runs). Admin clients refuse larger files before sending.
-                artistId: { type: string, format: uuid }
-                folderId: { type: string, format: uuid }
-                optimize: { type: string, enum: ['0', '1'] }
+                file: { type: string, format: binary }
       responses:
         '200':
           description: Success
@@ -8172,12 +8509,6 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '413':
-          description: Request body too large. Returned by the hosting platform as plain text (FUNCTION_PAYLOAD_TOO_LARGE), not problem+json.
-          content:
-            text/plain:
-              schema: { type: string }
-        '500': { $ref: '#/components/responses/InternalError' }
   /api/upload-epk:
     post:
       operationId: postupload-epk

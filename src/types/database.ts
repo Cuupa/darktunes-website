@@ -433,6 +433,10 @@ export interface Database {
           request_id: string | null
           route_path: string | null
           method: string | null
+          error_type: string | null
+          http_status: number | null
+          operation: string | null
+          deployment_id: string | null
         }
         Insert: {
           id?: string
@@ -455,6 +459,10 @@ export interface Database {
           request_id?: string | null
           route_path?: string | null
           method?: string | null
+          error_type?: string | null
+          http_status?: number | null
+          operation?: string | null
+          deployment_id?: string | null
         }
         Update: {
           id?: string
@@ -477,6 +485,10 @@ export interface Database {
           request_id?: string | null
           route_path?: string | null
           method?: string | null
+          error_type?: string | null
+          http_status?: number | null
+          operation?: string | null
+          deployment_id?: string | null
         }
         Relationships: []
       }
@@ -5243,6 +5255,414 @@ export interface Database {
           }
         ]
       }
+      ai_conversations: {
+        Row: {
+          id: string
+          user_id: string
+          artist_id: string | null
+          access_context: 'artist' | 'editor' | 'admin'
+          title: string
+          status: 'active' | 'archived' | 'deleted'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          artist_id?: string | null
+          access_context: 'artist' | 'editor' | 'admin'
+          title?: string
+          status?: 'active' | 'archived' | 'deleted'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          artist_id?: string | null
+          access_context?: 'artist' | 'editor' | 'admin'
+          title?: string
+          status?: 'active' | 'archived' | 'deleted'
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          role: 'user' | 'assistant' | 'system' | 'tool'
+          content: string
+          model: string | null
+          token_usage: Record<string, unknown>
+          status: 'pending' | 'streaming' | 'complete' | 'cancelled' | 'failed'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          role: 'user' | 'assistant' | 'system' | 'tool'
+          content?: string
+          model?: string | null
+          token_usage?: Record<string, unknown>
+          status?: 'pending' | 'streaming' | 'complete' | 'cancelled' | 'failed'
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          role?: 'user' | 'assistant' | 'system' | 'tool'
+          content?: string
+          model?: string | null
+          token_usage?: Record<string, unknown>
+          status?: 'pending' | 'streaming' | 'complete' | 'cancelled' | 'failed'
+          created_at?: string
+        }
+        Relationships: []
+      }
+      ai_usage_events: {
+        Row: {
+          id: string
+          user_id: string
+          artist_id: string | null
+          conversation_id: string | null
+          request_id: string
+          model: string
+          input_tokens: number
+          output_tokens: number
+          reasoning_tokens: number
+          total_tokens: number
+          usage_source: 'provider' | 'estimate' | 'settlement'
+          operation_type: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          artist_id?: string | null
+          conversation_id?: string | null
+          request_id: string
+          model: string
+          input_tokens?: number
+          output_tokens?: number
+          reasoning_tokens?: number
+          total_tokens?: number
+          usage_source?: 'provider' | 'estimate' | 'settlement'
+          operation_type?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          artist_id?: string | null
+          conversation_id?: string | null
+          request_id?: string
+          model?: string
+          input_tokens?: number
+          output_tokens?: number
+          reasoning_tokens?: number
+          total_tokens?: number
+          usage_source?: 'provider' | 'estimate' | 'settlement'
+          operation_type?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      ai_token_budgets: {
+        Row: {
+          id: string
+          scope: 'global' | 'role' | 'user'
+          scope_id: string
+          period: 'day' | 'month'
+          period_start: string
+          token_limit: number
+          used_tokens: number
+          reserved_tokens: number
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          scope: 'global' | 'role' | 'user'
+          scope_id?: string
+          period: 'day' | 'month'
+          period_start: string
+          token_limit: number
+          used_tokens?: number
+          reserved_tokens?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          scope?: 'global' | 'role' | 'user'
+          scope_id?: string
+          period?: 'day' | 'month'
+          period_start?: string
+          token_limit?: number
+          used_tokens?: number
+          reserved_tokens?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_token_reservations: {
+        Row: {
+          id: string
+          request_id: string
+          budget_id: string
+          scope: string
+          reserved_tokens: number
+          consumed_tokens: number
+          status: 'reserved' | 'settled' | 'released' | 'expired'
+          expires_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          request_id: string
+          budget_id: string
+          scope: string
+          reserved_tokens: number
+          consumed_tokens?: number
+          status?: 'reserved' | 'settled' | 'released' | 'expired'
+          expires_at: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          request_id?: string
+          budget_id?: string
+          scope?: string
+          reserved_tokens?: number
+          consumed_tokens?: number
+          status?: 'reserved' | 'settled' | 'released' | 'expired'
+          expires_at?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      ai_settings: {
+        Row: {
+          label_id: string
+          enabled: boolean
+          test_mode: boolean
+          provider: string
+          model_fast: string
+          model_reasoning: string
+          default_streaming: boolean
+          token_limits: Record<string, unknown>
+          reasoning_settings: Record<string, unknown>
+          feature_flags: Record<string, unknown>
+          timeouts: Record<string, unknown>
+          max_tool_rounds: number
+          provider_capabilities: Record<string, unknown>
+          last_connection_test: Record<string, unknown> | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          label_id?: string
+          enabled?: boolean
+          test_mode?: boolean
+          provider?: string
+          model_fast?: string
+          model_reasoning?: string
+          default_streaming?: boolean
+          token_limits?: Record<string, unknown>
+          reasoning_settings?: Record<string, unknown>
+          feature_flags?: Record<string, unknown>
+          timeouts?: Record<string, unknown>
+          max_tool_rounds?: number
+          provider_capabilities?: Record<string, unknown>
+          last_connection_test?: Record<string, unknown> | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          label_id?: string
+          enabled?: boolean
+          test_mode?: boolean
+          provider?: string
+          model_fast?: string
+          model_reasoning?: string
+          default_streaming?: boolean
+          token_limits?: Record<string, unknown>
+          reasoning_settings?: Record<string, unknown>
+          feature_flags?: Record<string, unknown>
+          timeouts?: Record<string, unknown>
+          max_tool_rounds?: number
+          provider_capabilities?: Record<string, unknown>
+          last_connection_test?: Record<string, unknown> | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      ai_diagnostics: {
+        Row: {
+          id: string
+          user_id: string | null
+          artist_id: string | null
+          error_reference: string
+          fingerprint: string | null
+          analysis_status: 'pending' | 'running' | 'complete' | 'failed'
+          classification: string | null
+          sanitized_analysis: Record<string, unknown>
+          evidence_refs: unknown[]
+          model: string | null
+          token_usage: Record<string, unknown>
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          artist_id?: string | null
+          error_reference: string
+          fingerprint?: string | null
+          analysis_status?: 'pending' | 'running' | 'complete' | 'failed'
+          classification?: string | null
+          sanitized_analysis?: Record<string, unknown>
+          evidence_refs?: unknown[]
+          model?: string | null
+          token_usage?: Record<string, unknown>
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          artist_id?: string | null
+          error_reference?: string
+          fingerprint?: string | null
+          analysis_status?: 'pending' | 'running' | 'complete' | 'failed'
+          classification?: string | null
+          sanitized_analysis?: Record<string, unknown>
+          evidence_refs?: unknown[]
+          model?: string | null
+          token_usage?: Record<string, unknown>
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ai_tool_executions: {
+        Row: {
+          id: string
+          request_id: string
+          tool_name: string
+          actor_id: string | null
+          target_scope: string | null
+          status: 'ok' | 'error' | 'denied' | 'timeout'
+          duration_ms: number | null
+          error_code: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          request_id: string
+          tool_name: string
+          actor_id?: string | null
+          target_scope?: string | null
+          status: 'ok' | 'error' | 'denied' | 'timeout'
+          duration_ms?: number | null
+          error_code?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          request_id?: string
+          tool_name?: string
+          actor_id?: string | null
+          target_scope?: string | null
+          status?: 'ok' | 'error' | 'denied' | 'timeout'
+          duration_ms?: number | null
+          error_code?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      ai_action_confirmations: {
+        Row: {
+          id: string
+          token_hash: string
+          user_id: string
+          artist_id: string | null
+          action: string
+          payload_hash: string
+          payload: Record<string, unknown>
+          expires_at: string
+          used_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          token_hash: string
+          user_id: string
+          artist_id?: string | null
+          action: string
+          payload_hash: string
+          payload?: Record<string, unknown>
+          expires_at: string
+          used_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          token_hash?: string
+          user_id?: string
+          artist_id?: string | null
+          action?: string
+          payload_hash?: string
+          payload?: Record<string, unknown>
+          expires_at?: string
+          used_at?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      integration_outbox: {
+        Row: {
+          id: string
+          target: 'zammad'
+          status: 'pending' | 'sending' | 'sent' | 'failed'
+          attempts: number
+          next_retry_at: string
+          last_error: string | null
+          idempotency_key: string
+          result_ref: string | null
+          payload: Record<string, unknown>
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          target: 'zammad'
+          status?: 'pending' | 'sending' | 'sent' | 'failed'
+          attempts?: number
+          next_retry_at?: string
+          last_error?: string | null
+          idempotency_key: string
+          result_ref?: string | null
+          payload?: Record<string, unknown>
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          target?: 'zammad'
+          status?: 'pending' | 'sending' | 'sent' | 'failed'
+          attempts?: number
+          next_retry_at?: string
+          last_error?: string | null
+          idempotency_key?: string
+          result_ref?: string | null
+          payload?: Record<string, unknown>
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -5599,6 +6019,21 @@ export interface Database {
           p_table: string
         }
         Returns: number
+      }
+      reserve_ai_tokens: {
+        Args: {
+          p_request_id: string
+          p_items: Json
+          p_expires_at: string
+        }
+        Returns: Json
+      }
+      settle_ai_tokens: {
+        Args: {
+          p_request_id: string
+          p_consumed: number | null
+        }
+        Returns: Json
       }
     }
     Enums: {

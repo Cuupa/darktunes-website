@@ -96,6 +96,7 @@ Read the relevant file before working in that area:
 | Admin auth, sync, cron, assets, health | [backend.md](docs/agent/backend.md) |
 | Portal write auth (JWT vs service role) | [portal-write-auth.md](docs/agent/portal-write-auth.md) |
 | Portal (analytics split, feedback, Bandsintown, press, EPK, PWA) | [features.md](docs/agent/features.md) |
+| AI assistant (NVIDIA, tools, token budgets) | [ai-assistant.md](docs/agent/ai-assistant.md) |
 | Legacy / hardcode / security residual inventory | [debt-inventory.md](docs/agent/debt-inventory.md) |
 | Compliance / certification readiness (SOC 2, ISO 27001) | [docs/compliance/README.md](docs/compliance/README.md) |
 

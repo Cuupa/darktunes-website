@@ -2,7 +2,7 @@
  * SSOT for admin-managed external API credential keys stored in api_credentials.
  */
 
-export type CredentialCategory = 'sync' | 'email' | 'newsletter' | 'monitoring'
+export type CredentialCategory = 'sync' | 'email' | 'newsletter' | 'monitoring' | 'ai'
 
 export type CredentialGroup =
   | 'spotify'
@@ -17,6 +17,7 @@ export type CredentialGroup =
   | 'resend'
   | 'mailerlite'
   | 'health_alerts'
+  | 'nvidia'
 
 export interface CredentialKeyDefinition {
   key: string
@@ -172,6 +173,16 @@ export const CREDENTIAL_KEY_DEFINITIONS: readonly CredentialKeyDefinition[] = [
     group: 'health_alerts',
     isSecret: true,
   },
+  {
+    key: 'nvidia_api_key',
+    label: 'NVIDIA API Key',
+    description:
+      'NVIDIA NIM API key for the darkTunes AI assistant (chat, tools, and diagnostics).',
+    category: 'ai',
+    group: 'nvidia',
+    isSecret: true,
+    docsUrl: 'https://build.nvidia.com/models',
+  },
 ] as const
 
 export type CredentialKey = (typeof CREDENTIAL_KEY_DEFINITIONS)[number]['key']
@@ -193,6 +204,7 @@ export const CREDENTIAL_CATEGORIES: readonly CredentialCategory[] = [
   'email',
   'newsletter',
   'monitoring',
+  'ai',
 ]
 
 export const CATEGORY_LABELS: Record<CredentialCategory, string> = {
@@ -200,6 +212,7 @@ export const CATEGORY_LABELS: Record<CredentialCategory, string> = {
   email: 'Email',
   newsletter: 'Newsletter',
   monitoring: 'Monitoring',
+  ai: 'AI',
 }
 
 export const GROUP_LABELS: Record<CredentialGroup, string> = {
@@ -215,6 +228,7 @@ export const GROUP_LABELS: Record<CredentialGroup, string> = {
   resend: 'Resend',
   mailerlite: 'MailerLite',
   health_alerts: 'Health Alerts',
+  nvidia: 'NVIDIA',
 }
 
 /** Display order of provider groups within each category. */
@@ -233,4 +247,5 @@ export const GROUP_ORDER_BY_CATEGORY: Record<CredentialCategory, readonly Creden
   email: ['resend'],
   newsletter: ['mailerlite'],
   monitoring: ['health_alerts'],
+  ai: ['nvidia'],
 }

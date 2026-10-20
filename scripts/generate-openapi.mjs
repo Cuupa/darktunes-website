@@ -50,6 +50,7 @@ function getTag(routePath) {
     'exchange-rates': 'Public',
     'log-error': 'Public',
     v1: 'Partner API',
+    ai: 'AI',
   };
   return map[root] ?? 'Public';
 }
@@ -61,7 +62,12 @@ function getSecurity(routePath, auth) {
     if (auth.bearerAdminOnly) return [{ AdminBearer: [] }];
     return [{ AdminBearer: [] }];
   }
-  if (routePath.startsWith('/api/portal/') || routePath.startsWith('/api/account/') || routePath.startsWith('/api/press/')) {
+  if (
+    routePath.startsWith('/api/portal/') ||
+    routePath.startsWith('/api/account/') ||
+    routePath.startsWith('/api/press/') ||
+    routePath.startsWith('/api/ai/')
+  ) {
     return [{ SessionBearer: [] }];
   }
   if (auth.bearerAdmin) return [{ AdminBearer: [] }];
@@ -147,7 +153,7 @@ for (const file of files) {
     bearerAdmin: /verifyAdmin\b|verifyAdminOrEditor|verifyPermission/.test(content),
     bearerAdminOnly: /verifyAdmin\(/.test(content) && !/verifyAdminOrEditor/.test(content),
     bearerCron: /CRON_SECRET|verifyCronSecret/.test(content),
-    bearerSession: /createServerSupabaseClient|getUser\(\)|getSession|verifyPortalAccess|requirePortalArtist/.test(content),
+    bearerSession: /createServerSupabaseClient|getUser\(\)|getSession|verifyPortalAccess|requirePortalArtist|requireAiActor|authenticatePortalBearer/.test(content),
   };
 
   const rel = file.replace(apiDir, '').replace(/\\/g, '/').replace(/\/route\.ts$/, '');
@@ -180,6 +186,7 @@ const tagDescriptions = {
   Newsletter: 'Double opt-in newsletter subscription.',
   Portal: 'Artist portal dashboard APIs.',
   Press: 'Journalist/press dashboard APIs.',
+  AI: 'Authenticated AI assistant for portal artists and label staff (session bearer).',
   Public: 'Unauthenticated public endpoints.',
   Sync: 'Artist/release sync jobs (cron or admin triggered).',
   Upload: 'Media upload endpoints.',
@@ -620,6 +627,50 @@ lines.push('        stats: { type: array, items: { type: object, additionalPrope
 lines.push('        territoryMetrics: { type: array, items: { type: object, additionalProperties: true } }');
 lines.push('        listenerMetrics: { type: array, items: { type: object, additionalProperties: true } }');
 lines.push('        statements: { type: array, items: { type: object, additionalProperties: true } }');
+lines.push('    AiActionConfirmationRequest:');
+lines.push('      type: object');
+lines.push('      required: [confirmation_token, action]');
+lines.push('      properties:');
+lines.push('        confirmation_token: { type: string, minLength: 16, maxLength: 200 }');
+lines.push('        action: { type: string, enum: [save_epk_text, save_profile_update, save_release_draft, create_support_ticket, save_error_report] }');
+lines.push('        artist_id: { type: string, format: uuid, nullable: true }');
+lines.push('    AiActionConfirmationResult:');
+lines.push('      type: object');
+lines.push('      required: [ok, detail]');
+lines.push('      properties:');
+lines.push('        ok: { type: boolean }');
+lines.push('        detail: { type: string }');
+lines.push('    AiDiagnosticReportRequest:');
+lines.push('      type: object');
+lines.push('      required: [error_id]');
+lines.push('      properties:');
+lines.push('        error_id: { type: string, minLength: 3, maxLength: 80, pattern: "^[A-Za-z0-9._:-]+$" }');
+lines.push('        fingerprint: { type: string, minLength: 3, maxLength: 200 }');
+lines.push('    AiDiagnosticReportResult:');
+lines.push('      type: object');
+lines.push('      required: [report]');
+lines.push('      properties:');
+lines.push('        report: { type: object, additionalProperties: true }');
+lines.push('    AdminAiDiagnosticsList:');
+lines.push('      type: object');
+lines.push('      required: [items, next_cursor]');
+lines.push('      properties:');
+lines.push('        items: { type: array, items: { type: object, additionalProperties: true } }');
+lines.push('        next_cursor: { type: string, nullable: true }');
+lines.push('    AdminAiUsage:');
+lines.push('      type: object');
+lines.push('      required: [today_tokens, month_tokens, by_model]');
+lines.push('      properties:');
+lines.push('        today_tokens: { type: integer, minimum: 0 }');
+lines.push('        month_tokens: { type: integer, minimum: 0 }');
+lines.push('        by_model:');
+lines.push('          type: array');
+lines.push('          items:');
+lines.push('            type: object');
+lines.push('            required: [model, total_tokens]');
+lines.push('            properties:');
+lines.push('              model: { type: string }');
+lines.push('              total_tokens: { type: integer, minimum: 0 }');
 lines.push('');
 lines.push('  responses:');
 lines.push('    BadRequest:');
@@ -1018,6 +1069,39 @@ const schemaOverrides = {
       },
     },
   },
+  '/api/ai/action-confirmations': {
+    POST: {
+      summary: 'Confirm a prepared assistant write after a second authz check',
+      requestBody: { schema: 'AiActionConfirmationRequest' },
+      responses: {
+        200: { schema: 'AiActionConfirmationResult' },
+        409: { description: 'Confirmation already used, wrong action, or payload mismatch.' },
+        410: { description: 'Confirmation expired.' },
+      },
+    },
+  },
+  '/api/ai/diagnostic-reports': {
+    POST: {
+      summary: 'Build and persist a developer error report from a log row (label staff)',
+      requestBody: { schema: 'AiDiagnosticReportRequest' },
+      responses: {
+        201: { schema: 'AiDiagnosticReportResult', description: 'Report stored.' },
+        404: { description: 'No matching error was found.' },
+      },
+    },
+  },
+  '/api/admin/ai/diagnostics': {
+    GET: {
+      summary: 'List recent AI diagnostic rows',
+      responses: { 200: { schema: 'AdminAiDiagnosticsList' } },
+    },
+  },
+  '/api/admin/ai/usage': {
+    GET: {
+      summary: 'Sum AI token usage for today and this month',
+      responses: { 200: { schema: 'AdminAiUsage' } },
+    },
+  },
 };
 
   for (const route of sortedPaths) {
@@ -1160,7 +1244,7 @@ const schemaOverrides = {
         lines.push("        '503':");
         lines.push(`          description: ${yamlEscape(responses[503].description ?? 'Service unavailable')}`);
       }
-      for (const code of ['409', '422', '429']) {
+      for (const code of ['409', '410', '422', '429']) {
         if (!responses[code]) continue;
         lines.push(`        '${code}':`);
         lines.push(`          description: ${yamlEscape(responses[code].description ?? 'Error')}`);

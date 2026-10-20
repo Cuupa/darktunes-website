@@ -28,6 +28,7 @@ import { AdminSidebarNav } from '@/components/admin/AdminSidebarNav'
 import { AdminPushBootstrap } from '@/components/notifications/AdminPushBootstrap'
 import { ScrollableAppShell } from '@/components/layout/ScrollableAppShell'
 import { isAdminListRoute } from '@/lib/scroll/dashboardRoutes'
+import { AssistantMount } from '@/components/ai/AssistantMount'
 
 interface AdminClientLayoutProps {
   children: React.ReactNode
@@ -62,6 +63,7 @@ export function AdminClientLayout({ children }: AdminClientLayoutProps) {
         >
           <Suspense>{children}</Suspense>
           <AdminPushBootstrap />
+          <AssistantMount dashboard="admin" />
         </ScrollableAppShell>
       </AdminNavBadgesProvider>
     </AuthProvider>

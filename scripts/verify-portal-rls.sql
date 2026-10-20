@@ -41,7 +41,9 @@ WITH expected(table_name, policy_name) AS (
     ('release_submission_tracks', 'release_submission_tracks: artist read own'),
     ('video_submissions', 'video_submissions: artist insert own'),
     ('video_submissions', 'video_submissions: artist read own'),
-    ('submission_form_drafts', 'submission_form_drafts: member all own')
+    ('submission_form_drafts', 'submission_form_drafts: member all own'),
+    ('ai_conversations', 'ai_conversations: owner read'),
+    ('ai_messages', 'ai_messages: owner read')
 )
 SELECT
   e.table_name,

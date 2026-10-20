@@ -22,7 +22,16 @@
    - Navigate to Environment Variables
    - Add all variables from `.env.example`
 
-4. **Deploy**
+### NVIDIA AI assistant (optional)
+
+1. Apply schema (`npm run db:apply` / `supabase/reset.sql`) so `ai_*` tables and `reserve_ai_tokens` exist.
+2. In Admin → API Keys, add **NVIDIA API Key**, or set `NVIDIA_API_KEY` on the server.
+3. Open Admin → AI Assistant, run **Test Connection**, then enable the assistant.
+4. Live smoke tests are not part of PR CI: `NVIDIA_API_KEY=… AI_LIVE_TESTS=1 npm run test:ai:live`.
+
+Do not create AI cron jobs in SQL. Optional outbox drain can be a dashboard HTTPS job later.
+
+5. **Deploy**
    ```bash
    # Preview deployment
    vercel
