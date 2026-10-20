@@ -2772,6 +2772,36 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/release-submissions/{id}/assets/{kind}:
+    get:
+      operationId: getadmin_release-submissions_ById_assets_ById
+      tags: [Admin]
+      summary: "Retrieve /api/admin/release-submissions/{id}/assets/{kind}"
+      security:
+        - AdminBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: kind
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/admin/release-submissions/export:
     get:
       operationId: getadmin_release-submissions_export
@@ -6749,6 +6779,31 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /api/portal/release-submission-assets:
+    post:
+      operationId: postportal_release-submission-assets
+      tags: [Portal]
+      summary: Create or submit /api/portal/release-submission-assets
+      security:
+        - SessionBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/portal/release-submissions:
     get:
       operationId: getportal_release-submissions
@@ -6756,6 +6811,31 @@ paths:
       summary: Retrieve /api/portal/release-submissions
       security:
         - SessionBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/portal/release-submissions/{id}:
+    get:
+      operationId: getportal_release-submissions_ById
+      tags: [Portal]
+      summary: "Retrieve /api/portal/release-submissions/{id}"
+      security:
+        - SessionBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Success
@@ -8007,6 +8087,31 @@ paths:
       summary: Create or submit /api/press/interview-requests
       security:
         - SessionBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/purge-release-submission-assets:
+    post:
+      operationId: postpurge-release-submission-assets
+      tags: [Public]
+      summary: Create or submit /api/purge-release-submission-assets
+      security:
+        - CronSecret: []
       requestBody:
         required: true
         content:

@@ -1492,5 +1492,12 @@
   "review_assistant_create_draft": "Create draft release",
   "review_assistant_draft_created": "Draft release linked",
   "review_assistant_draft_failed": "Could not create draft",
-  "review_assistant_open_releases": "Open Releases"
+  "review_assistant_open_releases": "Open Releases",
+  "review_assistant_open_draft": "Open draft release",
+  "review_assistant_tracks_loading": "Loading tracks…",
+  "review_assistant_tracks_empty": "No tracks.",
+  "submission_download_audio": "Download audio",
+  "submission_download_cover": "Download cover",
+  "submission_files_expire_today": "Audio and cover files expire today and will be deleted. Download them now.",
+  "submission_files_expire_in": "Audio and cover files are deleted automatically in {days} days. Download them now."
 }

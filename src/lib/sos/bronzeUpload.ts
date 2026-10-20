@@ -3,8 +3,8 @@
  *
  * Primary (supported) route: presigned direct browser → R2 (single PUT for
  * small files, multipart with 16 MB parts above). Requires R2 bucket CORS —
- * see DEPLOYMENT.md. Every PUT retries with a freshly signed URL on a dropped
- * connection.
+ * see DEPLOYMENT.md. Presign uses an R2 client with flexible checksums off.
+ * Every PUT retries with a freshly signed URL on a dropped connection.
  * Small-file fallback when direct is disabled: server proxy single request
  * (≤ 4 MB). There is deliberately no server-proxy multipart path: R2 rejects
  * non-final parts below 5 MiB.
@@ -15,9 +15,9 @@ import { explainSosError } from '@/lib/sos/explainSosError'
 import {
   BRONZE_DIRECT_UPLOAD_PART_BYTES,
   BRONZE_R2_MIN_PART_BYTES,
-  BRONZE_SINGLE_PUT_MAX_BYTES,
   MAX_BRONZE_CSV_BYTES,
   MAX_BRONZE_CSV_SERVER_BYTES,
+  planBronzeDirectUpload,
 } from '@/lib/sos/bronzeUploadLimits'
 
 const MONTH_RE = /^\d{4}-\d{2}$/
@@ -228,8 +228,13 @@ class BronzeUploadError extends Error {
 }
 
 function toBronzeMessage(err: unknown): string {
+  if (err instanceof BronzeUploadError && err.final) return err.message
+  // Browser → R2 CORS/signature failures surface as Failed to fetch, not as HTTP 403.
+  if (isTransientBronzeFetchError(err)) {
+    return humanizeBronzeUploadError('R2 PUT failed (blocked request)')
+  }
   const raw = err instanceof Error ? err.message : 'Direct R2 upload failed'
-  return err instanceof BronzeUploadError && err.final ? raw : humanizeBronzeUploadError(raw)
+  return humanizeBronzeUploadError(raw)
 }
 
 function normalizeEtag(etag: string | null): string {
@@ -263,14 +268,14 @@ function isRetryableR2PutError(error: unknown): boolean {
   return /R2 PUT failed \((403|408|425|429|5\d\d)\)/.test(message)
 }
 
-async function putOnce(url: string, body: Blob, contentType: string): Promise<string> {
+async function putOnce(url: string, body: Blob, contentType?: string): Promise<string> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), putAttemptTimeoutMs(body.size))
   try {
     const res = await fetch(url, {
       method: 'PUT',
       body,
-      headers: { 'Content-Type': contentType },
+      headers: contentType ? { 'Content-Type': contentType } : undefined,
       signal: controller.signal,
     })
     if (!res.ok) throw new BronzeUploadError(`R2 PUT failed (${res.status})`)
@@ -288,7 +293,7 @@ async function putOnce(url: string, body: Blob, contentType: string): Promise<st
 async function putToPresignedUrl(
   initialUrl: string,
   body: Blob,
-  contentType: string,
+  contentType: string | undefined,
   resign: () => Promise<string>,
 ): Promise<string> {
   let url = initialUrl
@@ -396,7 +401,7 @@ async function uploadBronzeCsvDirectMultipart(
     if (!uploadId) return fail('Missing multipart upload ID')
 
     const parts: { partNumber: number; etag: string }[] = []
-    const totalParts = Math.ceil(uploadBlob.size / BRONZE_DIRECT_UPLOAD_PART_BYTES)
+    const { partCount: totalParts } = planBronzeDirectUpload(uploadBlob.size)
 
     for (let partNumber = 1; partNumber <= totalParts; partNumber++) {
       const start = (partNumber - 1) * BRONZE_DIRECT_UPLOAD_PART_BYTES
@@ -412,7 +417,7 @@ async function uploadBronzeCsvDirectMultipart(
       }
 
       const sign = () => requestBronzePresignedPartUrl(batchId, uploadId as string, partNumber)
-      const etag = await putToPresignedUrl(await sign(), chunk, contentType, sign)
+      const etag = await putToPresignedUrl(await sign(), chunk, undefined, sign)
       parts.push({ partNumber, etag })
     }
 
@@ -438,7 +443,7 @@ async function uploadBronzeCsvDirect(
   uploadBlob: Blob,
   contentType: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (uploadBlob.size <= BRONZE_SINGLE_PUT_MAX_BYTES) {
+  if (planBronzeDirectUpload(uploadBlob.size).mode === 'single-put') {
     return uploadBronzeCsvDirectSingle(batchId, uploadBlob, contentType)
   }
   return uploadBronzeCsvDirectMultipart(batchId, operationId, uploadBlob, contentType)

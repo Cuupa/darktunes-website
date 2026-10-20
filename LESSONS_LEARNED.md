@@ -247,6 +247,16 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-10-21 — An expired asset row is not the live pointer
+
+- **Finding:** Submission purge deleted R2 object A then `update release_submissions set audio_r2_key = null where id = submissionId`. After reject → new upload B, row A was still attached. Day-30 purge of A wiped the pointer to B. Asset `expires_at` was set at register, while the UI countdown used submit time.
+- **Rule:** When a column stores “the current object”, a TTL job must `eq` that column to the key it is deleting. Refresh `expires_at` when the object is attached to a submit. Do not treat an old linked row as the live file.
+
+### 2026-10-20 — A presigned URL is not browser-safe just because getSignedUrl returned
+
+- **Finding:** Believe Q4 (`63671078` bytes) registered, then the direct-R2 multipart PUT failed in 7520 ms as `TypeError: Failed to fetch`. AWS SDK v3 default flexible checksums add `x-amz-checksum-crc32` and `x-amz-sdk-checksum-algorithm` as **query** params on the presigned URL, hashed against an empty body. The browser PUT of the real part does not match. R2’s 403 omits CORS headers, so the client cannot read the status and reports “offline / VPN”. Admin health had a second, unrelated 401: full snapshot used `verifyAdmin(bearer)` only, while SOS register uses cookies.
+- **Rule:** R2 `S3Client` used for presign must set `requestChecksumCalculation` / `responseChecksumValidation` to `WHEN_REQUIRED`. Assert presigned URLs do not contain `x-amz-checksum-*`. Map a failed browser→R2 fetch to storage/CORS, not generic offline. Dashboard GETs that the admin UI calls must use `requireAdminFromRequest` (stale Bearer falls through to cookies). Do not toast-fail a 503 that still returned a health snapshot. Lock part math against the on-disk example sizes (`planBronzeDirectUpload`): Believe Q1’s last part is below 5 MiB and must still complete — R2’s floor applies only to non-final parts.
+
 ### 2026-10-20 — Read-then-write is not single-use, and `%` in LIKE is not a literal
 
 - **Finding:** AI confirmations checked `used_at` then updated; two concurrent Confirm requests both saw null and both executed. `drainZammadOutbox` selected pending rows then sent, so two serverless drains duplicated tickets. `POST /api/ai/diagnostic-reports` interpolated `error_id` into `ilike('%…%')`, so `%`/`_` matched other users’ logs. `get_recent_app_errors` returned `[]` on a PostgREST error, which looked like “no errors”.

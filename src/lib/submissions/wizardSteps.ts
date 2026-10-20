@@ -22,7 +22,10 @@ export interface WizardStep {
 }
 
 /** Preferred order for well-known groups; others sort by min displayOrder. */
-const KNOWN_GROUP_ORDER = ['metadata', 'distribution', 'rights'] as const
+const KNOWN_GROUP_ORDER = ['metadata', 'distribution'] as const
+
+/** Artist wizard never shows these groups (admin-only or unused). */
+const SKIP_WIZARD_GROUPS = new Set(['rights', 'other'])
 
 /** Field keys that belong only on the type step (not repeated in groups). */
 export const TYPE_STEP_FIELD_KEYS = new Set(['type'])
@@ -109,6 +112,7 @@ export function buildReleaseWizardSteps(
   })
 
   for (const groupKey of groupKeys) {
+    if (SKIP_WIZARD_GROUPS.has(groupKey)) continue
     const fields = byGroup.get(groupKey) ?? []
     if (fields.length === 0) continue
     steps.push({

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { buildHealthSnapshot } from './healthSnapshot'
+import { isHealthSnapshot } from './types'
 import { invalidateCredentialCache } from '@/lib/secrets/getExternalCredentials'
 import type { Database } from '@/types/database'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -153,6 +154,8 @@ describe('buildHealthSnapshot', () => {
   it('returns unavailable APIs when db is null', async () => {
     const snapshot = await buildHealthSnapshot({ db: null, nowMs: NOW_MS })
     expect(snapshot.database.status).toBe('offline')
+    expect(isHealthSnapshot(snapshot)).toBe(true)
+    expect(isHealthSnapshot({ error: 'Unauthorized', status: 401 })).toBe(false)
     expect(snapshot.apis.itunes.operationalState).toBe('unavailable')
     expect(snapshot.healthScore).toBe(0)
     expect(snapshot.alerts.length).toBeGreaterThan(0)

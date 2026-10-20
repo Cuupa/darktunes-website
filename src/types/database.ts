@@ -4651,6 +4651,9 @@ export interface Database {
           admin_reply_at: string | null
           progress_note: string | null
           release_id: string | null
+          audio_r2_key: string | null
+          cover_r2_key: string | null
+          assets_expire_at: string | null
           created_at: string
           updated_at: string
         }
@@ -4677,6 +4680,9 @@ export interface Database {
           admin_reply_at?: string | null
           progress_note?: string | null
           release_id?: string | null
+          audio_r2_key?: string | null
+          cover_r2_key?: string | null
+          assets_expire_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -4703,8 +4709,47 @@ export interface Database {
           admin_reply_at?: string | null
           progress_note?: string | null
           release_id?: string | null
+          audio_r2_key?: string | null
+          cover_r2_key?: string | null
+          assets_expire_at?: string | null
           created_at?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      release_submission_assets: {
+        Row: {
+          id: string
+          artist_id: string
+          submission_id: string | null
+          kind: 'audio' | 'cover'
+          r2_key: string
+          content_type: string | null
+          byte_size: number | null
+          expires_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          submission_id?: string | null
+          kind: 'audio' | 'cover'
+          r2_key: string
+          content_type?: string | null
+          byte_size?: number | null
+          expires_at: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          submission_id?: string | null
+          kind?: 'audio' | 'cover'
+          r2_key?: string
+          content_type?: string | null
+          byte_size?: number | null
+          expires_at?: string
+          created_at?: string
         }
         Relationships: []
       }

@@ -43,6 +43,7 @@ export async function collectReferencedKeys(db: ServiceDb, publicBase: string): 
     'artist_assets',
     'press_photos',
     'media_files',
+    'release_submission_assets',
   ] as const
 
   for (const table of r2KeyTables) {
@@ -71,6 +72,19 @@ export async function collectReferencedKeys(db: ServiceDb, publicBase: string): 
       const record = row as { image_url?: string | null; logo_url?: string | null }
       addFromValue(keys, record.image_url, publicBase)
       addFromValue(keys, record.logo_url, publicBase)
+    }
+  }
+
+  {
+    const built = db
+      .from('release_submissions')
+      .select('audio_r2_key, cover_r2_key')
+      .order('id', { ascending: true })
+    const rows = await paginateRows(built)
+    for (const row of rows) {
+      const record = row as { audio_r2_key?: string | null; cover_r2_key?: string | null }
+      addKey(keys, record.audio_r2_key)
+      addKey(keys, record.cover_r2_key)
     }
   }
 

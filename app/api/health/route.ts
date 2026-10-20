@@ -8,9 +8,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
+import { requireAdminFromRequest } from '@/lib/adminAuth'
 import { isValidCronSecret } from '@/lib/cronAuth'
-import { ApiError, withErrorHandler } from '@/lib/errors'
+import { withErrorHandler } from '@/lib/errors'
 import { getCachedHealthSnapshot } from '@/lib/health/cachedHealthSnapshot'
 import { createHealthDbClient } from '@/lib/health/healthDbClient'
 import { buildHealthLivenessResponse } from '@/lib/health/healthLiveness'
@@ -20,6 +20,9 @@ import type { HealthLivenessResponse, HealthResponse } from '@/lib/health/types'
 export type { HealthResponse } from '@/lib/health/types'
 
 const HEALTH_CACHE_CONTROL = 'private, max-age=60'
+
+/** Full snapshot + watch-rule scan can exceed the default 10–15 s function budget. */
+export const maxDuration = 60
 
 function isFullHealthRequest(req: NextRequest): boolean {
   const url = new URL(req.url)
@@ -37,12 +40,7 @@ async function assertFullHealthAuthorized(req: NextRequest): Promise<void> {
     return
   }
 
-  try {
-    const token = extractBearerToken(authHeader)
-    await verifyAdmin(token)
-  } catch {
-    throw new ApiError(401, 'Unauthorized')
-  }
+  await requireAdminFromRequest(req)
 }
 
 export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {

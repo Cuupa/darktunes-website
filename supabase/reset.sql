@@ -5948,22 +5948,47 @@ CREATE TABLE IF NOT EXISTS public.release_submissions (
   progress_note       TEXT,
   -- Linked catalog release when label creates a draft from this submission
   release_id          UUID                      REFERENCES public.releases (id) ON DELETE SET NULL,
+  audio_r2_key        TEXT,
+  cover_r2_key        TEXT,
+  assets_expire_at    TIMESTAMPTZ,
   created_at          TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ               NOT NULL DEFAULT NOW()
 );
 
 ALTER TABLE public.release_submissions ADD COLUMN IF NOT EXISTS release_id UUID REFERENCES public.releases (id) ON DELETE SET NULL;
 ALTER TABLE public.release_submissions ADD COLUMN IF NOT EXISTS progress_note TEXT;
+ALTER TABLE public.release_submissions ADD COLUMN IF NOT EXISTS audio_r2_key TEXT;
+ALTER TABLE public.release_submissions ADD COLUMN IF NOT EXISTS cover_r2_key TEXT;
+ALTER TABLE public.release_submissions ADD COLUMN IF NOT EXISTS assets_expire_at TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_release_submissions_artist_id ON public.release_submissions (artist_id);
 CREATE INDEX IF NOT EXISTS idx_release_submissions_status    ON public.release_submissions (status);
 CREATE INDEX IF NOT EXISTS idx_release_submissions_created   ON public.release_submissions (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_release_submissions_release_id ON public.release_submissions (release_id);
+CREATE INDEX IF NOT EXISTS idx_release_submissions_assets_expire ON public.release_submissions (assets_expire_at)
+  WHERE assets_expire_at IS NOT NULL;
 
 DROP TRIGGER IF EXISTS trg_release_submissions_updated_at ON public.release_submissions;
 CREATE TRIGGER trg_release_submissions_updated_at
   BEFORE UPDATE ON public.release_submissions
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- Staging + attached private R2 objects for submission audio/cover (30-day TTL from submit).
+CREATE TABLE IF NOT EXISTS public.release_submission_assets (
+  id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  artist_id       UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  submission_id   UUID        REFERENCES public.release_submissions (id) ON DELETE SET NULL,
+  kind            TEXT        NOT NULL CHECK (kind IN ('audio', 'cover')),
+  r2_key          TEXT        NOT NULL UNIQUE,
+  content_type    TEXT,
+  byte_size       INTEGER,
+  expires_at      TIMESTAMPTZ NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_release_submission_assets_artist ON public.release_submission_assets (artist_id);
+CREATE INDEX IF NOT EXISTS idx_release_submission_assets_submission ON public.release_submission_assets (submission_id);
+CREATE INDEX IF NOT EXISTS idx_release_submission_assets_expires ON public.release_submission_assets (expires_at);
 
 -- ---------------------------------------------------------------------------
 -- TABLE: release_submission_tracks
@@ -6024,9 +6049,12 @@ BEGIN
     spotify_url,
     apple_music_url,
     youtube_url,
-    notes,
-    form_data
-  ) VALUES (
+     notes,
+     form_data,
+     audio_r2_key,
+     cover_r2_key,
+     assets_expire_at
+   ) VALUES (
     (p_submission->>'artist_id')::uuid,
     p_submission->>'title',
     p_submission->>'audio_download_url',
@@ -6042,14 +6070,17 @@ BEGIN
     NULLIF(p_submission->>'apple_music_url', ''),
     NULLIF(p_submission->>'youtube_url', ''),
     NULLIF(p_submission->>'notes', ''),
-    CASE
-      WHEN p_submission ? 'form_data' AND p_submission->'form_data' IS NOT NULL
-        AND jsonb_typeof(p_submission->'form_data') = 'object'
-      THEN p_submission->'form_data'
-      ELSE NULL
-    END
-  )
-  RETURNING id INTO v_id;
+     CASE
+       WHEN p_submission ? 'form_data' AND p_submission->'form_data' IS NOT NULL
+         AND jsonb_typeof(p_submission->'form_data') = 'object'
+       THEN p_submission->'form_data'
+       ELSE NULL
+     END,
+     NULLIF(p_submission->>'audio_r2_key', ''),
+     NULLIF(p_submission->>'cover_r2_key', ''),
+     NULLIF(p_submission->>'assets_expire_at', '')::timestamptz
+   )
+   RETURNING id INTO v_id;
 
   IF p_tracks IS NOT NULL AND jsonb_typeof(p_tracks) = 'array' THEN
     FOR v_track IN SELECT * FROM jsonb_array_elements(p_tracks)
@@ -6105,6 +6136,113 @@ $$;
 
 REVOKE ALL ON FUNCTION public.create_release_submission_with_tracks(JSONB, JSONB) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.create_release_submission_with_tracks(JSONB, JSONB) TO service_role;
+
+-- Atomic replace of a rejected row + tracks (service_role after membership check)
+CREATE OR REPLACE FUNCTION public.replace_rejected_release_submission_with_tracks(
+  p_id UUID,
+  p_submission JSONB,
+  p_tracks JSONB DEFAULT '[]'::jsonb
+)
+RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_id UUID;
+  v_track JSONB;
+  v_i INT := 0;
+BEGIN
+  UPDATE public.release_submissions SET
+    title = p_submission->>'title',
+    audio_download_url = p_submission->>'audio_download_url',
+    cover_art_url = p_submission->>'cover_art_url',
+    cover_art_verified = COALESCE((p_submission->>'cover_art_verified')::boolean, false),
+    release_date = NULLIF(p_submission->>'release_date', '')::date,
+    type = NULLIF(p_submission->>'type', '')::public.release_type,
+    genre = NULLIF(p_submission->>'genre', ''),
+    catalog_number = NULLIF(p_submission->>'catalog_number', ''),
+    isrc = NULLIF(p_submission->>'isrc', ''),
+    label_copy = NULLIF(p_submission->>'label_copy', ''),
+    spotify_url = NULLIF(p_submission->>'spotify_url', ''),
+    apple_music_url = NULLIF(p_submission->>'apple_music_url', ''),
+    youtube_url = NULLIF(p_submission->>'youtube_url', ''),
+    notes = NULLIF(p_submission->>'notes', ''),
+    form_data = CASE
+      WHEN p_submission ? 'form_data' AND p_submission->'form_data' IS NOT NULL
+        AND jsonb_typeof(p_submission->'form_data') = 'object'
+      THEN p_submission->'form_data'
+      ELSE NULL
+    END,
+    audio_r2_key = NULLIF(p_submission->>'audio_r2_key', ''),
+    cover_r2_key = NULLIF(p_submission->>'cover_r2_key', ''),
+    assets_expire_at = NULLIF(p_submission->>'assets_expire_at', '')::timestamptz,
+    admin_reply = NULL,
+    admin_reply_at = NULL,
+    status = 'received'
+  WHERE id = p_id AND status = 'rejected'
+  RETURNING id INTO v_id;
+
+  IF v_id IS NULL THEN
+    RAISE EXCEPTION 'Rejected submission not found';
+  END IF;
+
+  DELETE FROM public.release_submission_tracks WHERE submission_id = v_id;
+
+  IF p_tracks IS NOT NULL AND jsonb_typeof(p_tracks) = 'array' THEN
+    FOR v_track IN SELECT * FROM jsonb_array_elements(p_tracks)
+    LOOP
+      INSERT INTO public.release_submission_tracks (
+        submission_id,
+        track_number,
+        display_order,
+        title,
+        isrc,
+        composer,
+        author,
+        genre,
+        language,
+        gema,
+        explicit,
+        live,
+        cover,
+        instrumental,
+        preview_start_seconds,
+        duration_seconds,
+        form_data
+      ) VALUES (
+        v_id,
+        COALESCE((v_track->>'track_number')::int, v_i + 1),
+        COALESCE((v_track->>'display_order')::int, v_i),
+        NULLIF(v_track->>'title', ''),
+        NULLIF(v_track->>'isrc', ''),
+        NULLIF(v_track->>'composer', ''),
+        NULLIF(v_track->>'author', ''),
+        NULLIF(v_track->>'genre', ''),
+        NULLIF(v_track->>'language', ''),
+        CASE WHEN v_track ? 'gema' THEN (v_track->>'gema')::boolean ELSE NULL END,
+        CASE WHEN v_track ? 'explicit' THEN (v_track->>'explicit')::boolean ELSE NULL END,
+        CASE WHEN v_track ? 'live' THEN (v_track->>'live')::boolean ELSE NULL END,
+        CASE WHEN v_track ? 'cover' THEN (v_track->>'cover')::boolean ELSE NULL END,
+        CASE WHEN v_track ? 'instrumental' THEN (v_track->>'instrumental')::boolean ELSE NULL END,
+        CASE WHEN v_track ? 'preview_start_seconds' THEN (v_track->>'preview_start_seconds')::int ELSE NULL END,
+        CASE WHEN v_track ? 'duration_seconds' THEN (v_track->>'duration_seconds')::int ELSE NULL END,
+        CASE
+          WHEN v_track ? 'form_data' AND jsonb_typeof(v_track->'form_data') = 'object'
+          THEN v_track->'form_data'
+          ELSE NULL
+        END
+      );
+      v_i := v_i + 1;
+    END LOOP;
+  END IF;
+
+  RETURN v_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.replace_rejected_release_submission_with_tracks(UUID, JSONB, JSONB) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.replace_rejected_release_submission_with_tracks(UUID, JSONB, JSONB) TO service_role;
 
 -- ---------------------------------------------------------------------------
 -- TABLE: video_submissions
@@ -6261,20 +6399,20 @@ VALUES
   ('release', 'prod_year',          'Prod Year',           'Produktionsjahr',       'year',     'release', 'metadata',     NULL, FALSE, TRUE,  35, NULL, NULL),
   ('release', 'genre',              'Genre',               'Genre',                 'text',     'release', 'metadata',     NULL, FALSE, TRUE,  40, 'e.g. Techno, House', 'z.B. Techno, House'),
   ('release', 'language',           'Language',            'Sprache',               'text',     'release', 'metadata',     NULL, FALSE, TRUE,  45, NULL, NULL),
-  ('release', 'audio_download_url', 'Audio Download Link', 'Audio-Download-Link',   'url',      'release', 'distribution', NULL, TRUE,  TRUE,  50, 'https://drive.google.com/...', 'https://drive.google.com/...'),
-  ('release', 'cover_art_url',      'Cover Art URL',       'Cover-Art-URL',         'url',      'release', 'distribution', NULL, TRUE,  TRUE,  60, 'https://drive.google.com/...', 'https://drive.google.com/...'),
-  ('release', 'catalog_number',     'Catalogue Number',    'Katalognummer',         'text',     'release', 'metadata',     NULL, FALSE, TRUE,  70, 'DT-001', 'DT-001'),
-  ('release', 'ean',                'EAN',                 'EAN',                   'ean',      'release', 'metadata',     NULL, FALSE, TRUE,  75, NULL, NULL),
-  ('release', 'isrc',               'ISRC (release)',      'ISRC (Release)',        'isrc',     'release', 'metadata',     NULL, FALSE, TRUE,  80, 'DE-XXX-24-00001', 'DE-XXX-24-00001'),
-  ('release', 'label_copy',         'Label Copy / Credits','Label-Text / Credits',  'textarea', 'release', 'rights',       NULL, FALSE, TRUE,  90, NULL, NULL),
-  ('release', 'gema_release',       'GEMA',                'GEMA',                  'boolean',  'release', 'rights',       NULL, FALSE, TRUE,  95, NULL, NULL),
+  ('release', 'audio_download_url', 'Audio file',          'Audio-Datei',           'url',      'release', 'distribution', NULL, TRUE,  TRUE,  50, NULL, NULL),
+  ('release', 'cover_art_url',      'Cover art',           'Cover-Art',             'url',      'release', 'distribution', NULL, TRUE,  TRUE,  60, NULL, NULL),
+  ('release', 'catalog_number',     'Catalogue Number',    'Katalognummer',         'text',     'release', 'metadata',     NULL, FALSE, FALSE, 70, 'DT-001', 'DT-001'),
+  ('release', 'ean',                'EAN',                 'EAN',                   'ean',      'release', 'metadata',     NULL, FALSE, FALSE, 75, NULL, NULL),
+  ('release', 'isrc',               'ISRC (release)',      'ISRC (Release)',        'isrc',     'release', 'metadata',     NULL, FALSE, FALSE, 80, 'DE-XXX-24-00001', 'DE-XXX-24-00001'),
+  ('release', 'label_copy',         'Label Copy / Credits','Label-Text / Credits',  'textarea', 'release', 'rights',       NULL, FALSE, FALSE, 90, NULL, NULL),
+  ('release', 'gema_release',       'GEMA',                'GEMA',                  'boolean',  'release', 'rights',       NULL, FALSE, FALSE, 95, NULL, NULL),
   ('release', 'spotify_url',        'Spotify Link',        'Spotify-Link',          'url',      'release', 'distribution', NULL, FALSE, TRUE, 100, NULL, NULL),
   ('release', 'apple_music_url',    'Apple Music Link',    'Apple Music-Link',      'url',      'release', 'distribution', NULL, FALSE, TRUE, 110, NULL, NULL),
   ('release', 'youtube_url',        'YouTube Link',        'YouTube-Link',          'url',      'release', 'distribution', NULL, FALSE, TRUE, 120, NULL, NULL),
   ('release', 'notes',              'Additional Notes',    'Zusätzliche Hinweise',  'textarea', 'release', 'metadata',     NULL, FALSE, TRUE, 130, NULL, NULL),
   ('release', 'track_number',       'Track Nr',            'Track-Nr.',             'number',   'track',   'track',        NULL, FALSE, FALSE, 200, NULL, NULL),
   ('release', 'song_title',         'Song Title',          'Songtitel',             'text',     'track',   'track',        NULL, TRUE,  TRUE, 210, NULL, NULL),
-  ('release', 'track_isrc',         'ISRC',                'ISRC',                  'isrc',     'track',   'track',        NULL, FALSE, TRUE, 220, NULL, NULL),
+  ('release', 'track_isrc',         'ISRC (only if already released)', 'ISRC (nur wenn bereits veröffentlicht)', 'isrc', 'track', 'track', NULL, FALSE, TRUE, 220, NULL, NULL),
   ('release', 'composer',           'Composer',            'Komponist',             'text',     'track',   'track',        NULL, FALSE, TRUE, 230, NULL, NULL),
   ('release', 'author',             'Author',              'Autor',                 'text',     'track',   'track',        NULL, FALSE, TRUE, 240, NULL, NULL),
   ('release', 'track_genre',        'Genre',               'Genre',                 'text',     'track',   'track',        NULL, FALSE, TRUE, 250, NULL, NULL),
@@ -6287,6 +6425,37 @@ VALUES
   ('release', 'preview_start_seconds', 'Preview Start (seconds)', 'Preview-Start (Sekunden)', 'seconds', 'track', 'distribution', NULL, FALSE, TRUE, 320, NULL, NULL),
   ('release', 'duration',           'Duration',            'Dauer',                 'duration', 'track',   'track',        NULL, FALSE, TRUE, 330, 'HH:MM:SS', 'HH:MM:SS')
 ON CONFLICT (form_type, field_key) DO NOTHING;
+
+UPDATE public.submission_form_schema
+SET is_visible = FALSE
+WHERE form_type = 'release'
+  AND field_key IN ('catalog_number', 'ean', 'isrc', 'label_copy', 'gema_release');
+
+UPDATE public.submission_form_schema
+SET
+  field_label_en = 'ISRC (only if already released)',
+  field_label_de = 'ISRC (nur wenn bereits veröffentlicht)'
+WHERE form_type = 'release' AND field_key = 'track_isrc';
+
+UPDATE public.submission_form_schema
+SET
+  field_label_en = 'Audio file',
+  field_label_de = 'Audio-Datei',
+  placeholder_en = NULL,
+  placeholder_de = NULL
+WHERE form_type = 'release' AND field_key = 'audio_download_url';
+
+UPDATE public.submission_form_schema
+SET
+  field_label_en = 'Cover art',
+  field_label_de = 'Cover-Art',
+  placeholder_en = NULL,
+  placeholder_de = NULL
+WHERE form_type = 'release' AND field_key = 'cover_art_url';
+
+UPDATE public.submission_form_schema
+SET visibility_condition = '{"field":"instrumental","op":"neq","value":"true"}'::jsonb
+WHERE form_type = 'release' AND field_key = 'author';
 
 -- Seed default schema for video form
 INSERT INTO public.submission_form_schema
@@ -6311,6 +6480,7 @@ ON CONFLICT (form_type, field_key) DO NOTHING;
 -- ---------------------------------------------------------------------------
 ALTER TABLE public.release_submissions         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.release_submission_tracks   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.release_submission_assets   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.video_submissions           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.submission_form_schema           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.submission_release_type_rules    ENABLE ROW LEVEL SECURITY;
@@ -6335,6 +6505,11 @@ CREATE POLICY "release_submissions: editor+ read all" ON public.release_submissi
 DROP POLICY IF EXISTS "release_submissions: editor+ update" ON public.release_submissions;
 CREATE POLICY "release_submissions: editor+ update" ON public.release_submissions
   FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
+
+DROP POLICY IF EXISTS "release_submission_assets: editor+ all" ON public.release_submission_assets;
+CREATE POLICY "release_submission_assets: editor+ all" ON public.release_submission_assets
+  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
+  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
 
 -- release_submission_tracks: artist insert/read via submission ownership
 DROP POLICY IF EXISTS "release_submission_tracks: artist insert own" ON public.release_submission_tracks;

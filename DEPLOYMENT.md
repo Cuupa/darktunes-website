@@ -149,7 +149,8 @@ Admin bronze distributor CSVs (SOS Accounting) upload and download **directly** 
 ```
 
 - `ETag` must be exposed — the multipart client reads it from the PUT response.
-- `content-type` must be allowed — the presigned PUT sends the CSV content type.
+- `content-type` must be allowed — the single presigned PUT sends the CSV content type. Multipart part PUTs send no extra headers.
+- The app’s R2 client disables AWS SDK flexible checksums (`WHEN_REQUIRED`). Presigned URLs must **not** include `x-amz-checksum-*` query params — those are hashed against an empty body, so a real browser PUT fails. R2 403 responses omit CORS headers, which the browser reports as `Failed to fetch`.
 - Add Vercel preview origins if bronze uploads are tested on previews.
 - Without this policy the direct upload fails; the client surfaces the R2 error instead of silently falling back.
 - The server proxy (`/api/admin/sos/import-batches/{id}/upload`) accepts **single** requests ≤ 4 MB and is only used when `NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD=false`. There is deliberately no server-proxy multipart path — R2 rejects non-final parts below 5 MiB.
@@ -202,7 +203,7 @@ External integration API keys (Spotify, Discogs, Resend, YouTube, MailerLite, Od
 - `CONTACT_EMAIL`: The email address that receives contact form submissions from `POST /api/contact`. Defaults to `info@darktunes.com` if not set. Use a monitored inbox.
 
 ### Cron & infra secrets (optional — remain in Vercel env)
-- `CRON_SECRET`: Shared secret for scheduled calls. Accepted by `/api/sync`, `/api/sync/queue`, `/api/sync/requeue`, `/api/sync-youtube`, `/api/sync-api`, and `/api/health/alert`. Supabase Cron HTTP jobs send it inline as `Authorization: Bearer <CRON_SECRET>` (see [Sync Scheduler](#sync-scheduler-supabase-cron--nextjs-worker)).
+- `CRON_SECRET`: Shared secret for scheduled calls. Accepted by `/api/sync`, `/api/sync/queue`, `/api/sync/requeue`, `/api/sync-youtube`, `/api/sync-api`, `/api/health/alert`, and `/api/purge-release-submission-assets`. Supabase Cron HTTP jobs send it inline as `Authorization: Bearer <CRON_SECRET>` (see [Sync Scheduler](#sync-scheduler-supabase-cron--nextjs-worker)).
 - `NEXT_PUBLIC_SITE_URL`: Public site URL without trailing slash (e.g. `https://darktunes.com`).
 - `LABEL_NOTIFICATION_EMAIL`: Label inbox for portal submission and health-alert emails. Leave blank to disable.
 - `HEALTH_ALERT_WEBHOOK_URL`: Configure in Admin → API Keys (encrypted in DB), not env.
@@ -336,6 +337,7 @@ silently in production and was removed):
 | `Spotify Playzahlen` | `0 0 1 * *` | HTTP | `POST https://www.darktunes.com/api/admin/analytics/sync-spotify-plays` |
 | `sync-telemetry-cleanup` | `15 4 * * *` | SQL | Prunes `cron_ticks` (14d) and `sync_runs` (30d) |
 | `app-logs-cleanup` | `30 4 * * *` | SQL | Prunes `app_logs` rows not seen for 90 days |
+| `purge-release-submission-assets` | `15 5 * * *` | HTTP | `POST https://www.darktunes.com/api/purge-release-submission-assets` — deletes expired submission audio/cover (30 days after submit; only clears the live key if it still matches) |
 
 `/api/sync/execute` is an alias of `/api/sync`; do not schedule both.
 

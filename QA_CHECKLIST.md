@@ -85,7 +85,7 @@
 - [ ] Verify unauthenticated users are blocked or redirected from protected routes (`/admin/*`, `/portal/*`, `/press/dashboard/*`, `/promo-pool/*`)
 - [ ] Validate protected API endpoints reject missing/invalid authentication
 - [ ] Confirm editor JWT cannot call finance APIs (`/api/admin/sales-statements/*`, `/api/admin/settlements/*`, `/api/admin/invoices/*`, `/api/admin/sos/*`) — expect 403
-- [ ] Confirm `GET /api/health?mode=full` without auth returns 401; admin System Health widget still loads with Bearer token
+- [ ] Confirm `GET /api/health?mode=full` without auth returns 401; admin System Health widget still loads with a cookie session when the in-memory Bearer token is stale; a 503 DB-offline snapshot still renders (no “Health check failed: 503” toast)
 - [ ] Admin System Health shows app version `vX.Y.Z` (matches `package.json`); on Vercel also shows short commit SHA next to status
 - [ ] Admin System Health: a chatty API (many recent logs) does not force quieter configured APIs to “Awaiting first sync” / Never when they have older successful `sync_logs`
 - [ ] Admin System → Logs: with the log tables reachable, every tab (Sync Log, Sync Errors, App Errors, RBAC Audit, Admin Actions) lists rows; if a query fails, the tab shows "Could not load logs: …" above the table instead of an empty list
@@ -127,13 +127,17 @@
 
 ## Portal release submission
 - [ ] `/portal/releases/new` stepped wizard; `?step=` updates; progress + Back/Continue work
-- [ ] Cover: public Drive JPEG 3000×3000 verifies; private/wrong size/format show clear errors
+- [ ] Audio + cover upload to R2 (no Drive URL); cover JPEG 3000×3000; 30-day deletion notice counts from submit, not first upload
 - [ ] Cover token allows submit without re-download fail; double-click Submit does not create two rows
-- [ ] Album: track focus mode + show-all; copy-from-previous / apply-to-all; incomplete tracks block review
+- [ ] Album: Continue advances track-by-track; last complete track goes to Review; instrumental hides author
+- [ ] Review lists every track; catalog number / EAN / release ISRC / Rights step are not shown
+- [ ] Rejected submission: Edit and resubmit loads the same row; status returns to received; old reject message is gone
+- [ ] Resubmit with a new audio file: after the first file’s TTL the download still opens the new file
 - [ ] Draft: refresh restores from server when online; Start over clears local + server draft
-- [ ] Review completeness bar, clickable URLs, cover preview when verified
 - [ ] Prefill from last submission; video form uses wizard shell
-- [ ] Admin wizard group maps to artist step; apply `submission_form_drafts` from reset.sql
+- [ ] Admin guided review shows metadata, tracks, and download links; Excel columns reorder by drag
+- [ ] After accept → create draft → Open draft lands on `/admin/releases?id=` with the cover image present
+- [ ] Create the Supabase Cron job `purge-release-submission-assets` (see DEPLOYMENT.md)
 
 ## Settlements / invoices
 - [ ] Approve draft statement once → single `statement_payout`; second approve fails
@@ -215,7 +219,7 @@
 - [ ] Invalid period (end before start, month 13, start without end) → Export/PDF/Excel/Publish blocked with a plain reason; no `Q1-<current year>` upload appears
 - [ ] Source file without any recognizable sales month → bronze card shows “archiving skipped” instead of archiving under the current month
 - [ ] Darkmerch CSV with `15,79` (DE) → correct euro basis and artist share; Believe/Bandcamp `15.79` unchanged; `12x` or an empty required amount appears as a row error, never as `0`
-- [ ] Bronze upload >32 MB (e.g. the 60–70 MB Believe Q4 file) archives via direct multipart (16 MB parts, no `/multipart/part` request); drop the connection mid-upload → the part retries with a fresh presigned URL (each attempt has a size-scaled timeout, 2–14 min, no infinite hang; a slow upload still completes); two large files queue (one archive at a time, second card shows “Archiving…”); removing a file while it waits in the queue → it is not archived (no orphan batch); with R2 CORS broken the R2 error is shown (no silent proxy fallback); direct disabled + >4 MB shows the clear “direct upload disabled” message
+- [ ] Bronze upload >32 MB (e.g. `statement of sales examples/Q4 2025 - Q1 2026/Believe_Q4_2025.csv` 63 671 078 bytes → 4 parts; `Believe_Q1_2026.csv` 71 684 050 bytes → 5 parts, last part ~4.4 MiB which R2 allows as the final part) archives via direct multipart (16 MB parts, no `/multipart/part` request); Bandcamp raw (~2.4 MB) and Darkmerch stay on a single PUT; a Failed-to-fetch R2 PUT is shown as an archive/CORS problem, not “offline / VPN”; drop the connection mid-upload → the part retries with a fresh presigned URL (each attempt has a size-scaled timeout, 2–14 min, no infinite hang; a slow upload still completes); two large files queue (one archive at a time, second card shows “Archiving…”); removing a file while it waits in the queue → it is not archived (no orphan batch); with R2 CORS broken the R2 error is shown (no silent proxy fallback); direct disabled + >4 MB shows the clear “direct upload disabled” message
 - [ ] Retry a bronze upload after registration response loss: the same `operation_id` returns the same batch; no second batch or duplicate rows appear. Each phase log has that ID, phase, duration, byte/row counts, and result. Archive errors show the same ID on the file card.
 - [ ] Stall register, multipart init/complete, PUT, abort, and confirm requests: each reaches its deadline, the file shows the failed phase, and the next queued file starts. Retry confirm after a lost response: the existing operation completes without another batch.
 - [ ] Finish a multipart upload, then retry its old PUT URL before expiry: it cannot change the confirmed file hash or downloaded final CSV. A failed or deleted batch aborts its stored multipart ID; run a full R2 scan and verify `multipart_aborted_count` includes legacy incomplete uploads older than 24 hours.

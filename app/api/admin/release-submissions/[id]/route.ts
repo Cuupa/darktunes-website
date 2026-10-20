@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { withErrorHandler, ApiError } from '@/lib/errors'
@@ -5,10 +6,49 @@ import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/l
 import { extractBearerToken, verifyAdminOrEditor } from '@/lib/adminAuth'
 import {
   createDraftReleaseFromSubmission,
+  getReleaseSubmissionById,
   updateReleaseSubmissionStatus,
 } from '@/lib/api/releaseSubmissions'
+import {
+  buildR2PublicUrl,
+  createR2Client,
+  downloadObjectBufferFromR2,
+  objectExistsInR2,
+  putObjectToR2,
+} from '@/lib/r2Utils'
+import {
+  canTransitionSubmissionStatus,
+  rejectionRequiresReply,
+} from '@/lib/submissions/submissionStatus'
 import { getTracksBySubmissionId } from '@/lib/api/releaseSubmissionTracks'
 import { emitNotification } from '@/lib/notifications/emit'
+
+async function copySubmissionCoverToCatalog(
+  db: Awaited<ReturnType<typeof createServiceRoleSupabaseClient>>,
+  releaseId: string,
+  coverR2Key: string,
+): Promise<string> {
+  const { serverEnv } = await import('@/lib/env.server')
+  const s3 = createR2Client(
+    serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
+    serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
+    serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+  )
+  const bytes = await downloadObjectBufferFromR2(
+    coverR2Key,
+    s3,
+    serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
+  )
+  const buffer = Buffer.from(bytes)
+  const key = `cover-art/${createHash('sha256').update(buffer).digest('hex')}.jpeg`
+  if (!(await objectExistsInR2(s3, serverEnv.CLOUDFLARE_R2_BUCKET_NAME, key))) {
+    await putObjectToR2(s3, serverEnv.CLOUDFLARE_R2_BUCKET_NAME, key, buffer, 'image/jpeg')
+  }
+  const url = buildR2PublicUrl(serverEnv.CLOUDFLARE_R2_PUBLIC_URL, key)
+  const { error } = await db.from('releases').update({ cover_art: url }).eq('id', releaseId)
+  if (error) throw new Error(error.message)
+  return url
+}
 
 function extractId(req: NextRequest): string {
   const segments = new URL(req.url).pathname.split('/')
@@ -42,6 +82,20 @@ export const PATCH = withErrorHandler(async (req: NextRequest) => {
 
   const id = extractId(req)
   const body = patchSchema.parse(await req.json())
+  const current = await getReleaseSubmissionById(supabase, id)
+  if (!current) throw new ApiError(404, 'Submission not found.')
+  if (!canTransitionSubmissionStatus(current.status, body.status)) {
+    throw new ApiError(
+      409,
+      `Cannot change status from ${current.status} to ${body.status}. Choose an allowed next status.`,
+    )
+  }
+  if (rejectionRequiresReply(body.status) && !body.adminReply?.trim()) {
+    throw new ApiError(
+      422,
+      'A message to the artist is required when rejecting. Write the reason, then reject.',
+    )
+  }
 
   const progressNote =
     body.progressNote === undefined
@@ -106,7 +160,20 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   try {
     const result = await createDraftReleaseFromSubmission(supabase, id)
-    return NextResponse.json(result, { status: result.created ? 201 : 200 })
+    let release = result.release
+    const coverKey = result.submission.coverR2Key
+    if (coverKey && !release.coverArt) {
+      try {
+        const url = await copySubmissionCoverToCatalog(supabase, release.id, coverKey)
+        release = { ...release, coverArt: url }
+      } catch (coverErr) {
+        console.error(
+          '[create_draft_release] cover copy',
+          coverErr instanceof Error ? coverErr.message : coverErr,
+        )
+      }
+    }
+    return NextResponse.json({ ...result, release }, { status: result.created ? 201 : 200 })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Failed to create draft release'
     if (msg === 'Submission not found') throw new ApiError(404, msg)

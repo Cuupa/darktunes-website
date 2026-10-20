@@ -2,7 +2,7 @@
 
 /**
  * Cover art verification for release submissions.
- * Remote URLs are checked server-side (JPEG 3000×3000). No R2 storage during the form.
+ * Checks a private R2 key or a remote URL (JPEG 3000×3000).
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
@@ -14,7 +14,9 @@ import { coverCodeToI18nKey, type CoverArtErrorCode } from '@/lib/submissions/co
 import type { CoverArtCheckStatus } from '@/lib/submissions/coverArtCheck'
 
 interface CoverArtAnalyzerProps {
-  url: string
+  url?: string
+  r2Key?: string | null
+  artistId?: string | null
   onVerified: (verified: boolean, token?: string | null) => void
   autoCheck?: boolean
 }
@@ -26,7 +28,13 @@ interface SizeInfo {
   height: number
 }
 
-export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArtAnalyzerProps) {
+export function CoverArtAnalyzer({
+  url = '',
+  r2Key = null,
+  artistId = null,
+  onVerified,
+  autoCheck = true,
+}: CoverArtAnalyzerProps) {
   const t = useTranslations('portal')
   const [state, setState] = useState<UiState>('idle')
   const [code, setCode] = useState<CoverArtErrorCode | null>(null)
@@ -38,7 +46,7 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
   onVerifiedRef.current = onVerified
 
   const verify = useCallback(async () => {
-    const trimmed = url.trim()
+    const trimmed = r2Key?.trim() || url.trim()
     if (!trimmed) return
 
     const requestId = ++requestIdRef.current
@@ -59,13 +67,16 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
         return
       }
 
-      const res = await fetch('/api/portal/cover-art-check', {
+      const checkUrl = artistId
+        ? `/api/portal/cover-art-check?artistId=${encodeURIComponent(artistId)}`
+        : '/api/portal/cover-art-check'
+      const res = await fetch(checkUrl, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: trimmed }),
+        body: JSON.stringify(r2Key ? { r2_key: r2Key } : { url: trimmed }),
       })
 
       if (requestId !== requestIdRef.current) return
@@ -102,11 +113,11 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
       setCode('COVER_FETCH_FAILED')
       onVerifiedRef.current(false, null)
     }
-  }, [url])
+  }, [url, r2Key, artistId])
 
   useEffect(() => {
     if (!autoCheck) return
-    const trimmed = url.trim()
+    const trimmed = r2Key?.trim() || url.trim()
     if (!trimmed) {
       // Avoid re-notifying parent on every mount/render when already cleared
       if (lastCheckedUrl.current === '' ) return
@@ -127,7 +138,7 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [url, autoCheck, verify])
+  }, [url, r2Key, autoCheck, verify])
 
   const getMessage = (): string => {
     if (state === 'verifying') return t('releases_submit_cover_check_verifying')
@@ -175,13 +186,13 @@ export function CoverArtAnalyzer({ url, onVerified, autoCheck = true }: CoverArt
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium">{t('releases_submit_cover_check_heading')}</p>
-      <p className="text-xs text-muted-foreground">{t('releases_submit_cover_check_hint')}</p>
+      <p className="text-xs text-muted-foreground">{t('releases_submit_cover_check_upload_hint')}</p>
       <div className="flex flex-wrap items-center gap-3">
         <Button
           type="button"
           variant="outline"
           size="sm"
-          disabled={!url.trim() || state === 'verifying'}
+          disabled={!(r2Key?.trim() || url.trim()) || state === 'verifying'}
           onClick={() => void verify()}
         >
           {state === 'verifying'
