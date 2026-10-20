@@ -38,6 +38,7 @@ import { PortalAccessGate } from './_components/PortalAccessGate'
 import { PortalNotificationProvider } from './_components/PortalNotificationProvider'
 import { PortalPushBootstrap } from '@/components/notifications/PortalPushBootstrap'
 import { PortalHelpPalette } from './_components/PortalHelpPalette'
+import { AssistantMount } from '@/components/ai/AssistantMount'
 import { getCachedPortalFaq } from '@/lib/portal/getCachedPortalFaq'
 import { ScrollableAppShell } from '@/components/layout/ScrollableAppShell'
 import { Warning } from '@phosphor-icons/react/dist/ssr'
@@ -232,6 +233,7 @@ async function PortalLayoutContent({ children }: { children: ReactNode }) {
           <PortalQueryProvider>
             <PortalOfflineBanner />
             <PortalHelpPalette faqTree={faqTree} />
+            <AssistantMount dashboard="portal" />
             {showTermsGate && artist ? (
               <PortalTermsGate artistId={artist.id} termsVersion={termsVersion} />
             ) : null}

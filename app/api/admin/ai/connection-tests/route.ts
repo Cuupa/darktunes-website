@@ -9,6 +9,7 @@ import { requireAdminWithServiceClient } from '@/lib/adminAuth'
 import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { resolveNvidiaApiKey } from '@/lib/ai/provider/resolveKey'
 import { runNvidiaConnectionTest } from '@/lib/ai/provider/connectionTest'
+import { updateAiSettings } from '@/lib/api/aiSettings'
 
 export const maxDuration = 60
 
@@ -26,6 +27,17 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
   }
 
   const result = await runNvidiaConnectionTest({ apiKey })
+  await updateAiSettings(serviceClient, {
+    last_connection_test: {
+      ok: result.ok,
+      started_at: result.started_at,
+      finished_at: result.finished_at,
+      total_latency_ms: result.total_latency_ms,
+      steps: result.steps,
+      discovered_capabilities: result.discovered_capabilities,
+    },
+    provider_capabilities: result.discovered_capabilities,
+  }).catch(() => undefined)
   return NextResponse.json({
     ok: result.ok,
     started_at: result.started_at,

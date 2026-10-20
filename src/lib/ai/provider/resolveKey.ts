@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { getApiCredential } from '@/lib/api/apiCredentials'
+import { getApiCredential } from '@/lib/secrets/getExternalCredentials'
 import type { Database } from '@/types/database'
 
 type DbClient = SupabaseClient<Database>

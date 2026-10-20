@@ -29,6 +29,7 @@
     "verify:api-contracts": "node scripts/verify-api-contracts.mjs",
     "api:inventory": "node scripts/extract-api-routes.mjs",
     "test": "vitest run --config vitest.config.ts",
+    "test:ai:live": "node scripts/ai-live-smoke.mjs",
     "test:watch": "vitest --config vitest.config.ts",
     "test:e2e": "playwright test",
     "db:apply": "node scripts/apply-schema.mjs",

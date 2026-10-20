@@ -10,6 +10,9 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 
 ## [Unreleased]
 
+### Added
+- **AI assistant (NVIDIA NIM)** for the artist portal and admin dashboard: encrypted `nvidia_api_key` under Admin → API Keys, token budgets with atomic reservation, streaming chat (`Ctrl+J`), server-side tools over existing DAL, error classification, and Admin → AI Assistant. Live NVIDIA smoke tests: `AI_LIVE_TESTS=1 npm run test:ai:live` (skipped without a key).
+
 ### Fixed
 - **Asset library picker hid band photos and only showed logos:** `AssetPicker` ignored the folder you clicked whenever it was opened with an artist (News hero, Release hero, Artist form) and listed `assets.artist_id` instead. File Explorer uploads into `artists/{name}` do not set `artist_id`, so photos vanished and logos remained. The picker now lists the selected folder, and with an artist it opens in that artist’s folder. Admin upload no longer looks for an artist folder with `parent_id IS NULL` (those folders live under `artists/`), so new form uploads land in the same place.
 - **Scheduled YouTube videos appeared before release with their upload date:** the channel sync picked up scheduled/private uploads from the uploads playlist and stored the upload date (e.g. EXTIZE – Zero Gravity dated 19 Aug instead of its 16 Oct release), so they showed early and sorted far down. The sync now reads each video's status and skips anything not public or still an upcoming premiere; the Supabase cron `sync-youtube-daily` runs hourly so releases show within an hour.

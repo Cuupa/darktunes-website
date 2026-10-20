@@ -1,5 +1,6 @@
 import about from './about.json'
 import admin from './admin.json'
+import ai from './ai.json'
 import adminSubmissions from './adminSubmissions.json'
 import apply from './apply.json'
 import artistDetail from './artistDetail.json'
@@ -37,6 +38,7 @@ import videos from './videos.json'
 export default {
   about,
   admin,
+  ai,
   adminSubmissions,
   apply,
   artistDetail,

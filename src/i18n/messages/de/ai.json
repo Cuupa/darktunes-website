@@ -1,0 +1,23 @@
+{
+  "title": "KI-Assistent",
+  "open": "KI-Assistent öffnen",
+  "close": "Assistent schließen",
+  "newConversation": "Neue Unterhaltung",
+  "deleteConversation": "Unterhaltung löschen",
+  "placeholder": "Frage zu dieser Seite…",
+  "send": "Senden",
+  "stop": "Stopp",
+  "copy": "Antwort kopieren",
+  "copied": "Kopiert",
+  "empty": "Stelle eine Frage zu Releases, Abrechnungen oder dieser Seite.",
+  "model": "Modell: {model}",
+  "tokens": "{total} Tokens",
+  "statusConnecting": "Verbinden…",
+  "statusStreaming": "Schreibt…",
+  "statusTool": "Daten werden geladen…",
+  "statusFailed": "Der Assistent konnte nicht fertigstellen.",
+  "retry": "Erneut versuchen",
+  "shortcutHint": "Strg+J",
+  "disabled": "Der KI-Assistent ist ausgeschaltet.",
+  "notConfigured": "Der NVIDIA-API-Schlüssel fehlt. Ein Admin kann ihn unter Admin → API Keys anlegen."
+}
