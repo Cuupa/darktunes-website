@@ -44,6 +44,21 @@ export const ERROR_CODES = [
   'SERVER_ERROR',
   'CONFIG_ERROR',
   'DB_ERROR',
+  'AI_DISABLED',
+  'AI_NOT_CONFIGURED',
+  'AI_BUDGET_EXCEEDED',
+  'AI_PROVIDER_INVALID_KEY',
+  'AI_PROVIDER_MODEL_UNAVAILABLE',
+  'AI_PROVIDER_RATE_LIMITED',
+  'AI_PROVIDER_TIMEOUT',
+  'AI_PROVIDER_NETWORK_ERROR',
+  'AI_PROVIDER_TLS_ERROR',
+  'AI_PROVIDER_INVALID_RESPONSE',
+  'AI_PROVIDER_TOOL_CALL_UNSUPPORTED',
+  'AI_PROVIDER_UNAVAILABLE',
+  'AI_TOOL_FORBIDDEN',
+  'AI_CONFIRMATION_EXPIRED',
+  'AI_CONVERSATION_NOT_FOUND',
 ] as const
 
 export type ErrorCode = (typeof ERROR_CODES)[number]
@@ -88,4 +103,34 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   CONFIG_ERROR:
     'This feature is not set up on the server: a required setting is missing or invalid. Tell the label team.',
   DB_ERROR: 'The database could not complete this operation.',
+  AI_DISABLED:
+    'The AI assistant is turned off. An admin can enable it under Admin → AI Assistant.',
+  AI_NOT_CONFIGURED:
+    'The NVIDIA API key is missing. Add it under Admin → API Keys, then run Test Connection.',
+  AI_BUDGET_EXCEEDED:
+    'The AI token budget for this request is used up. Wait for the next period or ask an admin to raise the limit.',
+  AI_PROVIDER_INVALID_KEY:
+    'NVIDIA rejected the API key. Replace the key under Admin → API Keys and run Test Connection.',
+  AI_PROVIDER_MODEL_UNAVAILABLE:
+    'The requested NVIDIA model is not available. Check Admin → AI Assistant → Models.',
+  AI_PROVIDER_RATE_LIMITED:
+    'NVIDIA rate-limited this request. Wait and try again; if it keeps happening, lower usage.',
+  AI_PROVIDER_TIMEOUT:
+    'The NVIDIA request timed out. Retry the question; if it keeps failing, try the fast model.',
+  AI_PROVIDER_NETWORK_ERROR:
+    'The NVIDIA endpoint could not be reached. Check connectivity and retry.',
+  AI_PROVIDER_TLS_ERROR:
+    'The NVIDIA TLS connection failed. Retry later; if it continues, tell the label team.',
+  AI_PROVIDER_INVALID_RESPONSE:
+    'NVIDIA returned a response this app could not read. Retry; if it continues, run Test Connection.',
+  AI_PROVIDER_TOOL_CALL_UNSUPPORTED:
+    'This NVIDIA model did not accept tool calling. Run Test Connection and check Admin → AI Assistant → Models.',
+  AI_PROVIDER_UNAVAILABLE:
+    'NVIDIA is currently unavailable. Retry later; the rest of the site still works.',
+  AI_TOOL_FORBIDDEN:
+    'That assistant action is not allowed for this account. Ask an admin if you need access.',
+  AI_CONFIRMATION_EXPIRED:
+    'The confirmation for this assistant action expired. Ask the assistant to prepare it again.',
+  AI_CONVERSATION_NOT_FOUND:
+    'That assistant conversation was not found or belongs to another account.',
 }

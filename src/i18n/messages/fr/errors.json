@@ -33,5 +33,20 @@
   "UPLOAD_UNREADABLE_RESPONSE": "Envoi de « {filename} » : le serveur a répondu HTTP {status} sans détail d’erreur. Envoyez l’heure de l’envoi à l’équipe du label.",
   "ERROR_REFERENCE": "ID d’erreur : {errorId} (à envoyer à l’équipe du label).",
   "RESPONSE_UNREADABLE": "Le serveur a répondu HTTP {status} sans détail d’erreur. Envoyez l’heure de la requête à l’équipe du label.",
-  "ARTISTS_LOAD_FAILED": "La liste des artistes n'a pas pu être chargée depuis la base de données. Réessayez ; si l'échec persiste, vérifiez Admin → Système → Log Manager."
+  "ARTISTS_LOAD_FAILED": "La liste des artistes n'a pas pu être chargée depuis la base de données. Réessayez ; si l'échec persiste, vérifiez Admin → Système → Log Manager.",
+  "AI_DISABLED": "L’assistant IA est désactivé. Un admin peut l’activer sous Admin → Assistant IA.",
+  "AI_NOT_CONFIGURED": "La clé API NVIDIA est absente. Ajoutez-la sous Admin → Clés API, puis lancez Test Connection.",
+  "AI_BUDGET_EXCEEDED": "Le budget de jetons pour cette demande est épuisé. Attendez la période suivante ou demandez à un admin d’augmenter la limite.",
+  "AI_PROVIDER_INVALID_KEY": "NVIDIA a rejeté la clé API. Remplacez-la sous Admin → Clés API et lancez Test Connection.",
+  "AI_PROVIDER_MODEL_UNAVAILABLE": "Le modèle NVIDIA demandé n’est pas disponible. Vérifiez Admin → Assistant IA → Modèles.",
+  "AI_PROVIDER_RATE_LIMITED": "NVIDIA a limité cette demande. Patientez puis réessayez.",
+  "AI_PROVIDER_TIMEOUT": "La demande NVIDIA a expiré. Relancez la question ; si l’échec continue, utilisez le modèle rapide.",
+  "AI_PROVIDER_NETWORK_ERROR": "Le point de terminaison NVIDIA est injoignable. Vérifiez la connexion et réessayez.",
+  "AI_PROVIDER_TLS_ERROR": "La connexion TLS NVIDIA a échoué. Réessayez plus tard ; si cela continue, prévenez l’équipe du label.",
+  "AI_PROVIDER_INVALID_RESPONSE": "NVIDIA a renvoyé une réponse illisible. Réessayez ; si cela continue, lancez Test Connection.",
+  "AI_PROVIDER_TOOL_CALL_UNSUPPORTED": "Ce modèle NVIDIA n’a pas accepté l’appel d’outils. Lancez Test Connection et vérifiez Admin → Assistant IA → Modèles.",
+  "AI_PROVIDER_UNAVAILABLE": "NVIDIA est indisponible pour le moment. Réessayez plus tard ; le reste du site fonctionne.",
+  "AI_TOOL_FORBIDDEN": "Cette action de l’assistant n’est pas autorisée pour ce compte. Demandez l’accès à un admin.",
+  "AI_CONFIRMATION_EXPIRED": "La confirmation de cette action a expiré. Demandez à l’assistant de la préparer à nouveau.",
+  "AI_CONVERSATION_NOT_FOUND": "Cette conversation de l’assistant est introuvable ou appartient à un autre compte."
 }
