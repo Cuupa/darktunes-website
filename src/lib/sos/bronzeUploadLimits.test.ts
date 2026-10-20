@@ -3,24 +3,42 @@ import {
   BRONZE_DIRECT_UPLOAD_PART_BYTES,
   BRONZE_R2_MIN_PART_BYTES,
   BRONZE_SINGLE_PUT_MAX_BYTES,
-  MAX_BRONZE_CSV_BYTES,
-  MAX_BRONZE_CSV_SERVER_BYTES,
-  VERCEL_FUNCTION_BODY_LIMIT_BYTES,
+  planBronzeDirectUpload,
 } from './bronzeUploadLimits'
 
-describe('bronzeUploadLimits', () => {
-  it('keeps the server proxy within the Vercel body cap', () => {
-    expect(MAX_BRONZE_CSV_SERVER_BYTES).toBeLessThan(VERCEL_FUNCTION_BODY_LIMIT_BYTES)
+/** Byte sizes of `statement of sales examples/Q4 2025 - Q1 2026/` (gitignored CSVs). */
+const BELIEVE_Q4_2025_BYTES = 63_671_078
+const BELIEVE_Q1_2026_BYTES = 71_684_050
+const BANDCAMP_RAW_BYTES = 2_400_806
+const BANDCAMP_PAYOUTS_BYTES = 500_215
+const DARKMERCH_CSV_BYTES = 7_454
+
+describe('planBronzeDirectUpload', () => {
+  it('uses a single PUT at and below 32 MB', () => {
+    expect(planBronzeDirectUpload(BRONZE_SINGLE_PUT_MAX_BYTES)).toEqual({
+      mode: 'single-put',
+      partCount: 1,
+      lastPartBytes: BRONZE_SINGLE_PUT_MAX_BYTES,
+    })
+    expect(planBronzeDirectUpload(BANDCAMP_RAW_BYTES).mode).toBe('single-put')
+    expect(planBronzeDirectUpload(BANDCAMP_PAYOUTS_BYTES).mode).toBe('single-put')
+    expect(planBronzeDirectUpload(DARKMERCH_CSV_BYTES).mode).toBe('single-put')
   })
 
-  it('keeps direct multipart parts provider-conform', () => {
-    expect(BRONZE_DIRECT_UPLOAD_PART_BYTES).toBeGreaterThanOrEqual(BRONZE_R2_MIN_PART_BYTES)
-    expect(BRONZE_DIRECT_UPLOAD_PART_BYTES).toBeGreaterThan(MAX_BRONZE_CSV_SERVER_BYTES)
+  it('splits Believe Q4 2025 into four 16 MB parts with a legal last part', () => {
+    const plan = planBronzeDirectUpload(BELIEVE_Q4_2025_BYTES)
+    expect(plan.mode).toBe('multipart')
+    expect(plan.partCount).toBe(4)
+    expect(plan.lastPartBytes).toBe(BELIEVE_Q4_2025_BYTES - 3 * BRONZE_DIRECT_UPLOAD_PART_BYTES)
+    expect(plan.lastPartBytes).toBeGreaterThanOrEqual(BRONZE_R2_MIN_PART_BYTES)
   })
 
-  it('allows large direct uploads to R2 via presigned URLs', () => {
-    expect(MAX_BRONZE_CSV_BYTES).toBeGreaterThan(200 * 1024 * 1024)
-    expect(BRONZE_SINGLE_PUT_MAX_BYTES).toBeGreaterThan(BRONZE_DIRECT_UPLOAD_PART_BYTES)
-    expect(BRONZE_SINGLE_PUT_MAX_BYTES).toBeLessThan(MAX_BRONZE_CSV_BYTES)
+  it('accepts Believe Q1 2026 whose final part is below the 5 MiB non-final floor', () => {
+    const plan = planBronzeDirectUpload(BELIEVE_Q1_2026_BYTES)
+    expect(plan.mode).toBe('multipart')
+    expect(plan.partCount).toBe(5)
+    expect(plan.lastPartBytes).toBe(BELIEVE_Q1_2026_BYTES - 4 * BRONZE_DIRECT_UPLOAD_PART_BYTES)
+    expect(plan.lastPartBytes).toBeGreaterThan(0)
+    expect(plan.lastPartBytes).toBeLessThan(BRONZE_R2_MIN_PART_BYTES)
   })
 })

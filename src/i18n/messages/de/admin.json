@@ -1492,5 +1492,12 @@
   "review_assistant_create_draft": "Draft-Release anlegen",
   "review_assistant_draft_created": "Draft-Release verknüpft",
   "review_assistant_draft_failed": "Draft konnte nicht angelegt werden",
-  "review_assistant_open_releases": "Releases öffnen"
+  "review_assistant_open_releases": "Releases öffnen",
+  "review_assistant_open_draft": "Entwurf öffnen",
+  "review_assistant_tracks_loading": "Tracks werden geladen…",
+  "review_assistant_tracks_empty": "Keine Tracks.",
+  "submission_download_audio": "Audio herunterladen",
+  "submission_download_cover": "Cover herunterladen",
+  "submission_files_expire_today": "Audio und Cover laufen heute ab und werden gelöscht. Jetzt herunterladen.",
+  "submission_files_expire_in": "Audio und Cover werden in {days} Tagen automatisch gelöscht. Jetzt herunterladen."
 }

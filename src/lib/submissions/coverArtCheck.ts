@@ -215,12 +215,25 @@ async function fetchAndInspect(
     }
   }
 
-  const bytes = new Uint8Array(buffer)
+  return inspectCoverArtBuffer(buffer)
+}
+
+export async function inspectCoverArtBuffer(
+  buffer: Buffer | Uint8Array,
+): Promise<Omit<CoverArtCheckResult, 'code'>> {
+  const bytes = buffer instanceof Buffer ? new Uint8Array(buffer) : buffer
+  if (bytes.byteLength > MAX_BYTES) {
+    return { status: 'too_large', verified: false, message: 'Cover art file is too large (max 20 MB)' }
+  }
+  if (bytes.byteLength < 3) {
+    return { status: 'not_image', verified: false, message: 'Empty or invalid image response' }
+  }
+
   let meta: Awaited<ReturnType<ReturnType<typeof sharp>['metadata']>>
   try {
-    meta = await sharp(buffer).metadata()
+    meta = await sharp(bytes).metadata()
   } catch {
-    if (!isJpegMagicBytes(bytes)) {
+    if (!isJpegMagicBytes(bytes.subarray(0, 3))) {
       return {
         status: 'wrong_format',
         verified: false,
@@ -238,7 +251,7 @@ async function fetchAndInspect(
     return { status: 'not_image', verified: false, message: 'Could not read image dimensions' }
   }
 
-  if (format !== 'jpeg' && !isJpegMagicBytes(bytes)) {
+  if (format !== 'jpeg' && !isJpegMagicBytes(bytes.subarray(0, 3))) {
     return {
       status: 'wrong_format',
       verified: false,

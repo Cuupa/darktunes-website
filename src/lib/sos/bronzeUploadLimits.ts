@@ -26,3 +26,23 @@ export const BRONZE_SINGLE_PUT_MAX_BYTES = 32 * 1024 * 1024
 
 /** R2 requires every non-final multipart part to be at least 5 MiB. */
 export const BRONZE_R2_MIN_PART_BYTES = 5 * 1024 * 1024
+
+export type BronzeDirectUploadPlan = {
+  mode: 'single-put' | 'multipart'
+  partCount: number
+  lastPartBytes: number
+}
+
+/**
+ * How a bronze CSV of `fileSize` bytes is sent browser → R2.
+ * The final multipart part may be below `BRONZE_R2_MIN_PART_BYTES`;
+ * only non-final parts must meet that floor (Believe Q1 2026 last part is ~4.4 MiB).
+ */
+export function planBronzeDirectUpload(fileSize: number): BronzeDirectUploadPlan {
+  if (fileSize <= BRONZE_SINGLE_PUT_MAX_BYTES) {
+    return { mode: 'single-put', partCount: 1, lastPartBytes: fileSize }
+  }
+  const partCount = Math.ceil(fileSize / BRONZE_DIRECT_UPLOAD_PART_BYTES)
+  const lastPartBytes = fileSize - (partCount - 1) * BRONZE_DIRECT_UPLOAD_PART_BYTES
+  return { mode: 'multipart', partCount, lastPartBytes }
+}

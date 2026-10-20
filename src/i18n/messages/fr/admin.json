@@ -1492,5 +1492,12 @@
   "review_assistant_create_draft": "Créer un brouillon de release",
   "review_assistant_draft_created": "Brouillon de release lié",
   "review_assistant_draft_failed": "Impossible de créer le brouillon",
-  "review_assistant_open_releases": "Ouvrir Releases"
+  "review_assistant_open_releases": "Ouvrir Releases",
+  "review_assistant_open_draft": "Ouvrir le brouillon",
+  "review_assistant_tracks_loading": "Chargement des titres…",
+  "review_assistant_tracks_empty": "Aucun titre.",
+  "submission_download_audio": "Télécharger l’audio",
+  "submission_download_cover": "Télécharger la pochette",
+  "submission_files_expire_today": "L’audio et la pochette expirent aujourd’hui et seront supprimés. Téléchargez-les maintenant.",
+  "submission_files_expire_in": "L’audio et la pochette seront supprimés automatiquement dans {days} jours. Téléchargez-les maintenant."
 }

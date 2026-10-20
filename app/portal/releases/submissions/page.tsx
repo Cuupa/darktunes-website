@@ -158,6 +158,17 @@ export default async function ReleaseSubmissionsPage({
                     <p className="text-muted-foreground whitespace-pre-wrap">{sub.adminReply}</p>
                   </div>
                 )}
+                {sub.status === 'rejected' && (
+                  <Button asChild variant="outline" size="sm">
+                    <Link
+                      href={`/portal/releases/new?submissionId=${encodeURIComponent(sub.id)}${
+                        artist ? `&artistId=${encodeURIComponent(artist.id)}` : ''
+                      }`}
+                    >
+                      {t('releases_edit_rejected')}
+                    </Link>
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ))}

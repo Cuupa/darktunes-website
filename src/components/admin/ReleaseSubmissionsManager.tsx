@@ -30,9 +30,49 @@ import type { ReleaseSubmission, ReleaseSubmissionTrack, SubmissionStatus } from
 import { GuidedModeChooser } from '@/components/guided/GuidedModeChooser'
 import type { GuidedMode } from '@/lib/guided/guidedSteps'
 import { ReleaseReviewAssistant } from '@/components/admin/ReleaseReviewAssistant'
+import { SubmissionAssetLinks } from '@/components/admin/SubmissionAssetLinks'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { DotsSixVertical } from '@phosphor-icons/react'
 
 const STATUS_OPTIONS: SubmissionStatus[] = ['received', 'reviewed', 'accepted', 'rejected']
 const MODE_KEY = 'admin-release-review-mode'
+
+function SortableColumnRow({
+  id,
+  onToggle,
+}: {
+  id: string
+  onToggle: (key: string, enabled: boolean) => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id })
+  return (
+    <li
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className="flex items-center gap-2 rounded border border-border px-2 py-1.5"
+    >
+      <button type="button" className="cursor-grab touch-none" aria-label={`Reorder ${id}`} {...attributes} {...listeners}>
+        <DotsSixVertical size={16} />
+      </button>
+      <Checkbox checked onCheckedChange={(checked) => onToggle(id, checked === true)} aria-label={id} />
+      <span className="flex-1 text-sm font-mono truncate">{id}</span>
+    </li>
+  )
+}
 
 const STATUS_LABELS: Record<SubmissionStatus, string> = {
   received: 'Received',
@@ -150,7 +190,10 @@ export function ReleaseSubmissionsManager() {
         ...(progress !== undefined ? { progressNote: progress } : {}),
       }),
     })
-    if (!res.ok) throw new Error('Failed')
+    if (!res.ok) {
+      const errBody = (await res.json().catch(() => ({}))) as { error?: string }
+      throw new Error(errBody.error ?? 'Failed')
+    }
     return (await res.json()) as ReleaseSubmission
   }
 
@@ -325,15 +368,16 @@ export function ReleaseSubmissionsManager() {
     })
   }
 
-  const moveColumn = (index: number, dir: -1 | 1) => {
+  const columnSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+
+  const onColumnDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
     setDraftColumns((prev) => {
-      const next = [...prev]
-      const target = index + dir
-      if (target < 0 || target >= next.length) return prev
-      const tmp = next[index]
-      next[index] = next[target]
-      next[target] = tmp
-      return next
+      const oldIndex = prev.indexOf(String(active.id))
+      const newIndex = prev.indexOf(String(over.id))
+      if (oldIndex < 0 || newIndex < 0) return prev
+      return arrayMove(prev, oldIndex, newIndex)
     })
   }
 
@@ -498,30 +542,7 @@ export function ReleaseSubmissionsManager() {
                 {selected.coverArtVerified ? '✅' : '❌'}
               </div>
             </div>
-            {selected.audioDownloadUrl && (
-              <div>
-                <a
-                  href={selected.audioDownloadUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-primary underline"
-                >
-                  Audio Download
-                </a>
-              </div>
-            )}
-            {selected.coverArtUrl && (
-              <div>
-                <a
-                  href={selected.coverArtUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-primary underline"
-                >
-                  Cover Art
-                </a>
-              </div>
-            )}
+            <SubmissionAssetLinks submission={selected} />
             {selected.notes && <p className="text-sm text-muted-foreground">{selected.notes}</p>}
             {selected.formData && Object.keys(selected.formData).length > 0 && (
               <div className="space-y-1">
@@ -605,18 +626,21 @@ export function ReleaseSubmissionsManager() {
               <Button onClick={() => void saveStatus()} disabled={saving}>
                 {saving ? t('saving') : t('field_save')}
               </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => void createDraftRelease()}
-                disabled={saving}
-              >
-                {selected.releaseId ? 'Open linked draft' : 'Create draft release'}
-              </Button>
-              {selected.releaseId && (
-                <span className="text-xs text-muted-foreground font-mono">
-                  release_id: {selected.releaseId}
-                </span>
+              {selected.releaseId ? (
+                <Button asChild variant="secondary">
+                  <a href={`/admin/releases?id=${encodeURIComponent(selected.releaseId)}`}>
+                    Open linked draft
+                  </a>
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void createDraftRelease()}
+                  disabled={saving}
+                >
+                  Create draft release
+                </Button>
               )}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -722,41 +746,15 @@ export function ReleaseSubmissionsManager() {
           ) : (
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground">{t('export_columns_order_hint')}</p>
-              <ul className="space-y-2">
-                {draftColumns.map((key, index) => (
-                  <li
-                    key={key}
-                    className="flex items-center gap-2 rounded border border-border px-2 py-1.5"
-                  >
-                    <Checkbox
-                      checked
-                      onCheckedChange={(checked) => toggleColumn(key, checked === true)}
-                      aria-label={key}
-                    />
-                    <span className="flex-1 text-sm font-mono truncate">{key}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2"
-                      disabled={index === 0}
-                      onClick={() => moveColumn(index, -1)}
-                    >
-                      ↑
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2"
-                      disabled={index === draftColumns.length - 1}
-                      onClick={() => moveColumn(index, 1)}
-                    >
-                      ↓
-                    </Button>
-                  </li>
-                ))}
-              </ul>
+              <DndContext sensors={columnSensors} collisionDetection={closestCenter} onDragEnd={onColumnDragEnd}>
+                <SortableContext items={draftColumns} strategy={verticalListSortingStrategy}>
+                  <ul className="space-y-2">
+                    {draftColumns.map((key) => (
+                      <SortableColumnRow key={key} id={key} onToggle={toggleColumn} />
+                    ))}
+                  </ul>
+                </SortableContext>
+              </DndContext>
               {availableColumns.filter((c) => !draftColumns.includes(c)).length > 0 && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">{t('export_columns_available')}</p>

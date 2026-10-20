@@ -11,9 +11,19 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 ## [Unreleased]
 
 ### Added
+- **Release submission files on R2:** artists upload audio (one ZIP/WAV/FLAC/AIFF/MP3, 32 MB) and JPEG cover (5 MB, 3000×3000) directly to private R2. Admin downloads via presigned links. Files auto-delete 30 days after submit (`POST /api/purge-release-submission-assets` — create the Cron job in the Supabase dashboard).
+- **Rejected submissions can be edited** and resubmitted on the same row, with a required message from the label.
+
+### Changed
+- Release date picker uses the house `DateField` calendar with `navLayout="around"` so month arrows no longer cover the grid.
+- Catalogue number, EAN, and release-level ISRC are hidden from the artist form (admin assigns them). Track ISRC is labelled “only if already released”. Rights & Other wizard steps are removed. Instrumental hides the author field.
+- Track Continue goes to the next track; Review lists every track. Admin guided review shows the received release; Excel export columns reorder by drag; accepted drafts open `/admin/releases?id=`.
 - **AI assistant (NVIDIA NIM)** for the artist portal and admin dashboard: encrypted `nvidia_api_key` under Admin → API Keys, token budgets with atomic reservation, streaming chat (`Ctrl+J`), server-side tools over existing DAL, error classification, and Admin → AI Assistant. Live NVIDIA smoke tests: `AI_LIVE_TESTS=1 npm run test:ai:live` (skipped without a key).
 
 ### Fixed
+- **Submission file purge could blank a resubmitted download:** deleting an old R2 object also nulled `audio_r2_key` / `cover_r2_key` even when the row already pointed at a newer key. Purge now matches the key. TTL is refreshed on submit (30 days from submit, not from the first upload). Rejected resubmit is one SQL RPC and clears the old reject message. Create draft copies the JPEG to the public `cover-art/` prefix.
+- **Believe Q4 bronze CSV (~64 MB) died in ~8 s with a fake “offline” error:** AWS SDK v3 signs `x-amz-checksum-crc32` of an empty body into presigned PUT/UploadPart URLs. The browser PUT of the real file fails, and R2’s 403 has no CORS headers, so the UI blamed VPN. `createR2Client` now sets checksum calculation/validation to `WHEN_REQUIRED`. Multipart parts no longer send `Content-Type` (it is not in the signed headers). A failed R2 PUT is reported as an archive/CORS problem, not as “the browser could not reach the server”. Part counts for the local example files are locked (`planBronzeDirectUpload`): Q4 63 671 078 bytes → 4 parts; Q1 71 684 050 bytes → 5 parts, last part below 5 MiB (legal as the final part).
+- **Admin System Health toast-failed with a valid session:** `GET /api/health?mode=full` required a live Bearer token and swallowed cookie fallback, so a stale in-memory JWT 401’d while Accounting still worked. Full health now uses `requireAdminFromRequest` (Bearer, then cookie). The widget renders a 503 snapshot instead of treating it as a transport failure. The route’s `maxDuration` is 60 s so the snapshot + watch-rule scan is not killed at the default 10–15 s budget.
 - **AI confirmations could run twice:** two concurrent Confirm clicks both passed the used-token check. The consume update now requires a row with `used_at IS NULL` and returns 409 if another request already used it.
 - **AI diagnostic reports accepted LIKE wildcards in `error_id`:** `%` / `_` could match another user’s log row. `error_id` is now a literal token and the newest matching log wins.
 - **Zammad outbox could send the same assistant ticket twice** when two serverless drains ran together. Drain now claims each row as `sending` before calling Zammad.

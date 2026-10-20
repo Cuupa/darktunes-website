@@ -42,6 +42,7 @@ describe('buildReleaseWizardSteps', () => {
         displayOrder: 60,
       }),
       field({ fieldKey: 'gema_release', fieldScope: 'release', fieldGroup: 'rights', displayOrder: 90 }),
+      field({ fieldKey: 'orphan', fieldScope: 'release', fieldGroup: '', displayOrder: 200 }),
     ]
     const tracks = [field({ fieldKey: 'song_title', fieldScope: 'track', fieldGroup: 'track' })]
 
@@ -50,7 +51,6 @@ describe('buildReleaseWizardSteps', () => {
       'type',
       'group:metadata',
       'group:distribution',
-      'group:rights',
       'tracks',
       'review',
     ])

@@ -11,12 +11,46 @@ vi.mock('@/lib/sos/clientAppLog', () => ({
   logClientAppEvent: vi.fn(async () => undefined),
 }))
 
+async function mockBronzeUploadLimits(
+  overrides: Partial<{
+    BRONZE_SINGLE_PUT_MAX_BYTES: number
+    BRONZE_DIRECT_UPLOAD_PART_BYTES: number
+    BRONZE_R2_MIN_PART_BYTES: number
+    MAX_BRONZE_CSV_BYTES: number
+    MAX_BRONZE_CSV_SERVER_BYTES: number
+  }>,
+): Promise<void> {
+  vi.doMock('./bronzeUploadLimits', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('./bronzeUploadLimits')>()
+    const BRONZE_SINGLE_PUT_MAX_BYTES =
+      overrides.BRONZE_SINGLE_PUT_MAX_BYTES ?? actual.BRONZE_SINGLE_PUT_MAX_BYTES
+    const BRONZE_DIRECT_UPLOAD_PART_BYTES =
+      overrides.BRONZE_DIRECT_UPLOAD_PART_BYTES ?? actual.BRONZE_DIRECT_UPLOAD_PART_BYTES
+    return {
+      ...actual,
+      ...overrides,
+      planBronzeDirectUpload: (fileSize: number) => {
+        if (fileSize <= BRONZE_SINGLE_PUT_MAX_BYTES) {
+          return { mode: 'single-put' as const, partCount: 1, lastPartBytes: fileSize }
+        }
+        const partCount = Math.ceil(fileSize / BRONZE_DIRECT_UPLOAD_PART_BYTES)
+        return {
+          mode: 'multipart' as const,
+          partCount,
+          lastPartBytes: fileSize - (partCount - 1) * BRONZE_DIRECT_UPLOAD_PART_BYTES,
+        }
+      },
+    }
+  })
+}
+
 describe('humanizeBronzeUploadError', () => {
   it('rewrites Failed to fetch without blaming file size', () => {
     expect(humanizeBronzeUploadError('Failed to fetch')).toMatch(/could not reach the server/i)
     expect(humanizeBronzeUploadError('Failed to fetch')).not.toMatch(/size/i)
     expect(humanizeBronzeUploadError('R2 PUT failed (403)')).toMatch(/file archive refused/i)
     expect(humanizeBronzeUploadError('R2 PUT failed (403)')).not.toMatch(/R2|403/)
+    expect(humanizeBronzeUploadError('R2 PUT failed (blocked request)')).toMatch(/file archive refused/i)
   })
 })
 
@@ -147,13 +181,9 @@ describe('uploadBronzeDistributorCsv', () => {
 
   it('reports a clear error when direct upload is disabled and the file exceeds the proxy limit', async () => {
     vi.resetModules()
-    vi.doMock('./bronzeUploadLimits', async (importOriginal) => {
-      const actual = await importOriginal<typeof import('./bronzeUploadLimits')>()
-      return {
-        ...actual,
-        MAX_BRONZE_CSV_SERVER_BYTES: 4,
-        MAX_BRONZE_CSV_BYTES: 200,
-      }
+    await mockBronzeUploadLimits({
+      MAX_BRONZE_CSV_SERVER_BYTES: 4,
+      MAX_BRONZE_CSV_BYTES: 200,
     })
     const { uploadBronzeDistributorCsv: uploadLargeCsv } = await import('./bronzeUpload')
 
@@ -190,15 +220,11 @@ describe('uploadBronzeDistributorCsv', () => {
   it('uses direct multipart above the single-PUT limit and never the proxy part route', async () => {
     vi.stubEnv('NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD', 'true')
     vi.resetModules()
-    vi.doMock('./bronzeUploadLimits', async (importOriginal) => {
-      const actual = await importOriginal<typeof import('./bronzeUploadLimits')>()
-      return {
-        ...actual,
-        BRONZE_SINGLE_PUT_MAX_BYTES: 4,
-        BRONZE_DIRECT_UPLOAD_PART_BYTES: 3,
-        BRONZE_R2_MIN_PART_BYTES: 3,
-        MAX_BRONZE_CSV_BYTES: 200,
-      }
+    await mockBronzeUploadLimits({
+      BRONZE_SINGLE_PUT_MAX_BYTES: 4,
+      BRONZE_DIRECT_UPLOAD_PART_BYTES: 3,
+      BRONZE_R2_MIN_PART_BYTES: 3,
+      MAX_BRONZE_CSV_BYTES: 200,
     })
     const { uploadBronzeDistributorCsv: uploadLargeCsv } = await import('./bronzeUpload')
 
@@ -246,6 +272,8 @@ describe('uploadBronzeDistributorCsv', () => {
     expect(urls[5]).toBe('https://r2.example/part-2')
     expect(urls[6]).toBe('/api/admin/sos/import-batches/batch-multi/multipart/complete')
     expect(urls.some((url) => typeof url === 'string' && url.includes('/multipart/part'))).toBe(false)
+    const partPutHeaders = fetchMock.mock.calls[3]?.[1]?.headers as Record<string, string> | undefined
+    expect(partPutHeaders?.['Content-Type']).toBeUndefined()
 
     vi.doUnmock('./bronzeUploadLimits')
     vi.resetModules()
@@ -254,15 +282,11 @@ describe('uploadBronzeDistributorCsv', () => {
   it('aborts the direct multipart session when a part request fails', async () => {
     vi.stubEnv('NEXT_PUBLIC_BRONZE_DIRECT_UPLOAD', 'true')
     vi.resetModules()
-    vi.doMock('./bronzeUploadLimits', async (importOriginal) => {
-      const actual = await importOriginal<typeof import('./bronzeUploadLimits')>()
-      return {
-        ...actual,
-        BRONZE_SINGLE_PUT_MAX_BYTES: 4,
-        BRONZE_DIRECT_UPLOAD_PART_BYTES: 3,
-        BRONZE_R2_MIN_PART_BYTES: 3,
-        MAX_BRONZE_CSV_BYTES: 200,
-      }
+    await mockBronzeUploadLimits({
+      BRONZE_SINGLE_PUT_MAX_BYTES: 4,
+      BRONZE_DIRECT_UPLOAD_PART_BYTES: 3,
+      BRONZE_R2_MIN_PART_BYTES: 3,
+      MAX_BRONZE_CSV_BYTES: 200,
     })
     const { uploadBronzeDistributorCsv: uploadLargeCsv } = await import('./bronzeUpload')
 
@@ -392,6 +416,9 @@ describe('uploadBronzeDistributorCsv', () => {
     )
     expect(fetchMock.mock.calls[2]?.[0]).toBe('https://r2.example/presigned-put')
     expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: 'PUT' })
+    expect(fetchMock.mock.calls[2]?.[1]?.headers).toMatchObject({
+      'Content-Type': 'text/csv; charset=utf-8',
+    })
   })
 
   it('retries the direct PUT with a fresh presigned URL after a dropped connection', async () => {
@@ -471,7 +498,7 @@ describe('uploadBronzeDistributorCsv', () => {
     })
 
     expect(result.ok).toBe(false)
-    if (!result.ok) expect(result.message).toMatch(/could not reach the server/i)
+    if (!result.ok) expect(result.message).toMatch(/file archive refused/i)
     expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'PUT')).toHaveLength(4)
   })
 

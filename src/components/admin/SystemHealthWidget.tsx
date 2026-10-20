@@ -41,7 +41,7 @@ import {
   type ApiOperationalState,
   type QueueOperationalState,
 } from '@/lib/health/apiStatus'
-import type { AlertSeverity, HealthResponse } from '@/lib/health/types'
+import { isHealthSnapshot, type AlertSeverity, type HealthResponse } from '@/lib/health/types'
 import { describeSyncQueueIssue } from '@/lib/sync/userFacingErrors'
 import { SyncAdvancedJobsPanel } from '@/components/admin/sync/SyncAdvancedJobsPanel'
 
@@ -191,9 +191,12 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
         : '/api/health?mode=full'
       const res = await fetch(url, {
         headers: bearerToken ? { Authorization: `Bearer ${bearerToken}` } : undefined,
+        credentials: 'same-origin',
       })
-      if (!res.ok) throw new Error(`Health check failed: ${res.status}`)
-      const data = (await parseAdminFetchJson(res)) as unknown as HealthResponse
+      const data = await parseAdminFetchJson(res)
+      if (!isHealthSnapshot(data)) {
+        throw new Error(`Health check failed: ${res.status}`)
+      }
       setHealth(data)
     } catch (err) {
       reportClientError('admin.health', err, { endpoint: '/api/health' }, 'warn')

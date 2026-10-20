@@ -1,5 +1,6 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Plus, PencilSimple, Trash, ArrowsClockwise, LinkSimple, Warning, MagnifyingGlass } from '@phosphor-icons/react'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -185,6 +186,9 @@ export function ReleasesManager() {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
 
   const [search, setSearch] = useState('')
+  const searchParams = useSearchParams()
+  const deepLinkId = searchParams.get('id')
+  const openedDeepLink = useRef(false)
 
   const formValue = editingRelease ? releaseToFormData(editingRelease) : EMPTY_FORM
 
@@ -206,6 +210,15 @@ export function ReleasesManager() {
     setEditingRelease(release)
     setDialogOpen(true)
   }
+
+  useEffect(() => {
+    if (openedDeepLink.current || !deepLinkId || isLoading) return
+    const match = releases.find((r) => r.id === deepLinkId)
+    if (match) {
+      openedDeepLink.current = true
+      openEdit(match)
+    }
+  }, [deepLinkId, isLoading, releases])
 
   const persistReleaseForm = async (data: ReleaseFormData, bumpTarget?: HeroFeaturedItem) => {
     if (bumpTarget) {
@@ -534,7 +547,15 @@ export function ReleasesManager() {
     {
       accessorKey: 'title',
       header: ({ column }) => <AdminSortableHeader column={column}>Title</AdminSortableHeader>,
-      cell: ({ row }) => <span className="font-medium">{row.original.title}</span>,
+      cell: ({ row }) => (
+        <button
+          type="button"
+          className="font-medium text-left hover:underline"
+          onClick={() => openEdit(row.original)}
+        >
+          {row.original.title}
+        </button>
+      ),
     },
     {
       accessorKey: 'artistName',

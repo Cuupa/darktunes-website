@@ -9,6 +9,15 @@ vi.mock('@/lib/health/cachedHealthSnapshot', () => ({
   }),
 }))
 
+vi.mock('@/lib/supabase/server', () => ({
+  createServerSupabaseClient: vi.fn(async () => ({
+    auth: {
+      getUser: async () => ({ data: { user: null }, error: { message: 'no session' } }),
+    },
+  })),
+  createServiceRoleSupabaseClient: vi.fn(),
+}))
+
 const ORIGINAL_ENV = { ...process.env }
 const MOCK_LITE_REQUEST = new NextRequest('http://localhost/api/health')
 const MOCK_FULL_REQUEST = new NextRequest('http://localhost/api/health?mode=full', {
@@ -173,6 +182,30 @@ describe('app/api/health/route', () => {
     const { GET } = await loadHealthRoute()
     const response = await GET(MOCK_FULL_UNAUTH_REQUEST)
     expect(response.status).toBe(401)
+  })
+
+  it('GET mode=full accepts a cookie admin session when Bearer is missing', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
+    process.env.CRON_SECRET = 'test-cron-secret'
+    process.env.API_CREDENTIALS_ENCRYPTION_KEY =
+      '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+
+    vi.doMock('@/lib/adminAuth', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@/lib/adminAuth')>()
+      return {
+        ...actual,
+        requireAdminFromRequest: vi.fn(async () => ({ userId: 'admin-1', role: 'admin' })),
+      }
+    })
+    mockSupabaseClientOnline()
+
+    const { GET } = await loadHealthRoute()
+    const response = await GET(MOCK_FULL_UNAUTH_REQUEST)
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { database?: { status?: string } }
+    expect(body.database?.status).toBe('online')
+    vi.doUnmock('@/lib/adminAuth')
   })
 
   it('HEAD returns 200 when GET full snapshot is healthy', async () => {

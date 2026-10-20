@@ -212,6 +212,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "release_checklists: artist insert own",
   "release_checklists: artist read own",
   "release_checklists: artist update own",
+  "release_submission_assets: editor+ all",
   "release_submission_tracks: artist insert own",
   "release_submission_tracks: artist read own",
   "release_submission_tracks: editor+ read all",
@@ -394,6 +395,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "rbac_audit_log",
   "release_artists",
   "release_checklists",
+  "release_submission_assets",
   "release_submission_tracks",
   "release_submissions",
   "releases",
@@ -819,6 +821,9 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
     "release_checklists: artist insert own",
     "release_checklists: artist read own",
     "release_checklists: artist update own",
+  ],
+  "release_submission_assets": [
+    "release_submission_assets: editor+ all",
   ],
   "release_submission_tracks": [
     "release_submission_tracks: artist insert own",

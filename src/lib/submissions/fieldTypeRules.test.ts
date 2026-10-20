@@ -53,6 +53,20 @@ describe('fieldTypeRules', () => {
     expect(rule).toEqual({ visible: false, required: false })
   })
 
+  it('filterFieldsForType hides author when instrumental is true', () => {
+    const fields = [
+      makeField({
+        fieldKey: 'author',
+        fieldScope: 'track',
+        visibilityCondition: { field: 'instrumental', op: 'neq', value: 'true' },
+      }),
+    ]
+    expect(filterFieldsForType(fields, 'single', { instrumental: 'false' }).map((f) => f.fieldKey)).toEqual([
+      'author',
+    ])
+    expect(filterFieldsForType(fields, 'single', { instrumental: 'true' })).toEqual([])
+  })
+
   it('filterFieldsForType hides fields for release type', () => {
     const fields = [
       makeField({ fieldKey: 'title' }),

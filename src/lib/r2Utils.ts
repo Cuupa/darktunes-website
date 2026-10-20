@@ -67,6 +67,11 @@ export function createR2Client(accountId: string, accessKeyId: string, secretAcc
     region: 'auto',
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey },
+    // Browser presigned PUT/UploadPart cannot send SDK flexible checksums.
+    // Leaving them on signs `x-amz-checksum-crc32` of an empty body into the URL,
+    // so the real CSV PUT fails and R2's 403 has no CORS headers (Failed to fetch).
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   })
 }
 

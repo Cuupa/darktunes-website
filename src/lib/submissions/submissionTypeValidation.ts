@@ -31,17 +31,17 @@ export function validateReleaseSubmissionByType(input: {
     else if (val != null) values[field.fieldKey] = String(val)
   }
 
+  const r2Skip = new Set<string>()
+  if (input.standardBody.audioR2Key) r2Skip.add('audio_download_url')
+  if (input.standardBody.coverR2Key) r2Skip.add('cover_art_url')
+
   const releaseFields = filterFieldsForType(
     input.schemaFields.filter((f) => f.fieldScope === 'release'),
     releaseType,
     values,
-  )
-  const trackFields = filterArtistTrackFields(
-    filterFieldsForType(
-      input.schemaFields.filter((f) => f.fieldScope === 'track'),
-      releaseType,
-      values,
-    ),
+  ).filter((f) => !r2Skip.has(f.fieldKey))
+  const trackSchemaFields = filterArtistTrackFields(
+    input.schemaFields.filter((f) => f.fieldScope === 'track'),
   )
 
   for (const field of releaseFields) {
@@ -62,11 +62,15 @@ export function validateReleaseSubmissionByType(input: {
     throw new ApiError(400, trackCountError)
   }
 
-  if (trackFields.length === 0 && input.tracks.length > 0) {
+  if (trackSchemaFields.length === 0 && input.tracks.length > 0) {
     throw new ApiError(400, 'Tracks are not allowed for this release type')
   }
 
   for (const track of input.tracks) {
+    const trackFields = filterFieldsForType(trackSchemaFields, releaseType, {
+      ...values,
+      ...track.values,
+    })
     for (const field of trackFields) {
       const raw = track.values[field.fieldKey] ?? ''
       if (field.isRequired && !raw.trim() && field.fieldType !== 'boolean') {
@@ -76,7 +80,7 @@ export function validateReleaseSubmissionByType(input: {
     }
   }
 
-  if (input.tracks.length === 0 && trackFields.some((f) => f.isRequired)) {
+  if (input.tracks.length === 0 && trackSchemaFields.some((f) => f.isRequired)) {
     throw new ApiError(400, 'At least one track is required')
   }
 }

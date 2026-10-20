@@ -31,6 +31,9 @@ function rowToSubmission(row: Row): ReleaseSubmission {
     adminReplyAt: row.admin_reply_at,
     progressNote: row.progress_note ?? null,
     releaseId: row.release_id ?? null,
+    audioR2Key: row.audio_r2_key ?? null,
+    coverR2Key: row.cover_r2_key ?? null,
+    assetsExpireAt: row.assets_expire_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -73,21 +76,13 @@ export async function createReleaseSubmission(
   return rowToSubmission(data)
 }
 
-/**
- * Atomic insert of submission + tracks via SECURITY DEFINER RPC
- * (public.create_release_submission_with_tracks). Call with service-role
- * after membership validation.
- */
-export async function createReleaseSubmissionWithTracksAtomic(
-  db: DbClient,
-  submission: Insert,
-  tracks: Array<
-    Omit<Database['public']['Tables']['release_submission_tracks']['Insert'], 'submission_id'> & {
-      submission_id?: string
-    }
-  >,
-): Promise<ReleaseSubmission> {
-  const pSubmission: Record<string, unknown> = {
+type TrackInsert = Omit<
+  Database['public']['Tables']['release_submission_tracks']['Insert'],
+  'submission_id'
+> & { submission_id?: string }
+
+function toRpcSubmission(submission: Insert): Record<string, unknown> {
+  return {
     artist_id: submission.artist_id,
     title: submission.title,
     audio_download_url: submission.audio_download_url,
@@ -104,9 +99,14 @@ export async function createReleaseSubmissionWithTracksAtomic(
     youtube_url: submission.youtube_url ?? null,
     notes: submission.notes ?? null,
     form_data: submission.form_data ?? null,
+    audio_r2_key: submission.audio_r2_key ?? null,
+    cover_r2_key: submission.cover_r2_key ?? null,
+    assets_expire_at: submission.assets_expire_at ?? null,
   }
+}
 
-  const pTracks = tracks.map((t) => ({
+function toRpcTracks(tracks: TrackInsert[]) {
+  return tracks.map((t) => ({
     track_number: t.track_number,
     display_order: t.display_order,
     title: t.title ?? null,
@@ -124,23 +124,37 @@ export async function createReleaseSubmissionWithTracksAtomic(
     duration_seconds: t.duration_seconds ?? null,
     form_data: t.form_data ?? null,
   }))
+}
 
+async function rpcSubmissionId(
+  db: DbClient,
+  fn: string,
+  args: Record<string, unknown>,
+): Promise<string> {
   // RPC is defined in reset.sql; Database.Functions is still Record<string, never>
   // until a full type regen — call via untyped client surface.
   const { data: id, error } = await (db as unknown as {
     rpc: (
-      fn: string,
-      args: { p_submission: Record<string, unknown>; p_tracks: unknown },
+      name: string,
+      rpcArgs: Record<string, unknown>,
     ) => Promise<{ data: string | null; error: { message: string } | null }>
-  }).rpc('create_release_submission_with_tracks', {
-    p_submission: pSubmission,
-    p_tracks: pTracks,
-  })
+  }).rpc(fn, args)
   if (error) throw new Error(error.message)
   if (!id || typeof id !== 'string') {
-    throw new Error('No id returned from create_release_submission_with_tracks')
+    throw new Error(`No id returned from ${fn}`)
   }
+  return id
+}
 
+export async function createReleaseSubmissionWithTracksAtomic(
+  db: DbClient,
+  submission: Insert,
+  tracks: TrackInsert[],
+): Promise<ReleaseSubmission> {
+  const id = await rpcSubmissionId(db, 'create_release_submission_with_tracks', {
+    p_submission: toRpcSubmission(submission),
+    p_tracks: toRpcTracks(tracks),
+  })
   const created = await getReleaseSubmissionById(db, id)
   if (!created) throw new Error('Submission created but could not be reloaded')
   return created
@@ -169,6 +183,22 @@ export async function updateReleaseSubmissionStatus(
   if (error) throw new Error(error.message)
   if (!data) throw new Error('No data returned from updateReleaseSubmissionStatus')
   return rowToSubmission(data)
+}
+
+export async function replaceRejectedSubmissionTracks(
+  db: DbClient,
+  submissionId: string,
+  submission: Insert,
+  tracks: TrackInsert[],
+): Promise<ReleaseSubmission> {
+  const id = await rpcSubmissionId(db, 'replace_rejected_release_submission_with_tracks', {
+    p_id: submissionId,
+    p_submission: toRpcSubmission(submission),
+    p_tracks: toRpcTracks(tracks),
+  })
+  const replaced = await getReleaseSubmissionById(db, id)
+  if (!replaced) throw new Error('Rejected submission not found')
+  return replaced
 }
 
 export async function getReleaseSubmissionById(

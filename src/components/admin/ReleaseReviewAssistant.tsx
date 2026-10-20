@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -17,8 +17,10 @@ import {
 } from '@/components/ui/select'
 import { GuidedStepShell } from '@/components/guided/GuidedStepShell'
 import type { GuidedStepDef } from '@/lib/guided/guidedSteps'
-import type { ReleaseSubmission, SubmissionStatus } from '@/types'
+import type { ReleaseSubmission, ReleaseSubmissionTrack, SubmissionStatus } from '@/types'
 import Link from 'next/link'
+import { SubmissionAssetLinks } from '@/components/admin/SubmissionAssetLinks'
+import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 
 const STEPS: readonly GuidedStepDef[] = [
   { id: 'queue', label: 'Queue' },
@@ -68,6 +70,43 @@ export function ReleaseReviewAssistant({
   const [reply, setReply] = useState('')
   const [busy, setBusy] = useState(false)
   const [draftReleaseId, setDraftReleaseId] = useState<string | null>(null)
+  const [tracks, setTracks] = useState<ReleaseSubmissionTrack[]>([])
+  const [tracksLoading, setTracksLoading] = useState(false)
+
+  useEffect(() => {
+    if (!selectedId) {
+      setTracks([])
+      setTracksLoading(false)
+      return
+    }
+    let cancelled = false
+    setTracksLoading(true)
+    void (async () => {
+      const supabase = createBrowserSupabaseClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        if (!cancelled) setTracksLoading(false)
+        return
+      }
+      const res = await fetch(`/api/admin/release-submissions/${selectedId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (cancelled) return
+      if (!res.ok) {
+        setTracks([])
+        setTracksLoading(false)
+        return
+      }
+      const data = (await res.json()) as { tracks: ReleaseSubmissionTrack[] }
+      setTracks(data.tracks ?? [])
+      setTracksLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedId])
 
   const stepIndex = STEPS.findIndex((s) => s.id === stepId)
   const rejectNeedsReply = decision === 'rejected' && !reply.trim()
@@ -204,8 +243,24 @@ export function ReleaseReviewAssistant({
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                {selected.type ?? '—'} · {selected.releaseDate ?? '—'}
+                {selected.type ?? '—'} · {selected.releaseDate ?? '—'} · {selected.genre ?? '—'}
               </p>
+              <p className="text-sm font-medium">{selected.title}</p>
+              <SubmissionAssetLinks submission={selected} />
+              {tracksLoading ? (
+                <p className="text-xs text-muted-foreground">{t('review_assistant_tracks_loading')}</p>
+              ) : tracks.length > 0 ? (
+                <ul className="space-y-1 text-sm">
+                  {tracks.map((track) => (
+                    <li key={track.id}>
+                      {track.trackNumber}. {track.title ?? '—'}
+                      {track.isrc ? ` · ${track.isrc}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">{t('review_assistant_tracks_empty')}</p>
+              )}
               {CHECK_KEYS.map((key) => (
                 <div key={key} className="flex items-center gap-2">
                   <Checkbox
@@ -261,8 +316,8 @@ export function ReleaseReviewAssistant({
               <p className="text-sm">{t('review_assistant_draft_body')}</p>
               {draftReleaseId || selected.releaseId ? (
                 <Button asChild>
-                  <Link href="/admin/releases">
-                    {t('review_assistant_open_releases')}
+                  <Link href={`/admin/releases?id=${encodeURIComponent(draftReleaseId || selected.releaseId || '')}`}>
+                    {t('review_assistant_open_draft')}
                   </Link>
                 </Button>
               ) : (

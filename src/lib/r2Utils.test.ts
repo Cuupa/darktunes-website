@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
 import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
-import { resetR2UploadConcurrencyForTests, uploadUrlToR2 } from './r2Utils'
+import { createR2Client, resetR2UploadConcurrencyForTests, uploadUrlToR2 } from './r2Utils'
 
 const IMAGE_BYTES = new Uint8Array([1, 2, 3])
 const EXPECTED_HASH = createHash('sha256').update(Buffer.from(IMAGE_BYTES)).digest('hex')
@@ -106,5 +106,48 @@ describe('uploadUrlToR2', () => {
     expect(url).toBe(`https://cdn.example.com/cover-art/${EXPECTED_HASH}.png`)
     expect(putAttempts).toBe(2)
     expect(fetchFn).toHaveBeenCalledTimes(2)
+  })
+})
+
+function signedHeadersFromUrl(url: string): string {
+  return decodeURIComponent(new URL(url).searchParams.get('X-Amz-SignedHeaders') ?? '')
+}
+
+describe('createR2Client presign', () => {
+  it('does not sign flexible checksum headers that a browser PUT cannot send', async () => {
+    const s3 = createR2Client('accountid', 'AKIAIOSFODNN7EXAMPLE', 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY')
+    const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner')
+    const { PutObjectCommand, UploadPartCommand } = await import('@aws-sdk/client-s3')
+
+    const putUrl = await getSignedUrl(
+      s3,
+      new PutObjectCommand({
+        Bucket: 'bucket',
+        Key: 'sos-imports/batch/file.csv',
+        ContentType: 'text/csv; charset=utf-8',
+      }),
+      { expiresIn: 900 },
+    )
+    const partUrl = await getSignedUrl(
+      s3,
+      new UploadPartCommand({
+        Bucket: 'bucket',
+        Key: 'sos-imports/batch/file.csv',
+        UploadId: 'upload-id',
+        PartNumber: 1,
+      }),
+      { expiresIn: 900 },
+    )
+
+    const putParams = [...new URL(putUrl).searchParams.keys()]
+    const partParams = [...new URL(partUrl).searchParams.keys()]
+    const putSigned = signedHeadersFromUrl(putUrl)
+    const partSigned = signedHeadersFromUrl(partUrl)
+    expect(putSigned).not.toMatch(/checksum/i)
+    expect(partSigned).not.toMatch(/checksum/i)
+    expect(putParams).not.toContain('x-amz-checksum-crc32')
+    expect(putParams).not.toContain('x-amz-sdk-checksum-algorithm')
+    expect(partParams).not.toContain('x-amz-checksum-crc32')
+    expect(partParams).not.toContain('x-amz-sdk-checksum-algorithm')
   })
 })

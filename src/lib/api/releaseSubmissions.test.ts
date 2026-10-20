@@ -55,6 +55,9 @@ const row = {
   admin_reply_at: null,
   progress_note: null,
   release_id: null,
+  audio_r2_key: null,
+  cover_r2_key: null,
+  assets_expire_at: null,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 }

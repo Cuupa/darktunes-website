@@ -947,6 +947,9 @@ export interface ReleaseSubmission {
   progressNote: string | null
   /** Catalog release created from this submission (draft), if any */
   releaseId?: string | null
+  audioR2Key?: string | null
+  coverR2Key?: string | null
+  assetsExpireAt?: string | null
   /** Admin list enrichment (not a DB column). */
   artistName?: string | null
   createdAt: string

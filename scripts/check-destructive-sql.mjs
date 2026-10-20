@@ -37,6 +37,8 @@ function normalizeTable(raw) {
 
 function main() {
   const sql = stripComments(readFileSync(resetPath, 'utf8'))
+  // Function bodies are not executed when reset.sql is applied.
+  const sqlApplyTime = sql.replace(/\$\$[\s\S]*?\$\$/g, '$$$$')
   const violations = []
 
   for (const match of sql.matchAll(/\bDROP\s+(TABLE|SCHEMA|DATABASE)\b[^;]*/gi)) {
@@ -51,7 +53,7 @@ function main() {
     violations.push(match[0].trim().split('\n')[0])
   }
 
-  for (const match of sql.matchAll(/\bDELETE\s+FROM\s+([a-zA-Z0-9_."%]+)/gi)) {
+  for (const match of sqlApplyTime.matchAll(/\bDELETE\s+FROM\s+([a-zA-Z0-9_."%]+)/gi)) {
     // Dynamic identifier (format('%I', …)) — e.g. clear_log_table(), which
     // enforces its own table allowlist before deleting. Literal table names here
     // are still checked against the allowlist below.

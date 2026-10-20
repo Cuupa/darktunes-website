@@ -99,6 +99,15 @@ export interface HealthResponse {
   checkedAt: string
 }
 
+/** True when a JSON body is a full health snapshot, including a 503 DB-offline payload. */
+export function isHealthSnapshot(value: unknown): value is HealthResponse {
+  if (!value || typeof value !== 'object') return false
+  const rec = value as Record<string, unknown>
+  const database = rec.database
+  if (!database || typeof database !== 'object') return false
+  return typeof rec.checkedAt === 'string' && typeof rec.healthScore === 'number'
+}
+
 export interface HealthLivenessResponse {
   status: 'ok' | 'offline'
   database: DatabaseHealth

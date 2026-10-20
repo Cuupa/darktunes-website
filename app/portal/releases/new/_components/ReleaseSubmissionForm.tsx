@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/accordion'
 import { CoverArtAnalyzer } from '@/components/portal/CoverArtAnalyzer'
 import { SchemaDrivenField } from '@/components/submissions/SchemaDrivenField'
+import { SubmissionAssetField } from '@/components/submissions/SubmissionAssetField'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { validateFieldValue } from '@/lib/submissions/fieldValidation'
 import {
@@ -29,7 +30,6 @@ import {
   applyFieldToAllTracks,
   buildReleaseWizardSteps,
   copyTrackValues,
-  countCompleteTracks,
   humanizeGroupKey,
   isTrackRowComplete,
   prefillTrackFromRelease,
@@ -62,6 +62,10 @@ interface DraftPayload {
   trackCount: number
   stepId: string
   coverArtCheckToken?: string | null
+  audioR2Key?: string | null
+  coverR2Key?: string | null
+  audioFileName?: string | null
+  coverFileName?: string | null
 }
 
 function emptyTrackValues(trackFields: SubmissionFormField[]): Record<string, string> {
@@ -146,6 +150,12 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
       : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
   )
   const [coverArtCheckToken, setCoverArtCheckToken] = useState<string | null>(null)
+  const [audioR2Key, setAudioR2Key] = useState<string | null>(null)
+  const [coverR2Key, setCoverR2Key] = useState<string | null>(null)
+  const [audioFileName, setAudioFileName] = useState<string | null>(null)
+  const [coverFileName, setCoverFileName] = useState<string | null>(null)
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null)
+  const [editingSubmissionId, setEditingSubmissionId] = useState<string | null>(null)
   const [trackFocusIndex, setTrackFocusIndex] = useState(0)
   const [showAllTracks, setShowAllTracks] = useState(false)
 
@@ -210,13 +220,109 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     // Never trust draft verification — CoverArtAnalyzer re-checks the URL
     setCoverArtVerified(false)
     setCoverArtCheckToken(null)
+    if (payload.audioR2Key) setAudioR2Key(payload.audioR2Key)
+    if (payload.coverR2Key) setCoverR2Key(payload.coverR2Key)
+    if (payload.audioFileName) setAudioFileName(payload.audioFileName)
+    if (payload.coverFileName) setCoverFileName(payload.coverFileName)
     if (payload.stepId) restoredStepIdRef.current = payload.stepId
     return true
   }, [])
 
+  const rejectedId = searchParams.get('submissionId')
+  const loadedRejectedRef = useRef(false)
+
+  useEffect(() => {
+    if (!rejectedId || !artist?.id || loadedRejectedRef.current) return
+    loadedRejectedRef.current = true
+    restoredRef.current = true
+    void (async () => {
+      try {
+        const supabase = createBrowserSupabaseClient()
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        if (!session?.access_token) return
+        const res = await fetch(
+          `/api/portal/release-submissions/${encodeURIComponent(rejectedId)}?artistId=${encodeURIComponent(artist.id)}`,
+          { headers: { Authorization: `Bearer ${session.access_token}` } },
+        )
+        if (!res.ok) {
+          toast.error(t('releases_submit_load_rejected_error'))
+          return
+        }
+        const data = (await res.json()) as {
+          submission: {
+            status: string
+            title: string
+            type: string | null
+            genre: string | null
+            notes: string | null
+            releaseDate: string | null
+            audioR2Key: string | null
+            coverR2Key: string | null
+            spotifyUrl: string | null
+            appleMusicUrl: string | null
+            youtubeUrl: string | null
+            formData: Record<string, unknown> | null
+          }
+          tracks: Array<{ trackNumber: number; title: string | null; isrc: string | null; composer: string | null; author: string | null; genre: string | null; language: string | null; gema: boolean | null; explicit: boolean | null; live: boolean | null; cover: boolean | null; instrumental: boolean | null; previewStartSeconds: number | null; durationSeconds: number | null; formData: Record<string, unknown> | null }>
+        }
+        if (data.submission.status !== 'rejected') {
+          toast.error(t('releases_submit_not_rejected'))
+          return
+        }
+        setEditingSubmissionId(rejectedId)
+        setValues((prev) => ({
+          ...prev,
+          title: data.submission.title,
+          type: data.submission.type ?? prev.type,
+          genre: data.submission.genre ?? '',
+          notes: data.submission.notes ?? '',
+          release_date: data.submission.releaseDate ?? '',
+          spotify_url: data.submission.spotifyUrl ?? '',
+          apple_music_url: data.submission.appleMusicUrl ?? '',
+          youtube_url: data.submission.youtubeUrl ?? '',
+          ...(data.submission.formData
+            ? Object.fromEntries(
+                Object.entries(data.submission.formData).map(([k, v]) => [k, v == null ? '' : String(v)]),
+              )
+            : {}),
+        }))
+        setAudioR2Key(data.submission.audioR2Key)
+        setCoverR2Key(data.submission.coverR2Key)
+        setTracks(
+          data.tracks.map((track, i) => ({
+            id: `track-${i + 1}`,
+            values: {
+              song_title: track.title ?? '',
+              track_isrc: track.isrc ?? '',
+              composer: track.composer ?? '',
+              author: track.author ?? '',
+              track_genre: track.genre ?? '',
+              track_language: track.language ?? '',
+              gema_track: track.gema ? 'true' : 'false',
+              explicit: track.explicit ? 'true' : 'false',
+              live: track.live ? 'true' : 'false',
+              cover_version: track.cover ? 'true' : 'false',
+              instrumental: track.instrumental ? 'true' : 'false',
+              preview_start_seconds: track.previewStartSeconds != null ? String(track.previewStartSeconds) : '',
+              duration: track.durationSeconds != null ? String(track.durationSeconds) : '',
+            },
+          })),
+        )
+        setTrackCount(Math.max(1, data.tracks.length))
+        allowPersistRef.current = true
+        toast.success(t('releases_submit_load_rejected'))
+      } catch {
+        toast.error(t('releases_submit_load_rejected_error'))
+      }
+    })()
+  }, [rejectedId, artist?.id, t])
+
   // Restore: prefer server draft, fall back to IndexedDB (once)
   useEffect(() => {
     if (!draftLoaded || restoredRef.current) return
+    if (searchParams.get('submissionId')) return
     restoredRef.current = true
 
     const restore = async () => {
@@ -319,6 +425,10 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
       trackCount,
       stepId: wizardSteps[activeIndex]?.id ?? 'type',
       coverArtCheckToken,
+      audioR2Key,
+      coverR2Key,
+      audioFileName,
+      coverFileName,
     }
     const handle = setTimeout(() => {
       setLocalDraft(payload)
@@ -352,6 +462,10 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     trackCount,
     activeIndex,
     coverArtCheckToken,
+    audioR2Key,
+    coverR2Key,
+    audioFileName,
+    coverFileName,
     wizardSteps,
     draftLoaded,
     artist?.id,
@@ -431,9 +545,19 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     setCoverArtCheckToken(verified ? (token ?? null) : null)
   }, [])
 
+  const fieldsForTrack = (trackValues: Record<string, string>) =>
+    filterArtistTrackFields(
+      filterFieldsForType(allTrackFields, releaseType, { ...values, ...trackValues }),
+    )
+
   const setTrackValue = (trackId: string, key: string, value: string) => {
     setTracks((prev) =>
-      prev.map((tr) => (tr.id === trackId ? { ...tr, values: { ...tr.values, [key]: value } } : tr)),
+      prev.map((tr) => {
+        if (tr.id !== trackId) return tr
+        const nextValues = { ...tr.values, [key]: value }
+        if (key === 'instrumental' && value === 'true') nextValues.author = ''
+        return { ...tr, values: nextValues }
+      }),
     )
     setFieldErrors((prev) => {
       const next = { ...prev }
@@ -447,8 +571,7 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     [visibleReleaseFields],
   )
   const coverNeedsVerification = Boolean(
-    coverField &&
-      (coverField.isRequired || (values.cover_art_url ?? '').trim().length > 0),
+    coverField && (coverField.isRequired || Boolean(coverR2Key) || (values.cover_art_url ?? '').trim().length > 0),
   )
 
   const validateCurrentStep = (): boolean => {
@@ -456,15 +579,25 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     const errors: Record<string, string> = {}
 
     if (activeStep.kind === 'type' || activeStep.kind === 'group') {
+      const fields = activeStep.fields.filter(
+        (f) => f.fieldKey !== 'audio_download_url' && f.fieldKey !== 'cover_art_url',
+      )
       Object.assign(
         errors,
-        validateStepFields(
-          activeStep.fields,
-          values,
-          validateFieldValue,
-          t('releases_submit_required'),
-        ),
+        validateStepFields(fields, values, validateFieldValue, t('releases_submit_required')),
       )
+      if (activeStep.fields.some((f) => f.fieldKey === 'audio_download_url')) {
+        const audioField = activeStep.fields.find((f) => f.fieldKey === 'audio_download_url')
+        if (audioField?.isRequired && !audioR2Key) {
+          errors.audio_download_url = t('releases_submit_required')
+        }
+      }
+      if (activeStep.fields.some((f) => f.fieldKey === 'cover_art_url')) {
+        const coverOnStep = activeStep.fields.find((f) => f.fieldKey === 'cover_art_url')
+        if (coverOnStep?.isRequired && !coverR2Key) {
+          errors.cover_art_url = t('releases_submit_required')
+        }
+      }
       if (activeStep.kind === 'type' && userSpecifiedTracks) {
         const trackCountError = validateTrackCount(activeTypeRule, trackCount, tracks.length)
         if (trackCountError) errors.track_count = trackCountError
@@ -484,8 +617,11 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
         tracks.length,
       )
       if (trackCountError) errors.track_count = trackCountError
-      for (const track of tracks) {
-        for (const field of visibleTrackFields) {
+      const focusMode = !showAllTracks && tracks.length > 1
+      const rows = focusMode ? [tracks[trackFocusIndex]].filter(Boolean) : tracks
+      for (const track of rows) {
+        if (!track) continue
+        for (const field of fieldsForTrack(track.values)) {
           const raw = track.values[field.fieldKey] ?? ''
           const errKey = `${track.id}:${field.fieldKey}`
           if (field.isRequired && !raw.trim() && field.fieldType !== 'boolean') {
@@ -505,7 +641,11 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
   const validateBeforeSubmit = (): boolean => {
     const errors: Record<string, string> = {}
 
+    if (!audioR2Key) errors.audio_download_url = t('releases_submit_required')
+    if (!coverR2Key) errors.cover_art_url = t('releases_submit_required')
+
     for (const field of visibleReleaseFields) {
+      if (field.fieldKey === 'audio_download_url' || field.fieldKey === 'cover_art_url') continue
       const raw = values[field.fieldKey] ?? ''
       if (field.isRequired && !raw.trim() && field.fieldType !== 'boolean') {
         errors[field.fieldKey] = t('releases_submit_required')
@@ -519,7 +659,7 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
     if (trackCountError) errors.track_count = trackCountError
 
     for (const track of tracks) {
-      for (const field of visibleTrackFields) {
+      for (const field of fieldsForTrack(track.values)) {
         const raw = track.values[field.fieldKey] ?? ''
         const errKey = `${track.id}:${field.fieldKey}`
         if (field.isRequired && !raw.trim() && field.fieldType !== 'boolean') {
@@ -544,12 +684,27 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
       toast.error(t('releases_submit_validation_error'))
       return
     }
+    if (activeStep?.kind === 'tracks' && !showAllTracks && tracks.length > 1) {
+      if (trackFocusIndex < tracks.length - 1) {
+        setTrackFocusIndex((i) => i + 1)
+        return
+      }
+      const allDone = tracks.every((track) => isTrackRowComplete(track.values, fieldsForTrack(track.values)))
+      if (!allDone) {
+        toast.error(t('releases_submit_validation_error'))
+        return
+      }
+    }
     const next = Math.min(activeIndex + 1, wizardSteps.length - 1)
     setActiveIndex(next)
     setMaxReachableIndex((m) => Math.max(m, next))
   }
 
   const goBack = () => {
+    if (activeStep?.kind === 'tracks' && !showAllTracks && trackFocusIndex > 0) {
+      setTrackFocusIndex((i) => i - 1)
+      return
+    }
     setActiveIndex((i) => Math.max(0, i - 1))
   }
 
@@ -582,6 +737,7 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
       const formData: Record<string, unknown> = {}
 
       for (const field of visibleReleaseFields) {
+        if (field.fieldKey === 'audio_download_url' || field.fieldKey === 'cover_art_url') continue
         const raw = values[field.fieldKey] ?? ''
         const bodyKey = RELEASE_STANDARD_FIELD_TO_BODY_KEY[field.fieldKey]
         if (bodyKey !== undefined) {
@@ -612,6 +768,9 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
         },
         body: JSON.stringify({
           ...standardBody,
+          audioR2Key,
+          coverR2Key,
+          submissionId: editingSubmissionId ?? undefined,
           formData: Object.keys(formData).length > 0 ? formData : null,
           tracks: trackPayload,
           trackCount: userSpecifiedTracks ? trackCount : 1,
@@ -665,19 +824,63 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
   const renderReleaseFields = (fields: SubmissionFormField[]) =>
     fields.map((field) => (
       <div key={field.id}>
-        {field.fieldKey === 'cover_art_url' ? (
+        {field.fieldKey === 'audio_download_url' && artist?.id ? (
+          <SubmissionAssetField
+            kind="audio"
+            artistId={artist.id}
+            label={getFieldLabel(field, locale)}
+            required={field.isRequired}
+            fileName={audioFileName}
+            error={fieldErrors[field.fieldKey]}
+            onUploaded={(key, file) => {
+              setAudioR2Key(key)
+              setAudioFileName(file.name)
+              setFieldErrors((prev) => {
+                const next = { ...prev }
+                delete next.audio_download_url
+                return next
+              })
+            }}
+          />
+        ) : field.fieldKey === 'cover_art_url' && artist?.id ? (
           <div className="space-y-2">
-            <SchemaDrivenField
-              field={field}
-              locale={locale}
-              value={values[field.fieldKey] ?? ''}
-              onChange={(v) => setFieldValue(field.fieldKey, v)}
+            <SubmissionAssetField
+              kind="cover"
+              artistId={artist.id}
+              label={getFieldLabel(field, locale)}
+              required={field.isRequired}
+              fileName={coverFileName}
               error={fieldErrors[field.fieldKey]}
+              onUploaded={(key, file) => {
+                setCoverR2Key(key)
+                setCoverFileName(file.name)
+                setCoverArtVerified(false)
+                setCoverArtCheckToken(null)
+                setCoverPreviewUrl((prev) => {
+                  if (prev) URL.revokeObjectURL(prev)
+                  return URL.createObjectURL(file)
+                })
+                setFieldErrors((prev) => {
+                  const next = { ...prev }
+                  delete next.cover_art_url
+                  return next
+                })
+              }}
             />
+            {coverPreviewUrl ? (
+              <div
+                className="h-20 w-20 rounded-md border border-border bg-cover bg-center"
+                role="img"
+                aria-label={t('releases_submit_cover_check_heading')}
+                style={{ backgroundImage: `url(${coverPreviewUrl})` }}
+              />
+            ) : null}
             <CoverArtAnalyzer
-              url={values.cover_art_url ?? ''}
+              r2Key={coverR2Key}
+              artistId={artist.id}
               onVerified={handleCoverArtVerified}
             />
+            <p className="text-xs text-muted-foreground">{t('releases_submit_files_ttl_notice')}</p>
           </div>
         ) : (
           <SchemaDrivenField
@@ -691,11 +894,27 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
       </div>
     ))
 
-  const tracksComplete = countCompleteTracks(tracks, visibleTrackFields)
+  const tracksComplete = tracks.filter((track) =>
+    isTrackRowComplete(track.values, fieldsForTrack(track.values)),
+  ).length
 
   const reviewIssues = useMemo(() => {
     const issues: Array<{ label: string; stepId: string }> = []
     for (const field of visibleReleaseFields) {
+      if (field.fieldKey === 'audio_download_url') {
+        if (field.isRequired && !audioR2Key) {
+          const dist = wizardSteps.find((s) => s.fields.some((f) => f.fieldKey === 'audio_download_url'))
+          issues.push({ label: getFieldLabel(field, locale), stepId: dist?.id ?? 'review' })
+        }
+        continue
+      }
+      if (field.fieldKey === 'cover_art_url') {
+        if (field.isRequired && !coverR2Key) {
+          const dist = wizardSteps.find((s) => s.fields.some((f) => f.fieldKey === 'cover_art_url'))
+          issues.push({ label: getFieldLabel(field, locale), stepId: dist?.id ?? 'review' })
+        }
+        continue
+      }
       const raw = values[field.fieldKey] ?? ''
       if (field.isRequired && field.fieldType !== 'boolean' && !raw.trim()) {
         const step =
@@ -732,6 +951,8 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
   }, [
     visibleReleaseFields,
     values,
+    audioR2Key,
+    coverR2Key,
     coverArtVerified,
     coverNeedsVerification,
     visibleTrackFields,
@@ -848,7 +1069,9 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
               ? submitting
                 ? t('releases_submit_saving')
                 : t('releases_submit_save')
-              : t('submission_wizard_next')
+              : activeStep.kind === 'tracks' && !showAllTracks && tracks.length > 1 && trackFocusIndex < tracks.length - 1
+                ? t('submission_wizard_track_next')
+                : t('submission_wizard_next')
           }
           backLabel={t('submission_wizard_back')}
           nextDisabled={
@@ -1062,7 +1285,7 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
                           {t('submission_wizard_copy_prev')}
                         </Button>
                       )}
-                      {visibleTrackFields.map((field) => (
+                      {fieldsForTrack(tracks[trackFocusIndex]!.values).map((field) => (
                         <div key={`${tracks[trackFocusIndex]!.id}-${field.id}`} className="space-y-1">
                           <SchemaDrivenField
                             field={field}
@@ -1101,7 +1324,7 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
               ) : (
                 <Accordion type="multiple" defaultValue={tracks[0] ? [tracks[0].id] : []} className="space-y-2">
                   {tracks.map((track, index) => {
-                    const complete = isTrackRowComplete(track.values, visibleTrackFields)
+                    const complete = isTrackRowComplete(track.values, fieldsForTrack(track.values))
                     return (
                       <AccordionItem
                         key={track.id}
@@ -1154,7 +1377,7 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
                               {t('submission_wizard_copy_prev')}
                             </Button>
                           )}
-                          {visibleTrackFields.map((field) => (
+                          {fieldsForTrack(track.values).map((field) => (
                             <div key={`${track.id}-${field.id}`} className="space-y-1">
                               <SchemaDrivenField
                                 field={field}
@@ -1226,18 +1449,29 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
                     }}
                   />
                 </div>
-                {values.cover_art_url?.trim() && coverArtVerified && (
+                {coverPreviewUrl && coverArtVerified && (
                   <div
                     className="h-20 w-20 rounded-md border border-border bg-cover bg-center"
                     role="img"
                     aria-label={t('releases_submit_cover_check_heading')}
-                    style={{
-                      backgroundImage: `url(${JSON.stringify(values.cover_art_url)})`,
-                    }}
+                    style={{ backgroundImage: `url(${coverPreviewUrl})` }}
                   />
                 )}
                 <dl className="grid gap-2 text-sm sm:grid-cols-2">
+                  {audioFileName ? (
+                    <div>
+                      <dt className="text-muted-foreground text-xs">{t('releases_submit_audio_file')}</dt>
+                      <dd className="font-medium break-all">{audioFileName}</dd>
+                    </div>
+                  ) : null}
+                  {coverFileName ? (
+                    <div>
+                      <dt className="text-muted-foreground text-xs">{t('releases_submit_cover_file')}</dt>
+                      <dd className="font-medium break-all">{coverFileName}</dd>
+                    </div>
+                  ) : null}
                   {visibleReleaseFields.map((field) => {
+                    if (field.fieldKey === 'audio_download_url' || field.fieldKey === 'cover_art_url') return null
                     const raw = values[field.fieldKey] ?? ''
                     if (!raw.trim() && field.fieldType !== 'boolean') return null
                     const isUrl = field.fieldType === 'url' || field.fieldKey.endsWith('_url')
@@ -1267,14 +1501,28 @@ export function ReleaseSubmissionForm({ artist, formSchema, typeRules }: Release
                       </div>
                     )
                   })}
-                  {visibleTrackFields.length > 0 && (
-                    <div>
+                  {tracks.length > 0 && (
+                    <div className="sm:col-span-2 space-y-2">
                       <dt className="text-muted-foreground text-xs">{t('releases_submit_tracks_heading')}</dt>
-                      <dd className="font-medium">
-                        {t('submission_wizard_tracks_progress', {
-                          done: String(tracksComplete),
-                          total: String(tracks.length),
-                        })}
+                      <dd>
+                        <ul className="space-y-2">
+                          {tracks.map((track, index) => (
+                            <li key={track.id} className="rounded-md border border-border p-2 text-sm">
+                              <p className="font-medium">
+                                {index + 1}. {track.values.song_title || t('releases_submit_track_label', { n: index + 1 })}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {[
+                                  track.values.track_isrc ? `ISRC ${track.values.track_isrc}` : null,
+                                  track.values.instrumental === 'true' ? t('releases_submit_instrumental') : track.values.author || null,
+                                  track.values.composer || null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ')}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
                       </dd>
                     </div>
                   )}

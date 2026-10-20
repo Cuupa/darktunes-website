@@ -47,7 +47,7 @@ Default to RSC. Add `"use client"` only for event handlers, browser APIs, hooks,
 | Cron / webhooks | Route Handlers |
 | SOS statement upload | Server Action `uploadStatement.ts` (portal/admin PDF path) |
 
-Admin bronze CSV uses direct browser → R2 presigned PUTs by default, with multipart above 32 MB. It requires bucket CORS. The ≤4 MB server-proxy path is an opt-in fallback only; see `DEPLOYMENT.md`.
+Admin bronze CSV uses direct browser → R2 presigned PUTs by default, with multipart above 32 MB. It requires bucket CORS. The R2 S3 client used for presign disables AWS flexible checksums. The ≤4 MB server-proxy path is an opt-in fallback only; see `DEPLOYMENT.md`.
 
 ## Metadata & loading
 

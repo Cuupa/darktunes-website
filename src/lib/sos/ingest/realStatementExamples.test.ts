@@ -1,7 +1,8 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { extractPeriodBounds } from '@/lib/sos/bronzeUpload'
+import { planBronzeDirectUpload } from '@/lib/sos/bronzeUploadLimits'
 import { processTransactionsWithCompilations } from '@/lib/sos/data-processor'
 import type { DataProcessorConfig } from '@/lib/sos/data-processor/types'
 import { parseDarkmerchCSV, parseDarkmerchXLSX } from '@/lib/sos/ingest/darkmerch-parser'
@@ -52,6 +53,30 @@ function pipelineConfig(): DataProcessorConfig {
 const present = existsSync(examplePath('Believe_Q4_2025.csv'))
 
 describe.skipIf(!present)('real statement-of-sales examples', () => {
+  it('routes the on-disk files the same way production bronze upload does', () => {
+    const sizes = {
+      'Believe_Q4_2025.csv': 63_671_078,
+      'Believe_Q1_2026.csv': 71_684_050,
+      '20251001-20260331_bandcamp_raw_data_darkTunes.csv': 2_400_806,
+      '20251001-20260331_bandcamp_payouts_darkTunes.csv': 500_215,
+      'Darkmerch_Q4_2025-Q1_2026.csv': 7_454,
+    } as const
+    for (const [name, expected] of Object.entries(sizes)) {
+      expect(statSync(examplePath(name)).size, name).toBe(expected)
+    }
+    expect(planBronzeDirectUpload(sizes['Believe_Q4_2025.csv'])).toMatchObject({
+      mode: 'multipart',
+      partCount: 4,
+    })
+    expect(planBronzeDirectUpload(sizes['Believe_Q1_2026.csv'])).toMatchObject({
+      mode: 'multipart',
+      partCount: 5,
+    })
+    expect(planBronzeDirectUpload(sizes['20251001-20260331_bandcamp_raw_data_darkTunes.csv']).mode).toBe(
+      'single-put',
+    )
+  })
+
   it('parses Darkmerch CSV and XLSX without NaN payouts', () => {
     const csv = parseDarkmerchCSV(readCsvText(examplePath('Darkmerch_Q4_2025-Q1_2026.csv')))
     expect(csv.transactions.length).toBeGreaterThan(10)
