@@ -9,7 +9,7 @@ import { requireAiActor } from '@/lib/ai/auth/requireAiActor'
 import { buildDeveloperErrorReport } from '@/lib/ai/diagnostics/buildReport'
 
 const bodySchema = z.object({
-  error_id: z.string().min(3).max(80),
+  error_id: z.string().min(3).max(80).regex(/^[A-Za-z0-9._:-]+$/),
   fingerprint: z.string().min(3).max(200).optional(),
 })
 
@@ -25,12 +25,18 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     throw new ApiError(400, 'Invalid JSON body')
   }
   const parsed = bodySchema.safeParse(raw)
-  if (!parsed.success) throw new ApiError(400, 'error_id is required', 'VALIDATION_ERROR')
+  if (!parsed.success) {
+    throw new ApiError(
+      400,
+      'error_id must be 3–80 letters, numbers, dots, colons, underscores or hyphens — no % wildcards.',
+      'VALIDATION_ERROR',
+    )
+  }
 
-  let query = actor.serviceDb.from('app_logs').select('*').limit(1)
+  let query = actor.serviceDb.from('app_logs').select('*')
   if (parsed.data.fingerprint) query = query.eq('fingerprint', parsed.data.fingerprint)
   else query = query.ilike('message', `%${parsed.data.error_id}%`)
-  const { data, error } = await query.maybeSingle()
+  const { data, error } = await query.order('last_seen_at', { ascending: false }).limit(1).maybeSingle()
   if (error) throw new ApiError(500, 'The error log could not be read.', 'DB_ERROR')
   if (!data) throw new ApiError(404, 'No matching error was found.', 'NOT_FOUND')
 

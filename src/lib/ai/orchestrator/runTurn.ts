@@ -198,7 +198,9 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
           role: 'tool',
           name: call.name,
           tool_call_id: call.id,
-          content: JSON.stringify(executed.ok ? executed.result : { error: executed.error }),
+          content: JSON.stringify(
+            executed.ok ? omitConfirmationToken(executed.result) : { error: executed.error },
+          ),
         })
       }
       yield { type: 'status', state: 'streaming' }
@@ -253,6 +255,13 @@ function isConfirmationResult(
     typeof record.action === 'string' &&
     typeof record.summary === 'string'
   )
+}
+
+function omitConfirmationToken(value: unknown): unknown {
+  if (!isConfirmationResult(value)) return value
+  const rest = { ...(value as Record<string, unknown>) }
+  delete rest.confirmation_token
+  return rest
 }
 
 export { abortAiTurn, conversationTurnKey }

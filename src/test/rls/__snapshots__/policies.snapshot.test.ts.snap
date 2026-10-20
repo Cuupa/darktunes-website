@@ -10,6 +10,12 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all CREATE POLICY names
   "accreditation_requests: own read",
   "admin_audit_log: admin insert",
   "admin_audit_log: admin read",
+  "ai_conversations: owner read",
+  "ai_diagnostics: owner read",
+  "ai_messages: owner read",
+  "ai_settings: admin read",
+  "ai_token_budgets: admin read",
+  "ai_usage_events: owner read",
   "api_credentials_admin_only",
   "apify_usage_months: admin all",
   "app_logs: admin read",
@@ -302,6 +308,15 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
 [
   "accreditation_requests",
   "admin_audit_log",
+  "ai_action_confirmations",
+  "ai_conversations",
+  "ai_diagnostics",
+  "ai_messages",
+  "ai_settings",
+  "ai_token_budgets",
+  "ai_token_reservations",
+  "ai_tool_executions",
+  "ai_usage_events",
   "api_credentials",
   "apify_usage_months",
   "app_logs",
@@ -340,6 +355,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "financial_audit_events",
   "genres",
   "idempotency_keys",
+  "integration_outbox",
   "interview_requests",
   "journalist_applications",
   "journalist_downloads",
@@ -434,6 +450,24 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: policies per table (ext
   "admin_audit_log": [
     "admin_audit_log: admin insert",
     "admin_audit_log: admin read",
+  ],
+  "ai_conversations": [
+    "ai_conversations: owner read",
+  ],
+  "ai_diagnostics": [
+    "ai_diagnostics: owner read",
+  ],
+  "ai_messages": [
+    "ai_messages: owner read",
+  ],
+  "ai_settings": [
+    "ai_settings: admin read",
+  ],
+  "ai_token_budgets": [
+    "ai_token_budgets: admin read",
+  ],
+  "ai_usage_events": [
+    "ai_usage_events: owner read",
   ],
   "api_credentials": [
     "api_credentials_admin_only",

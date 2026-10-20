@@ -39,7 +39,7 @@ export async function drainZammadOutbox(db: Db, limit = 5): Promise<number> {
     .from('integration_outbox')
     .select('*')
     .eq('target', 'zammad')
-    .in('status', ['pending', 'failed'])
+    .in('status', ['pending', 'failed', 'sending'])
     .lte('next_retry_at', new Date().toISOString())
     .order('created_at', { ascending: true })
     .limit(limit)
@@ -48,6 +48,19 @@ export async function drainZammadOutbox(db: Db, limit = 5): Promise<number> {
   const config = getZammadConfig()
   let sent = 0
   for (const row of data) {
+    const { data: claimed, error: claimError } = await db
+      .from('integration_outbox')
+      .update({
+        status: 'sending',
+        next_retry_at: new Date(Date.now() + 60_000).toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', row.id)
+      .in('status', ['pending', 'failed', 'sending'])
+      .lte('next_retry_at', new Date().toISOString())
+      .select('id')
+    if (claimError || !claimed?.length) continue
+
     const payload = (row.payload ?? {}) as {
       user_id?: string
       subject?: string

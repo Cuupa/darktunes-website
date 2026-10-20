@@ -94,11 +94,15 @@ export async function consumeActionConfirmation(
   if (sha256(canonicalJson(payload)) !== data.payload_hash) {
     throw new ApiError(409, 'The confirmation payload no longer matches.', 'CONFLICT')
   }
-  const { error: usedError } = await db
+  const { data: updated, error: usedError } = await db
     .from('ai_action_confirmations')
     .update({ used_at: new Date().toISOString() })
     .eq('id', data.id)
     .is('used_at', null)
+    .select('id')
   if (usedError) throw usedError
+  if (!updated?.length) {
+    throw new ApiError(409, 'This confirmation was already used.', 'CONFLICT')
+  }
   return payload
 }

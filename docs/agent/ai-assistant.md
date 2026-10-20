@@ -32,17 +32,19 @@ Per-user day/month caps come from the caller’s role numbers. Global day/month 
 
 ## API
 
-REST resources under `/api/ai/*` and `/api/admin/ai/*`. Chat turns stream SSE events: `status`, `delta`, `tool_start`, `tool_result`, `usage`, `error`, `done`.
+REST resources under `/api/ai/*` and `/api/admin/ai/*`. Chat turns stream SSE events: `status`, `delta`, `tool_start`, `tool_result`, `confirmation_required`, `usage`, `error`, `done`.
 
 ## Tools
 
 Server-side `ToolRegistry`. Artist tools are scoped to the membership-resolved `artistId`. Admin tools require `admin.panel.full` or `admin.panel.editor`. No arbitrary SQL.
 
-Write tools only prepare a payload. `POST /api/ai/action-confirmations` re-checks authz, then runs existing DAL (EPK bio, press quote, release wizard draft, Zammad outbox, diagnostic report).
+Write tools only prepare a payload. `POST /api/ai/action-confirmations` re-checks authz, then runs existing DAL (EPK bio, press quote, release wizard draft, Zammad outbox, diagnostic report). Consuming a confirmation marks the row used with `UPDATE … WHERE used_at IS NULL` and rejects a zero-row update (concurrent confirm). Confirmation tokens are not stored in the model transcript.
+
+`POST /api/ai/diagnostic-reports` looks up a log row by fingerprint or a literal `error_id` substring (`%` / `_` rejected). Zammad sends claim `integration_outbox` rows as `sending` (with a 60s retry) before `createZammadTicket`; a crash leaves the row reclaimable.
 
 ## Diagnostics
 
-Rule-based watch alerts run inside the health snapshot (no LLM). `POST /api/ai/diagnostics` classifies a log row. `POST /api/ai/diagnostic-reports` builds a `DeveloperErrorReport` from evidence and states that source maps were not read. Zammad sends go through `integration_outbox` with fingerprint dedup.
+Rule-based watch alerts run inside the health snapshot (no LLM). `POST /api/ai/diagnostics` classifies a log row. Diagnostic reports state that source maps were not read. Zammad sends go through `integration_outbox` with fingerprint dedup after the `sending` claim.
 
 ## Schema
 

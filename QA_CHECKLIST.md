@@ -11,7 +11,8 @@
 - [ ] Desktop: collapsible right panel; mobile: full-screen sheet; composer stays above the keyboard
 - [ ] Closing the browser mid-stream leaves no infinite spinner on reopen
 - [ ] NVIDIA unreachable: assistant shows a provider error; the rest of the dashboard still works
-- [ ] Artist asks to change EPK text: preview appears, Confirm saves, a second Confirm is rejected
+- [ ] Artist asks to change EPK text: preview appears, Confirm saves, a second Confirm (or a double-click) is rejected
+- [ ] `POST /api/ai/diagnostic-reports` with `error_id` containing `%` returns 400; a real `ERR-` id returns the newest matching log
 - [ ] Admin → AI Assistant: enable, Test Connection, token counts, diagnostics list load
 - [ ] Error boundary Analyze opens the assistant with the error reference on admin/portal routes
 

@@ -143,6 +143,7 @@ registerTool({
   description: 'List recent aggregated application errors. No raw stack traces.',
   input: z.object({}),
   output: z.object({
+    available: z.boolean(),
     errors: z.array(
       z.object({
         fingerprint: z.string().nullable(),
@@ -152,6 +153,7 @@ registerTool({
         last_seen_at: z.string(),
       }),
     ),
+    reason: z.string().optional(),
   }),
   capabilities: ['admin.panel.full'],
   dataScope: 'label',
@@ -166,8 +168,9 @@ registerTool({
       .eq('ignored', false)
       .order('last_seen_at', { ascending: false })
       .limit(15)
-    if (error) return { errors: [] }
+    if (error) return { available: false, errors: [], reason: 'The error log could not be read.' }
     return {
+      available: true,
       errors: (data ?? []).map((row) => ({
         fingerprint: row.fingerprint,
         source: row.source,
