@@ -186,6 +186,14 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
           requestId: input.requestId,
         })
         yield { type: 'tool_result', tool_name: call.name, ok: executed.ok }
+        if (executed.ok && isConfirmationResult(executed.result)) {
+          yield {
+            type: 'confirmation_required',
+            action: executed.result.action,
+            confirmation_token: executed.result.confirmation_token,
+            summary: executed.result.summary,
+          }
+        }
         messages.push({
           role: 'tool',
           name: call.name,
@@ -233,6 +241,18 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
   } finally {
     endAiTurn(conversationTurnKey(conversation.id))
   }
+}
+
+function isConfirmationResult(
+  value: unknown,
+): value is { action: string; confirmation_token: string; summary: string } {
+  if (!value || typeof value !== 'object') return false
+  const record = value as Record<string, unknown>
+  return (
+    typeof record.confirmation_token === 'string' &&
+    typeof record.action === 'string' &&
+    typeof record.summary === 'string'
+  )
 }
 
 export { abortAiTurn, conversationTurnKey }

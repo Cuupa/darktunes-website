@@ -128,6 +128,241 @@ registerTool({
 })
 
 registerTool({
+  name: 'get_artist_analytics',
+  description: 'Summarise streaming stats for the current artist. Never invent numbers.',
+  input: z.object({}),
+  output: z.object({
+    available: z.boolean(),
+    total_streams: z.number().optional(),
+    latest_period: z.string().nullable().optional(),
+    platforms: z.array(z.object({ platform: z.string(), total_streams: z.number() })),
+    reason: z.string().optional(),
+  }),
+  capabilities: [],
+  dataScope: 'self_artist',
+  classification: 'read',
+  maxResultBytes: 6000,
+  timeoutMs: 8000,
+  execute: async (_input, context) => {
+    const artistId = requireArtistId(context.actor.artistId)
+    const { getStreamingStatsByArtistId, getAggregatedStreamsByPlatform } = await import(
+      '@/lib/api/streamingStats'
+    )
+    const stats = await getStreamingStatsByArtistId(context.actor.serviceDb, artistId)
+    if (stats.length === 0) {
+      return { available: false, platforms: [], reason: 'No streaming stats are stored for this artist.' }
+    }
+    const platforms = getAggregatedStreamsByPlatform(stats)
+    return {
+      available: true,
+      total_streams: platforms.reduce((sum, row) => sum + row.totalStreams, 0),
+      latest_period: stats[0]?.period ?? null,
+      platforms: platforms.map((row) => ({ platform: row.platform, total_streams: row.totalStreams })),
+    }
+  },
+})
+
+registerTool({
+  name: 'get_artist_statements',
+  description: 'List royalty statements visible to the current artist (no file keys).',
+  input: z.object({}),
+  output: z.object({
+    available: z.boolean(),
+    statements: z.array(
+      z.object({
+        period: z.string(),
+        status: z.string(),
+        amount_eur: z.number().nullable(),
+        created_at: z.string(),
+      }),
+    ),
+    reason: z.string().optional(),
+  }),
+  capabilities: [],
+  dataScope: 'self_artist',
+  classification: 'read',
+  maxResultBytes: 6000,
+  timeoutMs: 8000,
+  execute: async (_input, context) => {
+    const artistId = requireArtistId(context.actor.artistId)
+    const { getSalesStatementsByArtistId } = await import('@/lib/api/salesStatements')
+    const rows = await getSalesStatementsByArtistId(context.actor.serviceDb, artistId)
+    if (rows.length === 0) {
+      return { available: false, statements: [], reason: 'No statements are visible for this artist.' }
+    }
+    return {
+      available: true,
+      statements: rows.slice(0, 12).map((row) => ({
+        period: row.period,
+        status: row.status,
+        amount_eur: row.amountEur ?? null,
+        created_at: row.createdAt,
+      })),
+    }
+  },
+})
+
+registerTool({
+  name: 'get_artist_invoices',
+  description: 'List invoices for the current artist (numbers and status only).',
+  input: z.object({}),
+  output: z.object({
+    available: z.boolean(),
+    invoices: z.array(
+      z.object({
+        invoice_number: z.string(),
+        status: z.string(),
+        issued_date: z.string(),
+        due_date: z.string(),
+      }),
+    ),
+    reason: z.string().optional(),
+  }),
+  capabilities: [],
+  dataScope: 'self_artist',
+  classification: 'read',
+  maxResultBytes: 6000,
+  timeoutMs: 8000,
+  execute: async (_input, context) => {
+    const artistId = requireArtistId(context.actor.artistId)
+    const { listArtistInvoices } = await import('@/lib/api/artistInvoices')
+    const { invoices } = await listArtistInvoices(context.actor.serviceDb, artistId, 1, 15)
+    if (invoices.length === 0) {
+      return { available: false, invoices: [], reason: 'No invoices are stored for this artist.' }
+    }
+    return {
+      available: true,
+      invoices: invoices.map((row) => ({
+        invoice_number: row.artistInvoiceNumber || row.invoiceNumber,
+        status: row.status,
+        issued_date: row.issuedDate,
+        due_date: row.dueDate,
+      })),
+    }
+  },
+})
+
+registerTool({
+  name: 'get_artist_events',
+  description: 'List upcoming concerts for the current artist.',
+  input: z.object({}),
+  output: z.object({
+    available: z.boolean(),
+    events: z.array(
+      z.object({
+        date: z.string(),
+        venue: z.string(),
+        city: z.string(),
+        status: z.string(),
+      }),
+    ),
+    reason: z.string().optional(),
+  }),
+  capabilities: [],
+  dataScope: 'self_artist',
+  classification: 'read',
+  maxResultBytes: 6000,
+  timeoutMs: 8000,
+  execute: async (_input, context) => {
+    const artistId = requireArtistId(context.actor.artistId)
+    const { getConcertsByArtistId } = await import('@/lib/api/concerts')
+    const concerts = await getConcertsByArtistId(context.actor.serviceDb, artistId)
+    if (concerts.length === 0) {
+      return { available: false, events: [], reason: 'No concert dates are stored for this artist.' }
+    }
+    return {
+      available: true,
+      events: concerts.slice(0, 15).map((row) => ({
+        date: row.concertDate,
+        venue: row.venueName ?? '',
+        city: row.venueCity ?? '',
+        status: row.status,
+      })),
+    }
+  },
+})
+
+registerTool({
+  name: 'get_artist_tour_overview',
+  description: 'List tours for the current artist (name and dates only).',
+  input: z.object({}),
+  output: z.object({
+    available: z.boolean(),
+    tours: z.array(
+      z.object({
+        name: z.string(),
+        start_date: z.string().nullable(),
+        end_date: z.string().nullable(),
+        archived: z.boolean(),
+      }),
+    ),
+    reason: z.string().optional(),
+  }),
+  capabilities: [],
+  dataScope: 'self_artist',
+  classification: 'read',
+  maxResultBytes: 4000,
+  timeoutMs: 8000,
+  execute: async (_input, context) => {
+    const artistId = requireArtistId(context.actor.artistId)
+    const { getToursByArtistId } = await import('@/lib/api/tours')
+    const tours = await getToursByArtistId(context.actor.serviceDb, artistId)
+    if (tours.length === 0) {
+      return { available: false, tours: [], reason: 'No tours are stored for this artist.' }
+    }
+    return {
+      available: true,
+      tours: tours.slice(0, 10).map((tour) => ({
+        name: tour.name,
+        start_date: tour.startDate,
+        end_date: tour.endDate,
+        archived: tour.archived,
+      })),
+    }
+  },
+})
+
+registerTool({
+  name: 'get_artist_documents_metadata',
+  description: 'List document vault metadata for the current artist. No file paths.',
+  input: z.object({}),
+  output: z.object({
+    available: z.boolean(),
+    documents: z.array(
+      z.object({
+        label: z.string(),
+        category: z.string(),
+        size_bytes: z.number().nullable(),
+        created_at: z.string(),
+      }),
+    ),
+    reason: z.string().optional(),
+  }),
+  capabilities: [],
+  dataScope: 'self_artist',
+  classification: 'read',
+  maxResultBytes: 4000,
+  timeoutMs: 8000,
+  execute: async (_input, context) => {
+    const artistId = requireArtistId(context.actor.artistId)
+    const { listArtistDocuments } = await import('@/lib/api/artistDocuments')
+    const documents = await listArtistDocuments(context.actor.serviceDb, artistId)
+    if (documents.length === 0) {
+      return { available: false, documents: [], reason: 'The document vault is empty.' }
+    }
+    return {
+      available: true,
+      documents: documents.slice(0, 20).map((doc) => ({
+        label: doc.label,
+        category: doc.category,
+        size_bytes: doc.fileSizeBytes ?? null,
+        created_at: doc.createdAt,
+      })),
+    }
+  },
+})
+
+registerTool({
   name: 'get_portal_feature_availability',
   description: 'Show which portal feature flags are enabled for artists.',
   input: z.object({}),

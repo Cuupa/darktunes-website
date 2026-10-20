@@ -340,6 +340,30 @@ export async function buildHealthSnapshot(
       source: 'system',
     })
   }
+  if (deps.db) {
+    try {
+      const { evaluateWatchRules } = await import('@/lib/ai/diagnostics/watchRules')
+      const { data: logRows } = await deps.db
+        .from('app_logs')
+        .select('fingerprint, occurrences, first_seen_at, last_seen_at, source, message, http_status, app_version')
+        .eq('ignored', false)
+        .order('last_seen_at', { ascending: false })
+        .limit(80)
+      const rows = logRows ?? []
+      const watch = evaluateWatchRules({
+        nowMs,
+        appVersion: getAppVersionInfo().version,
+        logs: rows,
+        failedSyncJobs: syncQueueHealth?.failed ?? 0,
+        uploadFailures: rows.filter((row) => /upload|r2|storage/i.test(`${row.source} ${row.message}`)).length,
+        serverErrors: rows.filter((row) => (row.http_status ?? 0) >= 500 || /error/i.test(row.source)).length,
+      })
+      alerts.push(...watch)
+    } catch {
+      // Watch rules must never fail the health snapshot.
+    }
+  }
+
   const healthScore = computeHealthScore(database, apis, syncQueueHealth, cronHealth)
   const appInfo = getAppVersionInfo()
 

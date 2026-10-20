@@ -194,6 +194,7 @@ export async function getKnownApiConfiguration(
     apifyToken,
     youtubeApiKey,
     youtubeChannelId,
+    nvidiaApiKey,
     artistsWithPublicBandsintownKey,
     artistsWithPrivateBandsintownKey,
   ] = await Promise.all([
@@ -208,6 +209,7 @@ export async function getKnownApiConfiguration(
     getApiCredential(db, 'apify_token'),
     getApiCredential(db, 'youtube_api_key'),
     getApiCredential(db, 'youtube_channel_id'),
+    getApiCredential(db, 'nvidia_api_key'),
     countNonNullBandsintownKeys(db, 'artists', 'id'),
     countNonNullBandsintownKeys(db, 'artist_private_data', 'artist_id'),
   ])
@@ -228,5 +230,6 @@ export async function getKnownApiConfiguration(
     soundcharts: Boolean(soundchartsApiKey),
     apify: Boolean(apifyToken),
     youtube: Boolean(youtubeApiKey && youtubeChannelId),
+    nvidia: Boolean(nvidiaApiKey) || Boolean(process.env.NVIDIA_API_KEY?.trim()),
   }
 }

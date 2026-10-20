@@ -15,6 +15,8 @@
  */
 
 import { useEffect } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Warning } from '@phosphor-icons/react'
@@ -27,6 +29,9 @@ interface ErrorPageProps {
 }
 
 export default function ErrorPage({ error, reset }: ErrorPageProps) {
+  const tAi = useTranslations('ai')
+  const router = useRouter()
+  const pathname = usePathname()
   useEffect(() => {
     const storage = typeof window !== 'undefined' ? window.sessionStorage : null
     if (shouldReloadForChunkError(error, storage)) {
@@ -63,9 +68,26 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
               ? error.message
               : 'An unexpected error occurred. Please try again or contact support if the problem persists.'}
           </p>
-          <Button onClick={reset} variant="default">
-            Try again
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button onClick={reset} variant="default">
+              Try again
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const ref = error.digest ?? error.message.slice(0, 80)
+                if (pathname.startsWith('/admin')) {
+                  router.push(`/admin/ai?error_ref=${encodeURIComponent(ref)}`)
+                  return
+                }
+                if (pathname.startsWith('/portal')) {
+                  router.push(`/portal?ai_error=${encodeURIComponent(ref)}`)
+                }
+              }}
+            >
+              {tAi('analyzeError')}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

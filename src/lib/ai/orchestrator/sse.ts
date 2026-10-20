@@ -4,6 +4,7 @@ export type ClientSseEvent =
   | { type: 'tool_start'; tool_name: string }
   | { type: 'tool_result'; tool_name: string; ok: boolean }
   | { type: 'usage'; input_tokens: number; output_tokens: number; reasoning_tokens: number; total_tokens: number }
+  | { type: 'confirmation_required'; action: string; confirmation_token: string; summary: string }
   | { type: 'error'; code: string; detail: string }
   | { type: 'done'; model: string }
 

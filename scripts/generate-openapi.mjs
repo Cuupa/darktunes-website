@@ -50,6 +50,7 @@ function getTag(routePath) {
     'exchange-rates': 'Public',
     'log-error': 'Public',
     v1: 'Partner API',
+    ai: 'AI',
   };
   return map[root] ?? 'Public';
 }

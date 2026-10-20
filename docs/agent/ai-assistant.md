@@ -38,6 +38,12 @@ REST resources under `/api/ai/*` and `/api/admin/ai/*`. Chat turns stream SSE ev
 
 Server-side `ToolRegistry`. Artist tools are scoped to the membership-resolved `artistId`. Admin tools require `admin.panel.full` or `admin.panel.editor`. No arbitrary SQL.
 
+Write tools only prepare a payload. `POST /api/ai/action-confirmations` re-checks authz, then runs existing DAL (EPK bio, press quote, release wizard draft, Zammad outbox, diagnostic report).
+
+## Diagnostics
+
+Rule-based watch alerts run inside the health snapshot (no LLM). `POST /api/ai/diagnostics` classifies a log row. `POST /api/ai/diagnostic-reports` builds a `DeveloperErrorReport` from evidence and states that source maps were not read. Zammad sends go through `integration_outbox` with fingerprint dedup.
+
 ## Schema
 
 Apply `supabase/reset.sql` (`npm run db:apply`). No `supabase/migrations/`.

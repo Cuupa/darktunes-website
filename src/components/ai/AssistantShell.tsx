@@ -12,7 +12,8 @@ import { cn } from '@/lib/utils'
 import { getErrorMessage } from '@/lib/clientErrors'
 import type { ApiErrorResponse } from '@/lib/errors'
 
-type ChatState = 'idle' | 'connecting' | 'streaming' | 'tool_running' | 'failed'
+type ChatState = 'idle' | 'connecting' | 'streaming' | 'tool_running' | 'awaiting_confirmation' | 'failed'
+type PendingConfirmation = { action: string; confirmation_token: string; summary: string }
 type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string }
 
 interface AssistantShellProps {
@@ -39,8 +40,16 @@ export function AssistantShell({ dashboard }: AssistantShellProps) {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [model, setModel] = useState<string | null>(null)
+  const [pending, setPending] = useState<PendingConfirmation | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const sendingRef = useRef(false)
+  const errorRef = searchParams.get('error_ref') ?? searchParams.get('ai_error')
+
+  useEffect(() => {
+    if (!errorRef) return
+    setOpen(true)
+    setInput((current) => current || `Please explain error ${errorRef}`)
+  }, [errorRef])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -108,6 +117,7 @@ export function AssistantShell({ dashboard }: AssistantShellProps) {
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let awaitingConfirmation = false
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -124,6 +134,9 @@ export function AssistantShell({ dashboard }: AssistantShellProps) {
             code?: string
             detail?: string
             model?: string
+            action?: string
+            confirmation_token?: string
+            summary?: string
           }
           if (payload.type === 'status' && payload.state === 'tool_running') setState('tool_running')
           if (payload.type === 'status' && payload.state === 'streaming') setState('streaming')
@@ -139,9 +152,18 @@ export function AssistantShell({ dashboard }: AssistantShellProps) {
             setError(payload.detail ?? t('statusFailed'))
             setState('failed')
           }
+          if (payload.type === 'confirmation_required' && payload.action && payload.confirmation_token && payload.summary) {
+            awaitingConfirmation = true
+            setPending({
+              action: payload.action,
+              confirmation_token: payload.confirmation_token,
+              summary: payload.summary,
+            })
+            setState('awaiting_confirmation')
+          }
           if (payload.type === 'done') {
             setModel(payload.model ?? null)
-            setState('idle')
+            if (!awaitingConfirmation) setState('idle')
           }
         }
       }
@@ -175,8 +197,32 @@ export function AssistantShell({ dashboard }: AssistantShellProps) {
     setMessages([])
     setError(null)
     setModel(null)
+    setPending(null)
     setState('idle')
   }, [])
+
+  const confirmPending = useCallback(async () => {
+    if (!pending) return
+    const res = await fetch('/api/ai/action-confirmations', {
+      method: 'POST',
+      headers: await headers(),
+      body: JSON.stringify({
+        confirmation_token: pending.confirmation_token,
+        action: pending.action,
+        artist_id: artistId,
+      }),
+    })
+    if (!res.ok) {
+      const body = (await res.json()) as ApiErrorResponse
+      setError(getErrorMessage(body, tErrors))
+      setState('failed')
+      return
+    }
+    const body = (await res.json()) as { detail: string }
+    setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'assistant', content: body.detail }])
+    setPending(null)
+    setState('idle')
+  }, [artistId, headers, pending, tErrors])
 
   const busy = state === 'connecting' || state === 'streaming' || state === 'tool_running'
 
@@ -255,6 +301,14 @@ export function AssistantShell({ dashboard }: AssistantShellProps) {
               </p>
             ) : null}
             {model ? <p className="text-xs text-muted-foreground">{t('model', { model })}</p> : null}
+            {pending ? (
+              <div className="space-y-2 rounded-md border border-border p-3">
+                <p className="text-sm">{pending.summary}</p>
+                <Button type="button" onClick={() => void confirmPending()}>
+                  {t('confirmAction')}
+                </Button>
+              </div>
+            ) : null}
           </ScrollPanel>
           <form
             className="flex items-end gap-2 border-t border-border p-3"
