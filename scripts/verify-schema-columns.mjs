@@ -102,6 +102,16 @@ const CRITICAL_TABLES = {
     extraStructural: ['artist_id', 'status', 'message', 'releases_synced', 'errors'],
   },
   cron_ticks: { mode: 'full', extraStructural: ['kind', 'status', 'detail'] },
+  ai_conversations: { mode: 'create-once' },
+  ai_messages: { mode: 'create-once' },
+  ai_usage_events: { mode: 'create-once' },
+  ai_token_budgets: { mode: 'create-once' },
+  ai_token_reservations: { mode: 'create-once' },
+  ai_settings: { mode: 'create-once' },
+  ai_diagnostics: { mode: 'create-once' },
+  ai_tool_executions: { mode: 'create-once' },
+  ai_action_confirmations: { mode: 'create-once' },
+  integration_outbox: { mode: 'create-once' },
 }
 
 function extractCreateTableBody(sql, table) {

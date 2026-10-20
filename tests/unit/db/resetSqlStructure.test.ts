@@ -34,6 +34,16 @@ describe('reset.sql — required tables', () => {
   it('contains submission_form_schema table', () => {
     expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS public\.submission_form_schema/)
   })
+
+  it('contains AI assistant tables and token RPCs', () => {
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS public\.ai_conversations/)
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS public\.ai_token_budgets/)
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS public\.ai_settings/)
+    expect(sql).toMatch(/CREATE TABLE IF NOT EXISTS public\.integration_outbox/)
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.reserve_ai_tokens/)
+    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.settle_ai_tokens/)
+    expect(sql).not.toMatch(/cron\.schedule/)
+  })
 })
 
 describe('reset.sql — column presence', () => {

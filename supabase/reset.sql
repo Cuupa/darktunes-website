@@ -3062,7 +3062,11 @@ CREATE TABLE IF NOT EXISTS public.app_logs (
   app_version   TEXT,
   request_id    TEXT,
   route_path    TEXT,
-  method        TEXT
+  method        TEXT,
+  error_type    TEXT,
+  http_status   INTEGER,
+  operation     TEXT,
+  deployment_id TEXT
 );
 
 -- Idempotent column guards for existing databases (SSOT: reset.sql, no migrations)
@@ -3079,6 +3083,10 @@ ALTER TABLE public.app_logs ADD COLUMN IF NOT EXISTS app_version   TEXT;
 ALTER TABLE public.app_logs ADD COLUMN IF NOT EXISTS request_id    TEXT;
 ALTER TABLE public.app_logs ADD COLUMN IF NOT EXISTS route_path    TEXT;
 ALTER TABLE public.app_logs ADD COLUMN IF NOT EXISTS method        TEXT;
+ALTER TABLE public.app_logs ADD COLUMN IF NOT EXISTS error_type    TEXT;
+ALTER TABLE public.app_logs ADD COLUMN IF NOT EXISTS http_status   INTEGER;
+ALTER TABLE public.app_logs ADD COLUMN IF NOT EXISTS operation     TEXT;
+ALTER TABLE public.app_logs ADD COLUMN IF NOT EXISTS deployment_id TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_app_logs_source     ON public.app_logs (source);
 CREATE INDEX IF NOT EXISTS idx_app_logs_level      ON public.app_logs (level);
@@ -3209,6 +3217,346 @@ CREATE TABLE IF NOT EXISTS public.zammad_ticket_log (
 
 CREATE INDEX IF NOT EXISTS idx_zammad_ticket_log_fingerprint_user ON public.zammad_ticket_log (fingerprint, user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_zammad_ticket_log_created_at ON public.zammad_ticket_log (created_at DESC);
+
+-- =============================================================================
+-- AI ASSISTANT — conversations, token budgets, diagnostics, outbox
+-- Schema SSOT: this file only (no supabase/migrations/).
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS public.ai_conversations (
+  id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id         UUID        NOT NULL REFERENCES public.users (id) ON DELETE CASCADE,
+  artist_id       UUID        REFERENCES public.artists (id) ON DELETE CASCADE,
+  access_context  TEXT        NOT NULL CHECK (access_context IN ('artist', 'editor', 'admin')),
+  title           TEXT        NOT NULL DEFAULT '',
+  status          TEXT        NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived', 'deleted')),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_conversations_user ON public.ai_conversations (user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_conversations_artist ON public.ai_conversations (artist_id, updated_at DESC)
+  WHERE artist_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS public.ai_messages (
+  id               UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  conversation_id  UUID        NOT NULL REFERENCES public.ai_conversations (id) ON DELETE CASCADE,
+  role             TEXT        NOT NULL CHECK (role IN ('user', 'assistant', 'system', 'tool')),
+  content          TEXT        NOT NULL DEFAULT '',
+  model            TEXT,
+  token_usage      JSONB       NOT NULL DEFAULT '{}',
+  status           TEXT        NOT NULL DEFAULT 'complete' CHECK (status IN ('pending', 'streaming', 'complete', 'cancelled', 'failed')),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_messages_conversation ON public.ai_messages (conversation_id, created_at);
+
+CREATE TABLE IF NOT EXISTS public.ai_usage_events (
+  id               UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id          UUID        NOT NULL REFERENCES public.users (id) ON DELETE CASCADE,
+  artist_id        UUID        REFERENCES public.artists (id) ON DELETE SET NULL,
+  conversation_id  UUID        REFERENCES public.ai_conversations (id) ON DELETE SET NULL,
+  request_id       TEXT        NOT NULL,
+  model            TEXT        NOT NULL,
+  input_tokens     INTEGER     NOT NULL DEFAULT 0 CHECK (input_tokens >= 0),
+  output_tokens    INTEGER     NOT NULL DEFAULT 0 CHECK (output_tokens >= 0),
+  reasoning_tokens INTEGER     NOT NULL DEFAULT 0 CHECK (reasoning_tokens >= 0),
+  total_tokens     INTEGER     NOT NULL DEFAULT 0 CHECK (total_tokens >= 0),
+  usage_source     TEXT        NOT NULL DEFAULT 'provider' CHECK (usage_source IN ('provider', 'estimate', 'settlement')),
+  operation_type   TEXT        NOT NULL DEFAULT 'chat',
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_usage_events_user_created ON public.ai_usage_events (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_events_request ON public.ai_usage_events (request_id);
+
+CREATE TABLE IF NOT EXISTS public.ai_token_budgets (
+  id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  scope           TEXT        NOT NULL CHECK (scope IN ('global', 'role', 'user')),
+  scope_id        TEXT        NOT NULL DEFAULT '',
+  period          TEXT        NOT NULL CHECK (period IN ('day', 'month')),
+  period_start    TIMESTAMPTZ NOT NULL,
+  token_limit     INTEGER     NOT NULL CHECK (token_limit >= 0),
+  used_tokens     INTEGER     NOT NULL DEFAULT 0 CHECK (used_tokens >= 0),
+  reserved_tokens INTEGER     NOT NULL DEFAULT 0 CHECK (reserved_tokens >= 0),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (scope, scope_id, period, period_start)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_token_budgets_scope ON public.ai_token_budgets (scope, scope_id, period, period_start);
+
+CREATE TABLE IF NOT EXISTS public.ai_token_reservations (
+  id               UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  request_id       TEXT        NOT NULL,
+  budget_id        UUID        NOT NULL REFERENCES public.ai_token_budgets (id) ON DELETE CASCADE,
+  scope            TEXT        NOT NULL,
+  reserved_tokens  INTEGER     NOT NULL CHECK (reserved_tokens >= 0),
+  consumed_tokens  INTEGER     NOT NULL DEFAULT 0 CHECK (consumed_tokens >= 0),
+  status           TEXT        NOT NULL DEFAULT 'reserved' CHECK (status IN ('reserved', 'settled', 'released', 'expired')),
+  expires_at       TIMESTAMPTZ NOT NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_token_reservations_request ON public.ai_token_reservations (request_id);
+CREATE INDEX IF NOT EXISTS idx_ai_token_reservations_status ON public.ai_token_reservations (status, expires_at);
+
+CREATE TABLE IF NOT EXISTS public.ai_settings (
+  label_id                 UUID        PRIMARY KEY DEFAULT '00000000-0000-0000-0000-000000000000',
+  enabled                  BOOLEAN     NOT NULL DEFAULT FALSE,
+  test_mode                BOOLEAN     NOT NULL DEFAULT TRUE,
+  provider                 TEXT        NOT NULL DEFAULT 'nvidia',
+  model_fast               TEXT        NOT NULL DEFAULT 'nvidia/nemotron-3.5-lightning-30b-a3b',
+  model_reasoning          TEXT        NOT NULL DEFAULT 'nvidia/nemotron-3-super-120b-a12b',
+  default_streaming        BOOLEAN     NOT NULL DEFAULT TRUE,
+  token_limits             JSONB       NOT NULL DEFAULT '{}',
+  reasoning_settings       JSONB       NOT NULL DEFAULT '{}',
+  feature_flags            JSONB       NOT NULL DEFAULT '{}',
+  timeouts                 JSONB       NOT NULL DEFAULT '{}',
+  max_tool_rounds          INTEGER     NOT NULL DEFAULT 4,
+  provider_capabilities    JSONB       NOT NULL DEFAULT '{}',
+  last_connection_test     JSONB,
+  updated_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by               UUID        REFERENCES public.users (id) ON DELETE SET NULL
+);
+
+INSERT INTO public.ai_settings (label_id, token_limits, reasoning_settings, feature_flags, timeouts)
+VALUES (
+  '00000000-0000-0000-0000-000000000000',
+  '{
+    "fast": {"max_input_tokens": 6000, "max_output_tokens": 900, "max_turn_tokens": 10000},
+    "reasoning": {"max_input_tokens": 12000, "max_output_tokens": 2500, "max_turn_tokens": 25000, "max_reasoning_tokens": 2500},
+    "roles": {
+      "artist": {"day": 30000, "month": 250000},
+      "editor": {"day": 50000, "month": 400000},
+      "admin": {"day": 120000, "month": 1000000}
+    },
+    "global": {"day": 300000, "month": 3000000},
+    "max_conversation_context_tokens": 8000
+  }'::jsonb,
+  '{"fast_default": false, "reasoning_default": true, "low_effort": true}'::jsonb,
+  '{"artist": true, "editor": true, "admin": true}'::jsonb,
+  '{"complete_ms": 45000, "stream_ms": 120000}'::jsonb
+)
+ON CONFLICT (label_id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS public.ai_diagnostics (
+  id                   UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id              UUID        REFERENCES public.users (id) ON DELETE SET NULL,
+  artist_id            UUID        REFERENCES public.artists (id) ON DELETE SET NULL,
+  error_reference      TEXT        NOT NULL,
+  fingerprint          TEXT,
+  analysis_status      TEXT        NOT NULL DEFAULT 'pending' CHECK (analysis_status IN ('pending', 'running', 'complete', 'failed')),
+  classification       TEXT,
+  sanitized_analysis   JSONB       NOT NULL DEFAULT '{}',
+  evidence_refs        JSONB       NOT NULL DEFAULT '[]',
+  model                TEXT,
+  token_usage          JSONB       NOT NULL DEFAULT '{}',
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_diagnostics_fingerprint ON public.ai_diagnostics (fingerprint, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ai_diagnostics_error_ref ON public.ai_diagnostics (error_reference);
+
+CREATE TABLE IF NOT EXISTS public.ai_tool_executions (
+  id            UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  request_id    TEXT        NOT NULL,
+  tool_name     TEXT        NOT NULL,
+  actor_id      UUID        REFERENCES public.users (id) ON DELETE SET NULL,
+  target_scope  TEXT,
+  status        TEXT        NOT NULL CHECK (status IN ('ok', 'error', 'denied', 'timeout')),
+  duration_ms   INTEGER,
+  error_code    TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_tool_executions_request ON public.ai_tool_executions (request_id);
+
+CREATE TABLE IF NOT EXISTS public.ai_action_confirmations (
+  id            UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  token_hash    TEXT        NOT NULL UNIQUE,
+  user_id       UUID        NOT NULL REFERENCES public.users (id) ON DELETE CASCADE,
+  artist_id     UUID        REFERENCES public.artists (id) ON DELETE CASCADE,
+  action        TEXT        NOT NULL,
+  payload_hash  TEXT        NOT NULL,
+  payload       JSONB       NOT NULL DEFAULT '{}',
+  expires_at    TIMESTAMPTZ NOT NULL,
+  used_at       TIMESTAMPTZ,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_action_confirmations_user ON public.ai_action_confirmations (user_id, expires_at);
+
+CREATE TABLE IF NOT EXISTS public.integration_outbox (
+  id               UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  target           TEXT        NOT NULL CHECK (target IN ('zammad')),
+  status           TEXT        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sending', 'sent', 'failed')),
+  attempts         INTEGER     NOT NULL DEFAULT 0,
+  next_retry_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_error       TEXT,
+  idempotency_key  TEXT        NOT NULL UNIQUE,
+  result_ref       TEXT,
+  payload          JSONB       NOT NULL DEFAULT '{}',
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_integration_outbox_pending ON public.integration_outbox (status, next_retry_at)
+  WHERE status IN ('pending', 'failed');
+
+ALTER TABLE public.app_logs ADD COLUMN IF NOT EXISTS error_type     TEXT;
+ALTER TABLE public.app_logs ADD COLUMN IF NOT EXISTS http_status    INTEGER;
+ALTER TABLE public.app_logs ADD COLUMN IF NOT EXISTS operation      TEXT;
+ALTER TABLE public.app_logs ADD COLUMN IF NOT EXISTS deployment_id  TEXT;
+
+-- Atomic token reservation. p_items is an array of
+-- {scope, scope_id, period, period_start, token_limit, tokens}.
+CREATE OR REPLACE FUNCTION public.reserve_ai_tokens(
+  p_request_id TEXT,
+  p_items      JSONB,
+  p_expires_at TIMESTAMPTZ
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  item JSONB;
+  v_budget_id UUID;
+  v_used INTEGER;
+  v_reserved INTEGER;
+  v_limit INTEGER;
+  v_tokens INTEGER;
+  v_remaining INTEGER;
+BEGIN
+  IF p_request_id IS NULL OR btrim(p_request_id) = '' THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'VALIDATION_ERROR', 'detail', 'request_id required');
+  END IF;
+
+  -- Release expired reservations for the same budgets before taking new ones.
+  UPDATE public.ai_token_budgets b
+  SET reserved_tokens = GREATEST(0, b.reserved_tokens - expired.tokens),
+      updated_at = NOW()
+  FROM (
+    SELECT budget_id, SUM(reserved_tokens) AS tokens
+    FROM public.ai_token_reservations
+    WHERE status = 'reserved' AND expires_at < NOW()
+    GROUP BY budget_id
+  ) expired
+  WHERE b.id = expired.budget_id;
+
+  UPDATE public.ai_token_reservations
+  SET status = 'expired'
+  WHERE status = 'reserved' AND expires_at < NOW();
+
+  FOR item IN SELECT * FROM jsonb_array_elements(p_items)
+  LOOP
+    v_tokens := COALESCE((item->>'tokens')::INTEGER, 0);
+    v_limit := COALESCE((item->>'token_limit')::INTEGER, 0);
+    IF v_tokens < 0 OR v_limit < 0 THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'VALIDATION_ERROR', 'detail', 'negative tokens');
+    END IF;
+
+    INSERT INTO public.ai_token_budgets (
+      scope, scope_id, period, period_start, token_limit, used_tokens, reserved_tokens
+    ) VALUES (
+      item->>'scope',
+      COALESCE(item->>'scope_id', ''),
+      item->>'period',
+      (item->>'period_start')::TIMESTAMPTZ,
+      v_limit,
+      0,
+      0
+    )
+    ON CONFLICT (scope, scope_id, period, period_start) DO NOTHING;
+
+    SELECT id, used_tokens, reserved_tokens, token_limit
+      INTO v_budget_id, v_used, v_reserved, v_limit
+    FROM public.ai_token_budgets
+    WHERE scope = item->>'scope'
+      AND scope_id = COALESCE(item->>'scope_id', '')
+      AND period = item->>'period'
+      AND period_start = (item->>'period_start')::TIMESTAMPTZ
+    FOR UPDATE;
+
+    v_remaining := v_limit - v_used - v_reserved;
+    IF v_tokens > v_remaining THEN
+      RETURN jsonb_build_object(
+        'ok', false,
+        'code', 'AI_BUDGET_EXCEEDED',
+        'scope', item->>'scope',
+        'scope_id', COALESCE(item->>'scope_id', ''),
+        'period', item->>'period',
+        'remaining', GREATEST(v_remaining, 0),
+        'needed', v_tokens
+      );
+    END IF;
+
+    UPDATE public.ai_token_budgets
+    SET reserved_tokens = reserved_tokens + v_tokens,
+        token_limit = v_limit,
+        updated_at = NOW()
+    WHERE id = v_budget_id;
+
+    INSERT INTO public.ai_token_reservations (
+      request_id, budget_id, scope, reserved_tokens, status, expires_at
+    ) VALUES (
+      p_request_id, v_budget_id, item->>'scope', v_tokens, 'reserved', p_expires_at
+    );
+  END LOOP;
+
+  RETURN jsonb_build_object('ok', true, 'request_id', p_request_id);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.settle_ai_tokens(
+  p_request_id TEXT,
+  p_consumed   INTEGER
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  rec RECORD;
+  v_consumed INTEGER;
+  v_used INTEGER;
+BEGIN
+  -- NULL / negative consumed: treat the full reservation as used (failed or unknown usage).
+  v_consumed := p_consumed;
+
+  FOR rec IN
+    SELECT id, budget_id, reserved_tokens
+    FROM public.ai_token_reservations
+    WHERE request_id = p_request_id AND status = 'reserved'
+    FOR UPDATE
+  LOOP
+    IF v_consumed IS NULL OR v_consumed < 0 THEN
+      v_used := rec.reserved_tokens;
+    ELSE
+      v_used := LEAST(rec.reserved_tokens, v_consumed);
+    END IF;
+    UPDATE public.ai_token_budgets
+    SET reserved_tokens = GREATEST(0, reserved_tokens - rec.reserved_tokens),
+        used_tokens = used_tokens + v_used,
+        updated_at = NOW()
+    WHERE id = rec.budget_id;
+    UPDATE public.ai_token_reservations
+    SET consumed_tokens = v_used,
+        status = 'settled'
+    WHERE id = rec.id;
+  END LOOP;
+
+  RETURN jsonb_build_object('ok', true, 'request_id', p_request_id, 'consumed', COALESCE(v_consumed, 0));
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.reserve_ai_tokens(TEXT, JSONB, TIMESTAMPTZ) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.reserve_ai_tokens(TEXT, JSONB, TIMESTAMPTZ) TO service_role;
+REVOKE ALL ON FUNCTION public.settle_ai_tokens(TEXT, INTEGER) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.settle_ai_tokens(TEXT, INTEGER) TO service_role;
 
 -- =============================================================================
 -- IDEMPOTENCY KEYS — prevent duplicate financial transactions
@@ -3546,6 +3894,16 @@ ALTER TABLE public.interview_requests    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.app_logs              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.support_known_errors  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.zammad_ticket_log     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_conversations      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_messages           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_usage_events       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_token_budgets      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_token_reservations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_settings           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_diagnostics        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_tool_executions    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_action_confirmations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.integration_outbox    ENABLE ROW LEVEL SECURITY;
 
 -- ---------------------------------------------------------------------------
 -- RLS: users
@@ -4033,6 +4391,41 @@ CREATE POLICY "support_known_errors: admin write" ON public.support_known_errors
 DROP POLICY IF EXISTS "zammad_ticket_log: admin read" ON public.zammad_ticket_log;
 
 CREATE POLICY "zammad_ticket_log: admin read" ON public.zammad_ticket_log
+  FOR SELECT USING (public.get_my_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- RLS: AI assistant
+-- Writes go through the service role after route-level authz.
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS "ai_conversations: owner read" ON public.ai_conversations;
+DROP POLICY IF EXISTS "ai_messages: owner read" ON public.ai_messages;
+DROP POLICY IF EXISTS "ai_usage_events: owner read" ON public.ai_usage_events;
+DROP POLICY IF EXISTS "ai_diagnostics: owner read" ON public.ai_diagnostics;
+DROP POLICY IF EXISTS "ai_settings: admin read" ON public.ai_settings;
+DROP POLICY IF EXISTS "ai_token_budgets: admin read" ON public.ai_token_budgets;
+
+CREATE POLICY "ai_conversations: owner read" ON public.ai_conversations
+  FOR SELECT USING (user_id = auth.uid() OR public.get_my_role() = 'admin');
+
+CREATE POLICY "ai_messages: owner read" ON public.ai_messages
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.ai_conversations c
+      WHERE c.id = conversation_id
+        AND (c.user_id = auth.uid() OR public.get_my_role() = 'admin')
+    )
+  );
+
+CREATE POLICY "ai_usage_events: owner read" ON public.ai_usage_events
+  FOR SELECT USING (user_id = auth.uid() OR public.get_my_role() = 'admin');
+
+CREATE POLICY "ai_diagnostics: owner read" ON public.ai_diagnostics
+  FOR SELECT USING (user_id = auth.uid() OR public.get_my_role() = 'admin');
+
+CREATE POLICY "ai_settings: admin read" ON public.ai_settings
+  FOR SELECT USING (public.get_my_role() = 'admin');
+
+CREATE POLICY "ai_token_budgets: admin read" ON public.ai_token_budgets
   FOR SELECT USING (public.get_my_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
