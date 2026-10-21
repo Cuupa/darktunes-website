@@ -76,4 +76,72 @@ describe('POST /api/admin/ai/connection-tests', () => {
     expect(body.ok).toBe(true)
     expect(runNvidiaConnectionTest).toHaveBeenCalledOnce()
   })
+
+  function failedResult(errorCode: string) {
+    return {
+      ok: false,
+      started_at: '2026-10-20T00:00:00.000Z',
+      finished_at: '2026-10-20T00:00:05.000Z',
+      total_latency_ms: 5000,
+      steps: [
+        { step: 'auth', ok: true, latency_ms: 1, error_code: null, detail: null },
+        { step: 'fast_complete', ok: false, latency_ms: 4999, error_code: errorCode, detail: 'boom' },
+      ],
+      discovered_capabilities: {},
+      usage: { fast: null, reasoning: null },
+    }
+  }
+
+  const errorCases: Array<[string, number, string]> = [
+    ['TIMEOUT', 504, 'AI_PROVIDER_TIMEOUT'],
+    ['NETWORK_ERROR', 503, 'AI_PROVIDER_NETWORK_ERROR'],
+    ['TLS_ERROR', 503, 'AI_PROVIDER_TLS_ERROR'],
+    ['RATE_LIMITED', 429, 'AI_PROVIDER_RATE_LIMITED'],
+    ['MODEL_UNAVAILABLE', 502, 'AI_PROVIDER_MODEL_UNAVAILABLE'],
+    ['PROVIDER_UNAVAILABLE', 503, 'AI_PROVIDER_UNAVAILABLE'],
+  ]
+
+  it.each(errorCases)('should map provider error %s to HTTP %s and code %s', async (code, status, apiCode) => {
+    resolveNvidiaApiKey.mockResolvedValue('nvapi-test')
+    runNvidiaConnectionTest.mockResolvedValue(failedResult(code))
+    const { POST } = await importRoute()
+    const res = await POST(
+      jsonRequest('/api/admin/ai/connection-tests', { method: 'POST', body: {}, bearer: 'token' }),
+    )
+    const body = await expectStatus<{ code: string }>(res, status)
+    expect(body.code).toBe(apiCode)
+  })
+
+  it('should keep INVALID_KEY → 401', async () => {
+    resolveNvidiaApiKey.mockResolvedValue('nvapi-test')
+    runNvidiaConnectionTest.mockResolvedValue(failedResult('INVALID_KEY'))
+    const { POST } = await importRoute()
+    const res = await POST(
+      jsonRequest('/api/admin/ai/connection-tests', { method: 'POST', body: {}, bearer: 'token' }),
+    )
+    const body = await expectStatus<{ code: string }>(res, 401)
+    expect(body.code).toBe('AI_PROVIDER_INVALID_KEY')
+  })
+
+  it('should keep TOOL_CALL_UNSUPPORTED → 400', async () => {
+    resolveNvidiaApiKey.mockResolvedValue('nvapi-test')
+    runNvidiaConnectionTest.mockResolvedValue(failedResult('TOOL_CALL_UNSUPPORTED'))
+    const { POST } = await importRoute()
+    const res = await POST(
+      jsonRequest('/api/admin/ai/connection-tests', { method: 'POST', body: {}, bearer: 'token' }),
+    )
+    const body = await expectStatus<{ code: string }>(res, 400)
+    expect(body.code).toBe('AI_PROVIDER_TOOL_CALL_UNSUPPORTED')
+  })
+
+  it('should keep INVALID_RESPONSE → 502', async () => {
+    resolveNvidiaApiKey.mockResolvedValue('nvapi-test')
+    runNvidiaConnectionTest.mockResolvedValue(failedResult('INVALID_RESPONSE'))
+    const { POST } = await importRoute()
+    const res = await POST(
+      jsonRequest('/api/admin/ai/connection-tests', { method: 'POST', body: {}, bearer: 'token' }),
+    )
+    const body = await expectStatus<{ code: string }>(res, 502)
+    expect(body.code).toBe('AI_PROVIDER_INVALID_RESPONSE')
+  })
 })

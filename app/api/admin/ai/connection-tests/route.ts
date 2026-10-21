@@ -21,10 +21,21 @@ function stepErrorToApi(
   switch (code) {
     case 'INVALID_KEY':
       return { apiCode: 'AI_PROVIDER_INVALID_KEY', status: 401 }
-    case 'TOOL_CALL_UNSUPPORTED':
-      return { apiCode: 'AI_PROVIDER_TOOL_CALL_UNSUPPORTED', status: 400 }
+    case 'MODEL_UNAVAILABLE':
+      return { apiCode: 'AI_PROVIDER_MODEL_UNAVAILABLE', status: 502 }
+    case 'RATE_LIMITED':
+      return { apiCode: 'AI_PROVIDER_RATE_LIMITED', status: 429 }
+    case 'TIMEOUT':
+      return { apiCode: 'AI_PROVIDER_TIMEOUT', status: 504 }
+    case 'NETWORK_ERROR':
+      return { apiCode: 'AI_PROVIDER_NETWORK_ERROR', status: 503 }
+    case 'TLS_ERROR':
+      return { apiCode: 'AI_PROVIDER_TLS_ERROR', status: 503 }
     case 'INVALID_RESPONSE':
       return { apiCode: 'AI_PROVIDER_INVALID_RESPONSE', status: 502 }
+    case 'TOOL_CALL_UNSUPPORTED':
+      return { apiCode: 'AI_PROVIDER_TOOL_CALL_UNSUPPORTED', status: 400 }
+    case 'PROVIDER_UNAVAILABLE':
     default:
       return { apiCode: 'AI_PROVIDER_UNAVAILABLE', status: 503 }
   }
