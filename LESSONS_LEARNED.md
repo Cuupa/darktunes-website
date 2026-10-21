@@ -253,6 +253,11 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-10-21 — Auto-apply of reset.sql on deploy is not a no-op
+
+- **Finding:** `vercel-install.sh` and CI-success `deploy-supabase.yml` ran `db:apply` on every production deploy. `apply-schema.mjs` sent all of `reset.sql` as one `pg` query (implicit transaction). Public site then served `SITE_SETTINGS_DEFAULTS` (`Music Label`) and empty catalogues because failed public reads are cached as `[]` for up to 1h.
+- **Rule:** Never apply `reset.sql` from Vercel install or from CI success. Manual only: SQL Editor, `npm run db:apply`, or GitHub `workflow_dispatch`. Apply with `psql -f` (one statement at a time), not `client.query(entireFile)`.
+
 ### 2026-10-21 — An expired asset row is not the live pointer
 
 - **Finding:** Submission purge deleted R2 object A then `update release_submissions set audio_r2_key = null where id = submissionId`. After reject → new upload B, row A was still attached. Day-30 purge of A wiped the pointer to B. Asset `expires_at` was set at register, while the UI countdown used submit time.

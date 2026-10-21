@@ -299,10 +299,16 @@ and DOI confirmation emails will never be delivered.
 
 ### Applying the schema
 
-`supabase/reset.sql` is applied **automatically on every deploy** via
-`scripts/vercel-install.sh` (the Vercel `installCommand`), provided
-`SUPABASE_DB_URL` (or `DATABASE_URL`) is set in the Vercel project environment
-variables. It runs after `npm ci` and before the build.
+Schema apply is **manual**. Vercel install (`scripts/vercel-install.sh`) and
+CI success must not run `reset.sql`. Apply when you intend to:
+
+1. Paste `supabase/reset.sql` into the Supabase SQL Editor, or
+2. `npm run db:apply` locally (`SUPABASE_DB_URL` / `DATABASE_URL`), or
+3. GitHub → Actions → **Deploy Supabase** → **Run workflow** (`workflow_dispatch`)
+
+`npm run db:apply` (`scripts/apply-schema.mjs`) uses `psql -v ON_ERROR_STOP=1 -f`
+(statement-by-statement). Do not send the whole file as one `pg` query —
+`ALTER TYPE … ADD VALUE` cannot run inside a single implicit transaction.
 
 `reset.sql` is idempotent and additive (`ADD COLUMN IF NOT EXISTS`, guarded
 `DROP … IF EXISTS`); `npm run check:destructive-sql` guards new destructive
@@ -310,10 +316,6 @@ statements.
 
 `reset.sql` contains **no** cron jobs, no cron wrapper functions and no Vault
 secrets. Re-applying it never touches the scheduled jobs.
-
-`npm run db:apply` (`scripts/apply-schema.mjs`) applies `reset.sql` via the
-`pg` client (`SUPABASE_DB_URL` required) — locally, or automatically on every
-Vercel deploy through `vercel-install.sh`.
 
 ### Sync Scheduler (Supabase Cron → Next.js worker)
 

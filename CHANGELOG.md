@@ -28,6 +28,7 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 - **AI assistant (NVIDIA NIM)** for the artist portal and admin dashboard: encrypted `nvidia_api_key` under Admin → API Keys, token budgets with atomic reservation, streaming chat (`Ctrl+J`), server-side tools over existing DAL, error classification, and Admin → AI Assistant. Live NVIDIA smoke tests: `AI_LIVE_TESTS=1 npm run test:ai:live` (skipped without a key).
 
 ### Fixed
+- **Stop applying `reset.sql` on every deploy.** Vercel install and CI no longer run `db:apply`. Schema apply is manual (`npm run db:apply` / SQL Editor / GitHub **Deploy Supabase** dispatch). `apply-schema.mjs` uses `psql` statement-by-statement again.
 - **Band news HTML could run on the public Personal Artist Page:** the news dialog now sanitizes with `sanitizeHtml`, same as BioBlock.
 - **Empty Profile gallery still showed leftover builder uploads** on the gallery block. An empty live photo list now wins over document JSON.
 - **Video thumbnails advertised as 5 MB died on Vercel:** they go through the 4.5 MB function body. Upload now uses `uploadViaServer` (4 MB cap, specific 413/size errors). Submit only stores thumbnail URLs under `video-submissions/{artistId}/` on the R2 public host.
