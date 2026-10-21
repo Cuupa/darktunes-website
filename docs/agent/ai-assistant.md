@@ -22,6 +22,8 @@ Defaults (also `ai_settings` column defaults / `DEFAULT_AI_MODELS`):
 
 Admin → AI Assistant → Models lists live NVIDIA NIM ids (`GET /api/admin/ai/models` → `GET {NVIDIA_API_BASE_URL}/models`) and PATCHes `model_fast` / `model_reasoning`. Chat turns and connection tests use the saved rows.
 
+The NVIDIA adapter serializes internal tool calls to the OpenAI-compatible `tool_calls: [{id,type:'function',function:{name,arguments}}]` wire format and pairs subsequent tool replies with `tool_call_id`. Abort and timeout signals remain active while the streaming response is read.
+
 Provider adapter: `src/lib/ai/provider/`. Domain code never imports NVIDIA payload types. Connection tests record which extras (`enable_thinking`, `low_effort`, `reasoning_budget`, tools+stream) the live API accepted.
 
 `max_tokens` includes reasoning tokens when thinking is on.
@@ -29,6 +31,8 @@ Provider adapter: `src/lib/ai/provider/`. Domain code never imports NVIDIA paylo
 ## Token budgets
 
 Atomic reservation: `reserve_ai_tokens` / `settle_ai_tokens` in `supabase/reset.sql`.
+
+Each NVIDIA completion in a tool-calling turn gets a separate atomic reservation (`requestId:round`) and settlement. Provider usage is accumulated across all rounds before recording the conversation total. A failed in-flight round consumes its outstanding reservation; previous completed rounds are already settled.
 
 Local estimates use `ceil(chars / 3.2) * 1.15`. Provider `usage` is authoritative after the call. Failed/unknown calls settle the reserved amount, never zero.
 

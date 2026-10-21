@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { estimateInputTokens, estimateTokens, preferProviderUsage } from '@/lib/ai/budget/estimator'
+import { estimateInputTokens, estimateTokens, preferProviderUsage, sumAiUsage } from '@/lib/ai/budget/estimator'
 
 describe('token estimator', () => {
   it('should overestimate relative to a naive chars/4 count', () => {
@@ -31,4 +31,15 @@ describe('token estimator', () => {
     expect(preferProviderUsage(estimate, provider)).toEqual(provider)
     expect(preferProviderUsage(estimate, null)).toEqual(estimate)
   })
+  it('accumulates input, output, and reasoning tokens across tool rounds', () => {
+    const first = { input_tokens: 150, output_tokens: 20, reasoning_tokens: 5, total_tokens: 170 }
+    const second = { input_tokens: 180, output_tokens: 50, reasoning_tokens: 30, total_tokens: 230 }
+    expect(sumAiUsage(first, second)).toEqual({
+      input_tokens: 330,
+      output_tokens: 70,
+      reasoning_tokens: 35,
+      total_tokens: 400,
+    })
+  })
+
 })

@@ -66,24 +66,29 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
 
   async complete(request: AiCompletionRequest, signal?: AbortSignal): Promise<AiCompletion> {
     const started = Date.now()
-    const response = await this.send(request, false, signal)
-    const text = await response.text()
-    let parsed: unknown
+    const { response, cleanup } = await this.send(request, false, signal)
     try {
-      parsed = JSON.parse(text)
-    } catch {
-      throw new AiProviderError('INVALID_RESPONSE', 'NVIDIA returned a non-JSON chat completion.', {
-        httpStatus: response.status,
-      })
+      const text = await response.text()
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(text)
+      } catch {
+        throw new AiProviderError('INVALID_RESPONSE', 'NVIDIA returned a non-JSON chat completion.', {
+          httpStatus: response.status,
+        })
+      }
+      return this.completionFromResponse(request, parsed, Date.now() - started)
+    } finally {
+      cleanup()
     }
-    return this.completionFromResponse(request, parsed, Date.now() - started)
   }
 
   async *stream(request: AiCompletionRequest, signal?: AbortSignal): AsyncIterable<AiStreamEvent> {
     const started = Date.now()
-    const response = await this.send(request, true, signal)
+    const { response, cleanup } = await this.send(request, true, signal)
     const body = response.body
     if (!body) {
+      cleanup()
       throw new AiProviderError('INVALID_RESPONSE', 'NVIDIA returned an empty stream body.', {
         httpStatus: response.status,
       })
@@ -140,7 +145,7 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
       if (error instanceof AiProviderError) throw error
       throw providerErrorFromNetwork(error)
     } finally {
-      this.controllers.delete(request.request_id)
+      cleanup()
       reader.releaseLock()
     }
 
@@ -160,13 +165,24 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
     request: AiCompletionRequest,
     stream: boolean,
     outerSignal?: AbortSignal,
-  ): Promise<Response> {
+  ): Promise<{ response: Response; cleanup: () => void }> {
     const controller = new AbortController()
     this.controllers.set(request.request_id, controller)
     const timeoutMs = request.timeout_ms ?? DEFAULT_TIMEOUT_MS
     const timeout = setTimeout(() => controller.abort(), timeoutMs)
     const onAbort = () => controller.abort()
     outerSignal?.addEventListener('abort', onAbort)
+    if (outerSignal?.aborted) controller.abort()
+
+    // Keep cancellation and timeouts active until the response body is consumed.
+    // A successful HTTP handshake does not mean a streamed completion has finished.
+    const cleanup = () => {
+      clearTimeout(timeout)
+      outerSignal?.removeEventListener('abort', onAbort)
+      if (this.controllers.get(request.request_id) === controller) {
+        this.controllers.delete(request.request_id)
+      }
+    }
 
     try {
       const response = await this.fetchImpl(this.completionsUrl, {
@@ -187,14 +203,11 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
           response.headers.get('retry-after'),
         )
       }
-      return response
+      return { response, cleanup }
     } catch (error) {
+      cleanup()
       if (error instanceof AiProviderError) throw error
       throw providerErrorFromNetwork(error)
-    } finally {
-      clearTimeout(timeout)
-      outerSignal?.removeEventListener('abort', onAbort)
-      if (!stream) this.controllers.delete(request.request_id)
     }
   }
 
@@ -271,6 +284,33 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
   }
 }
 
+/**
+ * Translate internal tool calls into OpenAI-compatible chat message objects.
+ * NVIDIA rejects the flattened internal { name, arguments } tool-call shape.
+ */
+export function serializeNvidiaMessages(messages: AiCompletionRequest['messages']): Record<string, unknown>[] {
+  return messages.map((message) => {
+    const serialized: Record<string, unknown> = {
+      role: message.role,
+      content: message.content,
+    }
+    if (message.role === 'tool') {
+      if (!message.tool_call_id) {
+        throw new AiProviderError('INVALID_RESPONSE', 'A tool reply is missing its tool_call_id.')
+      }
+      serialized.tool_call_id = message.tool_call_id
+    }
+    if (message.role === 'assistant' && message.tool_calls?.length) {
+      serialized.tool_calls = message.tool_calls.map((call) => ({
+        id: call.id,
+        type: 'function',
+        function: { name: call.name, arguments: call.arguments },
+      }))
+    }
+    return serialized
+  })
+}
+
 export function buildNvidiaPayload(
   request: AiCompletionRequest,
   stream: boolean,
@@ -278,13 +318,14 @@ export function buildNvidiaPayload(
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     model: request.model,
-    messages: request.messages,
+    messages: serializeNvidiaMessages(request.messages),
     temperature: request.temperature ?? capabilities.default_temperature,
     top_p: request.top_p ?? capabilities.default_top_p,
     max_tokens: request.max_tokens,
     stream,
   }
   if (request.tools && request.tools.length > 0) {
+    if (request.tool_choice) payload.tool_choice = request.tool_choice
     payload.tools = request.tools.map((tool) => ({
       type: 'function',
       function: {

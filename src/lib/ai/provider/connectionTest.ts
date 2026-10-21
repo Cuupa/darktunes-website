@@ -95,7 +95,7 @@ export async function runNvidiaConnectionTest(options: {
         request_id: 'connection-test-reasoning',
         model: reasoningModel,
         messages: [{ role: 'user', content: HARMLESS_USER_PROMPT }],
-        max_tokens: 64,
+        max_tokens: 512,
         enable_thinking: true,
         low_effort: true,
         timeout_ms: 40_000,
@@ -114,7 +114,7 @@ export async function runNvidiaConnectionTest(options: {
           request_id: 'connection-test-reasoning-plain',
           model: reasoningModel,
           messages: [{ role: 'user', content: HARMLESS_USER_PROMPT }],
-          max_tokens: 64,
+          max_tokens: 256,
           enable_thinking: false,
           timeout_ms: 40_000,
         })
@@ -166,7 +166,8 @@ export async function runNvidiaConnectionTest(options: {
           },
         ],
         tools: [CONNECTION_TEST_ECHO_TOOL],
-        max_tokens: 64,
+        tool_choice: 'required',
+        max_tokens: 128,
         enable_thinking: false,
         timeout_ms: 20_000,
       })

@@ -72,6 +72,7 @@ export interface AiCompletionRequest {
   model: string
   messages: AiChatMessage[]
   tools?: AiToolDefinition[]
+  tool_choice?: 'auto' | 'none' | 'required'
   stream?: boolean
   max_tokens: number
   temperature?: number

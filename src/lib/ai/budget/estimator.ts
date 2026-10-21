@@ -64,3 +64,13 @@ export function preferProviderUsage(estimate: AiUsage, provider: AiUsage | null)
   if (!provider || provider.total_tokens <= 0) return estimate
   return provider
 }
+
+/** Provider usage is per completion. Preserve every round's total for the conversation. */
+export function sumAiUsage(a: AiUsage, b: AiUsage): AiUsage {
+  return {
+    input_tokens: a.input_tokens + b.input_tokens,
+    output_tokens: a.output_tokens + b.output_tokens,
+    reasoning_tokens: a.reasoning_tokens + b.reasoning_tokens,
+    total_tokens: a.total_tokens + b.total_tokens,
+  }
+}
