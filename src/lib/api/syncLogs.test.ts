@@ -91,6 +91,22 @@ describe('recordSyncLog', () => {
     expect(mockWriteAppLog).not.toHaveBeenCalled()
   })
 
+  it('skips insert and returns true for success with zero releases synced', async () => {
+    const db = makeMockDb(mockRow)
+    const ok = await recordSyncLog(db, { status: 'success', api_source: 'itunes', releases_synced: 0 })
+    expect(ok).toBe(true)
+    expect(db.from).not.toHaveBeenCalled()
+    expect(mockWriteAppLog).not.toHaveBeenCalled()
+  })
+
+  it('still inserts success logs when releases were synced', async () => {
+    const db = makeMockDb(mockRow)
+    const ok = await recordSyncLog(db, { status: 'success', api_source: 'itunes', releases_synced: 3 })
+    expect(ok).toBe(true)
+    expect(db.from).toHaveBeenCalledWith('sync_logs')
+    expect(mockWriteAppLog).not.toHaveBeenCalled()
+  })
+
   it('returns false and reports the failure to app_logs when the insert fails', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const db = makeMockDb(null, { message: 'column metadata does not exist' })

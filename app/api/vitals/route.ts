@@ -69,6 +69,11 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     console.info('[WebVitals API]', JSON.stringify(body))
   }
 
+  // Opt-out for operators: disable web-vitals persistence entirely.
+  if (process.env.WEB_VITALS_LOG_DISABLED === 'true') {
+    return NextResponse.json({ ok: true })
+  }
+
   // Persist critical vitals to app_logs for admin visibility
   const threshold = CRITICAL_THRESHOLDS[body.name]
   if (threshold !== undefined && body.value > threshold) {

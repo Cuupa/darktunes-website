@@ -36,6 +36,12 @@ export async function insertSyncLog(db: DbClient, log: SyncLogInsert): Promise<S
  * the console instead of disappearing. Returns true when the row was persisted.
  */
 export async function recordSyncLog(db: DbClient, log: SyncLogInsert): Promise<boolean> {
+  // Skip pure-success sync logs with nothing synced — they carry no signal and
+  // would otherwise grow sync_logs unbounded on every worker tick.
+  if (log.status === 'success' && (log.releases_synced ?? 0) === 0) {
+    return true
+  }
+
   try {
     await insertSyncLog(db, log)
     return true
