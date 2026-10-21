@@ -21,6 +21,8 @@ import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { getCachedSiteSettings } from '@/lib/cache/publicQueries'
 import { getTranslations } from 'next-intl/server'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 import { EpkBuilderClient } from './_components/EpkBuilderClient'
 import { emptyArtistProfile } from '@/lib/epk/migrate/emptyArtistProfile'
 import type { Metadata } from 'next'
@@ -98,13 +100,34 @@ async function EpkBuilderContent({ searchParams }: { searchParams: Promise<{ art
     createdAt: font.createdAt,
   }))
 
-  const state = await ensureMigratedEpkDocument(
-    supabase,
-    artist.id,
-    profile ?? emptyArtistProfile(artist.id),
-    artist,
-    siteSettings?.labelName ?? undefined,
-  )
+  let state
+  try {
+    state = await ensureMigratedEpkDocument(
+      supabase,
+      artist.id,
+      profile ?? emptyArtistProfile(artist.id),
+      artist,
+      siteSettings?.labelName ?? undefined,
+    )
+  } catch (err) {
+    const message =
+      err instanceof Error && err.message === 'EPK_DOCUMENT_CORRUPT'
+        ? 'This EPK document is corrupted and cannot be opened. Restore a saved version.'
+        : 'Could not load the EPK document.'
+    return (
+      <div className="p-8 text-center">
+        <p className="text-destructive">{message}</p>
+        <Button
+          type="button"
+          asChild
+          variant="outline"
+          size="sm"
+        >
+          <Link href={`/portal/profile?artistId=${artist.id}`}>{t('epk_builder_back_profile')}</Link>
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <EpkBuilderClient

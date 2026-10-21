@@ -28,6 +28,7 @@ const putBodySchema = z.object({
   document: epkDocumentV2Schema,
   create_version: z.boolean().optional(),
   version_label: z.string().max(200).optional(),
+  expected_version: z.number().int().nonnegative().optional(),
 })
 
 export const GET = withErrorHandler(async (req: NextRequest) => {
@@ -60,19 +61,27 @@ export const PUT = withErrorHandler(async (req: NextRequest) => {
   const body = putBodySchema.parse(await req.json())
   const ctx = await withPortalMembership(req, body.artist_id)
 
-  const { value: state } = await portalMemberWrite(
-    ctx,
-    {
-      route: 'PUT /api/portal/epk/document',
-      table: 'artist_epks',
-      operation: 'upsert',
-    },
-    (db) =>
-      saveEpkDocument(db, ctx.artist.id, body.document, ctx.user.id, {
-        createVersion: body.create_version,
-        versionLabel: body.version_label,
-      }),
-  )
+  try {
+    const { value: state } = await portalMemberWrite(
+      ctx,
+      {
+        route: 'PUT /api/portal/epk/document',
+        table: 'artist_epks',
+        operation: 'upsert',
+      },
+      (db) =>
+        saveEpkDocument(db, ctx.artist.id, body.document, ctx.user.id, {
+          createVersion: body.create_version,
+          versionLabel: body.version_label,
+          expectedVersion: body.expected_version,
+        }),
+    )
 
-  return NextResponse.json(state)
+    return NextResponse.json(state)
+  } catch (err) {
+    if (err instanceof Error && err.message === 'EPK_DOCUMENT_STALE') {
+      throw new ApiError(409, 'The EPK was changed elsewhere. Reload and reapply your edits.')
+    }
+    throw err
+  }
 })

@@ -118,7 +118,7 @@ export function isAllowedEpkImageUrl(url: string, r2PublicUrl?: string): boolean
     return false
   }
 
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false
+  if (parsed.protocol !== 'https:') return false
   if (isPrivateOrLoopbackHost(parsed.hostname)) return false
 
   const patterns = buildEpkImageHostnamePatterns(r2PublicUrl)

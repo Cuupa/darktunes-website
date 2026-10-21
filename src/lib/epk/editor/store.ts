@@ -194,11 +194,29 @@ export function createEpkEditorStore(initialDocument: EpkDocumentV2) {
         nudgeSelected: (dx, dy) =>
           set((state) => {
             if (state.selectedIds.length === 0) return
+            const pageElements = new Map(
+              state.document.elements
+                .filter((el) => el.pageId === state.activePageId)
+                .map((el) => [el.id, el]),
+            )
             for (const id of state.selectedIds) {
-              const el = state.document.elements.find((e) => e.id === id)
+              const el = pageElements.get(id)
               if (!el || el.locked) continue
-              el.x = snapValue(el.x + dx, state.gridSize, state.snapEnabled)
-              el.y = snapValue(el.y + dy, state.gridSize, state.snapEnabled)
+              const nextX = snapValue(el.x + dx, state.gridSize, state.snapEnabled)
+              const nextY = snapValue(el.y + dy, state.gridSize, state.snapEnabled)
+              const shiftX = nextX - el.x
+              const shiftY = nextY - el.y
+              el.x = nextX
+              el.y = nextY
+              if (el.type === 'group' && el.children) {
+                for (const childId of el.children) {
+                  const child = pageElements.get(childId)
+                  if (child && !child.locked) {
+                    child.x = snapValue(child.x + shiftX, state.gridSize, state.snapEnabled)
+                    child.y = snapValue(child.y + shiftY, state.gridSize, state.snapEnabled)
+                  }
+                }
+              }
             }
             state.isDirty = true
           }),
@@ -360,22 +378,27 @@ export function createEpkEditorStore(initialDocument: EpkDocumentV2) {
           const newPageId = createEpkPageId(get().document.pages.length)
           const newPageName = `${sourcePage.name ?? 'Page'} copy`
 
+          const sourceElements = get().document.elements.filter((el) => el.pageId === pageId)
+          const idMap = new Map<string, string>()
+          const cloned: EpkElement[] = []
+          for (const el of sourceElements) {
+            const newId = createEpkElementId(el.type)
+            idMap.set(el.id, newId)
+            cloned.push({ ...el, id: newId, pageId: newPageId })
+          }
+          for (const el of cloned) {
+            if (el.type === 'group' && el.children) {
+              el.children = el.children.map((childId) => idMap.get(childId) ?? childId)
+            }
+          }
+
           set((state) => {
             state.document.pages.push({
               ...sourcePage,
               id: newPageId,
               name: newPageName,
             })
-
-            const sourceElements = state.document.elements.filter((el) => el.pageId === pageId)
-            for (const el of sourceElements) {
-              state.document.elements.push({
-                ...el,
-                id: createEpkElementId(el.type),
-                pageId: newPageId,
-              })
-            }
-
+            state.document.elements.push(...cloned)
             state.activePageId = newPageId
             state.selectedIds = []
             state.isDirty = true
@@ -463,14 +486,32 @@ export function createEpkEditorStore(initialDocument: EpkDocumentV2) {
           set((state) => {
             const page = state.document.pages.find((p) => p.id === state.activePageId)
             if (!page || state.selectedIds.length === 0) return
+            const pageElements = new Map(
+              state.document.elements
+                .filter((el) => el.pageId === state.activePageId)
+                .map((el) => [el.id, el]),
+            )
             for (const id of state.selectedIds) {
-              const el = state.document.elements.find((e) => e.id === id)
+              const el = pageElements.get(id)
               if (!el || el.locked) continue
+              const prevX = el.x
+              const prevY = el.y
               if (mode === 'center' || mode === 'center-h') {
                 el.x = snapValue((page.width - el.width) / 2, state.gridSize, state.snapEnabled)
               }
               if (mode === 'center' || mode === 'center-v') {
                 el.y = snapValue((page.height - el.height) / 2, state.gridSize, state.snapEnabled)
+              }
+              const shiftX = el.x - prevX
+              const shiftY = el.y - prevY
+              if ((shiftX || shiftY) && el.type === 'group' && el.children) {
+                for (const childId of el.children) {
+                  const child = pageElements.get(childId)
+                  if (child && !child.locked) {
+                    child.x = snapValue(child.x + shiftX, state.gridSize, state.snapEnabled)
+                    child.y = snapValue(child.y + shiftY, state.gridSize, state.snapEnabled)
+                  }
+                }
               }
             }
             state.isDirty = true
