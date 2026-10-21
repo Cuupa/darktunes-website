@@ -100,8 +100,8 @@ export const ROUTE_BUNDLES: Record<string, readonly Namespace[]> = {
   '/portal': ['portal', 'portalHelp', 'newsletter', 'errors', 'pwa'],
   // Admin reuses portal components (e.g. EventManager) — include portal strings
   // or keys render as raw "portal.tour_heading" in the admin UI.
-  '/admin': ['admin', 'adminSubmissions', 'portal', 'errors', 'pwa'],
-  '/editor': ['admin', 'adminSubmissions', 'portal', 'errors', 'pwa'],
+  '/admin': ['admin', 'adminSubmissions', 'portal', 'errors', 'pwa', 'ai'],
+  '/editor': ['admin', 'adminSubmissions', 'portal', 'errors', 'pwa', 'ai'],
   '/press': [
     'press',
     'pressLanding',
