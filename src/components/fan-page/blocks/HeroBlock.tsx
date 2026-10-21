@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import type { FanPageImageProps } from '@/lib/fan-page/schema/documentV1'
 import { resolveThemeColors } from '@/lib/fan-page/theme/resolveThemeColors'
 import type { FanPageTheme } from '@/lib/fan-page/schema/documentV1'
@@ -11,9 +12,11 @@ interface HeroBlockProps {
   subheadline?: string
   image?: FanPageImageProps
   showCountdown?: boolean
+  showLogo?: boolean
   compact?: boolean
   theme: FanPageTheme
   artistName?: string
+  logoUrl?: string
 }
 
 export function HeroBlock({
@@ -21,9 +24,11 @@ export function HeroBlock({
   subheadline,
   image,
   showCountdown,
+  showLogo,
   compact,
   theme,
   artistName,
+  logoUrl,
 }: HeroBlockProps) {
   const colors = resolveThemeColors(theme)
   const title = headline || artistName || ''
@@ -34,6 +39,16 @@ export function HeroBlock({
         <FanPageImage image={image} alt={title} fill className="rounded-lg" width={800} />
       </div>
       <div className={cn('flex-1', compact && 'text-center')}>
+        {showLogo && logoUrl ? (
+          <Image
+            src={logoUrl}
+            alt=""
+            width={220}
+            height={48}
+            unoptimized
+            className={cn('mb-4 h-12 w-auto max-w-[220px] object-contain', compact && 'mx-auto')}
+          />
+        ) : null}
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl" style={{ color: colors.primary }}>
           {title}
         </h1>

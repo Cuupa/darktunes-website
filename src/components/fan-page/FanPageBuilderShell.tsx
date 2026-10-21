@@ -101,7 +101,7 @@ export function FanPageBuilderShell({
 
   const rightPanel = (
     <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3" data-lenis-prevent>
-      <FanPagePropertiesPanel artistId={artistId} />
+      <FanPagePropertiesPanel artistId={artistId} hasLogo={Boolean(liveData.artist?.logoUrl)} />
       <FanPageThemePanel />
     </div>
   )

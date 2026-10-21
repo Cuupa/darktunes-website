@@ -49,6 +49,8 @@ function defaultPropsForBlock(type: FanPageBlockType): Record<string, unknown> {
       return { limit: 6 }
     case 'video_grid':
       return { limit: 3 }
+    case 'news':
+      return { limit: 6 }
     case 'spacer':
       return { size: 'md' }
     default:

@@ -12,6 +12,9 @@ import { getFanPageDocumentState } from '@/lib/api/fanPageDocument'
 import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getVideosByArtistId } from '@/lib/api/videos'
+import { getPublicNewsPostsByArtistId } from '@/lib/api/news'
+import { getPublishedArtistNewsByArtistId } from '@/lib/api/artistNews'
+import { mergeFanPageNews } from '@/lib/fan-page/mergeNews'
 import { getFeatureFlagsForRole } from '@/lib/api/featureFlags'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FanPageBuilderClient } from './_components/FanPageBuilderClient'
@@ -62,11 +65,13 @@ async function FanPageBuilderContent({
 
   const profile = await getArtistProfileByArtistId(supabase, artist.id).catch(() => null)
 
-  const [state, releases, concerts, videos] = await Promise.all([
+  const [state, releases, concerts, videos, labelNews, artistNews] = await Promise.all([
     getFanPageDocumentState(supabase, artist.id, artist, profile),
     getReleasesByArtistId(supabase, artist.id).catch(() => []),
     getConcertsByArtistId(supabase, artist.id).catch(() => []),
     getVideosByArtistId(supabase, artist.id).catch(() => []),
+    getPublicNewsPostsByArtistId(supabase, artist.id).catch(() => []),
+    getPublishedArtistNewsByArtistId(supabase, artist.id).catch(() => []),
   ])
 
   return (
@@ -79,6 +84,8 @@ async function FanPageBuilderContent({
       releases={releases}
       concerts={concerts}
       videos={videos}
+      news={mergeFanPageNews(labelNews, artistNews)}
+      galleryPhotos={profile?.epkGalleryPhotos ?? []}
     />
   )
 }

@@ -7,6 +7,7 @@ import type { LandingPageDocumentV1 } from '@/lib/fan-page/schema/documentV1'
 import type { FanPageDevice } from '@/lib/fan-page/editor/store'
 import type { Release, Concert, Video } from '@/types'
 import type { PublicArtist } from '@/lib/api/publicArtist'
+import type { FanPageNewsItem } from '@/lib/fan-page/mergeNews'
 import { FanPageBlockRenderer, type FanPageLiveData } from '@/components/fan-page/FanPageBlockRenderer'
 import { resolveThemeColors } from '@/lib/fan-page/theme/resolveThemeColors'
 
@@ -16,6 +17,8 @@ interface FanPagePublicViewProps {
   releases: Release[]
   concerts: Concert[]
   videos: Video[]
+  news?: FanPageNewsItem[]
+  galleryPhotos?: string[]
   isPreview?: boolean
 }
 
@@ -25,6 +28,8 @@ export function FanPagePublicView({
   releases,
   concerts,
   videos,
+  news,
+  galleryPhotos,
   isPreview = false,
 }: FanPagePublicViewProps) {
   const t = useTranslations('portal')
@@ -47,6 +52,8 @@ export function FanPagePublicView({
     concerts,
     videos,
     smartLinks: artist.smartLinks,
+    news,
+    galleryPhotos,
   }
 
   return (

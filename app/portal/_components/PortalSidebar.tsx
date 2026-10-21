@@ -19,6 +19,7 @@ import {
   MapTrifold,
   MegaphoneSimple,
   MusicNotes,
+  Newspaper,
   Question,
   Receipt,
   SignOut,
@@ -97,6 +98,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/portal/profile', label: 'profile', icon: User },
       { href: '/portal/epk-builder', label: 'epk_builder_nav', icon: FileText, flag: 'artist.epk_builder' },
       { href: '/portal/fan-page', label: 'fan_page_nav', icon: Globe, flag: 'artist.fan_page' },
+      { href: '/portal/news', label: 'artist_news_nav', icon: Newspaper, flag: 'artist.fan_page' },
       { href: '/portal/releases', label: 'releases', icon: MusicNotes },
       // Always available for artists (releases + events calendar).
       { href: '/portal/calendar', label: 'calendar', icon: CalendarDots },

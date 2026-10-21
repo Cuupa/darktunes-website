@@ -91,6 +91,8 @@ const CRITICAL_TABLES = {
   artist_billing_profiles: { mode: 'create-once' },
   artist_documents: { mode: 'create-once' },
   artist_landing_pages: { mode: 'create-once' },
+  artist_news_posts: { mode: 'create-once' },
+  video_submissions: { mode: 'create-once' },
   epk_fonts: { mode: 'create-once' },
   epk_share_links: { mode: 'create-once' },
   epk_versions: { mode: 'create-once' },

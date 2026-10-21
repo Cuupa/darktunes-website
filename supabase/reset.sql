@@ -2399,6 +2399,85 @@ CREATE INDEX IF NOT EXISTS idx_artist_landing_pages_published
   ON public.artist_landing_pages (publish_status)
   WHERE publish_status = 'published';
 
+-- ---------------------------------------------------------------------------
+-- TABLE: artist_news_posts  (band-authored news, independent of label CMS)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.artist_news_posts (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  artist_id     UUID        NOT NULL REFERENCES public.artists (id) ON DELETE CASCADE,
+  title         TEXT        NOT NULL,
+  slug          TEXT        NOT NULL,
+  excerpt       TEXT,
+  content       TEXT        NOT NULL DEFAULT '',
+  image_url     TEXT,
+  status        TEXT        NOT NULL DEFAULT 'draft'
+                CHECK (status IN ('draft', 'published')),
+  published_at  TIMESTAMPTZ,
+  created_by    UUID        REFERENCES auth.users (id) ON DELETE SET NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (artist_id, slug)
+);
+
+CREATE INDEX IF NOT EXISTS idx_artist_news_posts_artist_id
+  ON public.artist_news_posts (artist_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_artist_news_posts_published
+  ON public.artist_news_posts (artist_id, published_at DESC)
+  WHERE status = 'published';
+
+DROP TRIGGER IF EXISTS trg_artist_news_posts_updated_at ON public.artist_news_posts;
+CREATE TRIGGER trg_artist_news_posts_updated_at
+  BEFORE UPDATE ON public.artist_news_posts
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.artist_news_posts ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "artist_news_posts: artist read own" ON public.artist_news_posts;
+CREATE POLICY "artist_news_posts: artist read own" ON public.artist_news_posts
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "artist_news_posts: artist insert own" ON public.artist_news_posts;
+CREATE POLICY "artist_news_posts: artist insert own" ON public.artist_news_posts
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "artist_news_posts: artist update own" ON public.artist_news_posts;
+CREATE POLICY "artist_news_posts: artist update own" ON public.artist_news_posts
+  FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
+
+DROP POLICY IF EXISTS "artist_news_posts: artist delete own" ON public.artist_news_posts;
+CREATE POLICY "artist_news_posts: artist delete own" ON public.artist_news_posts
+  FOR DELETE USING (
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "artist_news_posts: admin all" ON public.artist_news_posts;
+CREATE POLICY "artist_news_posts: admin all" ON public.artist_news_posts
+  FOR ALL
+  USING (public.get_my_role() = 'admin')
+  WITH CHECK (public.get_my_role() = 'admin');
+
+DROP POLICY IF EXISTS "artist_news_posts: editor+ read all" ON public.artist_news_posts;
+CREATE POLICY "artist_news_posts: editor+ read all" ON public.artist_news_posts
+  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+
+DROP POLICY IF EXISTS "artist_news_posts: public read published" ON public.artist_news_posts;
+CREATE POLICY "artist_news_posts: public read published" ON public.artist_news_posts
+  FOR SELECT USING (
+    status = 'published'
+    AND published_at IS NOT NULL
+    AND published_at <= NOW()
+    AND EXISTS (
+      SELECT 1 FROM public.artists a
+      WHERE a.id = artist_id AND a.is_visible = TRUE
+    )
+  );
+
 DROP TRIGGER IF EXISTS trg_artist_landing_pages_updated_at ON public.artist_landing_pages;
 CREATE TRIGGER trg_artist_landing_pages_updated_at
   BEFORE UPDATE ON public.artist_landing_pages
@@ -3852,6 +3931,7 @@ ALTER TABLE public.epk_share_links   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.epk_download_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.epk_templates     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.artist_landing_pages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.artist_news_posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.streaming_stats              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales_statements             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.distributor_import_batches     ENABLE ROW LEVEL SECURITY;
@@ -6268,6 +6348,8 @@ CREATE TABLE IF NOT EXISTS public.video_submissions (
   created_at            TIMESTAMPTZ               NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ               NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.video_submissions ADD COLUMN IF NOT EXISTS form_data JSONB;
 
 CREATE INDEX IF NOT EXISTS idx_video_submissions_artist_id ON public.video_submissions (artist_id);
 CREATE INDEX IF NOT EXISTS idx_video_submissions_status    ON public.video_submissions (status);

@@ -95,7 +95,7 @@
 | Availability | **Always on** for signed-in portal artists (sidebar not gated by `artist.calendar`; page has no disable gate) |
 | Data | Releases: `getAllVisibleReleasesForCalendar` (slim nested select). Events: `getAllVisibleConcertsForCalendar` (past + future, nested artists / featured) |
 | Cache | `getCachedCalendarReleases` (`releases` tag) + `getCachedCalendarConcerts` (`concerts` tag) via cookie-free client |
-| UI filters | Kind: All / Releases / Events. Ownership: All artists / Mine only. Search: artists, titles, venues. Release type chips when releases visible |
+| UI | FullCalendar month + list (`@fullcalendar/react`). List is the default under 768px. Kind: All / Releases / Events. Ownership: All artists / Mine only. Search: artists, titles, venues. Release type chips when releases visible |
 | Filters SSOT | `src/lib/portal/releaseCalendarFilters.ts` (`filterCalendarReleases`, `filterCalendarConcerts`) |
 | Auth | `resolvePortalArtist` request-scoped for “Mine only”; calendar payloads are shared cache |
 
@@ -261,7 +261,7 @@ Artists are guided step-by-step; only fields visible/required for the selected t
 
 ## Video submission
 
-`/portal/releases/videos/new` → `video_submissions` row only (not a `videos` catalog entry until a future promote feature). Admin: `/admin/video-submissions`. APIs: `POST /api/portal/submit-video`, `PATCH /api/admin/video-submissions/[id]`.
+`/portal/releases/videos/new` → `video_submissions` row only (not a `videos` catalog entry until a future promote feature). Admin: `/admin/video-submissions`. APIs: `POST /api/portal/submit-video`, `POST /api/portal/video-submission-thumbnails` (JPEG/PNG/WebP, 4 MB server-proxy cap via `uploadViaServer`), `PATCH /api/admin/video-submissions/[id]`. Extra thumbs in `form_data.thumbnail_urls` must be this artist’s R2 URLs under `video-submissions/{artistId}/`.
 
 ## Portal access gate
 
@@ -302,8 +302,13 @@ Distinct from EPK (press/PDF) and the fixed `/artists/[slug]` profile. One custo
 | Public URL | Rewrite `/@:slug` → `/fan/:slug`; ISR tag `fan-page-{slug}` |
 | Publish | `draft` → `pending_review` (default) or direct when `artists.landing_publish_trusted` |
 | Assets | Upload `source=landing` → `asset_folders/landing`, tag `landing_editor` |
+| News block | Live merge of label `news_posts` for that artist + `artist_news_posts` (band-authored). Not on public `/news`. |
+| Gallery block | Reads `artist_epks.epk_gallery_photos` (Portal → Profile → Gallery). Empty profile list wins over document JSON. No per-block uploads. |
+| Hero logo | Optional `showLogo` toggle; source `artists.logo_url` (label-set). |
 
-DAL: `fanPageDocument.ts`, `publicFanPage.ts`. APIs: `app/api/portal/fan-page/document`, `publish`; admin `fan-page/review/[artistId]`.
+**Band news:** table `artist_news_posts`, portal `/portal/news` (gated by `artist.fan_page`). APIs `GET/POST /api/portal/artist-news`, `PATCH/DELETE /api/portal/artist-news/{id}`. Direct publish; never mixed into label CMS `/news`.
+
+DAL: `fanPageDocument.ts`, `publicFanPage.ts`, `artistNews.ts`. APIs: `app/api/portal/fan-page/document`, `publish`; admin `fan-page/review/[artistId]`.
 
 ## Journalist dashboard (`/press/dashboard/*`)
 

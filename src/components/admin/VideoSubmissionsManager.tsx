@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
@@ -129,6 +130,23 @@ export function VideoSubmissionsManager() {
                 Video Download
               </a>
             )}
+            {(() => {
+              const extra = selected.formData?.thumbnail_urls
+              const urls = [
+                selected.thumbnailUrl,
+                ...(Array.isArray(extra) ? extra.filter((v): v is string => typeof v === 'string') : []),
+              ].filter((v, i, all): v is string => Boolean(v) && all.indexOf(v) === i)
+              if (urls.length === 0) return null
+              return (
+                <div className="flex flex-wrap gap-2">
+                  {urls.map((url) => (
+                    <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+                      <Image src={url} alt="" width={144} height={80} unoptimized className="h-20 w-36 rounded object-cover" />
+                    </a>
+                  ))}
+                </div>
+              )
+            })()}
             {selected.youtubeDescription && (
               <p className="text-sm text-muted-foreground">{selected.youtubeDescription}</p>
             )}
@@ -138,7 +156,7 @@ export function VideoSubmissionsManager() {
             {selected.notes && <p className="text-sm text-muted-foreground">{selected.notes}</p>}
             {selected.formData && Object.keys(selected.formData).length > 0 && (
               <div className="space-y-1 text-sm text-muted-foreground">
-                {Object.entries(selected.formData).map(([key, value]) => (
+                {Object.entries(selected.formData).filter(([key]) => key !== 'thumbnail_urls').map(([key, value]) => (
                   <p key={key}>
                     <span className="font-medium">{key}: </span>
                     {String(value)}

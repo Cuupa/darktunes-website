@@ -13,6 +13,7 @@ const BLOCK_LABEL_KEYS: Record<FanPageBlockType, string> = {
   smart_links: 'fanPage_block_links',
   newsletter_signup: 'fanPage_block_newsletter',
   gallery: 'fanPage_block_gallery',
+  news: 'fanPage_block_news',
   video_grid: 'fanPage_block_videos',
   merch_shelf: 'fanPage_block_merch',
   cta_banner: 'fanPage_block_cta',

@@ -3,6 +3,7 @@
 import type { FanPageSection, FanPageTheme, FanPageImageProps } from '@/lib/fan-page/schema/documentV1'
 import type { FanPageDevice } from '@/lib/fan-page/editor/store'
 import type { Artist, Release, Concert, Video } from '@/types'
+import type { FanPageNewsItem } from '@/lib/fan-page/mergeNews'
 import { FanPageSectionShell } from './blocks/FanPageSectionShell'
 import { HeroBlock } from './blocks/HeroBlock'
 import { BioBlock } from './blocks/BioBlock'
@@ -12,6 +13,7 @@ import { TourDatesBlock } from './blocks/TourDatesBlock'
 import { SmartLinksBlock } from './blocks/SmartLinksBlock'
 import { NewsletterBlock } from './blocks/NewsletterBlock'
 import { GalleryBlock } from './blocks/GalleryBlock'
+import { NewsBlock } from './blocks/NewsBlock'
 import { VideoGridBlock } from './blocks/VideoGridBlock'
 import { MerchBlock } from './blocks/MerchBlock'
 import { CtaBannerBlock } from './blocks/CtaBannerBlock'
@@ -23,6 +25,8 @@ export interface FanPageLiveData {
   concerts?: Concert[]
   videos?: Video[]
   smartLinks?: Array<{ label: string; url: string }>
+  news?: FanPageNewsItem[]
+  galleryPhotos?: string[]
 }
 
 interface FanPageBlockRendererProps {
@@ -58,9 +62,11 @@ export function FanPageBlockRenderer({
             subheadline={prop<string>(props, 'subheadline')}
             image={prop<FanPageImageProps>(props, 'image')}
             showCountdown={prop<boolean>(props, 'showCountdown')}
+            showLogo={prop<boolean>(props, 'showLogo')}
             compact={prop<boolean>(props, 'compact')}
             theme={theme}
             artistName={artist?.name}
+            logoUrl={artist?.logoUrl}
           />
         )
       case 'bio':
@@ -113,9 +119,19 @@ export function FanPageBlockRenderer({
         return (
           <GalleryBlock
             images={prop<FanPageImageProps[]>(props, 'images')}
+            livePhotos={liveData?.galleryPhotos}
             theme={theme}
             title={prop<string>(props, 'title')}
             columns={prop<number>(props, 'columns')}
+          />
+        )
+      case 'news':
+        return (
+          <NewsBlock
+            items={liveData?.news}
+            limit={prop<number>(props, 'limit')}
+            theme={theme}
+            title={prop<string>(props, 'title')}
           />
         )
       case 'video_grid':

@@ -45,6 +45,7 @@ const row = {
   youtube_category: 'Music',
   target_publish_date: '2026-08-01',
   notes: null,
+  form_data: null,
   admin_reply: null,
   admin_reply_at: null,
   created_at: '2026-01-01T00:00:00Z',

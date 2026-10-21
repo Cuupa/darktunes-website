@@ -10,6 +10,8 @@ import { withIdempotency } from '@/lib/api/idempotency'
 import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { getClientIp } from '@/lib/ipRateLimit'
 import { emitNotification } from '@/lib/notifications/emit'
+import { PORTAL_VIDEO_THUMBNAIL_MAX, isArtistVideoThumbnailUrl } from '@/lib/uploads/portalUploadLimits'
+import { serverEnv } from '@/lib/env.server'
 
 const bodySchema = z.object({
   title: z.string().min(1),
@@ -50,6 +52,35 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
   const body = bodySchema.parse(await req.json())
 
+  const extraRaw = Array.isArray(body.formData?.thumbnail_urls)
+    ? (body.formData.thumbnail_urls as unknown[])
+    : []
+  const extraThumbs: string[] = []
+  for (const value of extraRaw) {
+    if (typeof value !== 'string' || !isArtistVideoThumbnailUrl(value, serverEnv.CLOUDFLARE_R2_PUBLIC_URL, artist.id)) {
+      throw new ApiError(
+        400,
+        'A thumbnail URL is not an image uploaded for this artist. Remove it and upload the file again.',
+      )
+    }
+    extraThumbs.push(value)
+  }
+  if (extraThumbs.length > PORTAL_VIDEO_THUMBNAIL_MAX) {
+    throw new ApiError(
+      400,
+      `At most ${PORTAL_VIDEO_THUMBNAIL_MAX} video thumbnails can be attached. Remove extra images and try again.`,
+    )
+  }
+  if (
+    body.thumbnailUrl &&
+    !isArtistVideoThumbnailUrl(body.thumbnailUrl, serverEnv.CLOUDFLARE_R2_PUBLIC_URL, artist.id)
+  ) {
+    throw new ApiError(
+      400,
+      'A thumbnail URL is not an image uploaded for this artist. Remove it and upload the file again.',
+    )
+  }
+
   const schemaFields = await getFormSchema(supabase, 'video')
   for (const field of schemaFields) {
     if (!field.isRequired) continue
@@ -69,14 +100,17 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       title: body.title,
       download_url: body.downloadUrl,
       description: body.description ?? null,
-      thumbnail_url: body.thumbnailUrl ?? null,
+      thumbnail_url: extraThumbs[0] ?? body.thumbnailUrl ?? null,
       youtube_title: body.youtubeTitle ?? null,
       youtube_description: body.youtubeDescription ?? null,
       youtube_tags: body.youtubeTags,
       youtube_category: body.youtubeCategory ?? null,
       target_publish_date: body.targetPublishDate ?? null,
       notes: body.notes ?? null,
-      form_data: body.formData ?? null,
+      form_data:
+        extraThumbs.length > 0
+          ? { ...(body.formData ?? {}), thumbnail_urls: extraThumbs }
+          : (body.formData ?? null),
     })
   })
 
