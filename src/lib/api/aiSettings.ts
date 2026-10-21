@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import { DEFAULT_LABEL_ID } from '@/lib/api/apiCredentials'
 import { DEFAULT_TOKEN_LIMITS, parseTokenLimits, type TokenLimits } from '@/lib/ai/budget/limits'
+import { DEFAULT_AI_MODELS } from '@/lib/ai/types/provider'
 
 type Db = SupabaseClient<Database>
 type SettingsRow = Database['public']['Tables']['ai_settings']['Row']
@@ -56,8 +57,8 @@ export async function getAiSettings(db: Db): Promise<AiSettings> {
       enabled: false,
       testMode: true,
       provider: 'nvidia',
-      modelFast: 'nvidia/nemotron-3.5-lightning-30b-a3b',
-      modelReasoning: 'nvidia/nemotron-3-super-120b-a12b',
+      modelFast: DEFAULT_AI_MODELS.fast,
+      modelReasoning: DEFAULT_AI_MODELS.reasoning,
       defaultStreaming: true,
       tokenLimits: parseTokenLimits(DEFAULT_TOKEN_LIMITS),
       reasoningSettings: { fast_default: false, reasoning_default: true, low_effort: true },

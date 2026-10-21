@@ -13,10 +13,14 @@ The assistant stays off until:
 
 ## Models
 
+Defaults (also `ai_settings` column defaults / `DEFAULT_AI_MODELS`):
+
 | Role | ID |
 |---|---|
 | Fast | `nvidia/nemotron-3.5-lightning-30b-a3b` |
 | Reasoning | `nvidia/nemotron-3-super-120b-a12b` |
+
+Admin → AI Assistant → Models lists live NVIDIA NIM ids (`GET /api/admin/ai/models` → `GET {NVIDIA_API_BASE_URL}/models`) and PATCHes `model_fast` / `model_reasoning`. Chat turns and connection tests use the saved rows.
 
 Provider adapter: `src/lib/ai/provider/`. Domain code never imports NVIDIA payload types. Connection tests record which extras (`enable_thinking`, `low_effort`, `reasoning_budget`, tools+stream) the live API accepted.
 

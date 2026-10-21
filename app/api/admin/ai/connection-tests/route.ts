@@ -11,7 +11,7 @@ import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { resolveNvidiaApiKey } from '@/lib/ai/provider/resolveKey'
 import { runNvidiaConnectionTest } from '@/lib/ai/provider/connectionTest'
 import type { ConnectionTestStepId } from '@/lib/ai/provider/connectionTest'
-import { updateAiSettings } from '@/lib/api/aiSettings'
+import { getAiSettings, updateAiSettings } from '@/lib/api/aiSettings'
 
 export const maxDuration = 60
 
@@ -54,7 +54,12 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     throw buildApiError('AI_NOT_CONFIGURED', 503)
   }
 
-  const result = await runNvidiaConnectionTest({ apiKey })
+  const settings = await getAiSettings(serviceClient)
+  const result = await runNvidiaConnectionTest({
+    apiKey,
+    fastModel: settings.modelFast,
+    reasoningModel: settings.modelReasoning,
+  })
   await updateAiSettings(serviceClient, {
     last_connection_test: {
       ok: result.ok,
