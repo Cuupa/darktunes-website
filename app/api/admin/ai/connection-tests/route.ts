@@ -3,15 +3,32 @@
  * Admin-only NVIDIA probe. Never retries on failure.
  */
 
+import type { ErrorCode } from '@/lib/errorCodes'
 import { NextRequest, NextResponse } from 'next/server'
 import { buildApiError, withErrorHandler } from '@/lib/errors'
 import { requireAdminWithServiceClient } from '@/lib/adminAuth'
 import { checkDistributedRateLimit } from '@/lib/rateLimitDistributed'
 import { resolveNvidiaApiKey } from '@/lib/ai/provider/resolveKey'
 import { runNvidiaConnectionTest } from '@/lib/ai/provider/connectionTest'
+import type { ConnectionTestStepId } from '@/lib/ai/provider/connectionTest'
 import { updateAiSettings } from '@/lib/api/aiSettings'
 
 export const maxDuration = 60
+
+function stepErrorToApi(
+  code: string | null,
+): { apiCode: ErrorCode; status: number } {
+  switch (code) {
+    case 'INVALID_KEY':
+      return { apiCode: 'AI_PROVIDER_INVALID_KEY', status: 401 }
+    case 'TOOL_CALL_UNSUPPORTED':
+      return { apiCode: 'AI_PROVIDER_TOOL_CALL_UNSUPPORTED', status: 400 }
+    case 'INVALID_RESPONSE':
+      return { apiCode: 'AI_PROVIDER_INVALID_RESPONSE', status: 502 }
+    default:
+      return { apiCode: 'AI_PROVIDER_UNAVAILABLE', status: 503 }
+  }
+}
 
 export const POST = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const { userId, serviceClient } = await requireAdminWithServiceClient(req)
@@ -38,6 +55,13 @@ export const POST = withErrorHandler(async (req: NextRequest): Promise<NextRespo
     },
     provider_capabilities: result.discovered_capabilities,
   }).catch(() => undefined)
+
+  if (!result.ok) {
+    const failedStep = result.steps.find((s) => !s.ok)
+    const { apiCode, status } = stepErrorToApi(failedStep?.error_code ?? null)
+    throw buildApiError(apiCode, status)
+  }
+
   return NextResponse.json({
     ok: result.ok,
     started_at: result.started_at,
