@@ -3,7 +3,10 @@
 import { useLocale, useTranslations } from 'next-intl'
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { SchemaDrivenField } from '@/components/submissions/SchemaDrivenField'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { buildReleaseWizardSteps, humanizeGroupKey, type WizardStep } from '@/lib/submissions/wizardSteps'
@@ -13,6 +16,8 @@ import {
   defaultStepLabel,
 } from '@/components/portal/SubmissionWizardShell'
 import type { Artist, SubmissionFormField } from '@/types'
+import { PORTAL_VIDEO_THUMBNAIL_MAX } from '@/lib/uploads/portalUploadLimits'
+import { ServerUploadError, uploadViaServer } from '@/lib/uploads/adminServerUpload'
 
 const STANDARD_FIELD_TO_BODY_KEY: Record<string, string> = {
   title: 'title',
@@ -34,6 +39,7 @@ interface VideoSubmissionFormProps {
 
 export function VideoSubmissionForm({ formSchema, artist }: VideoSubmissionFormProps) {
   const t = useTranslations('portal')
+  const tErrors = useTranslations('errors')
   const locale = useLocale()
   const router = useRouter()
   const [values, setValues] = useState<Record<string, string>>({
@@ -43,6 +49,8 @@ export function VideoSubmissionForm({ formSchema, artist }: VideoSubmissionFormP
   const [activeIndex, setActiveIndex] = useState(0)
   const [maxReachableIndex, setMaxReachableIndex] = useState(0)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [thumbnailUrls, setThumbnailUrls] = useState<string[]>([])
+  const [thumbBusy, setThumbBusy] = useState(false)
   const idempotencyKeyRef = useRef(
     typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
@@ -89,6 +97,7 @@ export function VideoSubmissionForm({ formSchema, artist }: VideoSubmissionFormP
     if (!activeStep || activeStep.kind === 'review') return true
     const errors: Record<string, string> = {}
     for (const field of activeStep.fields) {
+      if (field.fieldKey === 'thumbnail_url') continue
       const raw = values[field.fieldKey] ?? ''
       if (field.isRequired && !raw.trim() && field.fieldType !== 'boolean') {
         errors[field.fieldKey] = t('releases_submit_required')
@@ -124,9 +133,10 @@ export function VideoSubmissionForm({ formSchema, artist }: VideoSubmissionFormP
       }
 
       const standardBody: Record<string, unknown> = {}
-      const formData: Record<string, string> = {}
+      const formData: Record<string, unknown> = {}
 
       for (const field of visibleFields) {
+        if (field.fieldKey === 'thumbnail_url') continue
         const raw = values[field.fieldKey] ?? ''
         const bodyKey = STANDARD_FIELD_TO_BODY_KEY[field.fieldKey]
         if (bodyKey !== undefined) {
@@ -140,6 +150,11 @@ export function VideoSubmissionForm({ formSchema, artist }: VideoSubmissionFormP
         } else if (raw.trim()) {
           formData[field.fieldKey] = raw.trim()
         }
+      }
+
+      if (thumbnailUrls.length > 0) {
+        standardBody.thumbnailUrl = thumbnailUrls[0]
+        formData.thumbnail_urls = thumbnailUrls
       }
 
       const url = artist?.id
@@ -219,7 +234,9 @@ export function VideoSubmissionForm({ formSchema, artist }: VideoSubmissionFormP
       >
         {(activeStep.kind === 'type' || activeStep.kind === 'group') && (
           <div className="space-y-4">
-            {activeStep.fields.map((field) => (
+            {activeStep.fields
+              .filter((field) => field.fieldKey !== 'thumbnail_url')
+              .map((field) => (
               <SchemaDrivenField
                 key={field.id}
                 field={field}
@@ -229,6 +246,72 @@ export function VideoSubmissionForm({ formSchema, artist }: VideoSubmissionFormP
                 error={fieldErrors[field.fieldKey]}
               />
             ))}
+            {activeStep.fields.some((field) => field.fieldKey === 'thumbnail_url') || activeIndex === 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">{t('video_submit_thumbnails')}</p>
+                <p className="text-xs text-muted-foreground">{t('video_submit_thumbnails_hint')}</p>
+                <Input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={thumbBusy || thumbnailUrls.length >= PORTAL_VIDEO_THUMBNAIL_MAX || !artist?.id}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (!file || !artist?.id) return
+                    if (thumbnailUrls.length >= PORTAL_VIDEO_THUMBNAIL_MAX) {
+                      toast.error(t('video_submit_thumbnail_too_many'))
+                      return
+                    }
+                    setThumbBusy(true)
+                    void (async () => {
+                      try {
+                        const supabase = createBrowserSupabaseClient()
+                        const {
+                          data: { session },
+                        } = await supabase.auth.getSession()
+                        if (!session?.access_token) {
+                          toast.error(tErrors('AUTH_REQUIRED'))
+                          return
+                        }
+                        const payload = await uploadViaServer<{ url?: string }>({
+                          file,
+                          token: session.access_token,
+                          t: tErrors,
+                          endpoint: `/api/portal/video-submission-thumbnails?artist_id=${encodeURIComponent(artist.id)}`,
+                        })
+                        if (!payload.url) {
+                          toast.error(t('video_submit_error'))
+                          return
+                        }
+                        setThumbnailUrls((prev) => [...prev, payload.url!].slice(0, PORTAL_VIDEO_THUMBNAIL_MAX))
+                      } catch (err) {
+                        toast.error(err instanceof ServerUploadError ? err.message : t('video_submit_error'))
+                      } finally {
+                        setThumbBusy(false)
+                      }
+                    })()
+                  }}
+                />
+                {thumbnailUrls.length > 0 ? (
+                  <ul className="flex flex-wrap gap-2">
+                    {thumbnailUrls.map((url, index) => (
+                      <li key={url} className="relative">
+                        <Image src={url} alt="" width={112} height={64} unoptimized className="h-16 w-28 rounded object-cover" />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-6 px-1 text-xs"
+                          onClick={() => setThumbnailUrls((prev) => prev.filter((_, i) => i !== index))}
+                        >
+                          ×
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         )}
         {activeStep.kind === 'review' && (

@@ -47,6 +47,7 @@ Store key in DB `r2_key` column for cleanup via `deleteObjectFromR2`.
 | `profile-photos/{artistId}/` | Portal photos |
 | `release-covers/{artistId}/` | Portal release covers |
 | `release-submissions/{artistId}/` | Submission audio + cover (private, 30-day TTL from submit) |
+| `video-submissions/{artistId}/` | Portal video-submission thumbnails (public CDN URL) |
 | `statements/{artistId}/` | SOS PDFs |
 | `invoices/{artistId}/{invoiceId}.pdf` | Issued invoice PDFs (write-once; store `pdf_sha256`) |
 | `artist-assets/{artistId}/` | Marketing uploads |

@@ -4,10 +4,11 @@ import { useRef, useState } from 'react'
 import Image from 'next/image'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { Crop, Image as ImageIcon, UploadSimple } from '@phosphor-icons/react'
+import { Crop, UploadSimple } from '@phosphor-icons/react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Slider } from '@/components/ui/slider'
 import {
@@ -27,6 +28,7 @@ import { validatePortalUpload, PORTAL_ASSET_RULES } from '@/lib/portal/uploadVal
 
 interface FanPagePropertiesPanelProps {
   artistId: string
+  hasLogo?: boolean
 }
 
 function readImage(props: Record<string, unknown>, key: string): FanPageImageProps | undefined {
@@ -35,7 +37,7 @@ function readImage(props: Record<string, unknown>, key: string): FanPageImagePro
   return value as FanPageImageProps
 }
 
-export function FanPagePropertiesPanel({ artistId }: FanPagePropertiesPanelProps) {
+export function FanPagePropertiesPanel({ artistId, hasLogo = false }: FanPagePropertiesPanelProps) {
   const t = useTranslations('portal')
   const document = useFanPageEditorStore((s) => s.document)
   const selectedSectionId = useFanPageEditorStore((s) => s.selectedSectionId)
@@ -273,6 +275,18 @@ export function FanPagePropertiesPanel({ artistId }: FanPagePropertiesPanelProps
               />
             </div>
             {renderImageControls('image', t('fanPage_hero_image'))}
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="fp-show-logo">{t('fanPage_show_logo')}</Label>
+                <p className="text-xs text-muted-foreground">{t('fanPage_show_logo_hint')}</p>
+              </div>
+              <Switch
+                id="fp-show-logo"
+                checked={Boolean(props.showLogo)}
+                disabled={!hasLogo}
+                onCheckedChange={(checked) => updateSectionProps(section.id, { showLogo: checked })}
+              />
+            </div>
           </>
         )}
 
@@ -287,7 +301,7 @@ export function FanPagePropertiesPanel({ artistId }: FanPagePropertiesPanelProps
           </div>
         )}
 
-        {(section.type === 'release_grid' || section.type === 'video_grid' || section.type === 'tour_dates') && (
+        {(section.type === 'release_grid' || section.type === 'video_grid' || section.type === 'tour_dates' || section.type === 'news') && (
           <div className="space-y-2">
             <Label htmlFor="fp-limit">{t('fanPage_limit')}</Label>
             <Input
@@ -346,21 +360,7 @@ export function FanPagePropertiesPanel({ artistId }: FanPagePropertiesPanelProps
         )}
 
         {section.type === 'gallery' && (
-          <div className="space-y-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={uploading}
-              onClick={() => {
-                uploadTargetKey.current = 'gallery'
-                fileInputRef.current?.click()
-              }}
-            >
-              <ImageIcon size={16} className="mr-1.5" aria-hidden />
-              {t('fanPage_add_gallery_image')}
-            </Button>
-          </div>
+          <p className="text-sm text-muted-foreground">{t('fanPage_gallery_from_profile')}</p>
         )}
 
         {section.type === 'spacer' && (

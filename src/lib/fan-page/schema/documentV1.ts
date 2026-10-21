@@ -14,6 +14,7 @@ export const fanPageBlockTypeSchema = z.enum([
   'smart_links',
   'newsletter_signup',
   'gallery',
+  'news',
   'video_grid',
   'merch_shelf',
   'cta_banner',

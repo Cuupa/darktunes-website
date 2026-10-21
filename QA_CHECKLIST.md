@@ -16,6 +16,16 @@
 - [ ] Admin → AI Assistant: enable, Test Connection, token counts, diagnostics list load
 - [ ] Error boundary Analyze opens the assistant with the error reference on admin/portal routes
 
+## Personal Artist Page / band news
+- [ ] Fan-page builder: News block is insertable; public `/@{slug}` shows that artist’s label news and published band news only
+- [ ] Portal → Band news: draft stays off the public page; publish shows on the News block; delete removes it. Label `/news` is unchanged
+- [ ] Gallery block shows Profile → Gallery photos; empty gallery shows a dash, not leftover builder uploads
+- [ ] Hero “Show band logo” is disabled without `logo_url`; with a logo, the wordmark appears on the public page
+- [ ] Video submit: 3 JPEG/PNG/WebP thumbs (4 MB) upload to R2; a 4th is refused; a 4.2 MB file is refused before send with size vs limit; admin review shows the images
+- [ ] Band news body with `<img src=x onerror=alert(1)>` does not run in the public news dialog
+- [ ] After `db:apply`, `POST /api/portal/submit-video` no longer 500s on `form_data`
+- [ ] Portal calendar: month and list views, filters still work, event click opens the existing dialog
+
 ## Functional Tests
 - [ ] Artist bio with `<svg/onload=alert(1)>` does not run script on the public artist page (view source has no `onload`)
 - [ ] News embed from YouTube still plays; an iframe to another host does not

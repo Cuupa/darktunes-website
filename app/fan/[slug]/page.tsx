@@ -8,6 +8,10 @@ import { getPublicArtistBySlug } from '@/lib/api/publicArtist'
 import { getReleasesByArtistId } from '@/lib/api/releases'
 import { getConcertsByArtistId } from '@/lib/api/concerts'
 import { getPublicVideosByArtistId } from '@/lib/api/videos'
+import { getPublicNewsPostsByArtistId } from '@/lib/api/news'
+import { getPublishedArtistNewsByArtistId } from '@/lib/api/artistNews'
+import { getPublicArtistEpkByArtistId } from '@/lib/api/publicArtistEpk'
+import { mergeFanPageNews } from '@/lib/fan-page/mergeNews'
 import { verifyFanPagePreviewToken } from '@/lib/fan-page/previewToken'
 import { FanPagePublicView } from './_components/FanPagePublicView'
 import { getMetadataBrand, pageTitle } from '@/lib/seo/metadata'
@@ -30,13 +34,24 @@ function makeGetFanPageData(slug: string) {
       const artist = await getPublicArtistBySlug(client, slug)
       if (!artist) return null
 
-      const [releases, concerts, videos] = await Promise.all([
+      const [releases, concerts, videos, labelNews, artistNews, epk] = await Promise.all([
         getReleasesByArtistId(client, artist.id),
         getConcertsByArtistId(client, artist.id),
         getPublicVideosByArtistId(client, artist.id),
+        getPublicNewsPostsByArtistId(client, artist.id).catch(() => []),
+        getPublishedArtistNewsByArtistId(client, artist.id).catch(() => []),
+        getPublicArtistEpkByArtistId(client, artist.id).catch(() => null),
       ])
 
-      return { page, artist, releases, concerts, videos }
+      return {
+        page,
+        artist,
+        releases,
+        concerts,
+        videos,
+        news: mergeFanPageNews(labelNews, artistNews),
+        galleryPhotos: epk?.profile.epkGalleryPhotos ?? [],
+      }
     },
     [`fan-page-${slug}`],
     { revalidate: 60, tags: ['fan-pages', `fan-page-${slug}`] },
@@ -55,13 +70,24 @@ async function getPreviewFanPageData(slug: string, previewToken: string) {
   const artist = await getPublicArtistBySlug(client, slug, { requireVisible: false })
   if (!artist) return null
 
-  const [releases, concerts, videos] = await Promise.all([
+  const [releases, concerts, videos, labelNews, artistNews, epk] = await Promise.all([
     getReleasesByArtistId(client, artist.id),
     getConcertsByArtistId(client, artist.id),
     getPublicVideosByArtistId(client, artist.id),
+    getPublicNewsPostsByArtistId(client, artist.id).catch(() => []),
+    getPublishedArtistNewsByArtistId(client, artist.id).catch(() => []),
+    getPublicArtistEpkByArtistId(client, artist.id).catch(() => null),
   ])
 
-  return { page, artist, releases, concerts, videos }
+  return {
+    page,
+    artist,
+    releases,
+    concerts,
+    videos,
+    news: mergeFanPageNews(labelNews, artistNews),
+    galleryPhotos: epk?.profile.epkGalleryPhotos ?? [],
+  }
 }
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
@@ -106,6 +132,8 @@ export default async function FanPageRoute({ params, searchParams }: Props) {
           releases={previewData.releases}
           concerts={previewData.concerts}
           videos={previewData.videos}
+          news={previewData.news}
+          galleryPhotos={previewData.galleryPhotos}
           isPreview
         />
       </main>
@@ -123,6 +151,8 @@ export default async function FanPageRoute({ params, searchParams }: Props) {
         releases={data.releases}
         concerts={data.concerts}
         videos={data.videos}
+        news={data.news}
+        galleryPhotos={data.galleryPhotos}
       />
     </main>
   )

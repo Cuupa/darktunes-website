@@ -10,6 +10,26 @@ export const PORTAL_RELEASE_COVER_MAX_BYTES = 5 * 1024 * 1024
 export const PORTAL_FONT_MAX_BYTES = 5 * 1024 * 1024
 export const PORTAL_DOCUMENT_MAX_BYTES = 20 * 1024 * 1024
 export const PORTAL_TECH_DOC_MAX_BYTES = 10 * 1024 * 1024
+export const PORTAL_VIDEO_THUMBNAIL_MAX = 3
+// shortcut: 4 MB matches SERVER_UPLOAD_MAX_BYTES; switch to presigned PUT to raise it
+export const PORTAL_VIDEO_THUMBNAIL_MAX_BYTES = 4 * 1024 * 1024
+
+export function isArtistVideoThumbnailUrl(
+  url: string,
+  r2PublicBase: string,
+  artistId: string,
+): boolean {
+  if (!artistId || artistId.includes('/') || artistId.includes('..')) return false
+  try {
+    const parsed = new URL(url)
+    const base = new URL(r2PublicBase)
+    if (parsed.protocol !== 'https:' || parsed.host !== base.host) return false
+    const prefix = `${base.pathname.replace(/\/$/, '')}/video-submissions/${artistId}/`
+    return parsed.pathname.startsWith(prefix) && parsed.pathname.length > prefix.length && !parsed.pathname.includes('..')
+  } catch {
+    return false
+  }
+}
 
 export const PORTAL_PHOTO_MIME = new Set([
   'image/jpeg',

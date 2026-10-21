@@ -24,6 +24,7 @@ const INSERT_BLOCKS: { type: FanPageBlockType; labelKey: string }[] = [
   { type: 'hero', labelKey: 'fanPage_block_hero' },
   { type: 'bio', labelKey: 'fanPage_block_bio' },
   { type: 'release_grid', labelKey: 'fanPage_block_releases' },
+  { type: 'news', labelKey: 'fanPage_block_news' },
   { type: 'smart_links', labelKey: 'fanPage_block_links' },
   { type: 'cta_banner', labelKey: 'fanPage_block_cta' },
   { type: 'spacer', labelKey: 'fanPage_block_spacer' },

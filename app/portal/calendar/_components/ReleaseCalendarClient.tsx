@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 /**
  * app/portal/calendar/_components/ReleaseCalendarClient.tsx
@@ -10,20 +10,28 @@
  * Props are injected by the Server Component parent (IoC).
  */
 
-import { useState, useMemo, useCallback } from 'react'
+import 'temporal-polyfill/global'
+import { useState, useMemo, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { useReducedMotion } from 'framer-motion'
+import FullCalendar from '@fullcalendar/react'
+import dayGridPlugin from '@fullcalendar/react/daygrid'
+import listPlugin from '@fullcalendar/react/list'
+import deLocale from '@fullcalendar/react/locales/de'
+import frLocale from '@fullcalendar/react/locales/fr'
+import type { EventClickInfo, EventInput } from '@fullcalendar/react'
+import '@fullcalendar/react/skeleton.css'
+import '@fullcalendar/react/themes/classic/theme.css'
 import {
-  CaretLeft,
-  CaretRight,
   CalendarDots,
   Globe,
   MapPin,
   MusicNote,
   Ticket,
 } from '@phosphor-icons/react'
+import '@/components/portal/portal-calendar.css'
 import {
   Dialog,
   DialogContent,
@@ -32,7 +40,6 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { buildPlatformLinkEntries } from '@/lib/platforms/buildPlatformLinkEntries'
@@ -45,7 +52,6 @@ import {
   isReleasePubliclyVisible,
   type CalendarKindFilter,
   type CalendarOwnershipFilter,
-  type ReleaseSortOrder,
   type ReleaseTypeFilter,
 } from '@/lib/portal/releaseCalendarFilters'
 import type { Concert, Release } from '@/types'
@@ -77,48 +83,13 @@ function getItemStatus(date: string, today: string): ItemStatus {
   return 'upcoming'
 }
 
-function toDateString(year: number, month: number, day: number): string {
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-}
-
-function daysInMonth(year: number, month: number): number {
-  return new Date(year, month, 0).getDate()
-}
-
-function firstDayOfWeek(year: number, month: number): number {
-  const jsDay = new Date(year, month - 1, 1).getDay()
-  return jsDay === 0 ? 6 : jsDay - 1
-}
-
-const MONTH_NAMES_EN = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-]
-const MONTH_NAMES_DE = [
-  'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
-  'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
-]
-const WEEKDAY_HEADERS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const WEEKDAY_HEADERS_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
-
-function isGermanLocale(t: ReturnType<typeof useTranslations<'portal'>>): boolean {
-  return t('calendar_close') === 'Schließen'
-}
-
-function getMonthName(month: number, t: ReturnType<typeof useTranslations<'portal'>>): string {
-  const names = isGermanLocale(t) ? MONTH_NAMES_DE : MONTH_NAMES_EN
-  return names[month - 1] ?? ''
-}
-
-function getWeekdayHeaders(t: ReturnType<typeof useTranslations<'portal'>>): string[] {
-  return isGermanLocale(t) ? WEEKDAY_HEADERS_DE : WEEKDAY_HEADERS_EN
-}
-
-function formatDisplayDate(isoDate: string, t: ReturnType<typeof useTranslations<'portal'>>): string {
-  return new Date(isoDate + 'T12:00:00').toLocaleDateString(
-    isGermanLocale(t) ? 'de-DE' : 'en-GB',
-    { day: 'numeric', month: 'long', year: 'numeric' },
-  )
+function formatDisplayDate(isoDate: string, locale: string): string {
+  const tag = locale === 'de' ? 'de-DE' : locale === 'fr' ? 'fr-FR' : 'en-GB'
+  return new Date(isoDate + 'T12:00:00').toLocaleDateString(tag, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -163,6 +134,7 @@ function ReleaseDetailDialog({
   onClose: () => void
 }) {
   const t = useTranslations('portal')
+  const locale = useLocale()
   const prefersReducedMotion = useReducedMotion()
 
   if (!release) return null
@@ -224,7 +196,7 @@ function ReleaseDetailDialog({
 
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <CalendarDots size={16} aria-hidden="true" />
-              <time dateTime={release.releaseDate}>{formatDisplayDate(release.releaseDate, t)}</time>
+              <time dateTime={release.releaseDate}>{formatDisplayDate(release.releaseDate, locale)}</time>
             </div>
 
             {hasPresaveLink && (
@@ -317,6 +289,7 @@ function EventDetailDialog({
   onClose: () => void
 }) {
   const t = useTranslations('portal')
+  const locale = useLocale()
 
   if (!concert) return null
 
@@ -361,8 +334,8 @@ function EventDetailDialog({
             <div className="flex items-center gap-2">
               <CalendarDots size={16} aria-hidden="true" />
               <time dateTime={concert.concertDate}>
-                {formatDisplayDate(concert.concertDate, t)}
-                {concert.eventTime ? ` · ${concert.eventTime}` : null}
+                {formatDisplayDate(concert.concertDate, locale)}
+                {concert.eventTime ? ` Â· ${concert.eventTime}` : null}
               </time>
             </div>
             {location && (
@@ -406,173 +379,30 @@ function EventDetailDialog({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Calendar day cell
-// ---------------------------------------------------------------------------
-
-interface DayCellProps {
-  day: number
-  dateStr: string
-  releases: Release[]
-  concerts: Concert[]
-  today: string
-  isCurrentMonth: boolean
-  onSelectRelease: (r: Release) => void
-  onSelectConcert: (c: Concert) => void
-}
-
-function DayCell({
-  day,
-  dateStr,
-  releases,
-  concerts,
-  today,
-  isCurrentMonth,
-  onSelectRelease,
-  onSelectConcert,
-}: DayCellProps) {
-  const t = useTranslations('portal')
-  const isToday = dateStr === today
-  const total = releases.length + concerts.length
-
-  type Chip =
-    | { key: string; kind: 'release'; title: string; artists?: string; status: ItemStatus; onClick: () => void }
-    | { key: string; kind: 'event'; title: string; artists?: string; status: ItemStatus; cancelled: boolean; onClick: () => void }
-
-  const chips: Chip[] = [
-    ...releases.map((release) => ({
-      key: `r-${release.id}`,
-      kind: 'release' as const,
-      title: release.title,
-      artists: formatReleaseArtistNames(release),
-      status: getItemStatus(release.releaseDate, today),
-      onClick: () => onSelectRelease(release),
-    })),
-    ...concerts.map((concert) => ({
-      key: `e-${concert.id}`,
-      kind: 'event' as const,
-      title: concert.eventName,
-      artists: formatConcertArtistNames(concert),
-      status: getItemStatus(concert.concertDate, today),
-      cancelled: concert.status === 'cancelled',
-      onClick: () => onSelectConcert(concert),
-    })),
-  ]
-
-  const visible = chips.slice(0, 3)
-  const overflow = chips.length - visible.length
-
-  return (
-    <div
-      className={cn(
-        'min-h-[56px] rounded-md border text-xs p-1 flex flex-col gap-0.5',
-        isToday ? 'border-secondary/60 bg-secondary/10' : 'border-border bg-card',
-        !isCurrentMonth && 'opacity-30',
-      )}
-      aria-label={`${dateStr}${total ? `, ${total} ${t('calendar_items_count')}` : ''}`}
-    >
-      <span
-        className={cn(
-          'inline-flex w-5 h-5 items-center justify-center rounded-full text-[11px] font-medium shrink-0',
-          isToday ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground',
-        )}
-        aria-hidden="true"
-      >
-        {day}
-      </span>
-
-      <div className="flex flex-col gap-0.5 overflow-hidden">
-        {visible.map((chip) => {
-          const statusLabel =
-            chip.kind === 'event'
-              ? chip.status === 'today'
-                ? t('calendar_status_event_today')
-                : chip.status === 'upcoming'
-                  ? t('calendar_status_upcoming_event')
-                  : t('calendar_status_past_event')
-              : chip.status === 'today'
-                ? t('calendar_status_today')
-                : chip.status === 'upcoming'
-                  ? t('calendar_status_presave')
-                  : t('calendar_status_released')
-
-          return (
-            <button
-              key={chip.key}
-              type="button"
-              onClick={chip.onClick}
-              className={cn(
-                'w-full text-left rounded px-1 py-0.5 text-[10px] font-medium leading-tight',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                chip.kind === 'event'
-                  ? chip.cancelled
-                    ? 'bg-destructive/10 text-destructive line-through'
-                    : chip.status === 'past'
-                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400/80 hover:bg-emerald-500/15'
-                      : chip.status === 'today'
-                        ? 'bg-secondary/20 text-secondary hover:bg-secondary/30'
-                        : 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/30'
-                  : chip.status === 'past'
-                    ? 'bg-muted/60 text-muted-foreground/70 hover:bg-muted'
-                    : chip.status === 'today'
-                      ? 'bg-secondary/20 text-secondary hover:bg-secondary/30'
-                      : 'bg-primary/20 text-primary hover:bg-primary/30',
-              )}
-              aria-label={[
-                chip.kind === 'event' ? t('calendar_kind_event') : t('calendar_kind_release'),
-                chip.title,
-                chip.artists,
-                statusLabel,
-              ]
-                .filter(Boolean)
-                .join(' — ')}
-              title={[chip.title, chip.artists].filter(Boolean).join(' — ')}
-            >
-              <span className="flex items-center gap-0.5 min-w-0">
-                {chip.kind === 'event' ? (
-                  <MapPin size={10} weight="fill" className="shrink-0" aria-hidden="true" />
-                ) : (
-                  <MusicNote size={10} weight="fill" className="shrink-0" aria-hidden="true" />
-                )}
-                <span className="truncate">{chip.title}</span>
-              </span>
-              {chip.artists && (
-                <span className="block truncate text-[9px] font-normal opacity-80 pl-3">
-                  {chip.artists}
-                </span>
-              )}
-            </button>
-          )
-        })}
-        {overflow > 0 && (
-          <span className="text-[10px] text-muted-foreground px-1">+{overflow}</span>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
 export function ReleaseCalendarClient({
   releases,
   concerts,
   currentArtistId,
 }: ReleaseCalendarClientProps) {
   const t = useTranslations('portal')
+  const locale = useLocale()
 
   const today = useMemo(() => getToday(), [])
-  const [viewYear, setViewYear] = useState(() => new Date().getFullYear())
-  const [viewMonth, setViewMonth] = useState(() => new Date().getMonth() + 1)
   const [kindFilter, setKindFilter] = useState<CalendarKindFilter>('all')
   const [filterMode, setFilterMode] = useState<CalendarOwnershipFilter>('all')
   const [typeFilter, setTypeFilter] = useState<ReleaseTypeFilter>('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortOrder, setSortOrder] = useState<ReleaseSortOrder>('asc')
   const [selectedRelease, setSelectedRelease] = useState<Release | null>(null)
   const [selectedConcert, setSelectedConcert] = useState<Concert | null>(null)
+  const [narrow, setNarrow] = useState(false)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const update = () => setNarrow(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
 
   const showReleases = kindFilter === 'all' || kindFilter === 'releases'
   const showEvents = kindFilter === 'all' || kindFilter === 'events'
@@ -584,9 +414,9 @@ export function ReleaseCalendarClient({
       currentArtistId,
       typeFilter,
       searchQuery,
-      sortOrder,
+      sortOrder: 'asc',
     })
-  }, [showReleases, releases, filterMode, currentArtistId, typeFilter, searchQuery, sortOrder])
+  }, [showReleases, releases, filterMode, currentArtistId, typeFilter, searchQuery])
 
   const filteredConcerts = useMemo(() => {
     if (!showEvents) return []
@@ -594,101 +424,42 @@ export function ReleaseCalendarClient({
       filterMode,
       currentArtistId,
       searchQuery,
-      sortOrder,
+      sortOrder: 'asc',
     })
-  }, [showEvents, concerts, filterMode, currentArtistId, searchQuery, sortOrder])
+  }, [showEvents, concerts, filterMode, currentArtistId, searchQuery])
 
-  const releasesByDate = useMemo(() => {
-    const map = new Map<string, Release[]>()
-    for (const r of filteredReleases) {
-      if (!r.releaseDate) continue
-      const list = map.get(r.releaseDate) ?? []
-      list.push(r)
-      map.set(r.releaseDate, list)
-    }
-    return map
-  }, [filteredReleases])
+  const fcEvents = useMemo<EventInput[]>(() => {
+    const releaseEvents: EventInput[] = filteredReleases
+      .filter((r) => Boolean(r.releaseDate))
+      .map((release) => ({
+        id: `r-${release.id}`,
+        title: release.title,
+        start: release.releaseDate,
+        allDay: true,
+        classNames: ['fc-event-release'],
+        extendedProps: { kind: 'release', release },
+      }))
+    const concertEvents: EventInput[] = filteredConcerts
+      .filter((c) => Boolean(c.concertDate))
+      .map((concert) => ({
+        id: `e-${concert.id}`,
+        title: concert.eventName,
+        start: concert.concertDate,
+        allDay: true,
+        classNames: ['fc-event-event'],
+        extendedProps: { kind: 'event', concert },
+      }))
+    return [...releaseEvents, ...concertEvents]
+  }, [filteredReleases, filteredConcerts])
 
-  const concertsByDate = useMemo(() => {
-    const map = new Map<string, Concert[]>()
-    for (const c of filteredConcerts) {
-      if (!c.concertDate) continue
-      const list = map.get(c.concertDate) ?? []
-      list.push(c)
-      map.set(c.concertDate, list)
-    }
-    return map
-  }, [filteredConcerts])
+  function onEventClick(info: EventClickInfo) {
+    info.jsEvent.preventDefault()
+    const kind = info.event.extendedProps.kind
+    if (kind === 'release') setSelectedRelease(info.event.extendedProps.release as Release)
+    if (kind === 'event') setSelectedConcert(info.event.extendedProps.concert as Concert)
+  }
 
-  const weeks = useMemo(() => {
-    const totalDays = daysInMonth(viewYear, viewMonth)
-    const startWeekday = firstDayOfWeek(viewYear, viewMonth)
-
-    const prevYear = viewMonth === 1 ? viewYear - 1 : viewYear
-    const prevMonth = viewMonth === 1 ? 12 : viewMonth - 1
-    const prevTotal = daysInMonth(prevYear, prevMonth)
-    const prevDays: { day: number; dateStr: string; isCurrentMonth: false }[] = []
-    for (let i = startWeekday - 1; i >= 0; i--) {
-      const d = prevTotal - i
-      prevDays.push({
-        day: d,
-        dateStr: toDateString(prevYear, prevMonth, d),
-        isCurrentMonth: false,
-      })
-    }
-
-    const currentDays: { day: number; dateStr: string; isCurrentMonth: true }[] = []
-    for (let d = 1; d <= totalDays; d++) {
-      currentDays.push({
-        day: d,
-        dateStr: toDateString(viewYear, viewMonth, d),
-        isCurrentMonth: true,
-      })
-    }
-
-    const nextYear = viewMonth === 12 ? viewYear + 1 : viewYear
-    const nextMonth = viewMonth === 12 ? 1 : viewMonth + 1
-    const allSoFar = prevDays.length + currentDays.length
-    const nextCount = (7 - (allSoFar % 7)) % 7
-    const nextDays: { day: number; dateStr: string; isCurrentMonth: false }[] = []
-    for (let d = 1; d <= nextCount; d++) {
-      nextDays.push({
-        day: d,
-        dateStr: toDateString(nextYear, nextMonth, d),
-        isCurrentMonth: false,
-      })
-    }
-
-    const all = [...prevDays, ...currentDays, ...nextDays]
-    const weekChunks: typeof all[] = []
-    for (let i = 0; i < all.length; i += 7) {
-      weekChunks.push(all.slice(i, i + 7))
-    }
-    return weekChunks
-  }, [viewYear, viewMonth])
-
-  const goToPrevMonth = useCallback(() => {
-    setViewMonth((m) => {
-      if (m === 1) {
-        setViewYear((y) => y - 1)
-        return 12
-      }
-      return m - 1
-    })
-  }, [])
-
-  const goToNextMonth = useCallback(() => {
-    setViewMonth((m) => {
-      if (m === 12) {
-        setViewYear((y) => y + 1)
-        return 1
-      }
-      return m + 1
-    })
-  }, [])
-
-  const weekdayHeaders = getWeekdayHeaders(t)
-  const monthName = getMonthName(viewMonth, t)
+  const fcLocale = locale === 'de' ? deLocale : locale === 'fr' ? frLocale : undefined
 
   const segmentBtn = (active: boolean) =>
     cn(
@@ -708,33 +479,15 @@ export function ReleaseCalendarClient({
         <p className="text-sm text-muted-foreground">{t('calendar_subtitle')}</p>
       </div>
 
-      {/* Search + sort */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Input
-          type="search"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={t('calendar_search_placeholder')}
-          aria-label={t('calendar_search_placeholder')}
-          className="max-w-md"
-        />
-        <div className="flex items-center gap-2">
-          <label htmlFor="calendar-sort" className="text-sm text-muted-foreground whitespace-nowrap">
-            {t('calendar_sort_label')}
-          </label>
-          <select
-            id="calendar-sort"
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as ReleaseSortOrder)}
-            className="rounded-md border border-border bg-card px-3 py-1.5 text-sm"
-          >
-            <option value="asc">{t('calendar_sort_date_asc')}</option>
-            <option value="desc">{t('calendar_sort_date_desc')}</option>
-          </select>
-        </div>
-      </div>
+      <Input
+        type="search"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        placeholder={t('calendar_search_placeholder')}
+        aria-label={t('calendar_search_placeholder')}
+        className="max-w-md"
+      />
 
-      {/* Kind + ownership + type filters */}
       <div className="flex flex-wrap gap-2">
         <div
           role="group"
@@ -771,7 +524,7 @@ export function ReleaseCalendarClient({
           >
             {t('calendar_filter_all')}
           </button>
-          {currentArtistId && (
+          {currentArtistId ? (
             <button
               type="button"
               onClick={() => setFilterMode('mine')}
@@ -780,10 +533,10 @@ export function ReleaseCalendarClient({
             >
               {t('calendar_filter_mine')}
             </button>
-          )}
+          ) : null}
         </div>
 
-        {showReleases && (
+        {showReleases ? (
           <div
             role="group"
             aria-label={t('calendar_filter_type_all')}
@@ -801,70 +554,29 @@ export function ReleaseCalendarClient({
               </button>
             ))}
           </div>
-        )}
+        ) : null}
       </div>
 
-      {/* Month navigation */}
-      <div className="flex items-center justify-between">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={goToPrevMonth}
-          aria-label={t('calendar_prev_month')}
-          className="min-w-[44px] min-h-[44px]"
-        >
-          <CaretLeft size={18} aria-hidden="true" />
-        </Button>
-
-        <h2 className="text-lg font-semibold tabular-nums" aria-live="polite">
-          {monthName} {viewYear}
-        </h2>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={goToNextMonth}
-          aria-label={t('calendar_next_month')}
-          className="min-w-[44px] min-h-[44px]"
-        >
-          <CaretRight size={18} aria-hidden="true" />
-        </Button>
+      <div className="portal-fc">
+        <FullCalendar
+          key={narrow ? 'list' : 'month'}
+          plugins={[dayGridPlugin, listPlugin]}
+          initialView={narrow ? 'listMonth' : 'dayGridMonth'}
+          headerToolbar={{
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,listMonth',
+          }}
+          locales={fcLocale ? [fcLocale] : []}
+          locale={locale}
+          events={fcEvents}
+          eventClick={onEventClick}
+          height="auto"
+          firstDay={1}
+          displayEventTime={false}
+        />
       </div>
 
-      {/* Weekday headers */}
-      <div className="grid grid-cols-7 gap-1" aria-hidden="true">
-        {weekdayHeaders.map((wd) => (
-          <div
-            key={wd}
-            className="text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60 py-1"
-          >
-            {wd}
-          </div>
-        ))}
-      </div>
-
-      {/* Calendar grid */}
-      <div
-        className="grid grid-cols-7 gap-1"
-        role="grid"
-        aria-label={`${monthName} ${viewYear}`}
-      >
-        {weeks.flat().map(({ day, dateStr, isCurrentMonth }) => (
-          <DayCell
-            key={dateStr}
-            day={day}
-            dateStr={dateStr}
-            releases={releasesByDate.get(dateStr) ?? []}
-            concerts={concertsByDate.get(dateStr) ?? []}
-            today={today}
-            isCurrentMonth={isCurrentMonth}
-            onSelectRelease={setSelectedRelease}
-            onSelectConcert={setSelectedConcert}
-          />
-        ))}
-      </div>
-
-      {/* Legend */}
       <div
         className="flex flex-wrap gap-4 text-xs text-muted-foreground pt-2 border-t border-border"
         aria-label={t('calendar_legend')}

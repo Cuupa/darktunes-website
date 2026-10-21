@@ -13,6 +13,7 @@ import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import type { LandingPageDocumentV1, FanPagePublishStatus } from '@/lib/fan-page/schema/documentV1'
 import type { Artist, Release, Concert, Video } from '@/types'
 import type { FanPageLiveData } from '@/components/fan-page/FanPageBlockRenderer'
+import type { FanPageNewsItem } from '@/lib/fan-page/mergeNews'
 import { GuidedModeChooser } from '@/components/guided/GuidedModeChooser'
 import type { GuidedMode } from '@/lib/guided/guidedSteps'
 import { FanPageFirstPublishAssistant } from './FanPageFirstPublishAssistant'
@@ -38,6 +39,8 @@ interface FanPageBuilderClientProps {
   releases: Release[]
   concerts: Concert[]
   videos: Video[]
+  news: FanPageNewsItem[]
+  galleryPhotos: string[]
 }
 
 function FanPageBuilderWorkspace({
@@ -48,6 +51,8 @@ function FanPageBuilderWorkspace({
   releases,
   concerts,
   videos,
+  news,
+  galleryPhotos,
 }: Omit<FanPageBuilderClientProps, 'initialDocument'>) {
   const t = useTranslations('portal')
   const document = useFanPageEditorStore((s) => s.document)
@@ -83,6 +88,8 @@ function FanPageBuilderWorkspace({
     concerts,
     videos,
     smartLinks: artist.smartLinks,
+    news,
+    galleryPhotos,
   }
 
   const { saveStatus, saveNow } = useFanPageAutosave({
@@ -278,6 +285,8 @@ export function FanPageBuilderClient({
   releases,
   concerts,
   videos,
+  news,
+  galleryPhotos,
 }: FanPageBuilderClientProps) {
   return (
     <FanPageEditorProvider initialDocument={initialDocument}>
@@ -289,6 +298,8 @@ export function FanPageBuilderClient({
         releases={releases}
         concerts={concerts}
         videos={videos}
+        news={news}
+        galleryPhotos={galleryPhotos}
       />
     </FanPageEditorProvider>
   )

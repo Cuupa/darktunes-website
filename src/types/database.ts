@@ -1581,6 +1581,59 @@ export interface Database {
           },
         ]
       }
+      artist_news_posts: {
+        Row: {
+          id: string
+          artist_id: string
+          title: string
+          slug: string
+          excerpt: string | null
+          content: string
+          image_url: string | null
+          status: 'draft' | 'published'
+          published_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          artist_id: string
+          title: string
+          slug: string
+          excerpt?: string | null
+          content?: string
+          image_url?: string | null
+          status?: 'draft' | 'published'
+          published_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          artist_id?: string
+          title?: string
+          slug?: string
+          excerpt?: string | null
+          content?: string
+          image_url?: string | null
+          status?: 'draft' | 'published'
+          published_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'artist_news_posts_artist_id_fkey'
+            columns: ['artist_id']
+            isOneToOne: false
+            referencedRelation: 'artists'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       artist_documents: {
         Row: {
           id: string

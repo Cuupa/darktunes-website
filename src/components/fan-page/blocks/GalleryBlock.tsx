@@ -7,16 +7,21 @@ import { FanPageImage } from './FanPageImage'
 
 interface GalleryBlockProps {
   images?: FanPageImageProps[]
+  livePhotos?: string[]
   theme: FanPageTheme
   title?: string
   columns?: number
 }
 
-export function GalleryBlock({ images = [], theme, title, columns = 3 }: GalleryBlockProps) {
+export function GalleryBlock({ images = [], livePhotos, theme, title, columns = 3 }: GalleryBlockProps) {
   const colors = resolveThemeColors(theme)
   const cols = Math.min(4, Math.max(2, columns))
+  const photos: FanPageImageProps[] =
+    livePhotos !== undefined
+      ? livePhotos.map((src) => ({ src }))
+      : images
 
-  if (images.length === 0) {
+  if (photos.length === 0) {
     return <p className="text-sm opacity-60">—</p>
   }
 
@@ -31,7 +36,7 @@ export function GalleryBlock({ images = [], theme, title, columns = 3 }: Gallery
         className="grid gap-3"
         style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
       >
-        {images.map((image, index) => (
+        {photos.map((image, index) => (
           <div key={image.src ?? index} className="relative aspect-square overflow-hidden rounded-lg">
             <FanPageImage image={image} alt={image.alt ?? `Gallery ${index + 1}`} fill width={500} />
           </div>

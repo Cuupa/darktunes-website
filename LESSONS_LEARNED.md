@@ -65,6 +65,12 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-10-21 — `video_submissions.form_data` never landed on prod
+
+- Same CREATE-only trap as `artists.hometown`: the column was in `CREATE TABLE IF NOT EXISTS` and in TypeScript, so local/reset DBs worked and production PostgREST 500’d (`Could not find the 'form_data' column`).
+- Putting the table in `verify-schema-columns` as `create-once` does **not** catch this. Switch to `full` + `ADD COLUMN IF NOT EXISTS` the first time a create-once table evolves.
+- After the ALTER, PostgREST still needs `NOTIFY pgrst, 'reload schema'` (or a dashboard reload) or the schema cache keeps the old shape.
+
 ### 2026-09-28 — Vercel 413 disguised as “server error”
 
 - Vercel rejects function request bodies above 4.5 MB with a **plain-text** 413 before the route runs. A route-side `MAX_FILE_SIZE` of 100 MB never applies on Vercel. Check the size in the browser (`SERVER_UPLOAD_MAX_BYTES`) or use presigned direct-to-R2 uploads.

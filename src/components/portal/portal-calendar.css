@@ -1,0 +1,31 @@
+.portal-fc {
+  --fc-border-color: hsl(var(--border));
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: hsl(var(--muted) / 0.35);
+  --fc-today-bg-color: hsl(var(--secondary) / 0.18);
+  --fc-event-bg-color: hsl(var(--primary));
+  --fc-event-border-color: transparent;
+  --fc-event-text-color: hsl(var(--primary-foreground));
+  --fc-button-bg-color: hsl(var(--card));
+  --fc-button-border-color: hsl(var(--border));
+  --fc-button-text-color: hsl(var(--foreground));
+  --fc-button-hover-bg-color: hsl(var(--muted));
+  --fc-button-active-bg-color: hsl(var(--primary));
+  --fc-button-active-border-color: hsl(var(--primary));
+  --fc-list-event-hover-bg-color: hsl(var(--muted) / 0.5);
+  --fc-neutral-text-color: hsl(var(--muted-foreground));
+}
+.portal-fc .fc-event {
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+.portal-fc .fc-event-event {
+  background-color: rgb(16 185 129 / 0.85);
+  border-color: transparent;
+}
+.portal-fc .fc-toolbar-title {
+  font-size: 1.125rem;
+}
+.portal-fc .fc-daygrid-event {
+  white-space: nowrap;
+}
