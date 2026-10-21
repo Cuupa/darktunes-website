@@ -6,11 +6,11 @@ import {
   listAiMessages,
 } from '@/lib/api/aiConversations'
 import { TokenBudgetManager } from '@/lib/ai/budget/manager'
-import { estimateInputTokens, preferProviderUsage, usageFromEstimate } from '@/lib/ai/budget/estimator'
+import { estimateInputTokens, estimateTokens, preferProviderUsage, usageFromEstimate } from '@/lib/ai/budget/estimator'
 import { resolveNvidiaApiKey } from '@/lib/ai/provider/resolveKey'
 import { NvidiaOpenAiCompatibleProvider } from '@/lib/ai/provider/nvidia'
 import { MockAiProvider } from '@/lib/ai/provider/mock'
-import { isAiProviderError } from '@/lib/ai/provider/errors'
+import { AiProviderError, isAiProviderError } from '@/lib/ai/provider/errors'
 import { apiErrorFromProvider } from '@/lib/ai/provider/mapToApiError'
 import { buildSystemPrompt, type PromptPageContext } from '@/lib/ai/prompts/system'
 import { slideConversationWindow } from '@/lib/ai/context/window'
@@ -19,7 +19,7 @@ import { abortAiTurn, beginAiTurn, conversationTurnKey, endAiTurn } from '@/lib/
 import type { ClientSseEvent } from '@/lib/ai/orchestrator/sse'
 import type { AiActor } from '@/lib/ai/auth/requireAiActor'
 import type { AiProvider } from '@/lib/ai/provider/interface'
-import type { AiChatMessage, AiCompletion } from '@/lib/ai/types/provider'
+import type { AiChatMessage, AiCompletion, AiUsage } from '@/lib/ai/types/provider'
 import { EMPTY_AI_USAGE } from '@/lib/ai/types/provider'
 import { shouldEnableThinking } from '@/lib/ai/models/profiles'
 import { buildApiError } from '@/lib/errors'
@@ -91,8 +91,10 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
       : settings.tokenLimits.fast.max_output_tokens
 
   const budget = TokenBudgetManager.fromLimits(actor.serviceDb, settings.tokenLimits)
+  // Reserve every model round individually so token caps remain atomic when tools loop.
+  let activeReservation: string | null = `${input.requestId}:0`
   await budget.reserve({
-    requestId: input.requestId,
+    requestId: activeReservation,
     userId: actor.userId,
     role: actor.role,
     modelRole,
@@ -107,7 +109,8 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
   })
 
   const controller = beginAiTurn(conversationTurnKey(conversation.id))
-  let usage = usageFromEstimate(estimate.total_input, 0)
+  let usage = usageFromEstimate(0, 0)
+  let estimatedUsage = false
   let content = ''
   let modelUsed = model
 
@@ -121,6 +124,18 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
         : settings.tokenLimits.max_tool_rounds.fast
 
     while (rounds <= maxRounds) {
+      if (rounds > 0) {
+        activeReservation = `${input.requestId}:${rounds}`
+        const roundEstimate = estimateInputTokens(messages, tools)
+        await budget.reserve({
+          requestId: activeReservation,
+          userId: actor.userId,
+          role: actor.role,
+          modelRole,
+          estimatedInputTokens: roundEstimate.total_input,
+          estimatedOutputTokens: outputCap,
+        })
+      }
       let completion: AiCompletion | null = null
       for await (const event of provider.stream(
         {
@@ -153,7 +168,23 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
         }
       }
       modelUsed = completion.model
-      usage = preferProviderUsage(usage, completion.usage.total_tokens > 0 ? completion.usage : null)
+      // Provider usage is per completion, not cumulative across tool rounds.
+      const hasProviderUsage = completion.usage.total_tokens > 0
+      const roundUsage = preferProviderUsage(
+        usageFromEstimate(
+          estimateInputTokens(messages, tools).total_input,
+          estimateTokens(completion.content) +
+            estimateTokens(completion.reasoning_content ?? '') +
+            estimateTokens(JSON.stringify(completion.tool_calls)),
+        ),
+        hasProviderUsage ? completion.usage : null,
+      )
+      estimatedUsage ||= !hasProviderUsage
+      usage = sumAiUsage(usage, roundUsage)
+      if (activeReservation) {
+        await budget.settle(activeReservation, roundUsage.total_tokens)
+        activeReservation = null
+      }
       yield {
         type: 'usage',
         input_tokens: usage.input_tokens,
@@ -167,6 +198,9 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
         break
       }
 
+      if (rounds >= maxRounds) {
+        throw new AiProviderError('INVALID_RESPONSE', 'The assistant reached the maximum number of tool rounds.')
+      }
       messages.push({
         role: 'assistant',
         content: completion.content,
@@ -223,13 +257,13 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
       requestId: input.requestId,
       model: modelUsed,
       usage,
-      usageSource: usage.total_tokens > 0 ? 'provider' : 'estimate',
+      usageSource: estimatedUsage ? 'estimate' : 'provider',
       operationType: 'chat',
     })
-    await budget.settle(input.requestId, usage.total_tokens)
     yield { type: 'done', model: modelUsed }
   } catch (error) {
-    await budget.settle(input.requestId, null)
+    // On failures, charge the outstanding reservation instead of losing usage.
+    if (activeReservation) await budget.settle(activeReservation, null)
     if (controller.signal.aborted) {
       yield { type: 'error', code: 'AI_PROVIDER_TIMEOUT', detail: 'The answer was cancelled.' }
       return
@@ -242,6 +276,15 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
     throw error
   } finally {
     endAiTurn(conversationTurnKey(conversation.id))
+  }
+}
+
+export function sumAiUsage(a: AiUsage, b: AiUsage): AiUsage {
+  return {
+    input_tokens: a.input_tokens + b.input_tokens,
+    output_tokens: a.output_tokens + b.output_tokens,
+    reasoning_tokens: a.reasoning_tokens + b.reasoning_tokens,
+    total_tokens: a.total_tokens + b.total_tokens,
   }
 }
 
