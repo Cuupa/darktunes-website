@@ -193,7 +193,6 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
       }
 
       if (completion.tool_calls.length === 0) {
-        content = completion.content || content
         break
       }
 

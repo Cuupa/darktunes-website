@@ -269,12 +269,17 @@ export function AssistantShell({ dashboard }: AssistantShellProps) {
                   size="icon"
                   onClick={() => {
                     if (conversationId) {
-                      void headers().then((auth) =>
-                        fetch(`/api/ai/conversations/${conversationId}`, {
-                          method: 'DELETE',
-                          headers: auth,
-                        }),
-                      )
+                      void (async () => {
+                        try {
+                          const auth = await headers()
+                          await fetch(`/api/ai/conversations/${conversationId}`, {
+                            method: 'DELETE',
+                            headers: auth,
+                          })
+                        } catch {
+                          // fire-and-forget; local state already reset
+                        }
+                      })()
                     }
                     reset()
                   }}
