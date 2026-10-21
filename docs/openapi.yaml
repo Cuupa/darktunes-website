@@ -588,7 +588,11 @@ paths:
     post:
       operationId: postadmin_ai_connection-tests
       tags: [Admin]
-      summary: Create or submit /api/admin/ai/connection-tests
+      summary: Probe the NVIDIA AI provider connection (fast, reasoning, stream, tool-call, usage)
+      description: |
+        Runs a read-only connection test against NVIDIA NIM. Never retries on failure.
+        Returns per-step results so the admin can see exactly which step failed and why.
+        Rate-limited to 4 requests per 10 minutes per admin user.
       security:
         - AdminBearer: []
       requestBody:
@@ -600,15 +604,77 @@ paths:
               additionalProperties: true
       responses:
         '200':
-          description: Success
+          description: Connection test succeeded
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SuccessResponse"
+                type: object
+                required: [ok, started_at, finished_at, total_latency_ms, steps, discovered_capabilities, usage]
+                properties:
+                  ok:
+                    type: boolean
+                  started_at:
+                    type: string
+                    format: date-time
+                  finished_at:
+                    type: string
+                    format: date-time
+                  total_latency_ms:
+                    type: integer
+                    minimum: 0
+                  steps:
+                    type: array
+                    items:
+                      type: object
+                      required: [step, ok, latency_ms, error_code, detail]
+                      properties:
+                        step:
+                          type: string
+                          enum: [auth, fast_complete, reasoning_complete, stream, tool_call, usage]
+                        ok:
+                          type: boolean
+                        latency_ms:
+                          type: integer
+                          minimum: 0
+                        error_code:
+                          type: string
+                          nullable: true
+                        detail:
+                          type: string
+                          nullable: true
+                  discovered_capabilities:
+                    type: object
+                    additionalProperties: true
+                  usage:
+                    type: object
+                    required: [fast, reasoning]
+                    properties:
+                      fast:
+                        type: object
+                        nullable: true
+                      reasoning:
+                        type: object
+                        nullable: true
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '502':
+          description: NVIDIA returned an unreadable response or the model is unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        '503':
+          description: NVIDIA is temporarily unavailable (network, TLS, or provider error)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        '504':
+          description: The NVIDIA request timed out
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /api/admin/ai/diagnostics:
     get:
       operationId: getadmin_ai_diagnostics

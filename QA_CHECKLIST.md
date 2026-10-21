@@ -11,6 +11,7 @@
 - [ ] Desktop: collapsible right panel; mobile: full-screen sheet; composer stays above the keyboard
 - [ ] Closing the browser mid-stream leaves no infinite spinner on reopen
 - [ ] NVIDIA unreachable: assistant shows a provider error; the rest of the dashboard still works
+- [ ] NVIDIA connection test shows the specific cause per failure: timeout → "The NVIDIA request timed out.", network → "The NVIDIA endpoint could not be reached.", TLS → "The NVIDIA TLS connection failed.", rate limit → "NVIDIA rate-limited this request.", model unavailable → "The requested NVIDIA model is not available.", each with its `error_id`
 - [ ] Artist asks to change EPK text: preview appears, Confirm saves, a second Confirm (or a double-click) is rejected
 - [ ] `POST /api/ai/diagnostic-reports` with `error_id` containing `%` returns 400; a real `ERR-` id returns the newest matching log
 - [ ] Admin → AI Assistant: enable, Test Connection, token counts, diagnostics list load
@@ -56,6 +57,7 @@
 - [ ] Admin → Assets: **Optimize existing** recompresses catalog images; with a selection it only touches selected images; pixel size stays the same
 - [ ] Admin → System → Maintenance: Scan bucket completes (or Continue scan); stale multipart note; type `DELETE ORPHANS` to purge; Optimize catalog images runs without changing pixel dimensions
 - [ ] Admin → System → Maintenance: with more than one batch of orphans, `DELETE ORPHANS` reports how many remain (and failed) instead of a plain success; the storage bar drops to match the deleted objects
+- [ ] Admin → Assets: switch to the **R2 objects** view → lists every bucket object (not only DB-tracked catalog assets); prefix sizes expand to show contents; search filters object keys; deleting selected objects frees bucket storage and is reflected on the next bucket scan
 - [ ] Admin → Artists: force a list-read failure (e.g. block the `artists` read) → the page shows an error with Retry, not an empty "No artists yet" table
 - [ ] Admin → System → Log Manager: a failed Resolve/Ignore shows an error toast with an error ID; a failed log read shows a Retry that reloads the page
 - [ ] Sync integrity: a `/api/sync` tick where a job fails stores `status: 'partial'` in the run ledger (visible in Admin → System Health)
