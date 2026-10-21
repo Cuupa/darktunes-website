@@ -122,12 +122,12 @@ export function AssistantShell({ dashboard }: AssistantShellProps) {
         const { done, value } = await reader.read()
         if (done) break
         buffer += decoder.decode(value, { stream: true })
-        const frames = buffer.split('\n\n')
+        const frames = buffer.split(/\r?\n\r?\n/)
         buffer = frames.pop() ?? ''
         for (const frame of frames) {
-          const dataLine = frame.split('\n').find((line) => line.startsWith('data:'))
+          const dataLine = frame.split(/\r?\n/).find((line) => line.startsWith('data:'))
           if (!dataLine) continue
-          const payload = JSON.parse(dataLine.slice(5).trim()) as {
+          let payload: {
             type: string
             text?: string
             state?: string
@@ -137,6 +137,11 @@ export function AssistantShell({ dashboard }: AssistantShellProps) {
             action?: string
             confirmation_token?: string
             summary?: string
+          }
+          try {
+            payload = JSON.parse(dataLine.slice(5).trim()) as typeof payload
+          } catch {
+            continue
           }
           if (payload.type === 'status' && payload.state === 'tool_running') setState('tool_running')
           if (payload.type === 'status' && payload.state === 'streaming') setState('streaming')
@@ -264,10 +269,12 @@ export function AssistantShell({ dashboard }: AssistantShellProps) {
                   size="icon"
                   onClick={() => {
                     if (conversationId) {
-                      void fetch(`/api/ai/conversations/${conversationId}`, {
-                        method: 'DELETE',
-                        headers: new Headers(),
-                      })
+                      void headers().then((auth) =>
+                        fetch(`/api/ai/conversations/${conversationId}`, {
+                          method: 'DELETE',
+                          headers: auth,
+                        }),
+                      )
                     }
                     reset()
                   }}

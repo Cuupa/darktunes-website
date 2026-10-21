@@ -24,7 +24,7 @@ Admin → AI Assistant → Models lists live NVIDIA NIM ids (`GET /api/admin/ai/
 
 The NVIDIA adapter serializes internal tool calls to the OpenAI-compatible `tool_calls: [{id,type:'function',function:{name,arguments}}]` wire format and pairs subsequent tool replies with `tool_call_id`. Abort and timeout signals remain active while the streaming response is read.
 
-Provider adapter: `src/lib/ai/provider/`. Domain code never imports NVIDIA payload types. Connection tests record which extras (`enable_thinking`, `low_effort`, `reasoning_budget`, tools+stream) the live API accepted.
+Provider adapter: `src/lib/ai/provider/`. Domain code never imports NVIDIA payload types. Connection tests record which extras (`enable_thinking`, `low_effort`, `reasoning_budget`, tools+stream) the live API accepted. Chat completions retry retryable provider errors (rate limit, timeout, network, 5xx) up to 3 times and honour `Retry-After`; `abort(requestId)` does not retry. Connection tests still do not retry. SSE parsers accept LF and CRLF frames.
 
 `max_tokens` includes reasoning tokens when thinking is on.
 

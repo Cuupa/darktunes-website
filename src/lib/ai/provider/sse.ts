@@ -15,7 +15,7 @@ export interface SseChunk {
 }
 
 export function parseSseBlock(block: string): SseChunk | null {
-  const lines = block.split('\n')
+  const lines = block.split(/\r?\n/)
   let data = ''
   for (const line of lines) {
     if (line.startsWith('data:')) {

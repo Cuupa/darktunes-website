@@ -1,5 +1,10 @@
 import { getModelProfile, mergeDiscoveredCapabilities } from '@/lib/ai/models/profiles'
-import { AiProviderError, providerErrorFromHttpStatus, providerErrorFromNetwork } from '@/lib/ai/provider/errors'
+import {
+  AiProviderError,
+  isRetryableProviderError,
+  providerErrorFromHttpStatus,
+  providerErrorFromNetwork,
+} from '@/lib/ai/provider/errors'
 import type { AiProvider } from '@/lib/ai/provider/interface'
 import { mergeToolCallDeltas, parseSseBlock, parseUsage } from '@/lib/ai/provider/sse'
 import {
@@ -29,6 +34,7 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
   private readonly fetchImpl: typeof fetch
   private readonly discovered: Record<string, Partial<ModelCapabilities>>
   private readonly controllers = new Map<string, AbortController>()
+  private readonly abortedRequests = new Set<string>()
 
   constructor(options: NvidiaProviderOptions) {
     this.apiKey = options.apiKey
@@ -59,6 +65,7 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
   }
 
   abort(requestId: string): void {
+    this.abortedRequests.add(requestId)
     const controller = this.controllers.get(requestId)
     controller?.abort()
     this.controllers.delete(requestId)
@@ -66,7 +73,7 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
 
   async complete(request: AiCompletionRequest, signal?: AbortSignal): Promise<AiCompletion> {
     const started = Date.now()
-    const { response, cleanup } = await this.send(request, false, signal)
+    const { response, cleanup } = await this.sendWithRetry(request, false, signal)
     try {
       const text = await response.text()
       let parsed: unknown
@@ -85,7 +92,7 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
 
   async *stream(request: AiCompletionRequest, signal?: AbortSignal): AsyncIterable<AiStreamEvent> {
     const started = Date.now()
-    const { response, cleanup } = await this.send(request, true, signal)
+    const { response, cleanup } = await this.sendWithRetry(request, true, signal)
     const body = response.body
     if (!body) {
       cleanup()
@@ -108,7 +115,7 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
         const { done, value } = await reader.read()
         if (done) break
         buffer += decoder.decode(value, { stream: true })
-        const frames = buffer.split('\n\n')
+        const frames = buffer.split(/\r?\n\r?\n/)
         buffer = frames.pop() ?? ''
         for (const frame of frames) {
           const chunk = parseSseBlock(frame)
@@ -185,6 +192,10 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
     }
 
     try {
+      if (outerSignal?.aborted) {
+        controller.abort()
+        throw new AiProviderError('TIMEOUT', 'The NVIDIA request was aborted before a response arrived.')
+      }
       const response = await this.fetchImpl(this.completionsUrl, {
         method: 'POST',
         headers: {
@@ -209,6 +220,62 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
       if (error instanceof AiProviderError) throw error
       throw providerErrorFromNetwork(error)
     }
+  }
+
+  private async sendWithRetry(
+    request: AiCompletionRequest,
+    stream: boolean,
+    outerSignal?: AbortSignal,
+  ): Promise<{ response: Response; cleanup: () => void }> {
+    const maxAttempts = request.retry === false ? 1 : 3
+    let lastError: AiProviderError | null = null
+
+    try {
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (this.wasAborted(request.request_id, outerSignal)) {
+          throw lastError ?? new AiProviderError('TIMEOUT', 'The NVIDIA request was aborted before a response arrived.')
+        }
+        try {
+          return await this.send(request, stream, outerSignal)
+        } catch (error) {
+          if (!(error instanceof AiProviderError)) throw error
+          lastError = error
+          if (this.wasAborted(request.request_id, outerSignal)) throw error
+          if (!isRetryableProviderError(error.code, error.httpStatus ?? null)) throw error
+          if (attempt === maxAttempts - 1) throw error
+
+          const retryAfter = error.retryAfterMs ?? null
+          const backoffMs = retryAfter ?? Math.min(1000 * 2 ** attempt, 8000)
+          await this.waitForRetry(backoffMs, request.request_id, outerSignal)
+        }
+      }
+      throw lastError ?? new AiProviderError('PROVIDER_UNAVAILABLE', 'NVIDIA did not return a response.')
+    } finally {
+      this.abortedRequests.delete(request.request_id)
+    }
+  }
+
+  private wasAborted(requestId: string, outerSignal?: AbortSignal): boolean {
+    return Boolean(outerSignal?.aborted || this.abortedRequests.has(requestId))
+  }
+
+  private waitForRetry(ms: number, requestId: string, outerSignal?: AbortSignal): Promise<void> {
+    if (ms <= 0) return Promise.resolve()
+    return new Promise((resolve, reject) => {
+      if (this.wasAborted(requestId, outerSignal)) {
+        reject(new AiProviderError('TIMEOUT', 'The NVIDIA request was aborted before a response arrived.'))
+        return
+      }
+      const onAbort = () => {
+        clearTimeout(timer)
+        reject(new AiProviderError('TIMEOUT', 'The NVIDIA request was aborted before a response arrived.'))
+      }
+      const timer = setTimeout(() => {
+        outerSignal?.removeEventListener('abort', onAbort)
+        resolve()
+      }, ms)
+      outerSignal?.addEventListener('abort', onAbort, { once: true })
+    })
   }
 
   private completionFromResponse(

@@ -11,6 +11,8 @@
 - [ ] Desktop: collapsible right panel; mobile: full-screen sheet; composer stays above the keyboard
 - [ ] Closing the browser mid-stream leaves no infinite spinner on reopen
 - [ ] NVIDIA unreachable: assistant shows a provider error; the rest of the dashboard still works
+- [ ] A 429 with Retry-After is retried; Stop mid-stream does not keep retrying; Delete conversation succeeds while signed in
+- [ ] A tool-using turn does not exceed Fast/Reasoning `max_tool_rounds`; the last assistant text is still stored
 - [ ] NVIDIA connection test shows the specific cause per failure: timeout → "The NVIDIA request timed out.", network → "The NVIDIA endpoint could not be reached.", TLS → "The NVIDIA TLS connection failed.", rate limit → "NVIDIA rate-limited this request.", model unavailable → "The requested NVIDIA model is not available.", each with its `error_id`
 - [ ] Artist asks to change EPK text: preview appears, Confirm saves, a second Confirm (or a double-click) is rejected
 - [ ] `POST /api/ai/diagnostic-reports` with `error_id` containing `%` returns 400; a real `ERR-` id returns the newest matching log
