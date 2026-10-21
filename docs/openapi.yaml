@@ -494,6 +494,18 @@ components:
             properties:
               model: { type: string }
               total_tokens: { type: integer, minimum: 0 }
+    AdminAiModels:
+      type: object
+      required: [models]
+      properties:
+        models:
+          type: array
+          items:
+            type: object
+            required: [id]
+            properties:
+              id: { type: string }
+              name: { type: string }
 
   responses:
     BadRequest:
@@ -732,6 +744,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/ai/models:
+    get:
+      operationId: getadmin_ai_models
+      tags: [Admin]
+      summary: List models advertised by NVIDIA NIM
+      security:
+        - AdminBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAiModels"
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }

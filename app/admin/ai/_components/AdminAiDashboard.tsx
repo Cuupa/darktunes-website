@@ -6,6 +6,13 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { createBrowserSupabaseClient } from '@/lib/supabase/client'
 import { getErrorMessage } from '@/lib/clientErrors'
@@ -18,6 +25,11 @@ interface SettingsPayload {
   model_fast: string
   model_reasoning: string
   last_connection_test: Record<string, unknown> | null
+}
+
+interface AvailableModel {
+  id: string
+  name: string
 }
 
 async function authHeaders(): Promise<Headers> {
@@ -37,13 +49,16 @@ export function AdminAiDashboard() {
   const [diagnostics, setDiagnostics] = useState<Array<{ id: string; error_reference: string; classification: string | null }>>([])
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [availableModels, setAvailableModels] = useState<AvailableModel[]>([])
+  const [loadingModels, setLoadingModels] = useState(false)
 
   const load = useCallback(async () => {
     const headers = await authHeaders()
-    const [settingsRes, usageRes, diagRes] = await Promise.all([
+    const [settingsRes, usageRes, diagRes, modelsRes] = await Promise.all([
       fetch('/api/admin/ai/settings', { headers }),
       fetch('/api/admin/ai/usage', { headers }),
       fetch('/api/admin/ai/diagnostics', { headers }),
+      fetch('/api/admin/ai/models', { headers }),
     ])
     if (settingsRes.ok) setSettings((await settingsRes.json()) as SettingsPayload)
     if (usageRes.ok) {
@@ -54,6 +69,12 @@ export function AdminAiDashboard() {
     if (diagRes.ok) {
       const body = (await diagRes.json()) as { items: Array<{ id: string; error_reference: string; classification: string | null }> }
       setDiagnostics(body.items)
+    }
+    if (modelsRes.ok) {
+      const body = (await modelsRes.json()) as { models: AvailableModel[] }
+      setAvailableModels(body.models ?? [])
+    } else {
+      setAvailableModels([])
     }
   }, [])
 
@@ -77,6 +98,8 @@ export function AdminAiDashboard() {
           enabled: settings.enabled,
           test_mode: settings.test_mode,
           default_streaming: settings.default_streaming,
+          model_fast: settings.model_fast,
+          model_reasoning: settings.model_reasoning,
         }),
       })
       if (!res.ok) {
@@ -110,6 +133,36 @@ export function AdminAiDashboard() {
       setTesting(false)
     }
   }
+
+  const fetchModels = async () => {
+    setLoadingModels(true)
+    try {
+      const res = await fetch('/api/admin/ai/models', { headers: await authHeaders() })
+      if (!res.ok) throw new Error(t('modelsLoadFailed'))
+      const body = (await res.json()) as { models: AvailableModel[] }
+      setAvailableModels(body.models ?? [])
+    } catch {
+      toast.error(t('modelsLoadFailed'))
+    } finally {
+      setLoadingModels(false)
+    }
+  }
+
+  const modelOptions = useMemo(() => {
+    if (!settings) return []
+    const extraIds = new Set<string>([settings.model_fast, settings.model_reasoning])
+    const knownIds = new Set(availableModels.map((m) => m.id))
+    const all: Array<{ value: string; label: string }> = availableModels.map((m) => ({
+      value: m.id,
+      label: m.name || m.id,
+    }))
+    for (const id of extraIds) {
+      if (id && !knownIds.has(id)) {
+        all.push({ value: id, label: id })
+      }
+    }
+    return all
+  }, [availableModels, settings])
 
   if (!settings) return <p className="text-sm text-muted-foreground">{t('statusConnecting')}</p>
 
@@ -152,15 +205,61 @@ export function AdminAiDashboard() {
         </Button>
       </TabsContent>
       <TabsContent value="models" className="space-y-3 pt-4">
-        <p className="text-sm">
-          {t('fastModel')}: {settings.model_fast}
-        </p>
-        <p className="text-sm">
-          {t('reasoningModel')}: {settings.model_reasoning}
-        </p>
-        <Button type="button" onClick={() => void testConnection()} disabled={testing}>
-          {testing ? t('testing') : t('testConnection')}
-        </Button>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-4">
+            <Label htmlFor="ai-model-fast">{t('fastModel')}</Label>
+            <Select
+              value={settings.model_fast}
+              onValueChange={(value) => setSettings({ ...settings, model_fast: value })}
+              disabled={loadingModels || modelOptions.length === 0}
+            >
+              <SelectTrigger id="ai-model-fast" className="w-[260px]">
+                <SelectValue placeholder={t('chooseModel')} />
+              </SelectTrigger>
+              <SelectContent>
+                {modelOptions.map((option) => (
+                  <SelectItem key={`fast-${option.value}`} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <Label htmlFor="ai-model-reasoning">{t('reasoningModel')}</Label>
+            <Select
+              value={settings.model_reasoning}
+              onValueChange={(value) => setSettings({ ...settings, model_reasoning: value })}
+              disabled={loadingModels || modelOptions.length === 0}
+            >
+              <SelectTrigger id="ai-model-reasoning" className="w-[260px]">
+                <SelectValue placeholder={t('chooseModel')} />
+              </SelectTrigger>
+              <SelectContent>
+                {modelOptions.map((option) => (
+                  <SelectItem key={`reasoning-${option.value}`} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {loadingModels ? (
+            <p className="text-sm text-muted-foreground">{t('loadingModels')}</p>
+          ) : (
+            <Button type="button" onClick={() => void fetchModels()} size="sm">
+              {t('refreshModels')}
+            </Button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" onClick={() => void save()} disabled={saving}>
+            {t('saveSettings')}
+          </Button>
+          <Button type="button" onClick={() => void testConnection()} disabled={testing}>
+            {testing ? t('testing') : t('testConnection')}
+          </Button>
+        </div>
       </TabsContent>
       <TabsContent value="tokens" className="space-y-2 pt-4">
         <p className="text-sm">{t('todayTokens', { count: today })}</p>

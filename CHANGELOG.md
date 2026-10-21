@@ -11,6 +11,7 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 ## [Unreleased]
 
 ### Added
+- **Admin → AI Assistant → Models:** pick Fast and Reasoning from the live NVIDIA `/v1/models` list and save them to `ai_settings`. Chat and Test Connection use the saved IDs (defaults stay `nvidia/nemotron-3.5-lightning-30b-a3b` / `nvidia/nemotron-3-super-120b-a12b`).
 - **Personal Artist Page NEWS block** showing that band’s label news plus band-authored posts. Artists write posts at Portal → Band news (`artist_news_posts`); they never appear on `/news`.
 - **Hero band logo toggle** on the Personal Artist Page (uses `artists.logo_url`).
 - **Up to 3 video-submission thumbnails** uploaded to R2 (`video-submissions/{artistId}/`, 4 MB each via the server proxy).

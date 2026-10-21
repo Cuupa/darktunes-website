@@ -46,9 +46,13 @@ export async function runNvidiaConnectionTest(options: {
   apiKey: string
   provider?: AiProvider
   fetchImpl?: typeof fetch
+  fastModel?: string
+  reasoningModel?: string
 }): Promise<ConnectionTestResult> {
   const started = Date.now()
   const startedAt = new Date(started).toISOString()
+  const fastModel = options.fastModel?.trim() || FAST_MODEL_ID
+  const reasoningModel = options.reasoningModel?.trim() || REASONING_MODEL_ID
   const provider =
     options.provider ??
     new NvidiaOpenAiCompatibleProvider({ apiKey: options.apiKey, fetchImpl: options.fetchImpl })
@@ -68,7 +72,7 @@ export async function runNvidiaConnectionTest(options: {
   const fast = await runStep('fast_complete', async () => {
     const completion = await provider.complete({
       request_id: 'connection-test-fast',
-      model: FAST_MODEL_ID,
+      model: fastModel,
       messages: [{ role: 'user', content: HARMLESS_USER_PROMPT }],
       max_tokens: 32,
       enable_thinking: false,
@@ -78,7 +82,7 @@ export async function runNvidiaConnectionTest(options: {
     if (!completion.content.trim()) {
       throw new AiProviderError('INVALID_RESPONSE', 'The fast model returned an empty answer.')
     }
-    discovered[FAST_MODEL_ID] = {
+    discovered[fastModel] = {
       supports_enable_thinking: true,
     }
   })
@@ -89,7 +93,7 @@ export async function runNvidiaConnectionTest(options: {
     try {
       const completion = await provider.complete({
         request_id: 'connection-test-reasoning',
-        model: REASONING_MODEL_ID,
+        model: reasoningModel,
         messages: [{ role: 'user', content: HARMLESS_USER_PROMPT }],
         max_tokens: 64,
         enable_thinking: true,
@@ -97,7 +101,7 @@ export async function runNvidiaConnectionTest(options: {
         timeout_ms: 40_000,
       })
       usage.reasoning = completion.usage
-      discovered[REASONING_MODEL_ID] = {
+      discovered[reasoningModel] = {
         supports_enable_thinking: true,
         supports_low_effort: true,
       }
@@ -108,15 +112,15 @@ export async function runNvidiaConnectionTest(options: {
       if (isAiProviderError(error) && error.code === 'INVALID_RESPONSE') {
         const retry = await provider.complete({
           request_id: 'connection-test-reasoning-plain',
-          model: REASONING_MODEL_ID,
+          model: reasoningModel,
           messages: [{ role: 'user', content: HARMLESS_USER_PROMPT }],
           max_tokens: 64,
           enable_thinking: false,
           timeout_ms: 40_000,
         })
         usage.reasoning = retry.usage
-        discovered[REASONING_MODEL_ID] = {
-          ...(discovered[REASONING_MODEL_ID] ?? {}),
+        discovered[reasoningModel] = {
+          ...(discovered[reasoningModel] ?? {}),
           supports_low_effort: false,
         }
         return
@@ -131,7 +135,7 @@ export async function runNvidiaConnectionTest(options: {
     let sawDelta = false
     for await (const event of provider.stream({
       request_id: 'connection-test-stream',
-      model: FAST_MODEL_ID,
+      model: fastModel,
       messages: [{ role: 'user', content: HARMLESS_USER_PROMPT }],
       max_tokens: 24,
       enable_thinking: false,
@@ -139,8 +143,8 @@ export async function runNvidiaConnectionTest(options: {
     })) {
       if (event.type === 'delta' && event.text.length > 0) sawDelta = true
     }
-    discovered[FAST_MODEL_ID] = {
-      ...(discovered[FAST_MODEL_ID] ?? {}),
+    discovered[fastModel] = {
+      ...(discovered[fastModel] ?? {}),
       supports_streaming: sawDelta,
     }
     if (!sawDelta) {
@@ -154,7 +158,7 @@ export async function runNvidiaConnectionTest(options: {
     try {
       const completion = await provider.complete({
         request_id: 'connection-test-tool',
-        model: FAST_MODEL_ID,
+        model: fastModel,
         messages: [
           {
             role: 'user',
@@ -167,8 +171,8 @@ export async function runNvidiaConnectionTest(options: {
         timeout_ms: 20_000,
       })
       const supported = completion.tool_calls.some((call) => call.name === 'echo_test')
-      discovered[FAST_MODEL_ID] = {
-        ...(discovered[FAST_MODEL_ID] ?? {}),
+      discovered[fastModel] = {
+        ...(discovered[fastModel] ?? {}),
         supports_tools: supported,
       }
       if (!supported) {
@@ -250,14 +254,12 @@ async function runStep(
 export function capabilitiesAfterConnectionTest(
   result: ConnectionTestResult,
 ): Record<string, ModelCapabilities> {
-  return {
-    [FAST_MODEL_ID]: mergeDiscoveredCapabilities(
-      getModelProfile(FAST_MODEL_ID),
-      result.discovered_capabilities[FAST_MODEL_ID] ?? {},
-    ),
-    [REASONING_MODEL_ID]: mergeDiscoveredCapabilities(
-      getModelProfile(REASONING_MODEL_ID),
-      result.discovered_capabilities[REASONING_MODEL_ID] ?? {},
-    ),
+  const out: Record<string, ModelCapabilities> = {}
+  for (const modelId of Object.keys(result.discovered_capabilities)) {
+    out[modelId] = mergeDiscoveredCapabilities(
+      getModelProfile(modelId),
+      result.discovered_capabilities[modelId] ?? {},
+    )
   }
+  return out
 }

@@ -13,6 +13,8 @@ const patchSchema = z.object({
   enabled: z.boolean().optional(),
   test_mode: z.boolean().optional(),
   default_streaming: z.boolean().optional(),
+  model_fast: z.string().min(1).optional(),
+  model_reasoning: z.string().min(1).optional(),
   max_tool_rounds: z.number().int().min(1).max(12).optional(),
   token_limits: z.record(z.string(), z.unknown()).optional(),
 })
@@ -47,6 +49,8 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
     enabled: parsed.data.enabled,
     test_mode: parsed.data.test_mode,
     default_streaming: parsed.data.default_streaming,
+    model_fast: parsed.data.model_fast,
+    model_reasoning: parsed.data.model_reasoning,
     max_tool_rounds: parsed.data.max_tool_rounds,
     token_limits: parsed.data.token_limits,
     updated_by: userId,

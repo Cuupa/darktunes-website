@@ -14,6 +14,7 @@
 - [ ] NVIDIA connection test shows the specific cause per failure: timeout → "The NVIDIA request timed out.", network → "The NVIDIA endpoint could not be reached.", TLS → "The NVIDIA TLS connection failed.", rate limit → "NVIDIA rate-limited this request.", model unavailable → "The requested NVIDIA model is not available.", each with its `error_id`
 - [ ] Artist asks to change EPK text: preview appears, Confirm saves, a second Confirm (or a double-click) is rejected
 - [ ] `POST /api/ai/diagnostic-reports` with `error_id` containing `%` returns 400; a real `ERR-` id returns the newest matching log
+- [ ] Admin → AI Assistant → Models: list loads from NVIDIA, Fast/Reasoning can be changed and saved; Test Connection and chat use the saved IDs
 - [ ] Admin → AI Assistant: enable, Test Connection, token counts, diagnostics list load
 - [ ] Error boundary Analyze opens the assistant with the error reference on admin/portal routes
 

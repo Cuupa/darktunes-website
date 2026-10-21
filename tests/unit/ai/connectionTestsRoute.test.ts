@@ -5,6 +5,8 @@ const requireAdminWithServiceClient = vi.fn()
 const resolveNvidiaApiKey = vi.fn()
 const runNvidiaConnectionTest = vi.fn()
 const checkDistributedRateLimit = vi.fn()
+const getAiSettings = vi.fn()
+const updateAiSettings = vi.fn()
 
 vi.mock('@/lib/adminAuth', () => ({
   requireAdminWithServiceClient: (...args: unknown[]) => requireAdminWithServiceClient(...args),
@@ -22,6 +24,11 @@ vi.mock('@/lib/rateLimitDistributed', () => ({
   checkDistributedRateLimit: (...args: unknown[]) => checkDistributedRateLimit(...args),
 }))
 
+vi.mock('@/lib/api/aiSettings', () => ({
+  getAiSettings: (...args: unknown[]) => getAiSettings(...args),
+  updateAiSettings: (...args: unknown[]) => updateAiSettings(...args),
+}))
+
 async function importRoute() {
   return import('../../../app/api/admin/ai/connection-tests/route')
 }
@@ -35,6 +42,11 @@ describe('POST /api/admin/ai/connection-tests', () => {
       serviceClient: {},
     })
     checkDistributedRateLimit.mockResolvedValue({ limited: false, backend: 'memory' })
+    getAiSettings.mockResolvedValue({
+      modelFast: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+      modelReasoning: 'nvidia/nemotron-3-super-120b-a12b',
+    })
+    updateAiSettings.mockResolvedValue({})
   })
 
   it('should reject unauthenticated callers', async () => {
@@ -75,6 +87,11 @@ describe('POST /api/admin/ai/connection-tests', () => {
     const body = await expectStatus<{ ok: boolean }>(res, 200)
     expect(body.ok).toBe(true)
     expect(runNvidiaConnectionTest).toHaveBeenCalledOnce()
+    expect(runNvidiaConnectionTest).toHaveBeenCalledWith({
+      apiKey: 'nvapi-test',
+      fastModel: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+      reasoningModel: 'nvidia/nemotron-3-super-120b-a12b',
+    })
   })
 
   function failedResult(errorCode: string) {

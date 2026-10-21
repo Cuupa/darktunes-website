@@ -40,5 +40,9 @@
   "monthTokens": "Jetons ce mois : {count}",
   "noDiagnostics": "Aucune analyse enregistrée.",
   "fastModel": "Modèle rapide",
-  "reasoningModel": "Modèle de raisonnement"
+  "reasoningModel": "Modèle de raisonnement",
+  "chooseModel": "Choisir un modèle",
+  "loadingModels": "Chargement des modèles…",
+  "refreshModels": "Actualiser les modèles",
+  "modelsLoadFailed": "Échec du chargement des modèles."
 }

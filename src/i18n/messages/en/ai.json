@@ -40,5 +40,9 @@
   "monthTokens": "Tokens this month: {count}",
   "noDiagnostics": "No saved analyses yet.",
   "fastModel": "Fast model",
-  "reasoningModel": "Reasoning model"
+  "reasoningModel": "Reasoning model",
+  "chooseModel": "Choose a model",
+  "loadingModels": "Loading models…",
+  "refreshModels": "Refresh models",
+  "modelsLoadFailed": "Failed to load models."
 }
