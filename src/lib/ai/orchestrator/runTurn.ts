@@ -6,7 +6,7 @@ import {
   listAiMessages,
 } from '@/lib/api/aiConversations'
 import { TokenBudgetManager } from '@/lib/ai/budget/manager'
-import { estimateInputTokens, estimateTokens, preferProviderUsage, usageFromEstimate } from '@/lib/ai/budget/estimator'
+import { estimateInputTokens, estimateTokens, preferProviderUsage, sumAiUsage, usageFromEstimate } from '@/lib/ai/budget/estimator'
 import { resolveNvidiaApiKey } from '@/lib/ai/provider/resolveKey'
 import { NvidiaOpenAiCompatibleProvider } from '@/lib/ai/provider/nvidia'
 import { MockAiProvider } from '@/lib/ai/provider/mock'
@@ -19,7 +19,7 @@ import { abortAiTurn, beginAiTurn, conversationTurnKey, endAiTurn } from '@/lib/
 import type { ClientSseEvent } from '@/lib/ai/orchestrator/sse'
 import type { AiActor } from '@/lib/ai/auth/requireAiActor'
 import type { AiProvider } from '@/lib/ai/provider/interface'
-import type { AiChatMessage, AiCompletion, AiUsage } from '@/lib/ai/types/provider'
+import type { AiChatMessage, AiCompletion } from '@/lib/ai/types/provider'
 import { EMPTY_AI_USAGE } from '@/lib/ai/types/provider'
 import { shouldEnableThinking } from '@/lib/ai/models/profiles'
 import { buildApiError } from '@/lib/errors'
@@ -275,15 +275,6 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
     throw error
   } finally {
     endAiTurn(conversationTurnKey(conversation.id))
-  }
-}
-
-export function sumAiUsage(a: AiUsage, b: AiUsage): AiUsage {
-  return {
-    input_tokens: a.input_tokens + b.input_tokens,
-    output_tokens: a.output_tokens + b.output_tokens,
-    reasoning_tokens: a.reasoning_tokens + b.reasoning_tokens,
-    total_tokens: a.total_tokens + b.total_tokens,
   }
 }
 
