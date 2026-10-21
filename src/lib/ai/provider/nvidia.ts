@@ -325,6 +325,7 @@ export function buildNvidiaPayload(
     stream,
   }
   if (request.tools && request.tools.length > 0) {
+    if (request.tool_choice) payload.tool_choice = request.tool_choice
     payload.tools = request.tools.map((tool) => ({
       type: 'function',
       function: {
