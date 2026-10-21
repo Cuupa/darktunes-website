@@ -299,16 +299,21 @@ and DOI confirmation emails will never be delivered.
 
 ### Applying the schema
 
-`supabase/reset.sql` is applied **by hand** in the Supabase SQL editor. It is
-idempotent and additive (`ADD COLUMN IF NOT EXISTS`, guarded `DROP … IF EXISTS`);
-`npm run check:destructive-sql` guards new destructive statements.
+`supabase/reset.sql` is applied **automatically on every deploy** via
+`scripts/vercel-install.sh` (the Vercel `installCommand`), provided
+`SUPABASE_DB_URL` (or `DATABASE_URL`) is set in the Vercel project environment
+variables. It runs after `npm ci` and before the build.
+
+`reset.sql` is idempotent and additive (`ADD COLUMN IF NOT EXISTS`, guarded
+`DROP … IF EXISTS`); `npm run check:destructive-sql` guards new destructive
+statements.
 
 `reset.sql` contains **no** cron jobs, no cron wrapper functions and no Vault
 secrets. Re-applying it never touches the scheduled jobs.
 
-`npm run db:apply` (`scripts/apply-schema.mjs`) is an optional local helper that
-runs `reset.sql` via `psql` (`SUPABASE_DB_URL` required). The
-`deploy-supabase.yml` workflow is not the production path.
+`npm run db:apply` (`scripts/apply-schema.mjs`) applies `reset.sql` via the
+`pg` client (`SUPABASE_DB_URL` required) — locally, or automatically on every
+Vercel deploy through `vercel-install.sh`.
 
 ### Sync Scheduler (Supabase Cron → Next.js worker)
 

@@ -3,9 +3,9 @@
  *
  * Applies supabase/reset.sql to the target database.
  *
- * The schema is applied with `psql` (statement-by-statement, matching the
- * Supabase SQL editor semantics — avoids the single-implicit-transaction
- * problem with `ALTER TYPE … ADD VALUE`).
+ * The schema is applied with the `pg` client (no external `psql` binary
+ * required, so it runs on Vercel as part of the install hook).
+ * `reset.sql` is idempotent — safe to run on every deploy.
  *
  * Scheduled jobs (sync worker tick, daily enqueue, daily YouTube sync, etc.)
  * are NOT managed here — they are plain HTTPS jobs configured directly in the
@@ -18,47 +18,42 @@
  * Usage: npm run db:apply
  */
 
-import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { Client } from 'pg'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const resetPath = join(root, 'supabase', 'reset.sql')
 const dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL
 
-function applySchema() {
+async function applySchema() {
   if (!existsSync(resetPath)) {
     throw new Error(`reset.sql not found at ${resetPath}`)
   }
 
-  const result = spawnSync('psql', [dbUrl, '-v', 'ON_ERROR_STOP=1', '-f', resetPath], {
-    stdio: 'inherit',
-  })
-
-  if (result.error) {
-    throw new Error(
-      `psql could not be started (${result.error.message}). Install the PostgreSQL client tools.`,
-    )
-  }
-  if (result.status !== 0) {
-    throw new Error(`psql exited with status ${result.status}`)
+  const sql = readFileSync(resetPath, 'utf8')
+  const client = new Client({ connectionString: dbUrl })
+  await client.connect()
+  try {
+    await client.query(sql)
+  } finally {
+    await client.end()
   }
 }
 
-function main() {
+async function main() {
   if (!dbUrl) {
     throw new Error('SUPABASE_DB_URL (or DATABASE_URL) is required')
   }
 
-  applySchema()
+  await applySchema()
 
   console.log('[apply-schema] done')
 }
 
-try {
-  main()
-} catch (err) {
+main().catch((err) => {
   console.error('[apply-schema] failed:', err instanceof Error ? err.message : err)
   process.exit(1)
-}
+})
