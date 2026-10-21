@@ -102,79 +102,133 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
   async *stream(request: AiCompletionRequest, signal?: AbortSignal): AsyncIterable<AiStreamEvent> {
     const started = Date.now()
     const { response, cleanup } = await this.sendWithRetry(request, true, signal)
-    const body = response.body
-    if (!body) {
-      cleanup()
-      throw new AiProviderError('INVALID_RESPONSE', 'NVIDIA returned an empty stream body.', {
-        httpStatus: response.status,
-      })
-    }
-
-    const reader = body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    let content = ''
-    let reasoning = ''
-    let toolCalls: AiToolCall[] = []
-    let finishReason: AiCompletion['finish_reason'] = 'unknown'
-    let usage = EMPTY_AI_USAGE
+    const thinkingDisabled = request.enable_thinking === false
+    const contentType = (response.headers.get('content-type') ?? '').toLowerCase()
 
     try {
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const frames = buffer.split(/\r?\n\r?\n/)
-        buffer = frames.pop() ?? ''
-        for (const frame of frames) {
-          const chunk = parseSseBlock(frame)
-          if (!chunk) continue
-          if (chunk.done) {
-            const completion = this.buildCompletion(request, content, reasoning, toolCalls, finishReason, usage, Date.now() - started)
-            yield { type: 'done', completion }
-            return
-          }
-          if (chunk.contentDelta) {
-            content += chunk.contentDelta
-            yield { type: 'delta', text: chunk.contentDelta }
-          }
-          if (chunk.reasoningDelta) {
-            reasoning += chunk.reasoningDelta
-            yield { type: 'reasoning_delta', text: chunk.reasoningDelta }
-          }
-          if (chunk.toolCallDeltas.length > 0) {
-            toolCalls = mergeToolCallDeltas(toolCalls, chunk.toolCallDeltas)
-            for (const delta of chunk.toolCallDeltas) {
-              yield { type: 'tool_call_delta', tool_call: delta }
+      // Some NVIDIA deployments ignore stream:true and answer with a regular
+      // JSON completion. Treat that as one answer chunk instead of an empty stream.
+      if (contentType.includes('application/json') || contentType.includes('+json')) {
+        const text = await response.text()
+        let parsed: unknown
+        try {
+          parsed = JSON.parse(text)
+        } catch {
+          throw new AiProviderError('INVALID_RESPONSE', 'NVIDIA returned a non-JSON streaming response.', {
+            httpStatus: response.status,
+          })
+        }
+        const completion = this.completionFromResponse(request, parsed, Date.now() - started)
+        this.assertStreamCompletion(completion)
+        if (completion.content) yield { type: 'delta', text: completion.content }
+        if (completion.reasoning_content) {
+          yield { type: 'reasoning_delta', text: completion.reasoning_content }
+        }
+        if (completion.usage.total_tokens > 0) yield { type: 'usage', usage: completion.usage }
+        yield { type: 'done', completion }
+        return
+      }
+
+      const body = response.body
+      if (!body) {
+        throw new AiProviderError('INVALID_RESPONSE', 'NVIDIA returned an empty stream body.', {
+          httpStatus: response.status,
+        })
+      }
+
+      const reader = body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let content = ''
+      let reasoning = ''
+      let toolCalls: AiToolCall[] = []
+      let finishReason: AiCompletion['finish_reason'] = 'unknown'
+      let usage = EMPTY_AI_USAGE
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const frames = buffer.split(/\r?\n\r?\n/)
+          buffer = frames.pop() ?? ''
+          for (const frame of frames) {
+            const chunk = parseSseBlock(frame)
+            if (!chunk) continue
+            if (chunk.done) {
+              const completion = this.buildCompletion(request, content, reasoning, toolCalls, finishReason, usage, Date.now() - started)
+              this.assertStreamCompletion(completion)
+              yield { type: 'done', completion }
+              return
+            }
+            if (chunk.contentDelta) {
+              content += chunk.contentDelta
+              yield { type: 'delta', text: chunk.contentDelta }
+            }
+            if (chunk.reasoningDelta) {
+              // Nemotron streaming parsers can route the final answer to the
+              // reasoning channel when thinking is disabled. Mirror NVIDIA's
+              // own non-streaming fallback so the answer is not dropped.
+              if (thinkingDisabled) {
+                if (!chunk.contentDelta) {
+                  content += chunk.reasoningDelta
+                  yield { type: 'delta', text: chunk.reasoningDelta }
+                }
+              } else {
+                reasoning += chunk.reasoningDelta
+                yield { type: 'reasoning_delta', text: chunk.reasoningDelta }
+              }
+            }
+            if (chunk.toolCallDeltas.length > 0) {
+              toolCalls = mergeToolCallDeltas(toolCalls, chunk.toolCallDeltas)
+              for (const delta of chunk.toolCallDeltas) {
+                yield { type: 'tool_call_delta', tool_call: delta }
+              }
+            }
+            if (chunk.usage) {
+              usage = chunk.usage
+              yield { type: 'usage', usage }
+            }
+            if (chunk.finishReason) {
+              finishReason = normalizeFinishReason(chunk.finishReason)
             }
           }
-          if (chunk.usage) {
-            usage = chunk.usage
-            yield { type: 'usage', usage }
-          }
-          if (chunk.finishReason) {
-            finishReason = normalizeFinishReason(chunk.finishReason)
-          }
         }
+      } catch (error) {
+        if (error instanceof AiProviderError) throw error
+        throw providerErrorFromNetwork(error)
+      } finally {
+        reader.releaseLock()
       }
-    } catch (error) {
-      if (error instanceof AiProviderError) throw error
-      throw providerErrorFromNetwork(error)
+
+      const completion = this.buildCompletion(
+        request,
+        content,
+        reasoning,
+        toolCalls,
+        finishReason,
+        usage,
+        Date.now() - started,
+      )
+      this.assertStreamCompletion(completion)
+      yield { type: 'done', completion }
     } finally {
       cleanup()
-      reader.releaseLock()
     }
+  }
 
-    const completion = this.buildCompletion(
-      request,
-      content,
-      reasoning,
-      toolCalls,
-      finishReason,
-      usage,
-      Date.now() - started,
+  private assertStreamCompletion(completion: AiCompletion): void {
+    if (completion.content.trim().length > 0 || completion.tool_calls.length > 0) return
+    if (completion.reasoning_content) {
+      throw new AiProviderError(
+        'INVALID_RESPONSE',
+        `The model streamed reasoning but no answer text (finish reason: ${completion.finish_reason}). Retry or raise the output token limit.`,
+      )
+    }
+    throw new AiProviderError(
+      'INVALID_RESPONSE',
+      `The model streamed no answer text (finish reason: ${completion.finish_reason}).`,
     )
-    yield { type: 'done', completion }
   }
 
   private async send(
@@ -333,13 +387,17 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
         arguments: typeof call.function?.arguments === 'string' ? call.function.arguments : '{}',
       })
     }
-    const content = typeof message.content === 'string' ? message.content : ''
-    const reasoning =
+    let content = typeof message.content === 'string' ? message.content : ''
+    let reasoning =
       typeof message.reasoning_content === 'string'
         ? message.reasoning_content
         : typeof message.reasoning === 'string'
           ? message.reasoning
           : null
+    if (!content.trim() && request.enable_thinking === false && reasoning?.trim()) {
+      content = reasoning
+      reasoning = null
+    }
     return this.buildCompletion(
       request,
       content,

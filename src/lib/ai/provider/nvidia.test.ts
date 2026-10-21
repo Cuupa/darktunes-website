@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { AiProviderError } from '@/lib/ai/provider/errors'
 import { NvidiaOpenAiCompatibleProvider, buildNvidiaPayload } from '@/lib/ai/provider/nvidia'
 import { getModelProfile } from '@/lib/ai/models/profiles'
-import type { AiCompletionRequest } from '@/lib/ai/types/provider'
+import type { AiCompletionRequest, AiStreamEvent } from '@/lib/ai/types/provider'
 
 const baseRequest: AiCompletionRequest = {
   request_id: 'req-1',
@@ -237,6 +237,135 @@ describe('NvidiaOpenAiCompatibleProvider', () => {
       expect(done.completion.content).toBe('pong')
       expect(done.completion.usage.total_tokens).toBe(4)
     }
+  })
+
+  it('should use streamed reasoning as answer text when thinking is disabled', async () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"reasoning_content":"po"}}]}\n\n',
+      'data: {"choices":[{"delta":{"reasoning":"ng"}}]}\n\n',
+      'data: [DONE]\n\n',
+    ].join('')
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(sse, {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        }),
+    )
+    const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'nvapi-test', fetchImpl })
+    const events: AiStreamEvent[] = []
+    for await (const event of provider.stream({ ...baseRequest, enable_thinking: false })) {
+      events.push(event)
+    }
+    expect(events.filter((event) => event.type === 'delta').map((event) => event.type === 'delta' && event.text)).toEqual([
+      'po',
+      'ng',
+    ])
+    expect(events.some((event) => event.type === 'reasoning_delta')).toBe(false)
+    const done = events.at(-1)
+    expect(done?.type).toBe('done')
+    if (done?.type === 'done') {
+      expect(done.completion.content).toBe('pong')
+      expect(done.completion.reasoning_content).toBeNull()
+    }
+  })
+
+  it('should keep reasoning deltas separate when thinking is enabled', async () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"reasoning":"thinking"}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n',
+      'data: [DONE]\n\n',
+    ].join('')
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(sse, {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        }),
+    )
+    const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'nvapi-test', fetchImpl })
+    const events: AiStreamEvent[] = []
+    for await (const event of provider.stream({ ...baseRequest, enable_thinking: true })) {
+      events.push(event)
+    }
+    expect(events.filter((event) => event.type === 'reasoning_delta').map((event) => event.type === 'reasoning_delta' && event.text)).toEqual([
+      'thinking',
+    ])
+    expect(events.filter((event) => event.type === 'delta').map((event) => event.type === 'delta' && event.text)).toEqual([
+      'answer',
+    ])
+  })
+
+  it('should prefer content over reasoning when a frame carries both and thinking is disabled', async () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"content":"po","reasoning_content":"ignore"}}]}\n\n',
+      'data: [DONE]\n\n',
+    ].join('')
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(sse, {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        }),
+    )
+    const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'nvapi-test', fetchImpl })
+    const events: AiStreamEvent[] = []
+    for await (const event of provider.stream({ ...baseRequest, enable_thinking: false })) {
+      events.push(event)
+    }
+    expect(events.filter((event) => event.type === 'delta').map((event) => event.type === 'delta' && event.text)).toEqual([
+      'po',
+    ])
+    expect(events.some((event) => event.type === 'reasoning_delta')).toBe(false)
+  })
+
+  it('should fall back to a JSON completion when NVIDIA ignores stream:true', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        choices: [{ message: { content: 'pong' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 4, completion_tokens: 1, total_tokens: 5 },
+      }),
+    )
+    const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'nvapi-test', fetchImpl })
+    const events: AiStreamEvent[] = []
+    for await (const event of provider.stream(baseRequest)) {
+      events.push(event)
+    }
+    expect(events.filter((event) => event.type === 'delta').map((event) => event.type === 'delta' && event.text)).toEqual([
+      'pong',
+    ])
+    const done = events.at(-1)
+    expect(done?.type).toBe('done')
+    if (done?.type === 'done') expect(done.completion.usage.total_tokens).toBe(5)
+  })
+
+  it('should fail instead of silently completing an empty stream', async () => {
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response('data: [DONE]\n\n', {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        }),
+    )
+    const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'nvapi-test', fetchImpl })
+    await expect(async () => {
+      for await (const _event of provider.stream(baseRequest)) {
+        // consume
+      }
+    }).rejects.toMatchObject({ code: 'INVALID_RESPONSE' })
+  })
+
+  it('should backfill non-streaming content from reasoning when thinking is disabled', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        choices: [{ message: { content: '', reasoning_content: 'pong' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 4, completion_tokens: 1, total_tokens: 5 },
+      }),
+    )
+    const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'nvapi-test', fetchImpl })
+    const completion = await provider.complete({ ...baseRequest, enable_thinking: false })
+    expect(completion.content).toBe('pong')
+    expect(completion.reasoning_content).toBeNull()
   })
 
   it('should abort an in-flight request', async () => {

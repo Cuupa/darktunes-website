@@ -18,6 +18,7 @@
 - [ ] `POST /api/ai/diagnostic-reports` with `error_id` containing `%` returns 400; a real `ERR-` id returns the newest matching log
 - [ ] Admin → AI Assistant → Models: list loads from NVIDIA, Fast/Reasoning can be changed and saved; Test Connection and chat use the saved IDs
 - [ ] Admin → AI Assistant: enable, Test Connection, token counts, diagnostics list load
+- [ ] Fast model set to a Nemotron reasoning model: Test Connection passes `stream`, chat streams text (no empty bubble), and a tool question still answers after the tool round
 - [ ] Error boundary Analyze opens the assistant with the error reference on admin/portal routes
 
 ## Personal Artist Page / band news
