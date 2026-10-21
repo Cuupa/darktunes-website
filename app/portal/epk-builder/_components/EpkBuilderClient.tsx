@@ -102,12 +102,14 @@ function EpkBuilderWorkspace({
   const handleSave = useCallback(async () => {
     setIsSaving(true)
     try {
-      await saveNow()
-      toast.success(t('epk_editor_save_success'))
+      const saved = await saveNow({ expectedVersion: documentVersion })
+      if (saved) {
+        toast.success(t('epk_editor_save_success'))
+      }
     } finally {
       setIsSaving(false)
     }
-  }, [t, saveNow])
+  }, [t, saveNow, documentVersion])
 
   const handleSaveSnapshot = useCallback(async () => {
     setIsSaving(true)

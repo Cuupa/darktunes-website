@@ -38,11 +38,15 @@ export async function getEpkDocumentState(
   if (row.error) throw new Error(row.error.message)
 
   if (row.data?.epk_document) {
-    const document = parseEpkDocumentV2(row.data.epk_document)
-    return {
-      document,
-      documentVersion: row.data.epk_document_version ?? 1,
-      editorMode: (row.data.epk_editor_mode as EpkEditorMode) ?? 'canvas',
+    try {
+      const document = parseEpkDocumentV2(row.data.epk_document)
+      return {
+        document,
+        documentVersion: row.data.epk_document_version ?? 1,
+        editorMode: (row.data.epk_editor_mode as EpkEditorMode) ?? 'canvas',
+      }
+    } catch {
+      throw new Error('EPK_DOCUMENT_CORRUPT')
     }
   }
 
@@ -59,7 +63,11 @@ export async function saveEpkDocument(
   artistId: string,
   document: EpkDocumentV2,
   userId: string,
-  options?: { createVersion?: boolean; versionLabel?: string },
+  options?: {
+    createVersion?: boolean
+    versionLabel?: string
+    expectedVersion?: number
+  },
 ): Promise<EpkDocumentState> {
   const parsed = parseEpkDocumentV2(document)
 
@@ -71,21 +79,41 @@ export async function saveEpkDocument(
 
   if (current.error) throw new Error(current.error.message)
 
-  const nextVersion = (current.data?.epk_document_version ?? 0) + 1
+  const currentVersion = current.data?.epk_document_version ?? 0
+  if (options?.expectedVersion !== undefined && currentVersion !== options.expectedVersion) {
+    throw new Error('EPK_DOCUMENT_STALE')
+  }
 
-  const { error } = await db
-    .from('artist_epks')
-    .upsert(
-      {
-        artist_id: artistId,
+  const nextVersion = currentVersion + 1
+
+  if (currentVersion === 0) {
+    // First save — no row exists yet, so insert it.
+    const { error } = await db.from('artist_epks').insert({
+      artist_id: artistId,
+      epk_document: toDbRecord(parsed),
+      epk_document_version: nextVersion,
+      epk_editor_mode: 'canvas',
+    })
+    if (error) throw new Error(error.message)
+  } else {
+    // Subsequent saves — only overwrite if nobody else wrote a newer version
+    // between when we read the document and now.
+    const { data, error } = await db
+      .from('artist_epks')
+      .update({
         epk_document: toDbRecord(parsed),
         epk_document_version: nextVersion,
         epk_editor_mode: 'canvas',
-      },
-      { onConflict: 'artist_id' },
-    )
+      })
+      .eq('artist_id', artistId)
+      .eq('epk_document_version', currentVersion)
+      .select('id')
 
-  if (error) throw new Error(error.message)
+    if (error) throw new Error(error.message)
+    if ((data ?? []).length === 0) {
+      throw new Error('EPK_DOCUMENT_STALE')
+    }
+  }
 
   if (options?.createVersion) {
     await createEpkVersion(db, {
@@ -120,10 +148,14 @@ export async function ensureMigratedEpkDocument(
   if (row.error) throw new Error(row.error.message)
 
   if (row.data?.epk_document) {
-    return {
-      document: parseEpkDocumentV2(row.data.epk_document),
-      documentVersion: row.data.epk_document_version ?? 1,
-      editorMode: (row.data.epk_editor_mode as EpkEditorMode) ?? 'canvas',
+    try {
+      return {
+        document: parseEpkDocumentV2(row.data.epk_document),
+        documentVersion: row.data.epk_document_version ?? 1,
+        editorMode: (row.data.epk_editor_mode as EpkEditorMode) ?? 'canvas',
+      }
+    } catch {
+      throw new Error('EPK_DOCUMENT_CORRUPT')
     }
   }
 

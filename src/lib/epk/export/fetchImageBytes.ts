@@ -41,10 +41,18 @@ export async function fetchAndCompressImage(
   const r2PublicUrl = process.env.CLOUDFLARE_R2_PUBLIC_URL
   if (!url || !isAllowedEpkImageUrl(url, r2PublicUrl)) return null
 
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024
+
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(15_000) })
+    const response = await fetch(url, {
+      redirect: 'error',
+      signal: AbortSignal.timeout(15_000),
+    })
     if (!response.ok) return null
+    const contentLength = Number(response.headers.get('content-length') ?? '0')
+    if (contentLength > MAX_IMAGE_BYTES || contentLength < 0) return null
     const buffer = Buffer.from(await response.arrayBuffer())
+    if (buffer.byteLength > MAX_IMAGE_BYTES) return null
 
     let pipeline = sharp(buffer).rotate()
     if (crop) {

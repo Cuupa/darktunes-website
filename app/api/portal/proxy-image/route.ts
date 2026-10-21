@@ -59,13 +59,20 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
   }
 
   // 4. Fetch the image server-side and stream it back.
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024
   const upstream = await fetch(url, {
     headers: { Accept: 'image/*,*/*;q=0.8' },
+    redirect: 'error',
     signal: AbortSignal.timeout(15_000),
   })
 
   if (!upstream.ok) {
     return new NextResponse(null, { status: upstream.status })
+  }
+
+  const contentLength = Number(upstream.headers.get('content-length') ?? '0')
+  if (contentLength > MAX_IMAGE_BYTES || contentLength < 0) {
+    throw new ApiError(413, 'Image too large')
   }
 
   const contentType = upstream.headers.get('content-type') ?? 'application/octet-stream'

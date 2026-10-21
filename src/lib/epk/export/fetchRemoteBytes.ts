@@ -6,17 +6,27 @@
 
 import { isAllowedEpkImageUrl } from '@/lib/epk/epkImageProxy'
 
+const MAX_REMOTE_BYTES = 25 * 1024 * 1024
+
 export async function fetchRemoteBytes(
   url: string,
   r2PublicUrl?: string,
   timeoutMs = 15_000,
+  maxBytes = MAX_REMOTE_BYTES,
 ): Promise<Uint8Array | null> {
   if (!url || !isAllowedEpkImageUrl(url, r2PublicUrl)) return null
 
   try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) })
+    const response = await fetch(url, {
+      redirect: 'error',
+      signal: AbortSignal.timeout(timeoutMs),
+    })
     if (!response.ok) return null
-    return new Uint8Array(await response.arrayBuffer())
+    const contentLength = Number(response.headers.get('content-length') ?? '0')
+    if (contentLength > maxBytes || contentLength < 0) return null
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    if (bytes.byteLength > maxBytes) return null
+    return bytes
   } catch {
     return null
   }

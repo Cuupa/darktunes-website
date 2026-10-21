@@ -137,3 +137,79 @@ describe('epk editor store layers', () => {
     expect(pageElements.map((el) => el.id)).toEqual(['el-front', 'el-mid', 'el-back'])
   })
 })
+
+describe('epk editor store groups', () => {
+  const groupedDocument: EpkDocumentV2 = {
+    ...baseDocument,
+    elements: [
+      ...baseDocument.elements,
+      {
+        id: 'group-1',
+        pageId: 'page-1',
+        type: 'group',
+        x: 10,
+        y: 10,
+        width: 120,
+        height: 60,
+        rotation: 0,
+        zIndex: 3,
+        locked: false,
+        visible: true,
+        style: {},
+        children: ['el-1'],
+      },
+    ],
+  }
+
+  it('duplicates a page and remaps group children to the cloned ids', () => {
+    const store = createEpkEditorStore(groupedDocument)
+    const newPageId = store.getState().duplicatePage('page-1')
+
+    const pages = store.getState().document.pages
+    const elements = store.getState().document.elements
+    const newPageElements = elements.filter((el) => el.pageId === newPageId)
+
+    expect(pages).toHaveLength(2)
+    expect(newPageElements).toHaveLength(2)
+
+    const group = newPageElements.find((el) => el.type === 'group')
+    const text = newPageElements.find((el) => el.type === 'text')
+    expect(group).toBeDefined()
+    expect(text).toBeDefined()
+    expect(group!.id).not.toBe('group-1')
+    expect(text!.id).not.toBe('el-1')
+    expect(group!.children).toEqual([text!.id])
+    expect(group!.children).not.toContain('el-1')
+
+    // the original page keeps its own group/children untouched
+    const originalGroup = elements.find((el) => el.id === 'group-1')
+    expect(originalGroup!.children).toEqual(['el-1'])
+  })
+
+  it('nudges a group together with its children', () => {
+    const store = createEpkEditorStore(groupedDocument)
+    store.getState().setSnapEnabled(false)
+    store.getState().selectElements(['group-1'])
+    store.getState().nudgeSelected(10, 20)
+
+    const group = store.getState().document.elements.find((el) => el.id === 'group-1')
+    const child = store.getState().document.elements.find((el) => el.id === 'el-1')
+    expect(group!.x).toBe(20)
+    expect(group!.y).toBe(30)
+    expect(child!.x).toBe(20)
+    expect(child!.y).toBe(30)
+  })
+
+  it('aligns a group together with its children', () => {
+    const store = createEpkEditorStore(groupedDocument)
+    store.getState().setSnapEnabled(false)
+    store.getState().selectElements(['group-1'])
+    store.getState().alignSelected('center-h')
+
+    const group = store.getState().document.elements.find((el) => el.id === 'group-1')
+    const child = store.getState().document.elements.find((el) => el.id === 'el-1')
+    const expectedX = 794 / 2 - 120 / 2
+    expect(group!.x).toBe(expectedX)
+    expect(child!.x).toBe(expectedX)
+  })
+})
