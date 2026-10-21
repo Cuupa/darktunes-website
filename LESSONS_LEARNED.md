@@ -65,6 +65,11 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-10-21 — NVIDIA abort mapped as retryable TIMEOUT
+
+- `AbortError` becomes `TIMEOUT`, which is retryable. Retrying an aborted chat hangs until the test/client times out.
+- Track aborted request IDs separately and skip retry when `abort(requestId)` was called. Connection tests must stay single-attempt.
+
 ### 2026-10-21 — `video_submissions.form_data` never landed on prod
 
 - Same CREATE-only trap as `artists.hometown`: the column was in `CREATE TABLE IF NOT EXISTS` and in TypeScript, so local/reset DBs worked and production PostgREST 500’d (`Could not find the 'form_data' column`).

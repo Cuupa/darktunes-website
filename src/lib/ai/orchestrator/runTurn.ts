@@ -193,7 +193,6 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
       }
 
       if (completion.tool_calls.length === 0) {
-        content = completion.content || content
         break
       }
 
@@ -238,7 +237,6 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
       }
       yield { type: 'status', state: 'streaming' }
       rounds += 1
-      content = ''
     }
 
     await insertAiMessage(actor.serviceDb, {

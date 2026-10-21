@@ -11,6 +11,13 @@ describe('SSE parser', () => {
     expect(chunk?.done).toBe(false)
   })
 
+  it('should parse CRLF SSE frames', () => {
+    const chunk = parseSseBlock(
+      'event: message\r\ndata: {"choices":[{"delta":{"content":"Hi"}}]}\r',
+    )
+    expect(chunk?.contentDelta).toBe('Hi')
+  })
+
   it('should treat [DONE] as the end of the stream', () => {
     const chunk = parseSseBlock('data: [DONE]')
     expect(chunk?.done).toBe(true)

@@ -77,6 +77,7 @@ export async function runNvidiaConnectionTest(options: {
       max_tokens: 32,
       enable_thinking: false,
       timeout_ms: 20_000,
+      retry: false,
     })
     usage.fast = completion.usage
     if (!completion.content.trim()) {
@@ -99,6 +100,7 @@ export async function runNvidiaConnectionTest(options: {
         enable_thinking: true,
         low_effort: true,
         timeout_ms: 40_000,
+        retry: false,
       })
       usage.reasoning = completion.usage
       discovered[reasoningModel] = {
@@ -117,6 +119,7 @@ export async function runNvidiaConnectionTest(options: {
           max_tokens: 256,
           enable_thinking: false,
           timeout_ms: 40_000,
+          retry: false,
         })
         usage.reasoning = retry.usage
         discovered[reasoningModel] = {
@@ -140,6 +143,7 @@ export async function runNvidiaConnectionTest(options: {
       max_tokens: 24,
       enable_thinking: false,
       timeout_ms: 20_000,
+      retry: false,
     })) {
       if (event.type === 'delta' && event.text.length > 0) sawDelta = true
     }
@@ -170,6 +174,7 @@ export async function runNvidiaConnectionTest(options: {
         max_tokens: 128,
         enable_thinking: false,
         timeout_ms: 20_000,
+        retry: false,
       })
       const supported = completion.tool_calls.some((call) => call.name === 'echo_test')
       discovered[fastModel] = {

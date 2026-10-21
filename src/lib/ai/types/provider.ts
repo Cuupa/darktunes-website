@@ -81,6 +81,8 @@ export interface AiCompletionRequest {
   low_effort?: boolean
   reasoning_budget?: number
   timeout_ms?: number
+  /** Chat retries transient failures. Connection tests set this to false. */
+  retry?: boolean
 }
 
 export interface AiCompletion {

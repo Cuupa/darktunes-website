@@ -190,5 +190,66 @@ describe('NvidiaOpenAiCompatibleProvider', () => {
     const pending = provider.complete(baseRequest)
     provider.abort('req-1')
     await expect(pending).rejects.toMatchObject({ code: 'TIMEOUT' })
+    expect(fetchImpl).toHaveBeenCalledOnce()
+  })
+
+  it('should retry a 429 then complete', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { message: 'slow down' } }), {
+          status: 429,
+          headers: { 'Retry-After': '0' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          choices: [{ message: { content: 'pong' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+      )
+    const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'nvapi-test', fetchImpl })
+    const completion = await provider.complete(baseRequest)
+    expect(completion.content).toBe('pong')
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
+  it('should not retry when the outer signal is aborted', async () => {
+    const fetchImpl = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          const error = new Error('aborted')
+          error.name = 'AbortError'
+          reject(error)
+        })
+      })
+    })
+    const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'nvapi-test', fetchImpl: fetchImpl as typeof fetch })
+    const controller = new AbortController()
+    const pending = provider.complete(baseRequest, controller.signal)
+    controller.abort()
+    await expect(pending).rejects.toMatchObject({ code: 'TIMEOUT' })
+    expect(fetchImpl).toHaveBeenCalledOnce()
+  })
+
+  it('should not retry when retry is false', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(JSON.stringify({ error: { message: 'slow down' } }), {
+        status: 429,
+        headers: { 'Retry-After': '0' },
+      }),
+    )
+    const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'nvapi-test', fetchImpl })
+    await expect(provider.complete({ ...baseRequest, retry: false })).rejects.toMatchObject({
+      code: 'RATE_LIMITED',
+    })
+    expect(fetchImpl).toHaveBeenCalledOnce()
+  })
+
+  it('should not retry HTTP 401', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ error: { message: 'bad key' } }, 401))
+    const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'bad', fetchImpl })
+    await expect(provider.complete(baseRequest)).rejects.toMatchObject({ code: 'INVALID_KEY' })
+    expect(fetchImpl).toHaveBeenCalledOnce()
   })
 })
