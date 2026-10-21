@@ -137,6 +137,69 @@ describe('NvidiaOpenAiCompatibleProvider', () => {
     expect(fetchImpl).toHaveBeenCalledOnce()
   })
 
+  it('retries a saturated hosted worker, then succeeds on the third attempt', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetchImpl = vi.fn()
+        .mockResolvedValueOnce(jsonResponse({ error: { message: 'ResourceExhausted: Worker local total request limit reached (16/16)' } }, 503))
+        .mockResolvedValueOnce(jsonResponse({ error: { message: 'busy' } }, 503))
+        .mockResolvedValueOnce(jsonResponse({
+          choices: [{ message: { content: 'pong' }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 4, completion_tokens: 1, total_tokens: 5 },
+        }))
+      const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'nvapi-test', fetchImpl })
+      const result = provider.complete(baseRequest)
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect((await result).content).toBe('pong')
+      expect(fetchImpl).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops after three 503 responses and preserves the saturation detail', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({ error: { message: 'ResourceExhausted: Worker local total request limit reached (16/16)' } }, 503),
+      )
+      const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'nvapi-test', fetchImpl })
+      const result = provider.complete(baseRequest)
+      const rejected = expect(result).rejects.toMatchObject({ code: 'PROVIDER_UNAVAILABLE' })
+      await vi.advanceTimersByTimeAsync(3_000)
+      await rejected
+      expect(fetchImpl).toHaveBeenCalledTimes(3)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not retry when NVIDIA requests a long Retry-After or rejects credentials', async () => {
+    const backoffResponse = new Response('busy', { status: 503, headers: { 'Retry-After': '120' } })
+    const fetchImpl = vi.fn().mockResolvedValueOnce(backoffResponse)
+    const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'nvapi-test', fetchImpl })
+    await expect(provider.complete(baseRequest)).rejects.toMatchObject({
+      code: 'PROVIDER_UNAVAILABLE', retryAfterMs: 120_000,
+    })
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it('cancels a pending retry without sending another request', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetchImpl = vi.fn(async () => jsonResponse({ error: { message: 'busy' } }, 503))
+      const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'nvapi-test', fetchImpl })
+      const request = provider.complete(baseRequest)
+      const rejected = expect(request).rejects.toMatchObject({ code: 'TIMEOUT' })
+      await vi.advanceTimersByTimeAsync(0)
+      provider.abort(baseRequest.request_id)
+      await rejected
+      expect(fetchImpl).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('should map HTTP 401 to INVALID_KEY', async () => {
     const fetchImpl = vi.fn(async () => jsonResponse({ error: { message: 'bad key' } }, 401))
     const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'bad', fetchImpl })

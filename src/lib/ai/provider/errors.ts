@@ -89,6 +89,12 @@ export function parseRetryAfterMs(header: string | null): number | null {
 }
 
 function summarizeProviderBody(status: number, bodyText: string): string {
+  // NVIDIA hosted workers can reject requests before inference begins.
+  // Keep the worker occupancy visible without mislabeling it as a bad API key.
+  if (status === 503 && /ResourceExhausted|Worker local total request limit reached/i.test(bodyText)) {
+    const capacity = bodyText.match(/\b(\d+\s*\/\s*\d+)\b/)?.[1] ?? 'full'
+    return `NVIDIA hosted inference workers are currently saturated (${capacity}). The request was not processed. Retry later or choose a different available model.`
+  }
   const trimmed = bodyText.trim().slice(0, 280)
   if (!trimmed) return `NVIDIA returned HTTP ${status} with an empty body.`
   try {

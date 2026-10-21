@@ -15,6 +15,18 @@ describe('AiProviderError', () => {
     expect(error.message).toContain('slow down')
   })
 
+  it('classifies NVIDIA worker saturation as an upstream availability issue', () => {
+    const error = providerErrorFromHttpStatus(
+      503,
+      '{"error":{"message":"ResourceExhausted: Worker local total request limit reached (16/16)"}}',
+      null,
+    )
+    expect(error.code).toBe('PROVIDER_UNAVAILABLE')
+    expect(error.retryable).toBe(true)
+    expect(error.message).toContain('16/16')
+    expect(error.message).toContain('saturated')
+  })
+
   it('should map 401 to INVALID_KEY and not retry', () => {
     const error = providerErrorFromHttpStatus(401, 'unauthorized', null)
     expect(error.code).toBe('INVALID_KEY')
