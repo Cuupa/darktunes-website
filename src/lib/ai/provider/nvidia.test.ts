@@ -26,6 +26,50 @@ describe('NvidiaOpenAiCompatibleProvider', () => {
     expect(payload.chat_template_kwargs).toEqual({ enable_thinking: false })
   })
 
+  it('serializes a multi-step tool exchange into NVIDIA/OpenAI wire format', () => {
+    const payload = buildNvidiaPayload(
+      {
+        ...baseRequest,
+        messages: [
+          { role: 'user', content: 'Find my artist' },
+          {
+            role: 'assistant',
+            content: '',
+            tool_calls: [{ id: 'call_1', name: 'get_artist', arguments: '{"id":"a1"}' }],
+          },
+          { role: 'tool', name: 'get_artist', tool_call_id: 'call_1', content: '{"artist":"Test"}' },
+        ],
+      },
+      false,
+      getModelProfile(baseRequest.model),
+    )
+    expect(payload.messages).toEqual([
+      { role: 'user', content: 'Find my artist' },
+      {
+        role: 'assistant',
+        content: '',
+        tool_calls: [
+          {
+            id: 'call_1',
+            type: 'function',
+            function: { name: 'get_artist', arguments: '{"id":"a1"}' },
+          },
+        ],
+      },
+      { role: 'tool', content: '{"artist":"Test"}', tool_call_id: 'call_1' },
+    ])
+  })
+
+  it('rejects tool messages without a matching call identifier', () => {
+    expect(() =>
+      buildNvidiaPayload(
+        { ...baseRequest, messages: [{ role: 'tool', content: '{}' }] },
+        false,
+        getModelProfile(baseRequest.model),
+      ),
+    ).toThrow('tool_call_id')
+  })
+
   it('should send reasoning_budget only on the discovered path', () => {
     const capabilities = {
       ...getModelProfile(baseRequest.model),
