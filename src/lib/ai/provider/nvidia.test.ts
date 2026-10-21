@@ -70,6 +70,45 @@ describe('NvidiaOpenAiCompatibleProvider', () => {
     ).toThrow('tool_call_id')
   })
 
+  it('only sends tool_choice when tools are supplied', () => {
+    const request = {
+      ...baseRequest,
+      tool_choice: 'required' as const,
+      tools: [{ name: 'echo_test', description: 'Echo', parameters: { type: 'object' } }],
+    }
+    expect(buildNvidiaPayload(request, false, getModelProfile(request.model)).tool_choice).toBe('required')
+    expect(buildNvidiaPayload({ ...request, tools: [] }, false, getModelProfile(request.model)).tool_choice).toBeUndefined()
+  })
+
+  it('keeps stream timeouts active while waiting for SSE content', async () => {
+    vi.useFakeTimers()
+    try {
+      const fetchImpl = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              init?.signal?.addEventListener('abort', () => {
+                const error = new Error('aborted')
+                error.name = 'AbortError'
+                controller.error(error)
+              })
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'text/event-stream' } },
+        ),
+      )
+      const provider = new NvidiaOpenAiCompatibleProvider({ apiKey: 'nvapi-test', fetchImpl })
+      const iterator = provider.stream({ ...baseRequest, timeout_ms: 25 })[Symbol.asyncIterator]()
+      const pending = iterator.next()
+      // Register a rejection handler before advancing fake timers.
+      const check = expect(pending).rejects.toMatchObject({ code: 'TIMEOUT' })
+      await vi.advanceTimersByTimeAsync(30)
+      await check
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('should send reasoning_budget only on the discovered path', () => {
     const capabilities = {
       ...getModelProfile(baseRequest.model),
