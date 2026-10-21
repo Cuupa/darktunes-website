@@ -26,6 +26,10 @@ export interface NvidiaProviderOptions {
 }
 
 const DEFAULT_TIMEOUT_MS = 45_000
+// Hosted NVIDIA inference can return 503 ResourceExhausted during peak demand.
+// A server-requested delay longer than this would hold the serverless request
+// open, so fail promptly and let the caller retry instead.
+const MAX_RETRY_DELAY_MS = 4_000
 
 export class NvidiaOpenAiCompatibleProvider implements AiProvider {
   readonly id = 'nvidia' as const
@@ -34,6 +38,7 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
   private readonly fetchImpl: typeof fetch
   private readonly discovered: Record<string, Partial<ModelCapabilities>>
   private readonly controllers = new Map<string, AbortController>()
+  private readonly waitControllers = new Map<string, AbortController>()
   private readonly abortedRequests = new Set<string>()
 
   constructor(options: NvidiaProviderOptions) {
@@ -69,6 +74,10 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
     const controller = this.controllers.get(requestId)
     controller?.abort()
     this.controllers.delete(requestId)
+    // Also cancel a pending retry backoff so the turn stops immediately.
+    const waiter = this.waitControllers.get(requestId)
+    waiter?.abort()
+    this.waitControllers.delete(requestId)
   }
 
   async complete(request: AiCompletionRequest, signal?: AbortSignal): Promise<AiCompletion> {
@@ -244,14 +253,18 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
           if (!isRetryableProviderError(error.code, error.httpStatus ?? null)) throw error
           if (attempt === maxAttempts - 1) throw error
 
-          const retryAfter = error.retryAfterMs ?? null
-          const backoffMs = retryAfter ?? Math.min(1000 * 2 ** attempt, 8000)
-          await this.waitForRetry(backoffMs, request.request_id, outerSignal)
+          // Honour Retry-After. A long server delay would hold the serverless
+          // request open, so fail promptly instead of sleeping through it.
+          const jitteredBackoff = Math.round(500 * 2 ** attempt * (0.8 + Math.random() * 0.4))
+          const waitMs = error.retryAfterMs ?? jitteredBackoff
+          if (waitMs > MAX_RETRY_DELAY_MS) throw error
+          await this.waitForRetry(waitMs, request.request_id, outerSignal)
         }
       }
       throw lastError ?? new AiProviderError('PROVIDER_UNAVAILABLE', 'NVIDIA did not return a response.')
     } finally {
       this.abortedRequests.delete(request.request_id)
+      this.waitControllers.delete(request.request_id)
     }
   }
 
@@ -261,20 +274,29 @@ export class NvidiaOpenAiCompatibleProvider implements AiProvider {
 
   private waitForRetry(ms: number, requestId: string, outerSignal?: AbortSignal): Promise<void> {
     if (ms <= 0) return Promise.resolve()
+    const aborted = () =>
+      new AiProviderError('TIMEOUT', 'The NVIDIA request was aborted before a response arrived.')
+    if (this.wasAborted(requestId, outerSignal)) return Promise.reject(aborted())
+
+    const waiter = new AbortController()
+    this.waitControllers.set(requestId, waiter)
     return new Promise((resolve, reject) => {
-      if (this.wasAborted(requestId, outerSignal)) {
-        reject(new AiProviderError('TIMEOUT', 'The NVIDIA request was aborted before a response arrived.'))
-        return
+      const cleanup = () => {
+        clearTimeout(timer)
+        outerSignal?.removeEventListener('abort', onAbort)
+        waiter.signal.removeEventListener('abort', onAbort)
+        if (this.waitControllers.get(requestId) === waiter) this.waitControllers.delete(requestId)
       }
       const onAbort = () => {
-        clearTimeout(timer)
-        reject(new AiProviderError('TIMEOUT', 'The NVIDIA request was aborted before a response arrived.'))
+        cleanup()
+        reject(aborted())
       }
       const timer = setTimeout(() => {
-        outerSignal?.removeEventListener('abort', onAbort)
+        cleanup()
         resolve()
       }, ms)
       outerSignal?.addEventListener('abort', onAbort, { once: true })
+      waiter.signal.addEventListener('abort', onAbort, { once: true })
     })
   }
 

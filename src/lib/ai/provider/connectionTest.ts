@@ -66,6 +66,9 @@ export async function runNvidiaConnectionTest(options: {
       throw new AiProviderError('INVALID_KEY', 'No NVIDIA API key is configured.')
     }
   })
+  // The auth step only verifies the presence of a credential, not remote validity.
+  // The first live completion verifies whether NVIDIA accepts the key.
+  if (auth.ok) auth.detail = 'API key is configured locally. NVIDIA validation occurs during fast_complete.'
   steps.push(auth)
   if (!auth.ok) return finish(false)
 
