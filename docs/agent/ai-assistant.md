@@ -28,6 +28,8 @@ Hosted NVIDIA inference can return HTTP 503 `ResourceExhausted: Worker local tot
 
 Provider adapter: `src/lib/ai/provider/`. Domain code never imports NVIDIA payload types. Connection tests record which extras (`enable_thinking`, `low_effort`, `reasoning_budget`, tools+stream) the live API accepted. Connection tests stay single-attempt. SSE parsers accept LF and CRLF frames.
 
+Nemotron streaming deployments can put the final answer in `delta.reasoning` / `delta.reasoning_content` when `enable_thinking=false`; their non-streaming path swaps the fields. The provider treats reasoning-channel text as answer text when thinking is disabled, keeps it separate when thinking is on, forwards a JSON body returned for `stream:true` as one chunk, and raises `INVALID_RESPONSE` instead of finishing a stream with no answer text and no tool calls.
+
 `max_tokens` includes reasoning tokens when thinking is on.
 
 ## Token budgets

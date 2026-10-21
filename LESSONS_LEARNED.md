@@ -65,6 +65,11 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-10-22 — NVIDIA streamed answers can arrive in the reasoning channel
+
+- With a Nemotron reasoning model selected as Fast, non-streaming `fast_complete` passed but the `stream` health step failed with "no text deltas"; chat stored `done` with empty content. NVIDIA/vLLM routes the answer to `delta.reasoning` / `delta.reasoning_content` with `enable_thinking=false` on some streaming deployments while the non-streaming parser swaps the fields.
+- Normalize channels in the provider, not the UI. When thinking is disabled, reasoning-channel text is the answer; when enabled, keep it separate. Parse a JSON body returned for `stream:true`. Never emit `done` with no text and no tool calls.
+
 ### 2026-10-21 — NVIDIA abort mapped as retryable TIMEOUT
 
 - `AbortError` becomes `TIMEOUT`, which is retryable. Retrying an aborted chat hangs until the test/client times out.
