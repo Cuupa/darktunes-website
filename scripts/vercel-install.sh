@@ -105,8 +105,19 @@ else
   echo "  ✔  All required environment variables are present."
 fi
 
+# -----------------------------------------------------------------------------
+# 3. Apply Supabase schema (reset.sql) — runs on every deploy
+# -----------------------------------------------------------------------------
+if [ -n "${SUPABASE_DB_URL:-}" ] || [ -n "${DATABASE_URL:-}" ]; then
+  echo "▶  Applying Supabase schema (supabase/reset.sql)..."
+  npm run db:apply
+  echo "✔  Schema applied."
+else
+  echo "  ℹ  Skipping schema apply (SUPABASE_DB_URL/DATABASE_URL not set)"
+fi
+
 echo ""
-echo "╔══════════════════════════════════════════════════════╗"
+echo "╔═════════════════════════════════════════════════════╗"
 echo "║    Install complete. Proceeding to build…            ║"
-echo "╚══════════════════════════════════════════════════════╝"
+echo "╚═════════════════════════════════════════════════════╝"
 echo ""
