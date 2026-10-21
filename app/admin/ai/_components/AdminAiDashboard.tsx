@@ -87,6 +87,18 @@ export function AdminAiDashboard() {
     return last && last.ok === true
   }, [settings])
 
+  const lastTestSteps = useMemo(() => {
+    const value = settings?.last_connection_test?.steps
+    if (!Array.isArray(value)) return []
+    return value.filter((step): step is {
+      step: string
+      ok: boolean
+      latency_ms: number
+      error_code: string | null
+      detail: string | null
+    } => Boolean(step) && typeof step === 'object' && typeof step.step === 'string' && typeof step.ok === 'boolean')
+  }, [settings])
+
   const save = async () => {
     if (!settings) return
     setSaving(true)
@@ -128,6 +140,8 @@ export function AdminAiDashboard() {
       toast.success(body.ok ? t('testConnection') : t('statusFailed'))
       await load()
     } catch (err) {
+      // Failed probes are persisted by the API. Reload them instead of only showing a generic toast.
+      await load().catch(() => undefined)
       toast.error(err instanceof Error ? err.message : tErrors('SERVER_ERROR'))
     } finally {
       setTesting(false)
@@ -278,8 +292,22 @@ export function AdminAiDashboard() {
           </ul>
         )}
       </TabsContent>
-      <TabsContent value="health" className="space-y-2 pt-4">
-        <p className="text-sm">{lastTestOk ? t('testConnection') : t('notConfigured')}</p>
+      <TabsContent value="health" className="space-y-3 pt-4">
+        <p className="text-sm">{lastTestOk ? t('testConnection') : t('statusFailed')}</p>
+        {lastTestSteps.length > 0 && (
+          <ul className="space-y-2 text-sm">
+            {lastTestSteps.map((step) => (
+              <li key={step.step} className="rounded-md border border-border p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <code>{step.step}</code>
+                  <span>{step.ok ? 'OK' : (step.error_code ?? t('statusFailed'))}</span>
+                </div>
+                {step.detail && <p className="mt-1 text-muted-foreground">{step.detail}</p>}
+                <p className="mt-1 text-xs text-muted-foreground">{step.latency_ms} ms</p>
+              </li>
+            ))}
+          </ul>
+        )}
       </TabsContent>
     </Tabs>
   )
