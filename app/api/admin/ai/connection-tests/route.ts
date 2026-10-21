@@ -13,7 +13,7 @@ import { runNvidiaConnectionTest } from '@/lib/ai/provider/connectionTest'
 import type { ConnectionTestStepId } from '@/lib/ai/provider/connectionTest'
 import { getAiSettings, updateAiSettings } from '@/lib/api/aiSettings'
 
-export const maxDuration = 60
+export const maxDuration = 120
 
 function stepErrorToApi(
   code: string | null,
