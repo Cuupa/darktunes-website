@@ -102,12 +102,6 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
     estimatedOutputTokens: outputCap,
   })
 
-  await insertAiMessage(actor.serviceDb, {
-    conversationId: conversation.id,
-    role: 'user',
-    content: input.userText,
-  })
-
   const controller = beginAiTurn(conversationTurnKey(conversation.id))
   let usage = usageFromEstimate(0, 0)
   let estimatedUsage = false
@@ -115,6 +109,11 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
   let modelUsed = model
 
   try {
+    await insertAiMessage(actor.serviceDb, {
+      conversationId: conversation.id,
+      role: 'user',
+      content: input.userText,
+    })
     yield { type: 'status', state: 'streaming' }
     const messages: AiChatMessage[] = windowed
     let rounds = 0
