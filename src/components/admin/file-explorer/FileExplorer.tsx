@@ -22,6 +22,7 @@ import { FolderTree } from './FolderTree'
 import { TagsEditorDialog } from './AssetAssignDialog'
 import { AssetPreviewModal } from './AssetPreviewModal'
 import { UploadDropZone, type UploadDropZoneRef } from './UploadDropZone'
+import { R2Explorer } from './R2Explorer'
 
 interface RenamingState {
   type: 'file' | 'folder'
@@ -59,6 +60,7 @@ export function FileExplorer({
   const [storageStatsRevision, setStorageStatsRevision] = useState(0)
   const [optimizeImages, setOptimizeImages] = useState(true)
   const [optimizingExisting, setOptimizingExisting] = useState(false)
+  const [r2View, setR2View] = useState<'catalog' | 'r2'>('catalog')
 
   const bumpStorageStats = useCallback(() => {
     setStorageStatsRevision((n) => n + 1)
@@ -433,46 +435,52 @@ export function FileExplorer({
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize="80%" className="min-h-0">
             <div className="flex h-full min-h-0 flex-col">
-              <ExplorerToolbar
-                searchQuery={explorer.searchQuery}
-                onSearchChange={explorer.setSearchQuery}
-                searchInputRef={searchInputRef}
-                viewMode={explorer.viewMode}
-                onViewModeChange={explorer.setViewMode}
-                sortField={explorer.sortField}
-                sortDir={explorer.sortDir}
-                onSortChange={explorer.setSort}
-                itemCount={displayedFolders.length + displayedAssets.length}
-                selectedCount={explorer.selectedIds.size}
-                onCreateFolder={() => void createFolder(explorer.currentFolderId)}
-                onDeleteSelected={() => void deleteSelected()}
-                onUpload={() => uploadRef.current?.openPicker()}
-                authToken={explorer.token}
-                storageStatsRevision={storageStatsRevision}
-                pressFilters={explorer.pressFilters}
-                onPressFiltersChange={handlePressFiltersChange}
-                selectedFileCount={selectedFileCount}
-                onBulkPress={(action, kitArtistId) => void handleBulkPress(action, kitArtistId)}
-                artists={artistOptions}
-                optimizeImages={optimizeImages}
-                onOptimizeImagesChange={setOptimizeImages}
-                onOptimizeExisting={() => void handleOptimizeExisting()}
-                optimizingExisting={optimizingExisting}
-                selectedImageCount={selectedImageCount}
-              />
-              <ExplorerBreadcrumb path={explorer.folderPath} onNavigate={navigate} />
-              <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} optimizeImages={optimizeImages} onUploadComplete={handleUploadComplete}>
-                {explorer.viewMode === 'grid' ? (
-                  <FileGrid {...sharedGridListProps} />
-                ) : (
-                  <FileList
-                    {...sharedGridListProps}
+              {r2View === 'r2' ? (
+                <R2Explorer />
+              ) : (
+                <>
+                  <ExplorerToolbar
+                    searchQuery={explorer.searchQuery}
+                    onSearchChange={explorer.setSearchQuery}
+                    searchInputRef={searchInputRef}
+                    viewMode={explorer.viewMode}
+                    onViewModeChange={explorer.setViewMode}
                     sortField={explorer.sortField}
                     sortDir={explorer.sortDir}
                     onSortChange={explorer.setSort}
+                    itemCount={displayedFolders.length + displayedAssets.length}
+                    selectedCount={explorer.selectedIds.size}
+                    onCreateFolder={() => void createFolder(explorer.currentFolderId)}
+                    onDeleteSelected={() => void deleteSelected()}
+                    onUpload={() => uploadRef.current?.openPicker()}
+                    authToken={explorer.token}
+                    storageStatsRevision={storageStatsRevision}
+                    pressFilters={explorer.pressFilters}
+                    onPressFiltersChange={handlePressFiltersChange}
+                    selectedFileCount={selectedFileCount}
+                    onBulkPress={(action, kitArtistId) => void handleBulkPress(action, kitArtistId)}
+                    artists={artistOptions}
+                    optimizeImages={optimizeImages}
+                    onOptimizeImagesChange={setOptimizeImages}
+                    onOptimizeExisting={() => void handleOptimizeExisting()}
+                    optimizingExisting={optimizingExisting}
+                    selectedImageCount={selectedImageCount}
                   />
-                )}
-              </UploadDropZone>
+                  <ExplorerBreadcrumb path={explorer.folderPath} onNavigate={navigate} />
+                  <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} optimizeImages={optimizeImages} onUploadComplete={handleUploadComplete}>
+                    {explorer.viewMode === 'grid' ? (
+                      <FileGrid {...sharedGridListProps} />
+                    ) : (
+                      <FileList
+                        {...sharedGridListProps}
+                        sortField={explorer.sortField}
+                        sortDir={explorer.sortDir}
+                        onSortChange={explorer.setSort}
+                      />
+                    )}
+                  </UploadDropZone>
+                </>
+              )}
             </div>
           </ResizablePanel>
         </ResizablePanelGroup>
@@ -532,21 +540,27 @@ export function FileExplorer({
             />
           </div>
         )}
-        <ExplorerBreadcrumb path={explorer.folderPath} onNavigate={navigate} />
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} optimizeImages={optimizeImages} onUploadComplete={handleUploadComplete}>
-            {explorer.viewMode === 'grid' ? (
-              <FileGrid {...sharedGridListProps} />
-            ) : (
-              <FileList
-                {...sharedGridListProps}
-                sortField={explorer.sortField}
-                sortDir={explorer.sortDir}
-                onSortChange={explorer.setSort}
-              />
-            )}
-          </UploadDropZone>
-        </div>
+        {r2View === 'r2' ? (
+          <R2Explorer />
+        ) : (
+          <>
+            <ExplorerBreadcrumb path={explorer.folderPath} onNavigate={navigate} />
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <UploadDropZone ref={uploadRef} folderId={explorer.currentFolderId} token={explorer.token} optimizeImages={optimizeImages} onUploadComplete={handleUploadComplete}>
+                {explorer.viewMode === 'grid' ? (
+                  <FileGrid {...sharedGridListProps} />
+                ) : (
+                  <FileList
+                    {...sharedGridListProps}
+                    sortField={explorer.sortField}
+                    sortDir={explorer.sortDir}
+                    onSortChange={explorer.setSort}
+                  />
+                )}
+              </UploadDropZone>
+            </div>
+          </>
+        )}
       </div>
 
       <AssetPreviewModal

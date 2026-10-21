@@ -35,6 +35,7 @@ const NAMESPACES = [
   'adminSubmissions',
   'errors',
   'admin',
+  'ai',
   'pwa',
 ] as const satisfies readonly (keyof Dictionary)[]
 
@@ -172,6 +173,7 @@ const loaders: Record<Locale, Record<Namespace, () => Promise<unknown>>> = {
     adminSubmissions: () => import('./messages/en/adminSubmissions.json').then((m) => m.default),
     errors: () => import('./messages/en/errors.json').then((m) => m.default),
     admin: () => import('./messages/en/admin.json').then((m) => m.default),
+    ai: () => import('./messages/en/ai.json').then((m) => m.default),
     pwa: () => import('./messages/en/pwa.json').then((m) => m.default),
   },
   de: {
@@ -209,6 +211,7 @@ const loaders: Record<Locale, Record<Namespace, () => Promise<unknown>>> = {
     adminSubmissions: () => import('./messages/de/adminSubmissions.json').then((m) => m.default),
     errors: () => import('./messages/de/errors.json').then((m) => m.default),
     admin: () => import('./messages/de/admin.json').then((m) => m.default),
+    ai: () => import('./messages/de/ai.json').then((m) => m.default),
     pwa: () => import('./messages/de/pwa.json').then((m) => m.default),
   },
   fr: {
@@ -246,6 +249,7 @@ const loaders: Record<Locale, Record<Namespace, () => Promise<unknown>>> = {
     adminSubmissions: () => import('./messages/fr/adminSubmissions.json').then((m) => m.default),
     errors: () => import('./messages/fr/errors.json').then((m) => m.default),
     admin: () => import('./messages/fr/admin.json').then((m) => m.default),
+    ai: () => import('./messages/fr/ai.json').then((m) => m.default),
     pwa: () => import('./messages/fr/pwa.json').then((m) => m.default),
   },
 }
