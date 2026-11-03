@@ -140,6 +140,69 @@ describe('useCSVProcessor', () => {
     expect(result.current.isProcessing).toBe(false)
   })
 
+  it('does not infinitely retry a failed financial calculation', async () => {
+    const file = {
+      id: 'currency-mismatch',
+      name: 'shopify.csv',
+      size: 9,
+      type: 'shopify' as const,
+      data: 'Name,Currency\\nDM1,EUR',
+      uploadedAt: '2026-01-01T00:00:00.000Z',
+    }
+    const { result } = renderHook(() => useCSVProcessor([], [], makeConfig(), [file]))
+    const worker = workerInstances[0]
+    await act(async () => {
+      worker.onmessage?.({ data: {
+        type: 'parse-done', fileId: file.id, rowsParsed: 1, rowsSkipped: 0,
+        uniqueArtistsCount: 0, periodStart: '2026-01', periodEnd: '2026-01',
+      } } as MessageEvent)
+    })
+    const processCalls = () => worker.postMessage.mock.calls
+      .filter(([message]) => message.type === 'process').length
+    const before = processCalls()
+    expect(before).toBeGreaterThan(0)
+    await act(async () => {
+      worker.onmessage?.({ data: {
+        type: 'error', message: 'Shopify EUR and Printful USD differ',
+      } } as MessageEvent)
+    })
+    expect(processCalls()).toBe(before)
+    expect(result.current.isProcessing).toBe(false)
+    expect(result.current.processedData).toEqual([])
+  })
+
+  it('reports parse errors to the file card and ignores stale completions', async () => {
+    const file = {
+      id: 'bad-source',
+      name: 'darkmerch.csv',
+      size: 9,
+      type: 'darkmerch' as const,
+      data: 'DATE,BAND\\nunknown,Band',
+      uploadedAt: '2026-01-01T00:00:00.000Z',
+    }
+    const onParseDone = vi.fn()
+    const onParseError = vi.fn()
+    const { result, rerender } = renderHook(
+      ({ files }) => useCSVProcessor([], [], makeConfig(), [], [], files, { onParseDone, onParseError }),
+      { initialProps: { files: [file] } },
+    )
+    const worker = workerInstances[0]
+    await act(async () => {
+      worker.onmessage?.({ data: {
+        type: 'error', fileId: file.id, message: 'Invalid Darkmerch CSV structure',
+      } } as MessageEvent)
+    })
+    expect(onParseError).toHaveBeenCalledWith(file.id, 'Invalid Darkmerch CSV structure')
+    expect(result.current.isProcessing).toBe(false)
+    rerender({ files: [] })
+    await act(async () => {
+      worker.onmessage?.({ data: {
+        type: 'parse-done', fileId: file.id, rowsParsed: 1, rowsSkipped: 0, uniqueArtistsCount: 1,
+      } } as MessageEvent)
+    })
+    expect(onParseDone).not.toHaveBeenCalled()
+  })
+
   it('forwards worker parse-progress and parse-done to ingest callbacks', async () => {
     const onParseProgress = vi.fn()
     const onParseDone = vi.fn()
