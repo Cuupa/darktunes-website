@@ -223,7 +223,7 @@ function FileStatusIcon({ state, hasData }: { state: FileProcessingState | undef
     state?.bronzeStatus === 'uploading'
   )
     return <Spinner size={16} className="text-primary animate-spin flex-shrink-0" />
-  if (state?.bronzeStatus === 'error')
+  if (state?.bronzeStatus === 'error' || state?.bronzeStatus === 'skipped')
     return <Warning size={16} className="text-amber-400 flex-shrink-0" />
   if (!hasData && !state) return <Warning size={16} className="text-amber-400 flex-shrink-0" />
   return <CheckCircle size={16} className="text-green-500 flex-shrink-0" />
@@ -244,10 +244,10 @@ function FileProgressBar({ state }: { state: FileProcessingState | undefined }) 
     state.status === 'uploading' ||
     state.status === 'processing' ||
     archiving
-  if (!showBar && state.bronzeStatus !== 'error') return null
+  if (!showBar && state.bronzeStatus !== 'error' && state.bronzeStatus !== 'skipped') return null
 
   let label = state.detail ?? ''
-  if (state.bronzeStatus === 'error') {
+  if (state.bronzeStatus === 'error' || state.bronzeStatus === 'skipped') {
     label = ''
   } else if (state.phase === 'reading') {
     label = interpolate(t('ingestReading'), {
@@ -274,7 +274,7 @@ function FileProgressBar({ state }: { state: FileProcessingState | undefined }) 
         <Progress value={archiving ? 100 : state.progress} className="h-1.5" />
       )}
       {label ? <p className="text-xs text-muted-foreground">{label}</p> : null}
-      {state.bronzeStatus === 'error' && state.bronzeError ? (
+      {(state.bronzeStatus === 'error' || state.bronzeStatus === 'skipped') && state.bronzeError ? (
         <div className="space-y-0.5">
           <p className="text-xs text-amber-400 leading-relaxed">{state.bronzeError}</p>
           {state.operationId ? (
@@ -653,6 +653,11 @@ function FileItem({ file, source, state, index, onRemove, onReplace, replaceRef,
                 {state?.bronzeStatus === 'error' && !file.bronzeBatchId && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-400">
                     R2 archive failed
+                  </span>
+                )}
+                {state?.bronzeStatus === 'skipped' && !file.bronzeBatchId && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-400">
+                    R2 archive skipped
                   </span>
                 )}
               </div>
