@@ -111,6 +111,7 @@ vi.mock('@/lib/env.server', () => ({
     CLOUDFLARE_R2_ACCESS_KEY_ID: 'key',
     CLOUDFLARE_R2_SECRET_ACCESS_KEY: 'secret',
     CLOUDFLARE_R2_BUCKET_NAME: 'bucket',
+    CLOUDFLARE_R2_PRIVATE_INVOICE_BUCKET_NAME: 'private-invoices',
     CLOUDFLARE_R2_PUBLIC_URL: 'https://cdn.test',
     API_CREDENTIALS_ENCRYPTION_KEY: 'a'.repeat(64),
   },
