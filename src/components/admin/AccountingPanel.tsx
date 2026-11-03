@@ -411,6 +411,21 @@ function SosGeneratorPanel() {
       printfulManager.applyParseResult(stats)
       darkmerchManager.applyParseResult(stats)
     },
+    onParseError: (fileId: string, message: string) => {
+      const patch: Partial<FileProcessingState> = {
+        status: 'error',
+        phase: 'error',
+        progress: 0,
+        error: message,
+        bronzeStatus: 'skipped',
+        bronzeError: 'Parsing failed. Correct the file and upload it again.',
+      }
+      believeManager.patchFileState(fileId, patch)
+      bandcampManager.patchFileState(fileId, patch)
+      shopifyManager.patchFileState(fileId, patch)
+      printfulManager.patchFileState(fileId, patch)
+      darkmerchManager.patchFileState(fileId, patch)
+    },
   }
 
   // Load a bronze archive into the appropriate in-memory file manager for processing.
