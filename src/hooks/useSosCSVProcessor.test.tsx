@@ -146,7 +146,7 @@ describe('useCSVProcessor', () => {
       name: 'shopify.csv',
       size: 9,
       type: 'shopify' as const,
-      data: 'Name,Currency\\nDM1,EUR',
+      data: 'Name,Currency\nDM1,EUR',
       uploadedAt: '2026-01-01T00:00:00.000Z',
     }
     const { result } = renderHook(() => useCSVProcessor([], [], makeConfig(), [file]))
@@ -177,7 +177,7 @@ describe('useCSVProcessor', () => {
       name: 'darkmerch.csv',
       size: 9,
       type: 'darkmerch' as const,
-      data: 'DATE,BAND\\nunknown,Band',
+      data: 'DATE,BAND\nunknown,Band',
       uploadedAt: '2026-01-01T00:00:00.000Z',
     }
     const onParseDone = vi.fn()
