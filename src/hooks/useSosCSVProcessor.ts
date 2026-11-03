@@ -85,6 +85,7 @@ export {
 export interface CsvProcessorEvents {
   onParseProgress?: (progress: SosParseProgress) => void
   onParseDone?: (stats: SosParseDoneStats) => void
+  onParseError?: (fileId: string, message: string) => void
   onProcessProgress?: (progress: SosProcessProgress) => void
 }
 
@@ -169,6 +170,10 @@ export function useCSVProcessor(
   const processSeqRef = useRef(0)
   /** Number of 'add-file' messages still awaiting 'parse-done' from the worker. */
   const pendingParsesRef = useRef(0)
+  /** Ignore stale completions from removed, replaced or reset files. */
+  const pendingParseIdsRef = useRef(new Set<string>())
+  /** A source parse error must block downstream statements, not produce partial totals. */
+  const failedParseIdsRef = useRef(new Set<string>())
   /** Latest config snapshot — updated synchronously so the parse-done handler uses it. */
   const latestConfigRef = useRef<WorkerProcessConfig | null>(null)
   /** The alias key that was in effect the last time files were synced with the worker. */
@@ -436,6 +441,8 @@ export function useCSVProcessor(
     if (workerGeneration > 0) {
       sentFingerprintRef.current.clear()
       pendingParsesRef.current = 0
+      pendingParseIdsRef.current.clear()
+      failedParseIdsRef.current.clear()
       prevAliasKeyRef.current = undefined
     }
 
@@ -463,7 +470,10 @@ export function useCSVProcessor(
           break
 
         case 'parse-done':
-          pendingParsesRef.current = Math.max(0, pendingParsesRef.current - 1)
+          // A late event from a removed/replaced file must not decrement a
+          // different import's pending count or mark its archive as complete.
+          if (!pendingParseIdsRef.current.delete(msg.fileId)) break
+          pendingParsesRef.current = pendingParseIdsRef.current.size
           eventsRef.current.onParseDone?.({
             fileId: msg.fileId,
             rowsParsed: msg.rowsParsed,
@@ -475,7 +485,11 @@ export function useCSVProcessor(
             periodEnd: msg.periodEnd ?? '',
           })
           if (pendingParsesRef.current === 0) {
-            sendProcessRef.current()
+            if (failedParseIdsRef.current.size === 0) sendProcessRef.current()
+            else {
+              setWorkerResult(EMPTY_RESULT)
+              setIsProcessing(false)
+            }
           }
           break
 
@@ -500,10 +514,6 @@ export function useCSVProcessor(
           if (msg.requestId !== undefined && msg.requestId !== processSeqRef.current) break
           resolveResultWaiters(false)
           console.error('CSV Worker error:', msg.message)
-          if (msg.fileId) {
-            pendingParsesRef.current = Math.max(0, pendingParsesRef.current - 1)
-            sentFingerprintRef.current.delete(msg.fileId)
-          }
           const labels = tRef.current
           const missingCurrency = parseMissingExchangeRateCurrency(msg.message)
           if (missingCurrency) {
@@ -526,13 +536,19 @@ export function useCSVProcessor(
             })
           }
           setPipelineProgress(null)
-          if (pendingParsesRef.current === 0) {
-            if (sentFingerprintRef.current.size > 0) {
-              sendProcessRef.current()
-            } else {
-              setIsProcessing(false)
+          if (msg.fileId) {
+            // A parse failure is an invalid source file, not a failed
+            // calculation that should spin in an infinite retry loop.
+            failedParseIdsRef.current.add(msg.fileId)
+            if (pendingParseIdsRef.current.delete(msg.fileId)) {
+              pendingParsesRef.current = pendingParseIdsRef.current.size
             }
+            eventsRef.current.onParseError?.(msg.fileId, msg.message)
           }
+          // Never keep the last successful financial result after a failed
+          // parse or reconciliation. Explicit file replacement is required.
+          setWorkerResult(EMPTY_RESULT)
+          if (pendingParsesRef.current === 0) setIsProcessing(false)
           break
         }
 
@@ -611,6 +627,7 @@ export function useCSVProcessor(
         }),
       })
       setIsProcessing(false)
+      setWorkerResult(EMPTY_RESULT)
       for (const pending of pendingExcelRef.current.values()) {
         pending.reject(new Error(err.message || 'Worker crashed'))
       }
@@ -632,6 +649,8 @@ export function useCSVProcessor(
       resolveResultWaiters(false)
       sentFingerprints.clear()
       pendingParsesRef.current = 0
+      pendingParseIdsRef.current.clear()
+      failedParseIdsRef.current.clear()
       for (const pending of pendingExcel.values()) pending.resolve(null)
       pendingExcel.clear()
       orphanExcel.clear()
@@ -670,6 +689,8 @@ export function useCSVProcessor(
         worker.postMessage({ type: 'reset' } satisfies WorkerRequest)
         sentFingerprintRef.current.clear()
         pendingParsesRef.current = 0
+        pendingParseIdsRef.current.clear()
+        failedParseIdsRef.current.clear()
       }
     }
 
@@ -681,15 +702,21 @@ export function useCSVProcessor(
     for (const id of toRemove) {
       worker.postMessage({ type: 'remove-file', fileId: id } satisfies WorkerRequest)
       sentFingerprintRef.current.delete(id)
+      pendingParseIdsRef.current.delete(id)
+      failedParseIdsRef.current.delete(id)
     }
+    pendingParsesRef.current = pendingParseIdsRef.current.size
 
     let newFilesQueued = 0
     for (const id of toAdd) {
       const file = currentFileMap.get(id)
       if (!file?.data) continue
       sentFingerprintRef.current.set(id, fileParseFingerprint(id, file.data))
-      pendingParsesRef.current++
+      failedParseIdsRef.current.delete(id)
+      pendingParseIdsRef.current.add(id)
+      pendingParsesRef.current = pendingParseIdsRef.current.size
       newFilesQueued++
+      setWorkerResult(EMPTY_RESULT)
       worker.postMessage({
         type: 'add-file',
         fileId: id,
@@ -703,7 +730,10 @@ export function useCSVProcessor(
     // If all files were already known (no new adds) and there are no pending
     // parses, trigger a process with the current config immediately.
     if (newFilesQueued === 0 && pendingParsesRef.current === 0) {
-      if (currentFileMap.size === 0) {
+      if (failedParseIdsRef.current.size > 0) {
+        setWorkerResult(EMPTY_RESULT)
+        setIsProcessing(false)
+      } else if (currentFileMap.size === 0) {
         // No files left — return empty result
         setWorkerResult(EMPTY_RESULT)
         setIsProcessing(false)
@@ -718,7 +748,7 @@ export function useCSVProcessor(
   useEffect(() => {
     const cfg = buildConfig()
     latestConfigRef.current = cfg
-    if (workerRef.current && pendingParsesRef.current === 0 && sentFingerprintRef.current.size > 0) {
+    if (workerRef.current && pendingParsesRef.current === 0 && failedParseIdsRef.current.size === 0 && sentFingerprintRef.current.size > 0) {
       sendProcessRef.current()
     }
   }, [configKey, buildConfig])
