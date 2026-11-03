@@ -14,6 +14,7 @@ describe('parseShopifyRaw strict amounts (#632)', () => {
 
     const result = parseShopifyRaw(csv)
     expect(result.orders).toHaveLength(1)
+    expect(result.orders[0]?.salesMonth).toBe('2026-01')
     expect(result.orders[0]?.lineItems[0]?.quantity).toBe(0)
     expect(result.errors).toHaveLength(0)
   })
@@ -61,6 +62,13 @@ describe('parsePrintfulCSV strict amounts (#632)', () => {
     const result = parsePrintfulCSV(csv)
     expect(result.costs).toEqual([{ orderId: '#DM1063', total: 15.79 }])
     expect(result.errors).toHaveLength(0)
+  })
+
+  it('derives archive provenance from Printful dates without changing the cost data', () => {
+    const csv = ['Order,Total,Date', '#DM1063,15.79,31/12/2025', '#DM1064,9.50,01/03/2026'].join('\n')
+    const result = parsePrintfulCSV(csv)
+    expect(result.costs).toEqual([{ orderId: '#DM1063', total: 15.79 }, { orderId: '#DM1064', total: 9.5 }])
+    expect(result.periodMonths).toEqual(['2025-12', '2026-03'])
   })
 
   it('reports an invalid total instead of using 0', () => {
