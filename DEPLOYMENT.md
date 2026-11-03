@@ -114,37 +114,6 @@ Enable **bucket versioning** on the production R2 bucket (or at least for prefix
 
 ### Invoice PDF privacy (ops)
 
-**Deployment gate:** Create a dedicated Cloudflare R2 bucket for invoice PDFs. Do
-not enable the public `r2.dev` domain and do not attach a public custom domain.
-Give the application's R2 API credentials read/write permission for that bucket.
-Set `CLOUDFLARE_R2_PRIVATE_INVOICE_BUCKET_NAME` to the private bucket name.
-It must differ from `CLOUDFLARE_R2_BUCKET_NAME`. Without it, the invoice
-creation API fails closed with HTTP 503 so legal names, addresses and tax IDs
-are never written into the public asset bucket.
-
-New invoices store an internal `r2-private:invoices/{artistId}/{invoiceId}/{sha256}.pdf`
-reference, not a public URL. The content-addressed key prevents a concurrent
-retry from overwriting the file attached to another version of the invoice.
-PDF download routes use the private bucket and continue to require authentication
-or expiring HMAC tokens. This remains secure only if the private bucket is
-actually not publicly exposed.
-
-**Existing invoices:** Older PDFs are still read from the original public
-bucket for compatibility. Those historical objects may be directly downloadable
-until they are migrated to the private bucket and deleted from the public bucket.
-Plan and verify a one-time migration, then update the database references while
-respecting the invoice immutability policy (an audited, explicitly authorized
-migration, not an ordinary invoice update). Do not claim the legacy exposure is
-resolved until the old objects are gone and direct public GET returns 403/404.
-
-**Post-deployment DB requirement:** Apply the updated `supabase/reset.sql`
-through the approved database change procedure. It adds the
-`trg_artist_invoices_pdf_immutable` trigger. Code-level conditional updates
-reduce races, but the database-level guarantee is only active after this schema
-change is deployed.
-
-### Invoice PDF privacy (ops)
-
 Invoice PDFs contain legal names, addresses, and tax IDs. The app no longer renders or emails the public `CLOUDFLARE_R2_PUBLIC_URL` for invoices: customer mails carry an expiring HMAC link (`/api/invoices/{id}/pdf?token=…`, signed with `API_CREDENTIALS_ENCRYPTION_KEY`), and portal/admin downloads use authenticated presigned routes.
 
 To make this a real access control (not just link hygiene), the `invoices/` prefix must not be publicly readable:
