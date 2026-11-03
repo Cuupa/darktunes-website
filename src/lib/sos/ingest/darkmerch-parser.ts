@@ -21,6 +21,7 @@
  *     buffer without producing a full parse result.
  */
 
+import Papa from 'papaparse'
 import type { SalesTransaction } from './csv-parser'
 import { parseAmount } from './amountParsing'
 
@@ -98,13 +99,21 @@ export function parseDarkmerchCSV(content: string): DarkmerchParseResult {
   let periodStart = ''
   let periodEnd = ''
 
-  const lines = content.split(/\r?\n/)
-  if (lines.length === 0) return { transactions, errors }
+  // PapaParse handles RFC 4180 quoting, embedded commas, semicolons, escaped
+  // quotes and multiline cells. A structural CSV error must not silently
+  // produce a partial financial statement.
+  const parsed = Papa.parse<string[]>(content.replace(/^\uFEFF/, ''), {
+    skipEmptyLines: 'greedy',
+    dynamicTyping: false,
+  })
+  if (parsed.errors.length > 0) {
+    throw new Error(`Invalid Darkmerch CSV structure: ${parsed.errors[0].message}`)
+  }
+  if (parsed.data.length === 0) return { transactions, errors }
 
   // ── Detect header and column indices ───────────────────────────────────────
-  const headerLine = lines[0] ?? ''
-  const delimiter = headerLine.includes(';') ? ';' : ','
-  const originalHeaders = headerLine.split(delimiter).map(h => h.trim())
+  const originalHeaders = (parsed.data[0] ?? []).map(h => h.trim())
+  const headerLine = originalHeaders.join(parsed.meta.delimiter || ',')
   const headers = originalHeaders.map(h => h.toUpperCase())
 
   const colDate = findColByAliases(headers, DATE_ALIASES)
@@ -121,11 +130,10 @@ export function parseDarkmerchCSV(content: string): DarkmerchParseResult {
   }
 
   // ── Parse data rows ─────────────────────────────────────────────────────────
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i]
-    if (!line || !line.trim()) continue
-
-    const cols = line.split(delimiter).map(c => c.trim())
+  for (let i = 1; i < parsed.data.length; i++) {
+    const cols = (parsed.data[i] ?? []).map(c => c.trim())
+    if (cols.every(c => !c)) continue
+    const line = cols.join(parsed.meta.delimiter || ',')
 
     const bandValue = cols[colBand] ?? ''
     const revenueStr = cols[colRevenue] ?? ''
