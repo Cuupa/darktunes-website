@@ -154,7 +154,6 @@ export default defineConfig({
       CLOUDFLARE_R2_SECRET_ACCESS_KEY:
         process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || 'placeholder-r2-secret-key',
       CLOUDFLARE_R2_BUCKET_NAME: process.env.CLOUDFLARE_R2_BUCKET_NAME || 'placeholder-bucket',
-      CLOUDFLARE_R2_PRIVATE_INVOICE_BUCKET_NAME: process.env.CLOUDFLARE_R2_PRIVATE_INVOICE_BUCKET_NAME || 'placeholder-private-invoices',
       CLOUDFLARE_R2_PUBLIC_URL:
         process.env.CLOUDFLARE_R2_PUBLIC_URL || 'https://cdn.placeholder.example',
       /* Required by src/lib/env.server.ts's Zod schema (64-char hex) wherever
