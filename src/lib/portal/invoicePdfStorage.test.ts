@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { privateInvoiceReference, resolveInvoicePdfObject } from './invoicePdfStorage'
 
 describe('private invoice PDF storage', () => {
-  const invoice = { id: 'inv-1', artistId: 'artist-1', pdfUrl: privateInvoiceReference('artist-1', 'inv-1') }
+  const hash = 'a'.repeat(64)
+  const invoice = { id: 'inv-1', artistId: 'artist-1', pdfSha256: hash, pdfUrl: privateInvoiceReference('artist-1', 'inv-1', hash) }
   const config = { publicBucket: 'public-assets', privateBucket: 'private-invoices' }
 
   it('stores new invoices under an opaque reference in a separate bucket', () => {
-    expect(invoice.pdfUrl).toBe('r2-private:invoices/artist-1/inv-1.pdf')
+    expect(invoice.pdfUrl).toBe(`r2-private:invoices/artist-1/inv-1/${hash}.pdf`)
     expect(resolveInvoicePdfObject(invoice, config)).toEqual({
-      key: 'invoices/artist-1/inv-1.pdf',
+      key: `invoices/artist-1/inv-1/${hash}.pdf`,
       bucket: 'private-invoices',
       isLegacyPublic: false,
     })
@@ -24,7 +25,7 @@ describe('private invoice PDF storage', () => {
 
   it('rejects swapped private references', () => {
     expect(() => resolveInvoicePdfObject({
-      ...invoice, pdfUrl: 'r2-private:invoices/other/inv-1.pdf',
+      ...invoice, pdfUrl: `r2-private:invoices/other/inv-1/${hash}.pdf`,
     }, config)).toThrow(/does not match/)
   })
 
