@@ -448,10 +448,12 @@ export async function markInvoiceReceived(
       updated_at: now,
     })
     .eq('id', id)
+    .eq('status', 'sent')
     .select('*')
-    .single()
+    .maybeSingle()
 
   if (error) throw new Error(error.message)
+  if (!data) throw new BusinessRuleError('Invoice state changed before receipt was recorded', 409, 'INVOICE_STATUS_CONFLICT')
   return rowToArtistInvoice(data as InvoiceRow)
 }
 
