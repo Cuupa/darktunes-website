@@ -12,7 +12,6 @@ import { extractBearerToken, verifyAdmin } from '@/lib/adminAuth'
 import { getAdminInvoiceById } from '@/lib/api/artistInvoices'
 import { ApiError, withErrorHandler } from '@/lib/errors'
 import { createR2Client } from '@/lib/r2Utils'
-import { resolveInvoicePdfObject } from '@/lib/portal/invoicePdfStorage'
 import { createServerSupabaseClient } from '@/lib/supabase/server'
 
 const EXPIRY_SECONDS = 600
@@ -29,10 +28,10 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   if (!invoice?.pdfUrl) throw new ApiError(404, 'Invoice PDF not found')
 
   const { serverEnv } = await import('@/lib/env.server')
-  const { key, bucket } = resolveInvoicePdfObject(invoice, {
-    publicBucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
-    privateBucket: serverEnv.CLOUDFLARE_R2_PRIVATE_INVOICE_BUCKET_NAME,
-  })
+  const publicBase = serverEnv.CLOUDFLARE_R2_PUBLIC_URL.replace(/\/$/, '')
+  const key = invoice.pdfUrl.startsWith(publicBase)
+    ? invoice.pdfUrl.slice(publicBase.length + 1)
+    : `invoices/${invoice.artistId}/${invoice.id}.pdf`
 
   const s3 = createR2Client(
     serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
@@ -41,7 +40,7 @@ export const GET = withErrorHandler(async (req: NextRequest) => {
   )
   const url = await getSignedUrl(
     s3,
-    new GetObjectCommand({ Bucket: bucket, Key: key }),
+    new GetObjectCommand({ Bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME, Key: key }),
     { expiresIn: EXPIRY_SECONDS },
   )
 
