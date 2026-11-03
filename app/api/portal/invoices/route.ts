@@ -242,7 +242,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       const replayInvoiceNumber =
         existingLinkedInvoice.artistInvoiceNumber ?? existingLinkedInvoice.invoiceNumber
 
-      if (['label_approved', 'artist_notified', 'viewed'].includes(statement.status)) {
+      if (existingLinkedInvoice.status === 'sent' &&
+          ['label_approved', 'artist_notified', 'viewed'].includes(statement.status)) {
         try {
           await write('sales_statements', 'update', (db) =>
             updateSalesStatementStatus(db, statement.id, 'invoiced'),
@@ -539,21 +540,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }
   }
 
-  if (
-    statement &&
-    ['label_approved', 'artist_notified', 'viewed'].includes(statement.status)
-  ) {
-    try {
-      await write('sales_statements', 'update', (db) =>
-        updateSalesStatementStatus(db, statement.id, 'invoiced'),
-      )
-    } catch (err) {
-      // The invoice row + PDF exist — surface the failure without losing them.
-      console.error('[portal invoices] statement status update failed:', err)
-      warnings.push('statement_status_failed')
-    }
-  }
-
   if (statement && settlementPeriodId) {
     // Net liability zeros statement_payout; cash still owed is tracked via unpaid invoice gross.
     // Recovered invoices book the persisted line items, never the retry payload.
@@ -678,6 +664,23 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       delivery_error: deliveryError,
     }),
   )
+
+  // Never mark a statement invoiced while its invoice remains an unsent
+  // draft. Only a confirmed send advances this financial workflow.
+  if (
+    statement &&
+    finalInvoice.status === 'sent' &&
+    ['label_approved', 'artist_notified', 'viewed'].includes(statement.status)
+  ) {
+    try {
+      await write('sales_statements', 'update', (db) =>
+        updateSalesStatementStatus(db, statement.id, 'invoiced'),
+      )
+    } catch (err) {
+      console.error('[portal invoices] statement status update failed:', err)
+      warnings.push('statement_status_failed')
+    }
+  }
 
   return NextResponse.json(
     {
