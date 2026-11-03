@@ -41,6 +41,7 @@ import { formatEcbRateNote, getEcbRateForCurrency } from '@/lib/legal/serverFx'
 import { generateInvoiceNumber } from '@/lib/portal/invoiceNumber'
 import { generateInvoicePdf } from '@/lib/portal/invoicePdf'
 import { mintInvoicePdfToken } from '@/lib/portal/invoicePdfToken'
+import { privateInvoiceReference } from '@/lib/portal/invoicePdfStorage'
 import { toPortalInvoiceListItem } from '@/lib/portal/invoiceUi'
 import { resolveLabelClientInfo } from '@/lib/portal/labelBilling'
 import { createR2Client } from '@/lib/r2Utils'
@@ -140,6 +141,10 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
   const fxNote = fxQuote ? formatEcbRateNote(fxQuote) : undefined
 
   const { serverEnv } = await import('@/lib/env.server')
+  const privateInvoiceBucket = serverEnv.CLOUDFLARE_R2_PRIVATE_INVOICE_BUCKET_NAME
+  if (!privateInvoiceBucket || privateInvoiceBucket === serverEnv.CLOUDFLARE_R2_BUCKET_NAME) {
+    throw new ApiError(503, 'Private invoice PDF storage is not configured. New invoice issuance is disabled until a separate private R2 bucket is available.')
+  }
   const emailCredentials = await getEmailCredentials(serviceDb)
 
   const statement = input.statement_id
@@ -498,11 +503,11 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
     serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
   )
-  // Stable key per invoice id — one immutable object (enable R2 versioning in ops).
+  // Stable key per invoice id in a PRIVATE bucket without a public CDN.
   const key = `invoices/${artist.id}/${invoice.id}.pdf`
   await s3.send(
     new PutObjectCommand({
-      Bucket: serverEnv.CLOUDFLARE_R2_BUCKET_NAME,
+      Bucket: privateInvoiceBucket,
       Key: key,
       Body: Buffer.from(pdfBytes),
       ContentType: 'application/pdf',
@@ -510,7 +515,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }),
   )
 
-  const pdfUrl = `${serverEnv.CLOUDFLARE_R2_PUBLIC_URL.replace(/\/$/, '')}/${key}`
+  const pdfUrl = privateInvoiceReference(artist.id, invoice.id)
   // Financial status and delivery are separate (#623): the status is decided
   // after the mail result below, never from the send request alone.
   const updatedInvoice = await write('artist_invoices', 'update', (db) =>
