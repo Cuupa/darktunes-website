@@ -37,8 +37,6 @@ const serverEnvSchema = z.object({
   CLOUDFLARE_R2_PUBLIC_URL: z
     .string()
     .url({ message: 'must be a valid URL (e.g. https://cdn.darktunes.com)' }),
-  /** Separate private R2 bucket for invoice PDFs (no public domain). */
-  CLOUDFLARE_R2_PRIVATE_INVOICE_BUCKET_NAME: z.string().min(1).optional(),
   /**
    * Master key for AES-256-GCM encryption of api_credentials values.
    * Generate with: openssl rand -hex 32
@@ -68,7 +66,6 @@ function validateServerEnv(): ServerEnv {
     CLOUDFLARE_R2_SECRET_ACCESS_KEY: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
     CLOUDFLARE_R2_BUCKET_NAME: process.env.CLOUDFLARE_R2_BUCKET_NAME,
     CLOUDFLARE_R2_PUBLIC_URL: process.env.CLOUDFLARE_R2_PUBLIC_URL,
-    CLOUDFLARE_R2_PRIVATE_INVOICE_BUCKET_NAME: process.env.CLOUDFLARE_R2_PRIVATE_INVOICE_BUCKET_NAME,
     API_CREDENTIALS_ENCRYPTION_KEY: process.env.API_CREDENTIALS_ENCRYPTION_KEY,
     CRON_SECRET: process.env.CRON_SECRET,
   })
