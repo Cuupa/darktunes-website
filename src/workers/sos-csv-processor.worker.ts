@@ -475,11 +475,15 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest>) => {
         if (source === 'shopify') {
           // Stage raw orders for reconciliation — do NOT convert to SalesTransactions yet.
           const { orders, errors } = parseShopifyRaw(content)
+          const currencyError = errors.find((error) => /currency/i.test(error.reason))
+          if (currencyError) throw new Error(`Shopify CSV contains invalid currency data at row ${currencyError.row}: ${currencyError.reason}`)
           shopifyRawOrdersMap.set(fileId, orders)
           postParseDone(fileId, orders.length, errors.length, 0, orders.map((order) => order.salesMonth))
         } else if (source === 'printful') {
           // Stage raw costs for reconciliation.
           const { costs, errors, periodMonths } = parsePrintfulCSV(content)
+          const currencyError = errors.find((error) => /currency/i.test(error.reason))
+          if (currencyError) throw new Error(`Printful CSV contains invalid currency data at row ${currencyError.row}: ${currencyError.reason}`)
           printfulRawCostsMap.set(fileId, costs)
           postParseDone(fileId, costs.length, errors.length, 0, periodMonths)
         } else if (source === 'darkmerch') {
