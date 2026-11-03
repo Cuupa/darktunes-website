@@ -229,7 +229,9 @@ export function unpaidInvoiceContributionCents(invoice: {
   paid_amount_cents?: number | null
   line_items?: unknown
 }): number {
-  if (invoice.status === 'paid') return 0
+  // Only submitted invoices are liabilities. Drafts and cancelled invoices
+  // must not inflate carry-forward balances beside approved statements.
+  if (['draft', 'cancelled', 'paid'].includes(invoice.status)) return 0
   if (invoice.outstanding_amount_cents != null) {
     return Number(invoice.outstanding_amount_cents)
   }
