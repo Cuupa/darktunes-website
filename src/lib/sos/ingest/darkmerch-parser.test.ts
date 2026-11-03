@@ -80,3 +80,32 @@ describe('Darkmerch archive period metadata', () => {
     })
   })
 })
+
+describe('Darkmerch CSV quoting safety', () => {
+  it('keeps quoted commas and escaped quotes in artist and period fields', () => {
+    const csv = [
+      'DATE,BAND,NET REVENUE',
+      '"Q4 2025 - Q1 2026","Band, The ""Reapers""",15',
+    ].join('\n')
+    const result = parseDarkmerchCSV(csv)
+    expect(result.errors).toHaveLength(0)
+    expect(result.transactions).toHaveLength(1)
+    expect(result.transactions[0]?.original_artist).toBe('Band, The "Reapers"')
+    expect(result.transactions[0]?.net_revenue).toBe(15)
+    expect(result.periodStart).toBe('2025-10')
+    expect(result.periodEnd).toBe('2026-03')
+  })
+
+  it('preserves quoted multiline artist cells and semicolon separated decimals', () => {
+    const csv = ['DATE;BAND;NET REVENUE', 'Q1 2026;"The\nReapers";15,79'].join('\n')
+    const result = parseDarkmerchCSV(csv)
+    expect(result.transactions).toHaveLength(1)
+    expect(result.transactions[0]?.original_artist).toBe('The\nReapers')
+    expect(result.transactions[0]?.net_revenue).toBe(15.79)
+  })
+
+  it('rejects malformed quotes instead of calculating with shifted columns', () => {
+    expect(() => parseDarkmerchCSV('DATE,BAND,NET REVENUE\nQ1 2026,"Invalid,5'))
+      .toThrow(/Invalid Darkmerch CSV structure/)
+  })
+})
