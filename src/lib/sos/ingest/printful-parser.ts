@@ -47,6 +47,8 @@ export function parsePrintfulCSV(content: string): PrintfulParseResult {
   const errors: PrintfulParseResult['errors'] = []
   const periodMonths: string[] = []
 
+  // A number without an explicit currency is not safe to reconcile.
+
   for (let i = 0; i < parsed.data.length; i++) {
     const row = parsed.data[i]
 
@@ -55,7 +57,28 @@ export function parsePrintfulCSV(content: string): PrintfulParseResult {
       const orderId = row['Order']?.trim()
       if (!orderId) continue
 
-      const totalResult = parseAmount(row['Total'] ?? '', 'en')
+      const totalRaw = row['Total'] ?? ''
+      const rawCurrency = (row['Currency'] ?? row['Total Currency'] ?? '').trim().toUpperCase()
+      const amountCurrency = /\b([A-Z]{3})\b/i.exec(totalRaw)?.[1]?.toUpperCase()
+      const symbols = [
+        totalRaw.includes('€') ? 'EUR' : null,
+        totalRaw.includes('£') ? 'GBP' : null,
+        totalRaw.includes('¥') ? 'JPY' : null,
+      ].filter((value): value is string => value !== null)
+      const currencies = [rawCurrency || null, amountCurrency ?? null, ...symbols]
+        .filter((value): value is string => value !== null)
+      if (currencies.some(value => !/^[A-Z]{3}$/.test(value)) || new Set(currencies).size > 1) {
+        errors.push({
+          row: i + 2,
+          reason: 'Conflicting or invalid Printful currency',
+          data: JSON.stringify(row),
+        })
+        continue
+      }
+      // Dollar symbols alone are ambiguous between multiple currencies.
+      const currency = currencies[0]
+      const amountText = amountCurrency ? totalRaw.replace(/\b[A-Z]{3}\b/i, '') : totalRaw
+      const totalResult = parseAmount(amountText, 'en')
       if (totalResult.kind !== 'valid') {
         errors.push({
           row: i + 2,
@@ -65,7 +88,7 @@ export function parsePrintfulCSV(content: string): PrintfulParseResult {
         continue
       }
 
-      costs.push({ orderId, total: totalResult.value })
+      costs.push({ orderId, total: totalResult.value, ...(currency ? { currency } : {}) })
       const month = normalizeDateToMonth(row['Date'] ?? '', 'printful')
       if (month) periodMonths.push(month)
     } catch (err) {
