@@ -163,9 +163,13 @@ export async function collectReferencedKeys(db: ServiceDb, publicBase: string): 
         pdf_url?: string | null
         pdf_sha256?: string | null
       }
-      addFromValue(keys, record.pdf_url, publicBase)
-      if (record.pdf_url || record.pdf_sha256) {
-        addKey(keys, invoiceObjectKey(record.artist_id, record.id))
+      // Private invoice references belong to a different R2 bucket. They
+      // must never be treated as public asset keys by the public-bucket janitor.
+      if (!record.pdf_url?.startsWith('r2-private:')) {
+        addFromValue(keys, record.pdf_url, publicBase)
+        if (record.pdf_url || record.pdf_sha256) {
+          addKey(keys, invoiceObjectKey(record.artist_id, record.id))
+        }
       }
     }
   }
