@@ -15,10 +15,13 @@
 import Papa from 'papaparse'
 import type { PrintfulRawCost } from './ecommerce-merger'
 import { parseAmount } from './amountParsing'
+import { normalizeDateToMonth } from './normalizeDateToMonth'
 
 export interface PrintfulParseResult {
   costs: PrintfulRawCost[]
   errors: Array<{ row: number; reason: string; data: string }>
+  /** Observed fulfilment months used for source archive bounds. */
+  periodMonths: string[]
 }
 
 /**
@@ -42,6 +45,7 @@ export function parsePrintfulCSV(content: string): PrintfulParseResult {
 
   const costs: PrintfulRawCost[] = []
   const errors: PrintfulParseResult['errors'] = []
+  const periodMonths: string[] = []
 
   for (let i = 0; i < parsed.data.length; i++) {
     const row = parsed.data[i]
@@ -62,6 +66,8 @@ export function parsePrintfulCSV(content: string): PrintfulParseResult {
       }
 
       costs.push({ orderId, total: totalResult.value })
+      const month = normalizeDateToMonth(row['Date'] ?? '', 'printful')
+      if (month) periodMonths.push(month)
     } catch (err) {
       errors.push({
         row: i + 2,
@@ -71,5 +77,5 @@ export function parsePrintfulCSV(content: string): PrintfulParseResult {
     }
   }
 
-  return { costs, errors }
+  return { costs, errors, periodMonths }
 }
