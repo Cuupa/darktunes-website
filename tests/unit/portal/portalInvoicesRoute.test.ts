@@ -286,9 +286,10 @@ describe('POST /api/portal/invoices', () => {
     expect(payload.invoice.hasPdf).toBe(true)
     expect(createSosLinkedInvoice).not.toHaveBeenCalled()
     expect(sendInvoiceEmail).not.toHaveBeenCalled()
-    // Replay repairs follow-up steps that failed after the PDF was attached.
-    expect(hasLedgerEntry).toHaveBeenCalled()
-    expect(appendLedgerEntry).toHaveBeenCalled()
+    // An unsent draft is not a financial liability. Its PDF can be replayed,
+    // but the statement and ledger only advance after confirmed delivery.
+    expect(hasLedgerEntry).not.toHaveBeenCalled()
+    expect(appendLedgerEntry).not.toHaveBeenCalled()
     expect(emitNotification).toHaveBeenCalled()
   })
 
