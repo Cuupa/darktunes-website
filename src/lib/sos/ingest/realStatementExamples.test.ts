@@ -80,6 +80,7 @@ describe.skipIf(!present)('real statement-of-sales examples', () => {
   it('parses Darkmerch CSV and XLSX without NaN payouts', () => {
     const csv = parseDarkmerchCSV(readCsvText(examplePath('Darkmerch_Q4_2025-Q1_2026.csv')))
     expect(csv.transactions.length).toBeGreaterThan(10)
+    expect(csv).toMatchObject({ periodStart: '2025-10', periodEnd: '2026-03' })
     expect(csv.transactions.every((row) => row.is_physical)).toBe(true)
     const emptyRevenue = csv.errors.filter((row) => /empty|zero|invalid/i.test(row.reason))
     expect(csv.errors.length).toBeGreaterThanOrEqual(emptyRevenue.length)

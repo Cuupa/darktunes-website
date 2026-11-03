@@ -7000,6 +7000,27 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE INDEX IF NOT EXISTS idx_artist_invoices_artist_id ON public.artist_invoices (artist_id);
 
+-- Write-once invoice PDF guarantee enforced inside PostgreSQL, not through
+-- an application read-before-write race. This runs for all writers, including
+-- service-role, direct SQL and concurrent requests. Metadata/status updates
+-- remain allowed as long as the PDF identifier and hash remain unchanged.
+CREATE OR REPLACE FUNCTION public.reject_invoice_pdf_mutation()
+RETURNS TRIGGER LANGUAGE plpgsql AS $
+BEGIN
+  IF (OLD.pdf_url IS NOT NULL OR OLD.pdf_sha256 IS NOT NULL)
+     AND (NEW.pdf_url IS DISTINCT FROM OLD.pdf_url
+          OR NEW.pdf_sha256 IS DISTINCT FROM OLD.pdf_sha256) THEN
+    RAISE EXCEPTION 'Invoice PDF is immutable after issuance'
+      USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END $;
+
+DROP TRIGGER IF EXISTS trg_artist_invoices_pdf_immutable ON public.artist_invoices;
+CREATE TRIGGER trg_artist_invoices_pdf_immutable
+  BEFORE UPDATE ON public.artist_invoices
+  FOR EACH ROW EXECUTE FUNCTION public.reject_invoice_pdf_mutation();
+
 DROP TRIGGER IF EXISTS trg_artist_invoices_updated_at ON public.artist_invoices;
 CREATE TRIGGER trg_artist_invoices_updated_at
   BEFORE UPDATE ON public.artist_invoices

@@ -242,7 +242,8 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       const replayInvoiceNumber =
         existingLinkedInvoice.artistInvoiceNumber ?? existingLinkedInvoice.invoiceNumber
 
-      if (['label_approved', 'artist_notified', 'viewed'].includes(statement.status)) {
+      if (existingLinkedInvoice.status === 'sent' &&
+          ['label_approved', 'artist_notified', 'viewed'].includes(statement.status)) {
         try {
           await write('sales_statements', 'update', (db) =>
             updateSalesStatementStatus(db, statement.id, 'invoiced'),
@@ -253,7 +254,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
         }
       }
 
-      if (replayPeriodId) {
+      if (existingLinkedInvoice.status === 'sent' && replayPeriodId) {
         try {
           await write('settlement_periods', 'select', (db) =>
             assertSettlementPeriodWritableById(db, replayPeriodId),
@@ -497,7 +498,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     serverEnv.CLOUDFLARE_R2_ACCESS_KEY_ID,
     serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
   )
-  // Stable key per invoice id — one immutable object (enable R2 versioning in ops).
+  // Stable key per invoice id in the existing R2 bucket.
   const key = `invoices/${artist.id}/${invoice.id}.pdf`
   await s3.send(
     new PutObjectCommand({
@@ -539,48 +540,6 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }
   }
 
-  if (
-    statement &&
-    ['label_approved', 'artist_notified', 'viewed'].includes(statement.status)
-  ) {
-    try {
-      await write('sales_statements', 'update', (db) =>
-        updateSalesStatementStatus(db, statement.id, 'invoiced'),
-      )
-    } catch (err) {
-      // The invoice row + PDF exist — surface the failure without losing them.
-      console.error('[portal invoices] statement status update failed:', err)
-      warnings.push('statement_status_failed')
-    }
-  }
-
-  if (statement && settlementPeriodId) {
-    // Net liability zeros statement_payout; cash still owed is tracked via unpaid invoice gross.
-    // Recovered invoices book the persisted line items, never the retry payload.
-    const invoiceTotalEur = getLineItemSubtotal(pdfLineItems) / 100
-    const alreadyBooked = await write('settlement_ledger', 'select', (db) =>
-      hasLedgerEntry(db, 'artist_invoice', invoice.id, 'invoice_liability'),
-    )
-    if (!alreadyBooked) {
-      try {
-        await write('settlement_ledger', 'insert', (db) =>
-          appendLedgerEntry(db, {
-            artistId: artist.id,
-            settlementPeriodId,
-            entryType: 'invoice_liability',
-            amountEur: -invoiceTotalEur,
-            currency,
-            referenceType: 'artist_invoice',
-            referenceId: invoice.id,
-            description: `Invoice liability ${pdfArtistInvoiceNumber}`,
-          }),
-        )
-      } catch (err) {
-        console.error('[portal invoices] ledger entry failed:', err)
-        warnings.push('ledger_entry_failed')
-      }
-    }
-  }
 
   try {
     await emitNotification(serviceDb, {
@@ -678,6 +637,52 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       delivery_error: deliveryError,
     }),
   )
+
+  if (statement && settlementPeriodId && finalInvoice.status === 'sent') {
+    // Net liability zeros statement_payout; cash still owed is tracked via unpaid invoice gross.
+    // Recovered invoices book the persisted line items, never the retry payload.
+    const invoiceTotalEur = getLineItemSubtotal(pdfLineItems) / 100
+    const alreadyBooked = await write('settlement_ledger', 'select', (db) =>
+      hasLedgerEntry(db, 'artist_invoice', invoice.id, 'invoice_liability'),
+    )
+    if (!alreadyBooked) {
+      try {
+        await write('settlement_ledger', 'insert', (db) =>
+          appendLedgerEntry(db, {
+            artistId: artist.id,
+            settlementPeriodId,
+            entryType: 'invoice_liability',
+            amountEur: -invoiceTotalEur,
+            currency,
+            referenceType: 'artist_invoice',
+            referenceId: invoice.id,
+            description: `Invoice liability ${pdfArtistInvoiceNumber}`,
+          }),
+        )
+      } catch (err) {
+        console.error('[portal invoices] ledger entry failed:', err)
+        warnings.push('ledger_entry_failed')
+      }
+    }
+  }
+
+
+  // Never mark a statement invoiced while its invoice remains an unsent
+  // draft. Only a confirmed send advances this financial workflow.
+  if (
+    statement &&
+    finalInvoice.status === 'sent' &&
+    ['label_approved', 'artist_notified', 'viewed'].includes(statement.status)
+  ) {
+    try {
+      await write('sales_statements', 'update', (db) =>
+        updateSalesStatementStatus(db, statement.id, 'invoiced'),
+      )
+    } catch (err) {
+      console.error('[portal invoices] statement status update failed:', err)
+      warnings.push('statement_status_failed')
+    }
+  }
 
   return NextResponse.json(
     {

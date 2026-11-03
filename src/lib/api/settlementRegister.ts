@@ -275,7 +275,12 @@ export async function archivePeriodWithCarryForward(
   // carry-out on retry or double-click (#628 / contract §A.5).
   const period = await getSettlementPeriodById(db, periodId)
   if (!period) throw new Error('Settlement period not found')
-  if (period.status === 'archived') return
+  if (period.status === 'archived') {
+    // The status may have been persisted before the statement-archive update
+    // failed. archiveSettlementPeriod reasserts is_archived on every call.
+    await archiveSettlementPeriod(db, periodId, actorId)
+    return
+  }
 
   const balances = await computeCarryForwardBalances(db, periodId)
   await createPeriodCarryForwards(db, periodId, balances, actorId)
