@@ -504,7 +504,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     serverEnv.CLOUDFLARE_R2_SECRET_ACCESS_KEY,
   )
   // Stable key per invoice id in a PRIVATE bucket without a public CDN.
-  const key = `invoices/${artist.id}/${invoice.id}.pdf`
+  const key = `invoices/${artist.id}/${invoice.id}/${pdfSha256}.pdf`
   await s3.send(
     new PutObjectCommand({
       Bucket: privateInvoiceBucket,
@@ -515,7 +515,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
     }),
   )
 
-  const pdfUrl = privateInvoiceReference(artist.id, invoice.id)
+  const pdfUrl = privateInvoiceReference(artist.id, invoice.id, pdfSha256)
   // Financial status and delivery are separate (#623): the status is decided
   // after the mail result below, never from the send request alone.
   const updatedInvoice = await write('artist_invoices', 'update', (db) =>
