@@ -27,6 +27,9 @@ import { parseAmount } from './amountParsing'
 export interface DarkmerchParseResult {
   transactions: SalesTransaction[]
   errors: Array<{ row: number; reason: string; data: string }>
+  /** Report period metadata, never a made-up sale date. */
+  periodStart?: string
+  periodEnd?: string
 }
 
 // ── Column alias lists (all uppercase for comparison) ──────────────────────
@@ -36,6 +39,38 @@ export interface DarkmerchParseResult {
 const BAND_ALIASES = ['BAND', 'ARTIST', 'BAND NAME', 'ARTIST NAME', 'KÜNSTLER', 'ACT', 'INTERPRET']
 const REVENUE_ALIASES = ['NET REVENUE', 'REVENUE', 'NET', 'NETTO', 'BETRAG', 'AMOUNT', 'NET_REVENUE', 'NETTOUMSATZ']
 const DATE_ALIASES = ['DATE', 'DATUM', 'PERIOD', 'ZEITRAUM', 'REPORTING PERIOD', 'ABRECHNUNGSZEITRAUM']
+
+/** Parse source report dates as bounds; keep individual sales undated. */
+export function parseDarkmerchReportingPeriod(value: string): { periodStart: string; periodEnd: string } | null {
+  const text = value.trim()
+  const quarter = (year: string, q: string) => ({
+    start: `${year}-${String((Number(q) - 1) * 3 + 1).padStart(2, '0')}`,
+    end: `${year}-${String(Number(q) * 3).padStart(2, '0')}`,
+  })
+  const range = /^Q([1-4])\s+(\d{4})\s*[-–—]\s*Q([1-4])\s+(\d{4})$/i.exec(text)
+  if (range) {
+    const first = quarter(range[2], range[1])
+    const last = quarter(range[4], range[3])
+    return first.start <= last.end ? { periodStart: first.start, periodEnd: last.end } : null
+  }
+  const single = /^Q([1-4])\s+(\d{4})$/i.exec(text)
+  if (single) {
+    const bounds = quarter(single[2], single[1])
+    return { periodStart: bounds.start, periodEnd: bounds.end }
+  }
+  const month = /^(\d{4})-(0[1-9]|1[0-2])(?:-(0[1-9]|[12]\d|3[01]))?$/.exec(text)
+  if (month) {
+    if (month[3]) {
+      const date = new Date(Date.UTC(Number(month[1]), Number(month[2]) - 1, Number(month[3])))
+      if (date.getUTCFullYear() !== Number(month[1]) ||
+          date.getUTCMonth() + 1 !== Number(month[2]) ||
+          date.getUTCDate() !== Number(month[3])) return null
+    }
+    const key = `${month[1]}-${month[2]}`
+    return { periodStart: key, periodEnd: key }
+  }
+  return null
+}
 
 /**
  * Returns the index of the first alias found in `headers`, or -1 if none match.
@@ -60,6 +95,8 @@ function findColByAliases(headers: string[], aliases: string[]): number {
 export function parseDarkmerchCSV(content: string): DarkmerchParseResult {
   const transactions: SalesTransaction[] = []
   const errors: Array<{ row: number; reason: string; data: string }> = []
+  let periodStart = ''
+  let periodEnd = ''
 
   const lines = content.split(/\r?\n/)
   if (lines.length === 0) return { transactions, errors }
@@ -116,6 +153,12 @@ export function parseDarkmerchCSV(content: string): DarkmerchParseResult {
     const netRevenue = revenueResult.value
     if (netRevenue === 0) continue
 
+    const sourcePeriod = parseDarkmerchReportingPeriod(dateValue)
+    if (sourcePeriod) {
+      if (!periodStart || sourcePeriod.periodStart < periodStart) periodStart = sourcePeriod.periodStart
+      if (!periodEnd || sourcePeriod.periodEnd > periodEnd) periodEnd = sourcePeriod.periodEnd
+    }
+
     const sourceId = crypto.randomUUID()
     transactions.push({
       id: sourceId,
@@ -144,7 +187,7 @@ export function parseDarkmerchCSV(content: string): DarkmerchParseResult {
     })
   }
 
-  return { transactions, errors }
+  return { transactions, errors, periodStart, periodEnd }
 }
 
 /**
