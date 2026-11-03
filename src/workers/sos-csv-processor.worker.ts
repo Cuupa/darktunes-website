@@ -476,14 +476,14 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest>) => {
           // Stage raw orders for reconciliation — do NOT convert to SalesTransactions yet.
           const { orders, errors } = parseShopifyRaw(content)
           shopifyRawOrdersMap.set(fileId, orders)
-          postParseDone(fileId, orders.length, errors.length, 0)
+          postParseDone(fileId, orders.length, errors.length, 0, orders.map((order) => order.salesMonth))
         } else if (source === 'printful') {
           // Stage raw costs for reconciliation.
-          const { costs, errors } = parsePrintfulCSV(content)
+          const { costs, errors, periodMonths } = parsePrintfulCSV(content)
           printfulRawCostsMap.set(fileId, costs)
-          postParseDone(fileId, costs.length, errors.length, 0)
+          postParseDone(fileId, costs.length, errors.length, 0, periodMonths)
         } else if (source === 'darkmerch') {
-          const { transactions, errors } = parseDarkmerchCSV(content)
+          const { transactions, errors, periodStart, periodEnd } = parseDarkmerchCSV(content)
           fileTransactions.set(fileId, transactions)
           const uniqueArtists = [...new Set(transactions.map(t => t.original_artist).filter(Boolean))]
           postParseDone(
@@ -491,7 +491,8 @@ self.addEventListener('message', async (event: MessageEvent<WorkerRequest>) => {
             transactions.length,
             errors.length,
             uniqueArtists.length,
-            transactions.map((tx) => tx.sales_month),
+            // Use report bounds, never pretend the aggregated orders have sale months.
+            [periodStart ?? '', periodEnd ?? ''],
           )
         } else {
           const result = await parseCSVContentStreaming(
