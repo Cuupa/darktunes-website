@@ -174,6 +174,8 @@ export function useCSVProcessor(
   const pendingParseIdsRef = useRef(new Set<string>())
   /** A source parse error must block downstream statements, not produce partial totals. */
   const failedParseIdsRef = useRef(new Set<string>())
+  /** A failed calculation is not automatically retried on incidental rerenders. */
+  const processFailedRef = useRef(false)
   /** Latest config snapshot — updated synchronously so the parse-done handler uses it. */
   const latestConfigRef = useRef<WorkerProcessConfig | null>(null)
   /** The alias key that was in effect the last time files were synced with the worker. */
@@ -408,6 +410,7 @@ export function useCSVProcessor(
   }), [config.compilationFilters, config.artistMappings, config.splitFees, config.manualRevenues, config.expenses, config.excludePhysical, exchangeRates, historicalRates, config.labelArtists, config.ignoredEntries, config.distributionFeePercentage, config.distributionFeeDigital, config.distributionFeePhysical, config.defaultSplitPercentage, config.defaultSplitPercentageDigital, config.defaultSplitPercentagePhysical, config.sourceSplits, config.trackRevenueAssignments, config.carryForwardByArtist])
 
   const sendProcess = useCallback(() => {
+    if (processFailedRef.current) return
     // Never process with empty rates — avoids race toast for missing USD/etc.
     if (Object.keys(exchangeRatesRef.current).length === 0) {
       setIsProcessing(false)
@@ -443,6 +446,7 @@ export function useCSVProcessor(
       pendingParsesRef.current = 0
       pendingParseIdsRef.current.clear()
       failedParseIdsRef.current.clear()
+      processFailedRef.current = false
       prevAliasKeyRef.current = undefined
     }
 
@@ -545,6 +549,7 @@ export function useCSVProcessor(
             }
             eventsRef.current.onParseError?.(msg.fileId, msg.message)
           }
+          if (!msg.fileId) processFailedRef.current = true
           // Never keep the last successful financial result after a failed
           // parse or reconciliation. Explicit file replacement is required.
           setWorkerResult(EMPTY_RESULT)
@@ -651,6 +656,7 @@ export function useCSVProcessor(
       pendingParsesRef.current = 0
       pendingParseIdsRef.current.clear()
       failedParseIdsRef.current.clear()
+      processFailedRef.current = false
       for (const pending of pendingExcel.values()) pending.resolve(null)
       pendingExcel.clear()
       orphanExcel.clear()
@@ -691,6 +697,7 @@ export function useCSVProcessor(
         pendingParsesRef.current = 0
         pendingParseIdsRef.current.clear()
         failedParseIdsRef.current.clear()
+        processFailedRef.current = false
       }
     }
 
@@ -698,6 +705,7 @@ export function useCSVProcessor(
       [...currentFileMap.values()],
       sentFingerprintRef.current,
     )
+    if (toRemove.length > 0 || toAdd.length > 0) processFailedRef.current = false
 
     for (const id of toRemove) {
       worker.postMessage({ type: 'remove-file', fileId: id } satisfies WorkerRequest)
@@ -748,7 +756,7 @@ export function useCSVProcessor(
   useEffect(() => {
     const cfg = buildConfig()
     latestConfigRef.current = cfg
-    if (workerRef.current && pendingParsesRef.current === 0 && failedParseIdsRef.current.size === 0 && sentFingerprintRef.current.size > 0) {
+    if (workerRef.current && !processFailedRef.current && pendingParsesRef.current === 0 && failedParseIdsRef.current.size === 0 && sentFingerprintRef.current.size > 0) {
       sendProcessRef.current()
     }
   }, [configKey, buildConfig])
