@@ -60,7 +60,7 @@ describe('parsePrintfulCSV strict amounts (#632)', () => {
     const csv = ['Order,Total,Status', '#DM1063,€15.79,fulfilled'].join('\n')
 
     const result = parsePrintfulCSV(csv)
-    expect(result.costs).toEqual([{ orderId: '#DM1063', total: 15.79 }])
+    expect(result.costs).toEqual([{ orderId: '#DM1063', total: 15.79, currency: 'EUR' }])
     expect(result.errors).toHaveLength(0)
   })
 
@@ -90,7 +90,7 @@ describe('reconcileMerchTransactions overlap handling (#631)', () => {
       ].join('\n'),
     )
     const printful = parsePrintfulCSV(
-      ['Order,Total,Status', '#DM2001,15,fulfilled', 'DM2001,5,fulfilled'].join('\n'),
+      ['Order,Total,Currency,Status', '#DM2001,15,EUR,fulfilled', 'DM2001,5,EUR,fulfilled'].join('\n'),
     )
 
     const { transactions } = reconcileMerchTransactions(shopify.orders, printful.costs)
@@ -110,5 +110,45 @@ describe('reconcileMerchTransactions overlap handling (#631)', () => {
 
     const { transactions } = reconcileMerchTransactions(shopify.orders, [])
     expect(transactions[0]?.net_revenue).toBeCloseTo(50, 6)
+  })
+})
+
+describe('e-commerce cost currency protection', () => {
+  const shopify = parseShopifyRaw([
+    SHOPIFY_HEADER,
+    'DM2026,Reaper - Shirt,S1,1,100,100,EUR,2026-02-05,Germany',
+  ].join('\n')).orders
+
+  it('blocks a matched cost with no explicit currency', () => {
+    const costs = parsePrintfulCSV('Order,Total\nDM2026,15').costs
+    expect(costs[0]?.currency).toBeUndefined()
+    expect(() => reconcileMerchTransactions(shopify, costs)).toThrow(/currency is missing/i)
+  })
+
+  it('blocks a USD Printful cost against EUR Shopify revenue', () => {
+    const costs = parsePrintfulCSV('Order,Total,Currency\nDM2026,15,USD').costs
+    expect(costs[0]?.currency).toBe('USD')
+    expect(() => reconcileMerchTransactions(shopify, costs)).toThrow(/Shopify EUR and Printful USD differ/)
+  })
+
+  it('blocks mixed currencies for multiple cost rows on the same order', () => {
+    const costs = parsePrintfulCSV('Order,Total,Currency\nDM2026,15,EUR\nDM2026,5,USD').costs
+    expect(() => reconcileMerchTransactions(shopify, costs)).toThrow(/inconsistent currency/i)
+  })
+
+  it('correctly subtracts explicitly matching EUR costs', () => {
+    const costs = parsePrintfulCSV('Order,Total,Currency\nDM2026,15,EUR').costs
+    expect(reconcileMerchTransactions(shopify, costs).transactions[0]?.net_revenue).toBeCloseTo(85)
+  })
+
+  it('refuses missing or internally contradictory Shopify currency codes', () => {
+    const noCurrency = parseShopifyRaw([SHOPIFY_HEADER, 'DM1,Reaper - Shirt,S1,1,100,100,,2026-02-05,Germany'].join('\n'))
+    expect(noCurrency.errors[0]?.reason).toMatch(/Currency/)
+    const mixed = parseShopifyRaw([
+      SHOPIFY_HEADER,
+      'DM1,Reaper - Shirt,S1,1,100,100,EUR,2026-02-05,Germany',
+      'DM1,Reaper - Shirt,S2,1,10,10,USD,2026-02-05,Germany',
+    ].join('\n'))
+    expect(mixed.errors[0]?.reason).toMatch(/Conflicting currencies/)
   })
 })
