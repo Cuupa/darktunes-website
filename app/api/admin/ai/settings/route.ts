@@ -111,7 +111,7 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
       : undefined,
     updated_by: userId,
   })
-  const providerConfigured = Boolean(await resolveNvidiaApiKey(serviceClient))
+  const providerConfigured = (await AiProviderRouter.create(serviceClient, parseStoredCapabilities(settings.providerCapabilities))).hasConfiguredProvider
   return NextResponse.json({ ...settingsPayload(settings), provider_configured: providerConfigured })
 })
 
