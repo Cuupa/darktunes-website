@@ -16,6 +16,13 @@ export type McpToolDefinition = {
   description: string
   inputSchema: Record<string, unknown>
   annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; openWorldHint?: boolean }
+  /** Explicit per-tool OAuth declaration used by ChatGPT for discovery/linking. */
+  securitySchemes?: Array<{ type: 'oauth2'; scopes: string[] }>
+  /** Compatibility mirror and model-visible tool discovery. */
+  _meta?: {
+    securitySchemes?: Array<{ type: 'oauth2'; scopes: string[] }>
+    ui?: { visibility?: Array<'model' | 'app'> }
+  }
 }
 export type McpExecutor = {
   listTools(): Promise<McpToolDefinition[]>

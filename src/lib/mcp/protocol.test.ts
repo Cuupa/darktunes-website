@@ -3,7 +3,16 @@ import { MCP_LEGACY, MCP_MODERN, processMcpMessage, type McpExecutor } from './p
 
 const executor: McpExecutor = {
   listTools: vi.fn(async () => [
-    { name: 'list_cms_news', description: 'Read news', inputSchema: { type: 'object' } },
+    {
+      name: 'list_cms_news',
+      description: 'Read news',
+      inputSchema: { type: 'object' },
+      securitySchemes: [{ type: 'oauth2' as const, scopes: [] }],
+      _meta: {
+        securitySchemes: [{ type: 'oauth2' as const, scopes: [] }],
+        ui: { visibility: ['model' as const, 'app' as const] },
+      },
+    },
   ]),
   callTool: vi.fn(async () => ({ ok: true, result: { items: [{ title: 'Test' }] } })),
 }
@@ -32,7 +41,14 @@ describe('MCP protocol adapter', () => {
   it('lists only tools supplied by the server-side allowlist', async () => {
     const response = await processMcpMessage(request('tools/list', modern), executor, MCP_MODERN)
     expect(response.message?.result).toMatchObject({
-      resultType: 'complete', tools: [{ name: 'list_cms_news' }],
+      resultType: 'complete', tools: [{
+        name: 'list_cms_news',
+        securitySchemes: [{ type: 'oauth2', scopes: [] }],
+        _meta: {
+          securitySchemes: [{ type: 'oauth2', scopes: [] }],
+          ui: { visibility: ['model', 'app'] },
+        },
+      }],
     })
   })
   it('returns structured tool output without violating the modern result envelope', async () => {
