@@ -1,6 +1,13 @@
 # Pre-Release QA Checklist
 
 ## AI assistant
+- [ ] Admin -> AI Assistant -> General: at desktop and mobile widths, all switches remain visually paired with the correct label and explanation; clicking the label toggles only the matching switch
+- [ ] Role switches retain their stored settings after Save/Reload; enabling a role never bypasses artist data scope or tool authorization
+- [ ] Admin AI tabs wrap without squashing labels or horizontal page overflow
+- [ ] Connection Health shows translated step labels and useful causes for unsupported tools, missing keys, timeouts and rate limits; raw codes and HTTP details appear only in Technical Details
+- [ ] Skipped dependent checks do not appear as separate root failures; a failed tool probe does not claim a working text reply failed
+- [ ] German, English and French AI headings and error messages render intact Unicode without question-mark replacement characters
+- [ ] Health and diagnostic tables remain readable via horizontal scrolling on small viewports
 - [ ] Admin -> API Keys shows NVIDIA; saving a key does not echo plaintext on GET
 - [ ] Admin -> AI Assistant -> Overview separates "Configured" from "Verified"; a key alone does not show a green verified state
 - [ ] Connection Health: Test fast and Test reasoning run independently; a reasoning timeout still shows fast/stream/tool results
