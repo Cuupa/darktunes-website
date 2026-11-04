@@ -14,6 +14,8 @@ The assistant stays off until:
 
 A configured key is **not** proof of authentication. Admin -> AI Assistant -> Connection Health performs a real `GET /v1/models` auth check. The Overview labels "Configured" and "Verified" separately.
 
+**Admin UI:** General settings use bounded, responsive toggle cards, each pairing a switch with its visible label and description. Role toggles only control access to the assistant, not data scopes or tool privileges. Connection Health displays localized step labels and actionable explanations for unsupported tool calls, timeouts, missing credentials and provider failures. Raw codes, HTTP statuses and provider messages stay under expandable Technical Details. "Skipped" indicates a dependent probe was not run, not an additional independent failure. The original step IDs and result payloads remain unchanged.
+
 ## Context model
 
 The server resolves every request into one typed actor:
