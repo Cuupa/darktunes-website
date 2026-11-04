@@ -7,6 +7,7 @@ import { withErrorHandler, ApiError } from '@/lib/errors'
 import { requireAiActor } from '@/lib/ai/auth/requireAiActor'
 import { getAiSettings } from '@/lib/api/aiSettings'
 import { startOfUtcDay } from '@/lib/ai/budget/limits'
+import { isMissingAiCreditSchema } from '@/lib/ai/budget/creditSchema'
 
 export const GET = withErrorHandler(async (req: NextRequest): Promise<NextResponse> => {
   const artistId = req.nextUrl.searchParams.get('artist_id')
@@ -28,7 +29,9 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
   const used = (data?.used_tokens ?? 0) + (data?.reserved_tokens ?? 0)
   const { data: creditSettings, error: creditSettingsError } = await actor.serviceDb.from('ai_credit_settings')
     .select('enabled, artist_monthly, editor_monthly, admin_monthly').eq('id', true).maybeSingle()
-  if (creditSettingsError) throw new ApiError(503, 'Credit settings unavailable.', 'AI_CREDITS_UNAVAILABLE')
+  if (creditSettingsError && !isMissingAiCreditSchema(creditSettingsError)) {
+    throw new ApiError(503, 'Credit settings unavailable.', 'AI_CREDITS_UNAVAILABLE')
+  }
   const creditScope = actor.artistId ? 'artist' : actor.role
   const creditScopeId = actor.artistId ?? (actor.role === 'admin' ? 'label' : actor.userId)
   const monthStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1))
