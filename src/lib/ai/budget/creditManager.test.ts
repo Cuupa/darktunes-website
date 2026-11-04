@@ -19,6 +19,25 @@ function dbMock(settings = configured, rpc = vi.fn(async () => ({ data: { ok: tr
 const usage = { input_tokens: 1000, output_tokens: 1000, reasoning_tokens: 0, total_tokens: 2000 }
 
 describe('CreditBudgetManager', () => {
+  it('preserves chat when the optional credit schema is not installed', async () => {
+    const rpc = vi.fn()
+    const db = {
+      from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: null, error: { code: 'PGRST205' } }) }) }) }),
+      rpc,
+    } as unknown as SupabaseClient<Database>
+    const manager = await CreditBudgetManager.load(db)
+    expect(manager.enabled).toBe(false)
+    await manager.reserve('old-chat:0', 'unknown', 'user', null, 'admin', 100, 100)
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('does not hide unexpected credit database failures', async () => {
+    const db = {
+      from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: null, error: { code: '42501' } }) }) }) }),
+    } as unknown as SupabaseClient<Database>
+    await expect(CreditBudgetManager.load(db)).rejects.toMatchObject({ code: 'AI_CREDITS_UNAVAILABLE' })
+  })
+
   it('uses one shared artist scope, independent of the band member', async () => {
     const { db, rpc } = dbMock()
     const manager = await CreditBudgetManager.load(db)
