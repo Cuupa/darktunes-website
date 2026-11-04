@@ -7,10 +7,10 @@ const executor: McpExecutor = {
       name: 'list_cms_news',
       description: 'Read news',
       inputSchema: { type: 'object' },
-      securitySchemes: [{ type: 'oauth2', scopes: [] }],
+      securitySchemes: [{ type: 'oauth2' as const, scopes: [] }],
       _meta: {
-        securitySchemes: [{ type: 'oauth2', scopes: [] }],
-        ui: { visibility: ['model', 'app'] },
+        securitySchemes: [{ type: 'oauth2' as const, scopes: [] }],
+        ui: { visibility: ['model' as const, 'app' as const] },
       },
     },
   ]),
