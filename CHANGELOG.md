@@ -46,6 +46,7 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 
 
 ### Fixed
+- **AI admin clarity:** settings now group related switches in responsive labeled cards; tabs wrap without distorted widths. Connection Health shows understandable step names and actionable failures, while raw API codes remain under Technical Details. Broken German and French AI translations, including “Übersicht”, and corrupted separators in English were repaired.
 - **Darkmerch XLSX archive skipped for `Q2 - Q3 2026`:** the period parser now recognizes same-year quarter spans where the year is written once after the second quarter. Bronze source bounds are `2026-04` through `2026-09`, without inventing individual sale months or allocating aggregated revenue to a quarter.
 - **Public cache no longer stores outages as empty data:** Supabase errors (e.g. 429) inside `unstable_cache` readers now reject instead of caching `[]`/`null`/"Music Label" for up to 1h, so Next keeps the last good value; the fallback is applied outside the cache and logged.
 - **"No artist linked to this account" for admins:** the AI auth resolver no longer requires an artist membership for admin/editor artist inspection, and only sends tools the actor can execute.
