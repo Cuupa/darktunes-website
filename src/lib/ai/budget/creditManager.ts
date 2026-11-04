@@ -3,6 +3,7 @@ import type { Database } from '@/types/database'
 import type { AiUsage } from '@/lib/ai/types/provider'
 import { ApiError } from '@/lib/errors'
 import { CREDIT_EUR, calculateCredits, type ModelPrice } from './credits'
+import { isMissingAiCreditSchema } from './creditSchema'
 
 type Db = SupabaseClient<Database>
 export interface CreditSettings {
@@ -23,7 +24,15 @@ export class CreditBudgetManager {
     // Credit schema must be installed before enabling. A missing table is a setup error,
     // not an invitation to bypass an enabled limit.
     const { data, error } = await db.from('ai_credit_settings').select('*').eq('id', true).single()
-    if (error || !data) throw new ApiError(503, 'AI credit accounting database is not installed.', 'AI_CREDITS_UNAVAILABLE')
+    if (error && isMissingAiCreditSchema(error)) {
+      // The feature is disabled by default. Preserve legacy chat during an
+      // additive schema rollout, but never conceal other database failures.
+      return new CreditBudgetManager(db, {
+        enabled: false, buffer_percent: 25, artist_monthly: 0,
+        editor_monthly: 0, admin_monthly: 0, model_prices: {},
+      })
+    }
+    if (error || !data) throw new ApiError(503, 'AI credit accounting database is unavailable.', 'AI_CREDITS_UNAVAILABLE')
     return new CreditBudgetManager(db, data as unknown as CreditSettings)
   }
 
