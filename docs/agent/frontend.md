@@ -48,6 +48,10 @@ CI enforces this via `npm run check:scroll` (`scripts/check-scroll-contract.mjs`
 
 **Scrollable containers:** Always use `<ScrollPanel>` (`src/components/ui/scroll-panel.tsx`) for scrollable content areas — it applies `overflow-y-auto overscroll-contain min-h-0` and `data-lenis-prevent` automatically. For inline usage, the `scrollPanelClass` constant is available.
 
+## Dashboard settings switches
+
+Admin settings should keep each switch adjacent to its corresponding `Label htmlFor` and explanatory text inside a single bordered card. Avoid unbounded `justify-between` rows spanning a full-width desktop panel: users cannot reliably tell which switch belongs to which setting. Use responsive grids, descriptive `aria-describedby`, keyboard-operable Radix switches and wrapping tab triggers (`flex-none` when a tabs list wraps). Keep wide diagnostics tables horizontally scrollable, without creating nested vertical scroll areas.
+
 ## WCAG 2.1 AA (mandatory)
 
 - Skip link → `#main-content` in `app/layout.tsx`
