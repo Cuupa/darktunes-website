@@ -11,6 +11,7 @@ import { getAiSettings, updateAiSettings } from '@/lib/api/aiSettings'
 import { AiProviderRouter } from '@/lib/ai/provider/router'
 import { getCatalogModel, isCatalogModelForRole } from '@/lib/ai/models/catalog'
 import { parseStoredCapabilities } from '@/lib/ai/models/capabilities'
+import { isMissingAiCreditSchema } from '@/lib/ai/budget/creditSchema'
 
 const patchSchema = z.object({
   enabled: z.boolean().optional(),
@@ -72,7 +73,9 @@ export const PATCH = withErrorHandler(async (req: NextRequest): Promise<NextResp
   // A paid/zero-credit credit setting may not silently miss newly selected models.
   const { data: creditConfig, error: creditsError } = await serviceClient
     .from('ai_credit_settings').select('enabled, model_prices').eq('id', true).maybeSingle()
-  if (creditsError) throw new ApiError(503, 'Install the AI credit schema before changing models.', 'AI_CREDITS_UNAVAILABLE')
+  if (creditsError && !isMissingAiCreditSchema(creditsError)) {
+    throw new ApiError(503, 'Cannot verify credit settings.', 'AI_CREDITS_UNAVAILABLE')
+  }
   if (creditConfig?.enabled) {
     const prices = creditConfig.model_prices as Record<string, unknown>
     for (const id of [fast, reasoning, ...(fallback ? [fallback] : [])]) {
