@@ -187,9 +187,55 @@ async function authHeaders(): Promise<Headers> {
   return headers
 }
 
+function useConnectionTestMessages() {
+  const t = useTranslations('ai')
+  const names: Record<string, string> = {
+    auth: t('admin.testStepAuth'),
+    fast_complete: t('admin.testStepFastComplete'),
+    fast_stream: t('admin.testStepFastStream'),
+    fast_tool: t('admin.testStepFastTool'),
+    fast_tool_stream: t('admin.testStepFastToolStream'),
+    fast_tool_roundtrip: t('admin.testStepFastToolRoundtrip'),
+    reasoning_complete: t('admin.testStepReasoningComplete'),
+    reasoning_stream: t('admin.testStepReasoningStream'),
+    reasoning_tool: t('admin.testStepReasoningTool'),
+    reasoning_tool_stream: t('admin.testStepReasoningToolStream'),
+    reasoning_tool_roundtrip: t('admin.testStepReasoningToolRoundtrip'),
+    integration: t('admin.testStepIntegration'),
+  }
+  const causes: Record<string, string> = {
+    INVALID_KEY: t('admin.testInvalidKey'),
+    AI_NOT_CONFIGURED: t('admin.testNoKey'),
+    MODEL_UNAVAILABLE: t('admin.testModelUnavailable'),
+    TOOL_CALL_UNSUPPORTED: t('admin.testToolsUnsupported'),
+    TIMEOUT: t('admin.testTimeout'),
+    RATE_LIMITED: t('admin.testRateLimited'),
+    EMPTY_RESPONSE: t('admin.testEmptyResponse'),
+    OUTPUT_TRUNCATED: t('admin.testIncompleteResponse'),
+    REASONING_ONLY: t('admin.testIncompleteResponse'),
+    PROVIDER_UNAVAILABLE: t('admin.testProviderUnavailable'),
+    NETWORK_ERROR: t('admin.testNetworkError'),
+    TLS_ERROR: t('admin.testNetworkError'),
+    INVALID_RESPONSE: t('admin.testInvalidResponse'),
+  }
+  return {
+    label: (id: string) => names[id] ?? id.replaceAll('_', ' '),
+    description: (step: ConnectionTestStep): string => {
+      if (step.ok) return t('admin.testPassedDetail')
+      if (step.status === 'skipped') return t('admin.testSkippedDetail')
+      if (step.id === 'integration') return t('admin.testIntegrationFailed')
+      if (step.error_code && causes[step.error_code]) return causes[step.error_code]
+      if (step.status === 'timed_out') return t('admin.testTimeout')
+      if (step.status === 'unavailable') return t('admin.testProviderUnavailable')
+      return t('admin.testUnknownError')
+    },
+  }
+}
+
 export function AdminAiDashboard() {
   const t = useTranslations('ai')
   const tErrors = useTranslations('errors')
+  const connectionMessages = useConnectionTestMessages()
   const [settings, setSettings] = useState<SettingsPayload | null>(null)
   const [modelsData, setModelsData] = useState<ModelsPayload | null>(null)
   const [usage, setUsage] = useState<UsagePayload | null>(null)
@@ -306,14 +352,16 @@ export function AdminAiDashboard() {
       setLastResult(result)
       if (result.ok) toast.success(t('admin.healthAllPassed'))
       else {
-        const failed = result.steps.find((step) => !step.ok && normalizeStepStatus(step) !== 'skipped')
+        const failed = result.steps.find(
+          (step) => !step.ok && normalizeStepStatus(step) !== 'skipped' && step.id !== 'integration',
+        )
         toast.error(
           failed
-            ? t('admin.healthFailedStep', {
-                step: failed.step,
-                code: failed.error_code ?? failed.status,
+            ? t('admin.healthFailedSummary', {
+                step: connectionMessages.label(failed.id),
+                reason: connectionMessages.description(failed),
               })
-            : t('statusFailed'),
+            : t('admin.testIntegrationFailed'),
         )
       }
       await load()
@@ -378,14 +426,14 @@ export function AdminAiDashboard() {
 
   return (
     <Tabs defaultValue="overview" className="space-y-4">
-      <TabsList className="flex h-auto flex-wrap">
-        <TabsTrigger value="overview">{t('admin.overview')}</TabsTrigger>
-        <TabsTrigger value="models">{t('tabModels')}</TabsTrigger>
-        <TabsTrigger value="health">{t('tabHealth')}</TabsTrigger>
-        <TabsTrigger value="usage">{t('tabTokens')}</TabsTrigger>
-        <TabsTrigger value="credits">KI-Credits</TabsTrigger>
-        <TabsTrigger value="diagnostics">{t('tabDiagnostics')}</TabsTrigger>
-        <TabsTrigger value="settings">{t('tabGeneral')}</TabsTrigger>
+      <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 p-1 sm:w-fit">
+        <TabsTrigger className="min-h-9 flex-none px-3" value="overview">{t('admin.overview')}</TabsTrigger>
+        <TabsTrigger className="min-h-9 flex-none px-3" value="models">{t('tabModels')}</TabsTrigger>
+        <TabsTrigger className="min-h-9 flex-none px-3" value="health">{t('tabHealth')}</TabsTrigger>
+        <TabsTrigger className="min-h-9 flex-none px-3" value="usage">{t('tabTokens')}</TabsTrigger>
+        <TabsTrigger className="min-h-9 flex-none px-3" value="credits">KI-Credits</TabsTrigger>
+        <TabsTrigger className="min-h-9 flex-none px-3" value="diagnostics">{t('tabDiagnostics')}</TabsTrigger>
+        <TabsTrigger className="min-h-9 flex-none px-3" value="settings">{t('tabGeneral')}</TabsTrigger>
       </TabsList>
 
       <TabsContent value="overview" className="space-y-4">
@@ -668,43 +716,50 @@ export function AdminAiDashboard() {
       </TabsContent>
 
       <TabsContent value="settings" className="space-y-4">
-        <Card>
+        <Card className="max-w-5xl">
           <CardHeader>
             <CardTitle>{t('tabGeneral')}</CardTitle>
             <CardDescription>{t('pageDescription')}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <ToggleRow
-              id="ai-enabled"
-              label={t('enableLabel')}
-              checked={settings.enabled}
-              onChange={(enabled) => setSettings({ ...settings, enabled })}
-            />
-            <ToggleRow
-              id="ai-test-mode"
-              label={t('testModeLabel')}
-              checked={settings.test_mode}
-              onChange={(test_mode) => setSettings({ ...settings, test_mode })}
-            />
-            <ToggleRow
-              id="ai-streaming"
-              label={t('streamingLabel')}
-              checked={settings.default_streaming}
-              onChange={(default_streaming) => setSettings({ ...settings, default_streaming })}
-            />
-            <div className="space-y-2">
-              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
-                <p className="text-xs font-medium">Zugriff auf den Assistenten</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Wähle, welche Benutzergruppen den KI-Assistenten verwenden dürfen.
-                </p>
+          <CardContent className="space-y-6">
+            <section className="space-y-3" aria-labelledby="ai-basic-settings-title">
+              <h3 id="ai-basic-settings-title" className="text-sm font-semibold">{t('admin.basicSettingsTitle')}</h3>
+              <div className="grid gap-3 md:grid-cols-2">
+                <ToggleRow
+                  id="ai-enabled"
+                  label={t('enableLabel')}
+                  description={t('admin.enableDescription')}
+                  checked={settings.enabled}
+                  onChange={(enabled) => setSettings({ ...settings, enabled })}
+                />
+                <ToggleRow
+                  id="ai-test-mode"
+                  label={t('testModeLabel')}
+                  description={t('admin.testModeDescription')}
+                  checked={settings.test_mode}
+                  onChange={(test_mode) => setSettings({ ...settings, test_mode })}
+                />
+                <ToggleRow
+                  id="ai-streaming"
+                  label={t('streamingLabel')}
+                  description={t('admin.streamingDescription')}
+                  checked={settings.default_streaming}
+                  onChange={(default_streaming) => setSettings({ ...settings, default_streaming })}
+                />
               </div>
-              <div className="grid gap-2 sm:grid-cols-3">
+            </section>
+            <section className="space-y-3" aria-labelledby="ai-access-title">
+              <div className="space-y-1">
+                <h3 id="ai-access-title" className="text-sm font-semibold">{t('admin.accessTitle')}</h3>
+                <p className="text-xs leading-5 text-muted-foreground">{t('admin.accessDescription')}</p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
                 {(['artist', 'editor', 'admin'] as const).map((role) => (
                   <ToggleRow
                     key={role}
                     id={`ai-role-${role}`}
                     label={t(`admin.role_${role}`)}
+                    description={t(role === 'artist' ? 'admin.artistAccessDescription' : role === 'editor' ? 'admin.editorAccessDescription' : 'admin.adminAccessDescription')}
                     checked={settings.feature_flags[role] !== false}
                     onChange={(enabled) =>
                       setSettings({
@@ -715,10 +770,10 @@ export function AdminAiDashboard() {
                   />
                 ))}
               </div>
-            </div>
+            </section>
             <details className="group rounded-lg border border-border bg-muted/10">
               <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-                Erweiterte Einstellungen · Performance, Reasoning und Timeouts
+                {t('admin.advancedSettingsTitle')}
               </summary>
               <div className="space-y-4 border-t border-border p-4">
                 <p className="text-xs text-muted-foreground">
@@ -728,6 +783,7 @@ export function AdminAiDashboard() {
                 <ToggleRow
                   id="ai-low-effort"
                   label={t('admin.lowEffort')}
+                  description={t('admin.lowEffortDescription')}
                   checked={settings.reasoning_settings.lowEffort}
                   onChange={(lowEffort) =>
                     setSettings({
@@ -855,9 +911,10 @@ function MetricCard({
 
 function HealthTable({ steps }: { steps: ConnectionTestStep[] }) {
   const t = useTranslations('ai')
+  const connectionMessages = useConnectionTestMessages()
   return (
-    <div className="overflow-hidden rounded-md border border-border">
-      <table className="w-full text-left text-xs">
+    <div className="overflow-x-auto overflow-y-clip rounded-md border border-border">
+      <table className="w-full min-w-[760px] text-left text-xs">
         <thead className="bg-muted/40 text-muted-foreground">
           <tr>
             <th className="px-3 py-2 font-medium">{t('admin.step')}</th>
@@ -870,22 +927,26 @@ function HealthTable({ steps }: { steps: ConnectionTestStep[] }) {
         <tbody>
           {steps.map((step) => (
             <tr key={`${step.id}-${step.model ?? ''}`} className="border-t border-border align-top">
-              <td className="px-3 py-2 font-medium">{step.step}</td>
-              <td className="max-w-[12rem] truncate px-3 py-2 font-mono text-[11px] text-muted-foreground" title={step.model ?? ''}>
+              <td className="px-3 py-3 font-medium">{connectionMessages.label(step.id)}</td>
+              <td className="max-w-[12rem] truncate px-3 py-3 font-mono text-[11px] text-muted-foreground" title={step.model ?? ''}>
                 {step.model ?? '—'}
               </td>
-              <td className="px-3 py-2">
+              <td className="px-3 py-3">
                 <HealthBadge status={normalizeStepStatus(step)} ok={step.ok} />
               </td>
-              <td className="px-3 py-2 tabular-nums">{step.latency_ms} ms</td>
-              <td className="px-3 py-2 text-muted-foreground">
-                <p className="line-clamp-2">{step.detail ?? '—'}</p>
-                {step.error_code ? <p className="font-mono text-[11px]">{step.error_code}</p> : null}
-                {step.technical ? (
-                  <details className="mt-1">
-                    <summary className="cursor-pointer select-none">{t('technicalDetails')}</summary>
-                    <pre className="mt-1 overflow-x-auto rounded bg-background/70 p-2 text-[10px]">
-                      {JSON.stringify(step.technical, null, 2)}
+              <td className="whitespace-nowrap px-3 py-3 tabular-nums">{step.latency_ms} ms</td>
+              <td className="min-w-[16rem] px-3 py-3">
+                <p className="leading-5">{connectionMessages.description(step)}</p>
+                {step.error_code || step.technical ? (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer select-none text-xs text-muted-foreground">{t('technicalDetails')}</summary>
+                    <pre className="mt-2 max-w-[28rem] overflow-x-auto whitespace-pre-wrap break-words rounded bg-background/70 p-2 font-mono text-[11px]">
+                      {JSON.stringify({
+                        code: step.error_code,
+                        http_status: step.http_status,
+                        detail: step.detail,
+                        technical: step.technical,
+                      }, null, 2)}
                     </pre>
                   </details>
                 ) : null}
@@ -1066,8 +1127,8 @@ function DiagnosticsTable({ items, empty }: { items: DiagnosticItem[]; empty: st
   const t = useTranslations('ai')
   if (items.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>
   return (
-    <div className="overflow-hidden rounded-md border border-border">
-      <table className="w-full text-left text-xs">
+    <div className="overflow-x-auto overflow-y-clip rounded-md border border-border">
+      <table className="w-full min-w-[800px] text-left text-xs">
         <thead className="bg-muted/40 text-muted-foreground">
           <tr>
             <th className="px-3 py-2 font-medium">{t('admin.time')}</th>
@@ -1126,18 +1187,36 @@ function DiagnosticsTable({ items, empty }: { items: DiagnosticItem[]; empty: st
 function ToggleRow({
   id,
   label,
+  description,
   checked,
   onChange,
 }: {
   id: string
   label: string
+  description?: string
   checked: boolean
   onChange: (checked: boolean) => void
 }) {
   return (
-    <div className="flex items-center justify-between gap-4">
-      <Label htmlFor={id}>{label}</Label>
-      <Switch id={id} checked={checked} onCheckedChange={onChange} />
+    <div className="flex min-h-16 min-w-0 items-center justify-between gap-4 rounded-lg border border-border bg-muted/10 px-4 py-3">
+      <div className="min-w-0 flex-1 space-y-1">
+        <Label htmlFor={id} className="block cursor-pointer text-sm font-medium leading-5">
+          {label}
+        </Label>
+        {description ? (
+          <p id={`${id}-description`} className="text-xs leading-5 text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
+      </div>
+      <Switch
+        id={id}
+        aria-label={label}
+        aria-describedby={description ? `${id}-description` : undefined}
+        checked={checked}
+        onCheckedChange={onChange}
+        className="shrink-0"
+      />
     </div>
   )
 }

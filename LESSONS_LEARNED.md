@@ -81,6 +81,12 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-11-04 — Wide switch rows and damaged translation data obscure AI errors
+
+- **Finding:** A full-width `justify-between` settings row separated switches from their labels by the width of the viewport. The German and French AI translation dictionaries contained literal `?` replacement characters, and connection tests displayed opaque step IDs and provider codes instead of explaining failed capabilities.
+- **Rule:** Keep toggle + label + description in one responsive card, check stored locale strings for lossy character replacement (not just font rendering), and map health-test codes to specific operator actions. Keep raw diagnostics accessible under a separate technical disclosure.
+
+
 ### 2026-11-04 — Darkmerch uses shared-year quarter labels
 
 - **Finding:** A Darkmerch XLSX with 18 valid revenue rows and `DATE = Q2 - Q3 2026` parsed financially but skipped bronze archiving. The report-period parser only accepted a year after each quarter (`Q2 2026 - Q3 2026`).
