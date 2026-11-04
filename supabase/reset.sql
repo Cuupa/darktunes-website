@@ -7233,7 +7233,7 @@ CREATE INDEX IF NOT EXISTS idx_artist_invoices_artist_id ON public.artist_invoic
 -- service-role, direct SQL and concurrent requests. Metadata/status updates
 -- remain allowed as long as the PDF identifier and hash remain unchanged.
 CREATE OR REPLACE FUNCTION public.reject_invoice_pdf_mutation()
-RETURNS TRIGGER LANGUAGE plpgsql AS $
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
   IF (OLD.pdf_url IS NOT NULL OR OLD.pdf_sha256 IS NOT NULL)
      AND (NEW.pdf_url IS DISTINCT FROM OLD.pdf_url
@@ -7242,7 +7242,8 @@ BEGIN
       USING ERRCODE = '23514';
   END IF;
   RETURN NEW;
-END $;
+END;
+$$;
 
 DROP TRIGGER IF EXISTS trg_artist_invoices_pdf_immutable ON public.artist_invoices;
 CREATE TRIGGER trg_artist_invoices_pdf_immutable
