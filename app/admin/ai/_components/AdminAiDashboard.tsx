@@ -404,13 +404,13 @@ export function AdminAiDashboard() {
             icon={<Robot className="h-4 w-4" aria-hidden />}
           />
           <StatusCard
-            title="KI-Anbieter"
+            title={t('admin.providersStatus')}
             value={
               settings.provider_configured ? t('admin.configured') : t('admin.notConfigured')
             }
             detail={
               modelsData
-                ? 'Verfügbare Anbieter und getestete Modelle'
+                ? t('admin.providersStatusDetail')
                 : settings.provider_configured
                   ? t('admin.modelsUnavailable')
                   : t('admin.notConfiguredHint')
