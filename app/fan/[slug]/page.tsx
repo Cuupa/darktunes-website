@@ -26,6 +26,8 @@ export const dynamicParams = true
 
 function makeGetFanPageData(slug: string) {
   return unstable_cache(
+    // No fallback catches in here: a throw keeps Next's last good cache entry
+    // instead of storing a degraded payload for the TTL.
     async () => {
       const client = createPublicSupabaseClient()
       const page = await getPublishedFanPageBySlug(client, slug)
@@ -38,9 +40,9 @@ function makeGetFanPageData(slug: string) {
         getReleasesByArtistId(client, artist.id),
         getConcertsByArtistId(client, artist.id),
         getPublicVideosByArtistId(client, artist.id),
-        getPublicNewsPostsByArtistId(client, artist.id).catch(() => []),
-        getPublishedArtistNewsByArtistId(client, artist.id).catch(() => []),
-        getPublicArtistEpkByArtistId(client, artist.id).catch(() => null),
+        getPublicNewsPostsByArtistId(client, artist.id),
+        getPublishedArtistNewsByArtistId(client, artist.id),
+        getPublicArtistEpkByArtistId(client, artist.id),
       ])
 
       return {
@@ -140,7 +142,9 @@ export default async function FanPageRoute({ params, searchParams }: Props) {
     )
   }
 
-  const data = await makeGetFanPageData(slug)().catch(() => null)
+  // Do NOT swallow errors here — a Supabase failure must surface as a 500
+  // (uncached) rather than render a false 404.
+  const data = await makeGetFanPageData(slug)()
   if (!data) notFound()
 
   return (

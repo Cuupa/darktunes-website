@@ -45,6 +45,7 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 
 
 ### Fixed
+- **Public cache no longer stores outages as empty data:** Supabase errors (e.g. 429) inside `unstable_cache` readers now reject instead of caching `[]`/`null`/"Music Label" for up to 1h, so Next keeps the last good value; the fallback is applied outside the cache and logged.
 - **"No artist linked to this account" for admins:** the AI auth resolver no longer requires an artist membership for admin/editor artist inspection, and only sends tools the actor can execute.
 - **Wrong history window:** conversations load the newest 80 messages (and paginate older pages) instead of the oldest 80. Message pages are returned chronologically, not newest-first.
 - **Retry duplicated the user question:** a retry now reuses the last user message when only failed/cancelled assistant/tool rows follow it, and trims the failed answer from the model context.

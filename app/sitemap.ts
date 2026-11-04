@@ -8,8 +8,7 @@
  *
  * Fallbacks (.catch(() => [])) are placed INSIDE each fetch so that a
  * Supabase failure only drops that section instead of breaking the whole
- * sitemap response (per the project-wide unstable_cache error-handling
- * convention in app/page.tsx).
+ * sitemap response. This is route-level ISR, not unstable_cache.
  */
 
 import type { MetadataRoute } from 'next'
