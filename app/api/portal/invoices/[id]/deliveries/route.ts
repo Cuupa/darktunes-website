@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getArtistInvoice, updateInvoice } from '@/lib/api/artistInvoices'
+import { getSalesStatementById, updateSalesStatementStatus } from '@/lib/api/salesStatements'
+import { appendLedgerEntry, hasLedgerEntry, invoiceTotalCents } from '@/lib/api/settlementLedger'
 import { sendInvoiceEmail } from '@/lib/email/sendInvoiceEmail'
 import { serverEnv } from '@/lib/env.server'
 import { ApiError, withErrorHandler } from '@/lib/errors'
@@ -69,9 +71,70 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
       }),
   )
 
+  // Finalise financial bookkeeping after a successful delivery retry.
+  // A failed delivery must leave both the statement and liability unchanged.
+  const warnings: string[] = []
+  if (result.success && updated.statementId) {
+    try {
+      const { value: statement } = await portalMemberWrite(
+        ctx,
+        { route: ROUTE, table: 'sales_statements', operation: 'select' },
+        (db) => getSalesStatementById(db, updated.statementId!, ctx.artist.id),
+      )
+      if (statement) {
+        if (statement.settlementPeriodId) {
+          try {
+            const { value: booked } = await portalMemberWrite(
+              ctx,
+              { route: ROUTE, table: 'artist_settlement_ledger', operation: 'select' },
+              (db) => hasLedgerEntry(db, 'artist_invoice', updated.id, 'invoice_liability'),
+            )
+            if (!booked) {
+              await portalMemberWrite(
+                ctx,
+                { route: ROUTE, table: 'artist_settlement_ledger', operation: 'insert' },
+                (db) => appendLedgerEntry(db, {
+                  artistId: ctx.artist.id,
+                  settlementPeriodId: statement.settlementPeriodId!,
+                  entryType: 'invoice_liability',
+                  amountEur: -invoiceTotalCents(updated.lineItems) / 100,
+                  currency: updated.currency,
+                  referenceType: 'artist_invoice',
+                  referenceId: updated.id,
+                  description: `Invoice liability ${updated.artistInvoiceNumber ?? updated.invoiceNumber}`,
+                }),
+              )
+            }
+          } catch (err) {
+            if ((err as { code?: string }).code !== '23505') {
+              console.error('[invoice delivery] liability repair failed', err)
+              warnings.push('ledger_entry_failed')
+            }
+          }
+        }
+        if (['label_approved', 'artist_notified', 'viewed'].includes(statement.status)) {
+          try {
+            await portalMemberWrite(
+              ctx,
+              { route: ROUTE, table: 'sales_statements', operation: 'update' },
+              (db) => updateSalesStatementStatus(db, statement.id, 'invoiced'),
+            )
+          } catch (err) {
+            console.error('[invoice delivery] statement status repair failed', err)
+            warnings.push('statement_status_failed')
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[invoice delivery] statement lookup failed', err)
+      warnings.push('statement_lookup_failed')
+    }
+  }
+
   return NextResponse.json({
     invoice: toPortalInvoiceListItem(updated),
     email_sent: result.success,
     email_error: result.success ? null : (result.error ?? 'Email delivery failed'),
+    warnings,
   })
 })

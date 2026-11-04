@@ -11,6 +11,8 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 ## [Unreleased]
 
 ### Added
+- **MCP CMS detail tools:** bounded, role-scoped lookups of individual news items, artist profiles, releases and events without exposing private columns.
+- **DarkTunes GPT/MCP connector (off by default):** OAuth-scoped CMS read tools, news-draft preparation and bounded updates to artists, releases and events using atomic, idempotent website approvals and an audited PostgreSQL transaction. Visibility, publishing and deletion cannot be invoked by external MCP clients. See `docs/MCP_CONNECTOR.md`.
 - **AI Assistant 2.0:** context-aware assistant workspace with conversation history, rename/delete, reload restore, Markdown answers, throttled streaming, tool activity rows, auto-scroll and a mobile full-screen layout. The editor dashboard now mounts the assistant too.
 - **AI context selector:** artist memberships, admin artist search and label-wide context; the active context is always visible in the header.
 - **AI Admin Control Center:** Overview, Models (Fast/Reasoning/Fallback), independent Connection Health probes, token usage charts (input/output/reasoning, model, role, budget, failures) and filtered Diagnostics with a copyable report.
@@ -31,6 +33,7 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 - **Admin → Assets: “All R2 objects” view** — toggle between the DB-tracked catalog and a full listing of every object in Cloudflare R2, with prefix/folder sizes, token search on object keys, and delete-selected to free storage.
 
 ### Changed
+- **Supabase schema auto-apply is back on:** **Deploy Supabase** applies `reset.sql` after CI succeeds on a push to `main` (only pushes, checks out the tested commit). Vercel install still never applies it.
 - AI chat defaults to the fast model; deterministic task classification (or explicit Auto/Fast/Deep) selects reasoning. Reasoning uses low effort when supported and has a larger output budget.
 - Connection tests run fast and reasoning independently; a reasoning timeout no longer hides fast/stream/tool success.
 - The assistant prompt, tools and conversations are strictly bound to the resolved role/artist context. Admins can inspect an artist without an `artist_members` row; invalid artist IDs are rejected instead of silently falling back.
@@ -42,6 +45,8 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 
 
 ### Fixed
+- **Darkmerch XLSX archive skipped for `Q2 - Q3 2026`:** the period parser now recognizes same-year quarter spans where the year is written once after the second quarter. Bronze source bounds are `2026-04` through `2026-09`, without inventing individual sale months or allocating aggregated revenue to a quarter.
+- **Public cache no longer stores outages as empty data:** Supabase errors (e.g. 429) inside `unstable_cache` readers now reject instead of caching `[]`/`null`/"Music Label" for up to 1h, so Next keeps the last good value; the fallback is applied outside the cache and logged.
 - **"No artist linked to this account" for admins:** the AI auth resolver no longer requires an artist membership for admin/editor artist inspection, and only sends tools the actor can execute.
 - **Wrong history window:** conversations load the newest 80 messages (and paginate older pages) instead of the oldest 80. Message pages are returned chronologically, not newest-first.
 - **Retry duplicated the user question:** a retry now reuses the last user message when only failed/cancelled assistant/tool rows follow it, and trims the failed answer from the model context.

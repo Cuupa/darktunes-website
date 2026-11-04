@@ -64,6 +64,8 @@ export const dynamicParams = true
  */
 function makeGetArtistData(slug: string) {
   return unstable_cache(
+    // No fallback catches in here: a throw keeps Next's last good cache entry
+    // instead of storing a degraded payload for the TTL.
     async () => {
       const client = createPublicSupabaseClient()
       // Public artist path: column whitelist only (no secrets in RSC payload).
@@ -76,8 +78,8 @@ function makeGetArtistData(slug: string) {
         getConcertsByArtistId(client, artist.id),
         getPublicVideosByArtistId(client, artist.id),
         getPublicNewsPostsByArtistId(client, artist.id),
-        getPublicArtistEpkByArtistId(serviceDb, artist.id).catch(() => null),
-        getPublicRelatedArtists(client, artist.id, artist.genres).catch(() => []),
+        getPublicArtistEpkByArtistId(serviceDb, artist.id),
+        getPublicRelatedArtists(client, artist.id, artist.genres),
       ])
       const galleryPhotos = (publicEpk?.profile.epkGalleryPhotos ?? []).filter(Boolean)
       return { artist, releases, concerts, videos, news, galleryPhotos, relatedArtists }

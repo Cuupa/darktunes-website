@@ -303,15 +303,27 @@ export async function updateInvoice(
     }
   }
 
-  const { data: row, error } = await supabase
+  let query = supabase
     .from('artist_invoices')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
     .eq('artist_id', artistId)
-    .select()
-    .single()
 
-  if (error) throw new Error(`Failed to update invoice: ${error.message}`)
+  if (updates.pdf_url !== undefined || updates.pdf_sha256 !== undefined) {
+    // Atomic predicate, in addition to the PostgreSQL write-once trigger:
+    // concurrent issuances cannot both claim the same blank invoice row.
+    query = query.is('pdf_url', null).is('pdf_sha256', null)
+  }
+
+  const { data: row, error } = await query.select().single()
+  if (error) {
+    if (
+      error.code === '23514' ||
+      ((updates.pdf_url !== undefined || updates.pdf_sha256 !== undefined) &&
+        error.code === 'PGRST116')
+    ) throw new BusinessRuleError('Invoice PDF has already been issued', 409, 'INVOICE_PDF_IMMUTABLE')
+    throw new Error(`Failed to update invoice: ${error.message}`)
+  }
   return rowToArtistInvoice(row)
 }
 
@@ -448,10 +460,12 @@ export async function markInvoiceReceived(
       updated_at: now,
     })
     .eq('id', id)
+    .eq('status', 'sent')
     .select('*')
-    .single()
+    .maybeSingle()
 
   if (error) throw new Error(error.message)
+  if (!data) throw new BusinessRuleError('Invoice state changed before receipt was recorded', 409, 'INVOICE_STATUS_CONFLICT')
   return rowToArtistInvoice(data as InvoiceRow)
 }
 

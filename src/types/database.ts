@@ -5760,6 +5760,7 @@ export interface Database {
           payload: Record<string, unknown>
           expires_at: string
           used_at: string | null
+          result: Json | null
           created_at: string
         }
         Insert: {
@@ -5772,6 +5773,7 @@ export interface Database {
           payload?: Record<string, unknown>
           expires_at: string
           used_at?: string | null
+          result?: Json | null
           created_at?: string
         }
         Update: {
@@ -5784,6 +5786,7 @@ export interface Database {
           payload?: Record<string, unknown>
           expires_at?: string
           used_at?: string | null
+          result?: Json | null
           created_at?: string
         }
         Relationships: []
@@ -6020,6 +6023,15 @@ export interface Database {
     }
     Views: Record<string, never>
     Functions: {
+      commit_mcp_approval: {
+        Args: {
+          p_token_hash: string
+          p_actor_id: string
+          p_action: string
+          p_payload_hash: string
+        }
+        Returns: Json
+      }
       get_assets_storage_stats: {
         Args: Record<string, never>
         /** JSON object: used_bytes, asset_count, zero_size_count */

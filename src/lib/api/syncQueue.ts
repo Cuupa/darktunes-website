@@ -25,7 +25,7 @@ export type SyncJobType =
   | 'spotify'
   | 'discogs'
   | 'youtube'
-  | 'odesli'
+  | 'odesli' // Historical queue rows only; never enqueued or executed.
   | 'songkick'
   | 'bandsintown'
 export type SyncJobStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled'
@@ -303,6 +303,7 @@ export async function enqueueArtistSyncJobs(
   artistIds: string[],
   jobType: SyncJobType = 'full',
 ): Promise<number> {
+  if (jobType === 'odesli') throw new Error('Retired sync provider cannot be enqueued')
   if (artistIds.length === 0) return 0
 
   // Find artists already queued (pending or running) to avoid duplicates
@@ -332,39 +333,6 @@ export async function enqueueArtistSyncJobs(
   if (error) throw new Error(`Failed to enqueue sync jobs: ${error.message}`)
 
   return toEnqueue.length
-}
-
-/**
- * Enqueues a global Odesli batch job when none is already pending or running.
- */
-export async function enqueueOdesliSyncJob(
-  db: DbClient,
-  cooldownMs = 0,
-): Promise<number> {
-  const { data: existing, error: existingError } = await db
-    .from('sync_queue')
-    .select('id')
-    .eq('job_type', 'odesli')
-    .is('artist_id', null)
-    .in('status', ['pending', 'running'])
-    .limit(1)
-
-  if (existingError) {
-    throw new Error(`Failed to read existing Odesli sync jobs: ${existingError.message}`)
-  }
-
-  if (existing && existing.length > 0) return 0
-
-  const scheduledAt = new Date(Date.now() + cooldownMs).toISOString()
-  const { error } = await db.from('sync_queue').insert({
-    artist_id: null,
-    job_type: 'odesli',
-    status: 'pending',
-    scheduled_at: scheduledAt,
-  })
-
-  if (error) throw new Error(`Failed to enqueue Odesli sync job: ${error.message}`)
-  return 1
 }
 
 /**
@@ -404,7 +372,7 @@ export async function enqueueBandsintownSyncJobs(db: DbClient): Promise<number> 
 }
 
 /**
- * Re-schedules a completed job when more work remains (e.g. Odesli batch).
+ * Re-schedules a completed job when more work remains.
  * Honours admin cancel requests set while the job was running.
  */
 export async function rescheduleSyncJob(
@@ -584,12 +552,13 @@ export async function markSyncJobCancelled(db: DbClient, jobId: string): Promise
 export async function retrySyncJob(db: DbClient, jobId: string): Promise<boolean> {
   const { data: existing, error: readError } = await db
     .from('sync_queue')
-    .select('id, status')
+    .select('id, status, job_type')
     .eq('id', jobId)
     .maybeSingle()
 
   if (readError) throw new Error(`Failed to load sync job: ${readError.message}`)
   if (!existing) throw new Error('Sync job not found')
+  if (existing.job_type === 'odesli') return false
   if (existing.status !== 'failed' && existing.status !== 'cancelled') return false
 
   const { error } = await db

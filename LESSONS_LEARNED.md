@@ -81,6 +81,15 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-11-04 — Darkmerch uses shared-year quarter labels
+
+- **Finding:** A Darkmerch XLSX with 18 valid revenue rows and `DATE = Q2 - Q3 2026` parsed financially but skipped bronze archiving. The report-period parser only accepted a year after each quarter (`Q2 2026 - Q3 2026`).
+- **Rule:** Test period recognition with actual source-label shapes, including shared-year ranges and empty spreadsheet columns. Use the range only for archive provenance; do not allocate aggregated sales to invented monthly transaction dates.
+
+### 2026-11-04 — Fallbacks inside unstable_cache cache the outage
+
+- **Finding:** Public read helpers wrapped Supabase calls in `unstable_cache` with `.catch(() => [])` / `.catch(() => null)` / `SITE_SETTINGS_DEFAULTS` inside the callback. A Supabase 429 therefore resolved successfully with an empty value, which Next stored in the Data Cache for up to 1h, overwriting the last good entry (the symptom behind the 2026-10-21 entry: `Music Label` and empty catalogues). If the callback throws, Next logs it and keeps/returns the stale entry (revalidateTag uses `'max'`, so stale entries survive invalidation); with no entry the error propagates and nothing is cached.
+- **Rule:** Never `.catch` with a fallback inside an `unstable_cache` callback. Let it reject and apply the fallback (plus `logError`) outside the cache, as `withUncachedFallback` in `src/lib/cache/publicQueries.ts` does. Callers of throwing cached readers must not turn an error into `notFound()`.
 ### 2026-10-22 — NVIDIA streamed answers can arrive in the reasoning channel
 
 - With a Nemotron reasoning model selected as Fast, non-streaming `fast_complete` passed but the `stream` health step failed with "no text deltas"; chat stored `done` with empty content. NVIDIA/vLLM routes the answer to `delta.reasoning` / `delta.reasoning_content` with `enable_thinking=false` on some streaming deployments while the non-streaming parser swaps the fields.
@@ -279,10 +288,11 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
-### 2026-10-21 — Auto-apply of reset.sql on deploy is not a no-op
+### 2026-10-21 — Empty public site was the Supabase rate limit, not schema auto-apply
 
-- **Finding:** `vercel-install.sh` and CI-success `deploy-supabase.yml` ran `db:apply` on every production deploy. `apply-schema.mjs` sent all of `reset.sql` as one `pg` query (implicit transaction). Public site then served `SITE_SETTINGS_DEFAULTS` (`Music Label`) and empty catalogues because failed public reads are cached as `[]` for up to 1h.
-- **Rule:** Never apply `reset.sql` from Vercel install or from CI success. Manual only: SQL Editor, `npm run db:apply`, or GitHub `workflow_dispatch`. Apply with `psql -f` (one statement at a time), not `client.query(entireFile)`.
+- **Finding:** Public site served `SITE_SETTINGS_DEFAULTS` (`Music Label`) and empty catalogues. Cause: Supabase rate limit — public reads failed, and failed reads are cached as `[]` for up to 1h. Auto-apply of `reset.sql` was first blamed and switched off (3b775a2f); that was the wrong cause (corrected 2026-11-04).
+- **Rule:** Before blaming a deploy step, check Supabase for rate-limit errors (429). Apply `reset.sql` with `psql -f` (one statement at a time), not `client.query(entireFile)` — `ALTER TYPE … ADD VALUE` cannot run inside one implicit transaction.
+- **Status:** Auto-apply after CI success on a push to `main` is back on (`deploy-supabase.yml`, `workflow_run`). Vercel install does not apply the schema.
 
 ### 2026-10-21 — An expired asset row is not the live pointer
 

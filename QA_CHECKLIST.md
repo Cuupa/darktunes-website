@@ -247,7 +247,8 @@
 - [ ] `/admin/accounting` Statement History tab and `/admin/statements` render without `Something went wrong`
 - [ ] Add an expense in period A, save Default / a named preset, open period B → expense is gone; mappings and splits remain
 - [ ] Load a preset while the current period has a manual revenue line → the line is still there
-- [ ] Sampler listed in compilation checks still appears in the artist payout; hiding compilations in PDF/Excel does not change the euro amount
+- [ ] A filtered compilation is excluded from artist payout, release breakdown and original-report sheets; its value remains in the informational audit summary and uploaded source archive
+- [ ] Track `Satisfaction` assigned 100% to Exstais and 0% to featured Agnis appears only in Exstais raw sheets; proportional splits show the allocated net amount separately from original distributor values
 - [ ] Ignored release is gone from payout; ignored artist without a release title drops that artist entirely
 - [ ] Track split 60/40 that sums to 100% splits across roster artists; 70/20 stays on the original artist
 - [ ] Portal PATCH invoice status `paid` returns 4xx; only admin payment records paid. Artist can cancel a draft with no payment
@@ -262,6 +263,7 @@
 - [ ] Set a manual period different from the detected source range → PDF/Excel, Settlement Center, payout, workspace key and carry-forward all use the manual period
 - [ ] Invalid period (end before start, month 13, start without end) → Export/PDF/Excel/Publish blocked with a plain reason; no `Q1-<current year>` upload appears
 - [ ] Source file without any recognizable sales month → bronze card shows “archiving skipped” instead of archiving under the current month
+- [ ] Darkmerch XLSX with `DATE = Q2 - Q3 2026`, five columns including a blank header, and 18 artist totals: source period resolves to `2026-04`–`2026-09`, all amounts stay intact, individual sale months stay unknown, and R2 archive completes after re-upload. `Q3 - Q2 2026` remains invalid; ordinary `Q4 2025 - Q1 2026` continues to work.
 - [ ] Darkmerch CSV with `15,79` (DE) → correct euro basis and artist share; Believe/Bandcamp `15.79` unchanged; `12x` or an empty required amount appears as a row error, never as `0`
 - [ ] Bronze upload >32 MB (e.g. `statement of sales examples/Q4 2025 - Q1 2026/Believe_Q4_2025.csv` 63 671 078 bytes → 4 parts; `Believe_Q1_2026.csv` 71 684 050 bytes → 5 parts, last part ~4.4 MiB which R2 allows as the final part) archives via direct multipart (16 MB parts, no `/multipart/part` request); Bandcamp raw (~2.4 MB) and Darkmerch stay on a single PUT; a Failed-to-fetch R2 PUT is shown as an archive/CORS problem, not “offline / VPN”; drop the connection mid-upload → the part retries with a fresh presigned URL (each attempt has a size-scaled timeout, 2–14 min, no infinite hang; a slow upload still completes); two large files queue (one archive at a time, second card shows “Archiving…”); removing a file while it waits in the queue → it is not archived (no orphan batch); with R2 CORS broken the R2 error is shown (no silent proxy fallback); direct disabled + >4 MB shows the clear “direct upload disabled” message
 - [ ] Retry a bronze upload after registration response loss: the same `operation_id` returns the same batch; no second batch or duplicate rows appear. Each phase log has that ID, phase, duration, byte/row counts, and result. Archive errors show the same ID on the file card.
@@ -350,8 +352,8 @@
 - [ ] Validate schema parity with `supabase/reset.sql`
 - [ ] Validate artist/release/news sync jobs and cron triggers
 - [ ] Validate RLS and role permissions for new tables/features
-- [ ] Admin → Releases → "Sync All APIs": progress climbs with backlog (not stuck at 100% mid-run); spinner stays until drain or ~5 min timeout; toast reflects drained vs still-running; cover art lands on CDN without `getaddrinfo EBUSY` spam in sync logs; Odesli job reschedules cleanly under rate limit
-- [ ] After a full/Odesli sync, System Health **Sync Queue** does not stay at `1 running, 0 pending` once APIs show Success. Releases with only an artist-profile Spotify URL (or Odesli 404/405/422) get a fallback smart link and do not recycle the same Odesli job. Already-CDN covers are not re-fetched. If a leftover `running` row remains from before this fix, cancel it in System → Advanced.
+- [ ] Admin → Releases → "Sync All APIs": progress climbs with backlog (not stuck at 100% mid-run); spinner stays until drain or ~5 min timeout; toast reflects drained vs still-running; cover art lands on CDN without `getaddrinfo EBUSY` spam in sync logs; no retired API jobs are queued
+- [ ] After a full sync, System Health **Sync Queue** returns to idle. Historical smartlinks remain visible, and retired Odesli jobs are not re-enqueued. Already-CDN covers are not re-fetched.
 - [ ] After release sync, public `/releases` and home release section show new visible non-promo releases (hard refresh OK; no need to wait full 1h TTL)
 - [ ] Admin → Videos → "Sync YouTube Channel": admin list updates; public `/videos` updates after revalidation
 - [ ] A scheduled (not yet public) or upcoming-premiere video is **not** synced; after it goes public the next hourly sync adds it with the release date
@@ -359,8 +361,7 @@
 - [ ] `GET /api/sync/queue` with admin Bearer returns `{ pending, running, done, failed }` and does **not** enqueue jobs
 - [ ] Admin → System → **Advanced**: job table lists pending/running; cancel pending removes work; cancel running sets cancel-requested then job ends cancelled; retry failed re-queues
 - [ ] Force Sync / Sync All: many artists drain continuously (pg_cron re-invokes the worker every minute); no manual re-kick while due jobs remain; rate-limited artists pause with cooldown while others proceed
-- [ ] Cron/Admin `apiSource: spotify`, `odesli`, `songkick`, or `bandsintown` via `/api/sync-api` starts the executor immediately (jobs do not wait for the next worker tick)
-- [ ] Odesli 429 does not stop remaining smart-link resolves or skip artist `platform_links`; leftover rows continue on the next batch without a 15-minute park
+- [ ] Cron/Admin `apiSource: spotify`, `songkick`, or `bandsintown` via `/api/sync-api` starts the executor immediately. Retired `odesli` requests return HTTP 410.
 - [ ] Artists with >200 iTunes collections get further pages (not truncated at 200)
 - [ ] Failed Spotify/Discogs cover uploads appear in sync errors (remote URL may remain)
 - [ ] YouTube remains a separate channel action (Force Sync YouTube / pg_cron `sync-youtube-daily`); artist queue jobs do not write videos
@@ -505,3 +506,30 @@
 ## Edge Function
 - [ ] Supabase Edge Function 'newsletter-confirm' is deployed and active
 - [ ] Edge Function appears in Supabase Dashboard → Edge Functions
+
+## ChatGPT / MCP Connector
+
+- [ ] Feature flag off: MCP returns 503 and discovery metadata is not published.
+- [ ] Supabase OAuth authorization-code with PKCE completes only for registered clients; grant and denial paths work.
+- [ ] A valid allowlisted OAuth token issued at `aal1` can connect without TOTP enrollment or an MFA challenge; revoked, wrong-client and ordinary portal tokens remain rejected.
+- [ ] CMS review and approval work with a normal signed-in browser session without `aal2`; cross-account sessions and OAuth bearer-only approval attempts still fail.
+- [ ] Missing token, non-OAuth portal JWT, revoked token, expired token, and artist-only user cannot access MCP tools.
+- [ ] tools/list reflects admin/editor capabilities; sensitive fields and raw SQL are unavailable.
+- [ ] News, releases, artists, and events data is bounded and excludes private fields.
+- [ ] Prepared news draft does not mutate CMS; review expires after ten minutes, binds to the initiating user and is single use.
+- [ ] Approval requires same-origin browser POST, CMS permission and safe plaintext preview. Never publishes automatically.
+- [ ] Approval creates exactly one unpublished draft and logs the action; reuse and cross-account attempts fail.
+- [ ] Re-run CI after changes and manually test connection before enabling in production.
+
+- [ ] MCP OAuth client allowlist is empty by default and rejects valid tokens until the exact client ID has been approved.
+
+- [ ] Artist/release/event patch preview shows accurate before/after fields and rejects stale `updated_at` revisions (concurrent editor changes).
+- [ ] Artist email, private notes and keys cannot be edited using MCP; event/release visibility and publishing changes are rejected.
+- [ ] OAuth tokens cannot submit a browser approval request, even when a forged Origin header is provided.
+- [ ] Confirmation payload hash detects modified nested `changes` or `before` objects, regardless of key ordering.
+
+- [ ] Atomic MCP SQL RPC exists only for `service_role`; `anon` and `authenticated` cannot execute it.
+- [ ] A failed editor audit INSERT rolls back the CMS UPDATE and leaves the approval unconsumed.
+- [ ] Two concurrent approval requests produce exactly one CMS mutation and one audit event, and both receive the same stored result (`replayed: true` for the second).
+- [ ] Stale record revision prevents the update without consuming the token.
+- [ ] Missing RPC returns a configuration error without attempting a legacy nontransactional write.

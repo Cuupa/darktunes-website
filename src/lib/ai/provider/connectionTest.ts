@@ -2,7 +2,7 @@ import { FAST_MODEL_ID, REASONING_MODEL_ID, getModelProfile, mergeDiscoveredCapa
 import { AiProviderError, isAiProviderError } from '@/lib/ai/provider/errors'
 import { NvidiaOpenAiCompatibleProvider } from '@/lib/ai/provider/nvidia'
 import type { AiProvider } from '@/lib/ai/provider/interface'
-import type { AiModelRole, AiProviderErrorCode, AiUsage, ModelCapabilities } from '@/lib/ai/types/provider'
+import type { AiModelRole, AiProviderErrorCode, AiToolCall, AiUsage, ModelCapabilities } from '@/lib/ai/types/provider'
 
 export const CONNECTION_TEST_ECHO_TOOL = {
   name: 'echo_test',
@@ -197,34 +197,57 @@ export async function runNvidiaConnectionTest(options: {
 
     const sampleToolCall: { current: AiToolCall | null } = { current: null }
     const tool = await runStep(toolId, model, async () => {
-      const completion = await provider.complete({
-        request_id: `connection-test-${role}-tool`,
-        model,
-        messages: [
-          {
-            role: 'user',
-            content: 'Call echo_test with ping set to pong. Do not answer in prose.',
-          },
-        ],
-        tools: [CONNECTION_TEST_ECHO_TOOL],
-        tool_choice: 'required',
-        max_tokens: 128,
-        enable_thinking: false,
-        force_nonempty_content: true,
-        timeout_ms: timeoutMs,
-        retry: false,
-      })
-      const matched = completion.tool_calls.find((call) => call.name === 'echo_test')
-      const supported = Boolean(matched)
-      if (matched) sampleToolCall.current = matched
+      const prompt = 'Call echo_test with ping set to pong. Do not answer in prose.'
+      const request = async (thinking: boolean, tokenLimit: number, suffix = '') =>
+        provider.complete({
+          request_id: `connection-test-${role}-tool${suffix}`,
+          model,
+          messages: [{ role: 'user', content: prompt }],
+          tools: [CONNECTION_TEST_ECHO_TOOL],
+          tool_choice: 'required',
+          // A 128-token cap can be exhausted by reasoning before the tool call
+          // is emitted. Do not force an answer when we require a tool call.
+          max_tokens: tokenLimit,
+          enable_thinking: thinking,
+          timeout_ms: timeoutMs,
+          retry: false,
+        })
+      const hasValidEcho = (completion: Awaited<ReturnType<typeof request>>) =>
+        completion.tool_calls.some((call) => {
+          if (call.name !== 'echo_test') return false
+          try {
+            const args: unknown = JSON.parse(call.arguments)
+            return Boolean(args && typeof args === 'object' &&
+              (args as { ping?: unknown }).ping === 'pong')
+          } catch {
+            return false
+          }
+        })
+      let completion = await request(false, 512)
+      let supported = hasValidEcho(completion)
+      let requiresThinkingForTools = false
+      // Some reasoning-capable fast models require thinking mode to form
+      // structured tool calls. Probe it only after a failed non-thinking call.
+      if (!supported && getModelProfile(model).supports_enable_thinking) {
+        completion = await request(true, 2048, '-thinking')
+        supported = hasValidEcho(completion)
+        requiresThinkingForTools = supported
+      }
+      if (supported) {
+        sampleToolCall.current = completion.tool_calls.find((call) => {
+          if (call.name !== 'echo_test') return false
+          try { return (JSON.parse(call.arguments) as { ping?: unknown }).ping === 'pong' } catch { return false }
+        }) ?? null
+      }
       discovered[model] = {
         ...(discovered[model] ?? {}),
         supports_tools: supported,
+        requires_thinking_for_tools: requiresThinkingForTools,
       }
       if (!supported) {
         throw new AiProviderError(
           'TOOL_CALL_UNSUPPORTED',
-          'The model did not emit the echo_test tool call.',
+          'The model did not emit a valid echo_test tool call, including the thinking-mode retry.',
         )
       }
     })
@@ -244,13 +267,16 @@ export async function runNvidiaConnectionTest(options: {
         messages: [{ role: 'user', content: 'Call echo_test with ping set to pong. No prose.' }],
         tools: [CONNECTION_TEST_ECHO_TOOL],
         tool_choice: 'required',
-        max_tokens: 256,
-        enable_thinking: false,
+        max_tokens: discovered[model]?.requires_thinking_for_tools ? 2048 : 512,
+        enable_thinking: discovered[model]?.requires_thinking_for_tools === true,
         timeout_ms: timeoutMs,
         retry: false,
       })) {
         if (event.type === 'done') {
-          validCall = event.completion.tool_calls.some((call) => call.name === 'echo_test')
+          validCall = event.completion.tool_calls.some((call) => {
+            if (call.name !== 'echo_test') return false
+            try { return (JSON.parse(call.arguments) as { ping?: unknown }).ping === 'pong' } catch { return false }
+          })
         }
       }
       discovered[model] = { ...(discovered[model] ?? {}), supports_tools_with_streaming: validCall }

@@ -2,18 +2,18 @@
  * app/page.tsx — Home page (React Server Component)
  *
  * Data is fetched server-side here using the Supabase server client.
- * Next.js 15 no longer caches fetch/GET by default, so we explicitly wrap
- * queries in unstable_cache with revalidation tags and a 60-second TTL.
+ * Next.js 15 no longer caches fetch/GET by default, so we explicitly use
+ * the unstable_cache helpers from src/lib/cache/publicQueries.ts (tagged, 1h TTL
+ * plus on-demand revalidation).
  * This prevents per-request Supabase queries while keeping data fresh.
  *
  * The fetched data is passed as props to HomePageContent (Client Component)
  * following the IoC principle: RSC owns data fetching, client owns rendering.
  */
 
-import { unstable_cache } from 'next/cache'
 import type { Metadata } from 'next'
 import { HomePageContent } from './_components/HomePageContent'
-import { getSiteSettings, SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
+import { SITE_SETTINGS_DEFAULTS } from '@/lib/api/siteSettings'
 
 import {
   getCachedPublicReleases,
@@ -21,9 +21,8 @@ import {
   getCachedPublicVideos,
   getCachedPublicConcerts,
   getCachedPublicArtists,
+  getCachedSiteSettings,
 } from '@/lib/cache/publicQueries'
-import { createPublicSupabaseClient } from '@/lib/supabase/publicClient'
-import type { SiteSettings } from '@/types'
 import {
   buildOrganizationSchema,
   buildWebSiteSchema,
@@ -41,29 +40,12 @@ export const metadata: Metadata = {
 }
 
 // ---------------------------------------------------------------------------
-// Home page uses a richer fallback for site settings (non-nullable SiteSettings)
-// because HomePageContent requires the full object.
-// For other RSC pages the nullable getCachedSiteSettings from publicQueries.ts
-// is sufficient — those components use optional chaining on every field.
-// ---------------------------------------------------------------------------
-
-const getCachedSiteSettings = unstable_cache(
-  async (): Promise<SiteSettings> => {
-    return getSiteSettings(createPublicSupabaseClient()).catch(
-      (): SiteSettings => SITE_SETTINGS_DEFAULTS,
-    )
-  },
-  ['site-settings'],
-  { revalidate: 60, tags: ['site-settings'] },
-)
-
-// ---------------------------------------------------------------------------
 // Page component
 // ---------------------------------------------------------------------------
 
 export default async function HomePage() {
   // Fetch all data in parallel on the server
-  const [releases, news, videos, concerts, siteSettings, artists] = await Promise.all([
+  const [releases, news, videos, concerts, siteSettingsOrNull, artists] = await Promise.all([
     getCachedPublicReleases(),
     getCachedPublicNews(),
     getCachedPublicVideos(),
@@ -71,6 +53,9 @@ export default async function HomePage() {
     getCachedSiteSettings(),
     getCachedPublicArtists(),
   ])
+  // HomePageContent needs the full object; the fallback is applied outside the
+  // cache so an outage is never stored as "Music Label".
+  const siteSettings = siteSettingsOrNull ?? SITE_SETTINGS_DEFAULTS
 
   return (
     <>

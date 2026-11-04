@@ -196,7 +196,7 @@ Set these in your Vercel project settings (Dashboard → Project → Settings �
 ### API Credentials Encryption (required)
 - `API_CREDENTIALS_ENCRYPTION_KEY`: 64-character hex string (32 bytes). Generate with `openssl rand -hex 32`. Encrypts external integration keys before they are stored in Supabase `api_credentials`. **Never** store this key in Supabase or commit it to git.
 
-External integration API keys (Spotify, Discogs, Resend, YouTube, MailerLite, Odesli, etc.) are **not** Vercel env vars anymore. Configure them in **Admin → API Keys** (`/admin/api-keys`). Values are encrypted with AES-256-GCM and persisted in `api_credentials` (admin-only RLS). iTunes sync works without keys.
+External integration API keys (Spotify, Discogs, Resend, YouTube, MailerLite, etc.) are **not** Vercel env vars anymore. Configure them in **Admin → API Keys** (`/admin/api-keys`). Values are encrypted with AES-256-GCM and persisted in `api_credentials` (admin-only RLS). iTunes sync works without keys.
 
 **Migrating from env vars:** After deploying, log in as admin → API Keys → **Import from environment variables** (one-time). Then remove the legacy `SPOTIFY_*`, `DISCOGS_*`, `RESEND_*`, etc. from Vercel.
 
@@ -300,12 +300,17 @@ and DOI confirmation emails will never be delivered.
 
 ### Applying the schema
 
-Schema apply is **manual**. Vercel install (`scripts/vercel-install.sh`) and
-CI success must not run `reset.sql`. Apply when you intend to:
+`supabase/reset.sql` is applied **automatically** by the GitHub workflow
+**Deploy Supabase** after **CI** succeeds on a push to `main` (a fork sync
+counts). It needs the repository secret `SUPABASE_DB_URL` (Session Pooler URI,
+`?sslmode=require`) in the repo where the workflow runs. Vercel install
+(`scripts/vercel-install.sh`) never runs `reset.sql`.
 
-1. Paste `supabase/reset.sql` into the Supabase SQL Editor, or
+Manual options:
+
+1. GitHub → Actions → **Deploy Supabase** → **Run workflow** (`workflow_dispatch`), or
 2. `npm run db:apply` locally (`SUPABASE_DB_URL` / `DATABASE_URL`), or
-3. GitHub → Actions → **Deploy Supabase** → **Run workflow** (`workflow_dispatch`)
+3. Paste `supabase/reset.sql` into the Supabase SQL Editor
 
 `npm run db:apply` (`scripts/apply-schema.mjs`) uses `psql -v ON_ERROR_STOP=1 -f`
 (statement-by-statement). Do not send the whole file as one `pg` query —
@@ -356,10 +361,7 @@ silently in production and was removed):
 > there, add a dashboard SQL job (owner decision) or clear a table manually from
 > Admin → System → Maintenance.
 
-> **Odesli note:** The Odesli / song.link `v1-alpha.1` public API was sunset on
-> 2026-07-31 (it now returns `401 PUBLIC_API_ACCESS_DEPRECATED`). Add an
-> `odesli_api_key` in Admin → API Keys to authenticate; without a key the Odesli
-> queue job completes as a no-op instead of failing.
+> The Odesli public API was retired in July 2026. Historical links remain stored and displayed; do not configure Odesli credentials or schedule related jobs.
 
 ---
 
@@ -459,3 +461,7 @@ Create the token in Zammad → **Profile → Token Access** with `ticket.agent` 
   `[SYSTEM ERROR REPORT — darkTunes]` prefix. Anonymous reports still persist to `app_logs`.
 - **Deduplication:** Same error fingerprint + user within 24 h → no duplicate Zammad ticket.
 - **Known errors:** Admin can block fingerprints in Support → Known Errors.
+
+## ChatGPT / remote MCP connector
+
+The connector is disabled by default. Configure Supabase OAuth Server, its authorization consent URL `/oauth/consent`, an asymmetric signing key and your canonical HTTPS public site URL. Set `MCP_CONNECTOR_ENABLED=true` only after the authenticated manual integration tests in [docs/MCP_CONNECTOR.md](docs/MCP_CONNECTOR.md). Configure distributed Upstash Redis rate limiting. Do not expose the Supabase service-role key or client secrets to the browser.

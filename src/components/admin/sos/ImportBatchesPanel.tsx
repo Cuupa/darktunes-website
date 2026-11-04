@@ -15,7 +15,7 @@ import { explainSosError } from '@/lib/sos/explainSosError'
 
 interface ImportBatchesPanelProps {
   labelArtists: LabelArtist[]
-  onLoadBatch?: (batch: DistributorImportBatch) => void
+  onLoadBatch?: (batch: DistributorImportBatch) => void | Promise<void>
   exchangeRates?: Record<string, number>
   historicalRates?: Record<string, Record<string, number>>
   carryForwardByArtist?: Record<string, number>
@@ -37,6 +37,8 @@ const BRONZE_FALLBACK = {
   bronzeDelete: 'Delete',
   bronzeDeleteConfirm: 'Delete this bronze archive (raw CSV in R2) permanently?',
   bronzeLoadError: 'Failed to load import batches',
+  bronzeArchiveLoadError: 'Failed to load saved archive',
+  bronzeArchiveIncomplete: 'This import was not fully archived. Select the original CSV to upload it again.',
   bronzeLoadUnavailable: 'Load is not available in this context',
   bronzeLoadSuccess: 'Loaded {distributor} archive into workspace',
   bronzeDeleteError: 'Delete failed',
@@ -83,6 +85,10 @@ export function ImportBatchesPanel({
   }, [loadBatches])
 
   const handleLoad = async (batch: DistributorImportBatch) => {
+    if (batch.status !== 'completed' || !batch.fileHash) {
+      toast.error(t.bronzeArchiveIncomplete)
+      return
+    }
     if (!onLoadBatch) {
       toast.info(t.bronzeLoadUnavailable)
       return
@@ -91,8 +97,10 @@ export function ImportBatchesPanel({
       await onLoadBatch(batch)
       const dist = batch.distributor
       toast.success(interpolate(t.bronzeLoadSuccess, { distributor: dist }))
-    } catch {
-      // error already reported by load implementation
+    } catch (err) {
+      toast.error(t.bronzeArchiveLoadError, {
+        description: err instanceof Error ? err.message : t.bronzeLoadError,
+      })
     }
   }
 
@@ -231,9 +239,11 @@ export function ImportBatchesPanel({
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={isPending}
+                      disabled={isPending || batch.status !== 'completed' || !batch.fileHash}
                       onClick={() => void handleLoad(batch)}
-                      title={t.bronzeLoad}
+                      title={batch.status !== 'completed' || !batch.fileHash
+                        ? t.bronzeArchiveIncomplete
+                        : t.bronzeLoad}
                     >
                       <DownloadSimple size={14} className="mr-1" />
                       {t.bronzeLoad}

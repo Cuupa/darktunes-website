@@ -27,6 +27,8 @@ export function isCompilation(
   filters: CompilationFilter[],
 ): boolean {
   for (const filter of filters) {
+    // Empty persisted filters must never exclude the entire catalogue.
+    if (!filter.identifier.trim()) continue
     switch (filter.type) {
       case 'ean':
         if (
@@ -67,7 +69,7 @@ export function resolveMainArtist(
 }
 
 /**
- * Builds the informational compilation summary panel (compilations still count toward revenue).
+ * Builds the informational summary of compilation rows excluded from artist revenue.
  */
 export function buildFilteredCompilations(
   transactions: SalesTransaction[],
@@ -120,7 +122,7 @@ export function buildFilteredCompilations(
   return Array.from(compilationMap.values()).sort((a, b) => b.revenue - a.revenue)
 }
 
-type ResolvedTransaction = SalesTransaction & { main_artist: string }
+type ResolvedTransaction = SalesTransaction & { main_artist: string; assignment_owner_locked?: boolean; assignment_allocation_percentage?: number }
 
 function normalizeMatchTitle(value: string | null | undefined): string {
   return (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
@@ -167,7 +169,16 @@ export function applyTrackRevenueAssignments(
 
     if (!match) return [t]
 
-    const owners = resolveAssignmentOwners(match)
+    // Coalesce duplicate artists before splitting. Without this, two owner
+    // entries for the same artist would duplicate the transaction and payout.
+    const ownersByArtist = new Map<string, { artist: string; fraction: number }>()
+    for (const owner of resolveAssignmentOwners(match)) {
+      const key = normalizeArtistNameKey(owner.artist)
+      const previous = ownersByArtist.get(key)
+      if (previous) previous.fraction += owner.fraction
+      else ownersByArtist.set(key, { artist: owner.artist.trim(), fraction: owner.fraction })
+    }
+    const owners = [...ownersByArtist.values()]
     if (owners.length === 0) return [t]
 
     const ownersForSum = owners.map((owner) => ({ percentage: owner.fraction * 100 }))
@@ -176,7 +187,7 @@ export function applyTrackRevenueAssignments(
     }
 
     if (owners.length === 1 && owners[0].fraction === 1) {
-      return [{ ...t, main_artist: owners[0].artist }]
+      return [{ ...t, main_artist: owners[0].artist, assignment_owner_locked: true, assignment_allocation_percentage: 100 }]
     }
 
     const revenueByOwner = splitRevenueAmongOwners(t.net_revenue, owners)
@@ -191,6 +202,8 @@ export function applyTrackRevenueAssignments(
         ...t,
         id: `${t.id}__split__${owner.artist}`,
         main_artist: owner.artist,
+        assignment_owner_locked: true,
+        assignment_allocation_percentage: owner.fraction * 100,
         net_revenue: revenueByOwner.get(owner.artist.trim()) ?? 0,
         quantity,
       }
@@ -219,6 +232,10 @@ export function applyLabelRosterFilter(
         labelArtists?.find(la => normalizeArtistNameKey(la.name) === mainKey)?.name ?? t.main_artist
       return [{ ...t, main_artist: canonical }]
     }
+
+    // Explicit ownership rules must never fall back to a featured artist in the source credit.
+    // If the assigned owner is outside the roster, omit the row instead of paying it twice.
+    if (t.assignment_owner_locked) return []
 
     const found = rosterNames.find(rn =>
       normalizeArtistNameKey(t.original_artist) === rn ||

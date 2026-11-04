@@ -23,7 +23,7 @@ import {
 import { createSyncUploadFn } from '@/lib/r2Utils'
 import { isValidCronSecret } from '@/lib/cronAuth'
 import { waitUntil } from '@vercel/functions'
-import { syncOdesliBatch, syncSingleArtist } from '@/lib/sync/syncAll'
+import { syncSingleArtist } from '@/lib/sync/syncAll'
 import { RATE_LIMIT_JOB_COOLDOWN_MS, isRateLimitedSyncError } from '@/lib/sync/retryPolicy'
 import { extractBearerToken, verifySyncTrigger } from '@/lib/adminAuth'
 import { withErrorHandler } from '@/lib/errors'
@@ -48,7 +48,6 @@ const LEASE_RENEW_INTERVAL_MS = 30_000
 function tagsForJobType(jobType: SyncJobType): PublicContentTag[] {
   // YouTube channel sync is a separate route; artist-scoped "youtube" jobs fall
   // through to full artist sync (releases/concerts) as a legacy fallback.
-  if (jobType === 'odesli') return ['releases', 'artists']
   if (jobType === 'songkick' || jobType === 'bandsintown') return ['concerts', 'artists']
   return [...RELEASE_SYNC_TAGS]
 }
@@ -67,30 +66,6 @@ async function processSyncJob(
     discogsToken: syncCredentials.discogsToken,
     songkickApiKey: syncCredentials.songkickApiKey,
     bandsintownApiKey: syncCredentials.bandsintownApiKey,
-    odesliApiKey: syncCredentials.odesliApiKey,
-  }
-
-  if (job.jobType === 'odesli') {
-    if (!syncCredentials.odesliApiKey) {
-      // Odesli's public v1-alpha.1 API was sunset (2026-07-31). Without an API
-      // key every call 401s, so complete the job instead of failing it.
-      await markSyncJobDone(db, job.id)
-      return []
-    }
-
-    const result = await syncOdesliBatch(deps)
-    const odesliResult = result.results.find((r) => r.api === 'odesli')
-    const hasMoreWork = odesliResult?.hasMoreWork ?? false
-
-    // Odesli 429s skip the item and continue; leftover rows stay smart_url=null.
-    // Never park the job for 15 minutes or abort the rest of the drain.
-    if (hasMoreWork) {
-      await rescheduleSyncJob(db, job.id, 0)
-    } else {
-      await markSyncJobDone(db, job.id)
-    }
-
-    return tagsForJobType('odesli')
   }
 
   if (!job.artistId) {
@@ -99,8 +74,7 @@ async function processSyncJob(
   }
 
   const result = await syncSingleArtist(job.artistId, job.jobType, deps)
-  // Odesli rate limits must not reschedule a full/spotify/… artist job.
-  const rateLimited = result.results.some((r) => r.api !== 'odesli' && r.rateLimited)
+  const rateLimited = result.results.some((r) => r.rateLimited)
 
   if (rateLimited) {
     // Push this artist out of the due window; keep draining other artists.
@@ -145,8 +119,6 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     console.error('[sync] scheduled news publish failed:', err)
   })
 
-  const syncCredentials = await getSyncCredentials(db)
-
   // Dead-man's switch: proves the HTTP hop reached Next.js (written before any
   // lease/claim so a 401 or crash upstream is distinguishable from a dead worker).
   await recordCronTick(db, 'worker', 'ok')
@@ -179,6 +151,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
       let completed = 0
       let failed = 0
       let runError: string | null = null
+      let syncCredentialsPromise: ReturnType<typeof getSyncCredentials> | null = null
 
       try {
         // Drain until budget headroom is gone or the due queue is empty.
@@ -198,6 +171,13 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
 
           claimed += 1
 
+          // Retire legacy jobs without querying the defunct provider or credentials.
+          if (job.jobType === 'odesli') {
+            await markSyncJobDone(db, job.id)
+            completed += 1
+            continue
+          }
+
           // Cooperative cancel: admin sets cancel_requested_at on running jobs
           // (pending jobs are cancelled before claim). Checked between jobs only.
           if (await isSyncJobCancelRequested(db, job.id)) {
@@ -206,7 +186,14 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
           }
 
           try {
-            const tags = await processSyncJob(db, job, uploadFn, syncCredentials)
+            // Do not read credentials for idle or already-cancelled sync ticks.
+            // Reuse one request for all jobs claimed by this worker invocation.
+            syncCredentialsPromise ??= getSyncCredentials(db)
+            const credentials = await syncCredentialsPromise.catch((error) => {
+              syncCredentialsPromise = null
+              throw error
+            })
+            const tags = await processSyncJob(db, job, uploadFn, credentials)
             // processSyncJob finalises via markSyncJobDone/rescheduleSyncJob, both
             // of which honour cancel_requested_at. Re-check so we never leave a
             // cancel request stranded if finalisation was skipped.

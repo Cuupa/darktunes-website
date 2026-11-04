@@ -106,6 +106,22 @@ describe('settlementLedger helpers', () => {
     ).toBe(0)
   })
 
+  it('does not carry draft or cancelled invoices into the next period', () => {
+    for (const status of ['draft', 'cancelled']) {
+      expect(unpaidInvoiceContributionCents({
+        status,
+        outstanding_amount_cents: 15000,
+        paid_amount_cents: 0,
+        line_items: [{ qty: 1, unit_price_cents: 15000 }],
+      })).toBe(0)
+    }
+    expect(unpaidInvoiceContributionCents({
+      status: 'received',
+      outstanding_amount_cents: 15000,
+      paid_amount_cents: 0,
+    })).toBe(15000)
+  })
+
   it('skips a second payment ledger row when invoice_liability already exists', () => {
     expect(resolvePaymentLedgerEntryType(true, 'paid')).toBeNull()
     expect(resolvePaymentLedgerEntryType(true, 'partially_paid')).toBeNull()

@@ -229,7 +229,9 @@ export function unpaidInvoiceContributionCents(invoice: {
   paid_amount_cents?: number | null
   line_items?: unknown
 }): number {
-  if (invoice.status === 'paid') return 0
+  // Only submitted invoices are liabilities. Drafts and cancelled invoices
+  // must not inflate carry-forward balances beside approved statements.
+  if (['draft', 'cancelled', 'paid'].includes(invoice.status)) return 0
   if (invoice.outstanding_amount_cents != null) {
     return Number(invoice.outstanding_amount_cents)
   }
@@ -270,7 +272,7 @@ export async function createPeriodCarryForwards(
   const alreadyCarriedOut = new Set((carryOutRows ?? []).map((row) => row.artist_id))
 
   for (const row of eligible) {
-    await db.from('period_carry_forwards').upsert(
+    const { error: carryError } = await db.from('period_carry_forwards').upsert(
       {
         from_period_id: fromPeriodId,
         artist_id: row.artistId,
@@ -279,6 +281,8 @@ export async function createPeriodCarryForwards(
       },
       { onConflict: 'from_period_id,artist_id' },
     )
+    // Never post the ledger entry if the source metadata failed to persist.
+    if (carryError) throw new Error(`Failed to store carry-forward for artist ${row.artistId}: ${carryError.message}`)
 
     if (alreadyCarriedOut.has(row.artistId)) continue
 

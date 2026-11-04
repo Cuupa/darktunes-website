@@ -8,6 +8,7 @@ import {
   aggregateTerritoryMetrics,
 } from './index'
 import { applyTrackRevenueAssignments } from './distribution'
+import { buildArtistRawSheets } from '../export/rawSourceRows'
 
 function makeTx(overrides: Partial<SalesTransaction>): SalesTransaction {
   return {
@@ -54,6 +55,12 @@ describe('distribution helpers', () => {
         primaryArtist: 'Frozen Plasma',
       }]),
     ).toBe('Frozen Plasma')
+  })
+
+  it('does not treat an empty stored compilation identifier as a wildcard', () => {
+    expect(isCompilation(makeTx({ release_title: 'Every Release' }), [
+      { id: 'bad', type: 'title', identifier: ' ', label: 'Empty' },
+    ])).toBe(false)
   })
 
   it('isCompilation matches EAN filter exactly', () => {
@@ -135,7 +142,7 @@ describe('processTransactionsWithCompilations', () => {
     expect(artistData[0].artist).toBe('Neuroklast')
   })
 
-  it('still counts compilation revenue while listing filtered compilations', () => {
+  it('excludes compilation revenue while retaining the audit summary', () => {
     const { artistData, filteredCompilations } = processTransactionsWithCompilations(
       [makeTx({ id: 'a', upc_ean: 'COMP-001', net_revenue: 40 })],
       {
@@ -147,7 +154,80 @@ describe('processTransactionsWithCompilations', () => {
 
     expect(filteredCompilations).toHaveLength(1)
     expect(filteredCompilations[0].revenue).toBe(40)
-    expect(artistData[0].grossRevenue).toBe(40)
+    expect(artistData).toHaveLength(0)
+  })
+
+  it('keeps excluded compilation rows out of the raw workbook while retaining ordinary sales', () => {
+    const headers = ['Artist Name', 'Track Title', 'Net Revenue']
+    const transactions = [
+      makeTx({ id: 'comp', upc_ean: 'COMP-001', net_revenue: 40, source_row_id: 'comp',
+        source_headers: headers, source_values: ['Neuroklast', 'Compilation', '40'] }),
+      makeTx({ id: 'normal', upc_ean: 'NORMAL-001', net_revenue: 20, source_row_id: 'normal',
+        source_headers: headers, source_values: ['Neuroklast', 'Track', '20'] }),
+    ]
+    const { artistData, filteredCompilations } = processTransactionsWithCompilations(transactions, {
+      ...emptyConfig(),
+      compilationFilters: [{ id: 'comp', type: 'ean', identifier: 'COMP-001', label: 'Comp' }],
+    })
+    expect(filteredCompilations[0]?.revenue).toBe(40)
+    expect(artistData[0]?.grossRevenue).toBe(20)
+    const rows = buildArtistRawSheets(artistData).get('neuroklast')?.[0]?.rows ?? []
+    expect(rows).toEqual([['Neuroklast', 'Track', '20']])
+  })
+
+  it('does not restore a 100%-assigned track to a featuring artist through roster fallback', () => {
+    const headers = ['Artist Name', 'Track Title', 'Net Revenue']
+    const transactions = [
+      makeTx({ id: 'satisfaction', original_artist: 'Exstais featuring Basila featuring Agnis',
+        main_artist: 'Agnis', release_title: 'Satisfaction', track_title: 'Satisfaction',
+        net_revenue: 250, source_row_id: 'satisfaction', source_headers: headers,
+        source_values: ['Exstais featuring Basila featuring Agnis', 'Satisfaction', '250'] }),
+      makeTx({ id: 'agnis-own', original_artist: 'Agnis', main_artist: 'Agnis',
+        release_title: 'Own Release', track_title: 'Own Track', net_revenue: 12,
+        source_row_id: 'agnis-own', source_headers: headers,
+        source_values: ['Agnis', 'Own Track', '12'] }),
+    ]
+    const { artistData } = processTransactionsWithCompilations(transactions, {
+      ...emptyConfig(),
+      labelArtists: [{ id: 'exstais', name: 'Exstais' }, { id: 'agnis', name: 'Agnis' }],
+      trackRevenueAssignments: [{ id: 'satisfaction', trackTitle: 'Satisfaction',
+        owners: [{ artist: 'Exstais', percentage: 100 }, { artist: 'Agnis', percentage: 0 }] }],
+    })
+    expect(artistData.find(a => a.artist === 'Exstais')?.grossRevenue).toBe(250)
+    expect(artistData.find(a => a.artist === 'Agnis')?.grossRevenue).toBe(12)
+    const sheets = buildArtistRawSheets(artistData)
+    expect(sheets.get('agnis')?.[0]?.rows).toEqual([['Agnis', 'Own Track', '12']])
+    expect(sheets.get('exstais')?.[0]?.rows[0]?.[1]).toBe('Satisfaction')
+  })
+
+  it('does not reassign a locked owner outside the roster to a featured roster artist', () => {
+    const { artistData } = processTransactionsWithCompilations([
+      makeTx({ original_artist: 'Exstais feat Agnis', release_title: 'Satisfaction',
+        track_title: 'Satisfaction', net_revenue: 250 }),
+    ], {
+      ...emptyConfig(),
+      labelArtists: [{ id: 'agnis', name: 'Agnis' }],
+      trackRevenueAssignments: [{ id: 'owner', trackTitle: 'Satisfaction',
+        owners: [{ artist: 'Exstais', percentage: 100 }] }],
+    })
+    expect(artistData).toHaveLength(0)
+  })
+
+  it('does not duplicate a track when the same owner is entered twice', () => {
+    const { artistData } = processTransactionsWithCompilations([
+      makeTx({ id: 'same-owner', original_artist: 'Collaboration', release_title: 'Duet',
+        track_title: 'Duet', net_revenue: 100, quantity: 100 }),
+    ], {
+      ...emptyConfig(),
+      trackRevenueAssignments: [{ id: 'duet', trackTitle: 'Duet', owners: [
+        { artist: 'Exstais', percentage: 40 },
+        { artist: ' Exstais ', percentage: 60 },
+      ] }],
+    })
+    expect(artistData).toHaveLength(1)
+    expect(artistData[0]?.artist).toBe('Exstais')
+    expect(artistData[0]?.grossRevenue).toBe(100)
+    expect(artistData[0]?.totalQuantity).toBe(100)
   })
 
   it('sums compilation summary after FX conversion', () => {

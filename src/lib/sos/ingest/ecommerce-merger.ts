@@ -83,6 +83,8 @@ export interface PrintfulRawCost {
   orderId: string
   /** Total production + shipping cost charged by Printful. */
   total: number
+  /** ISO 4217 currency, undefined when the source did not specify one. */
+  currency?: string
 }
 
 /** Structured warning emitted when a Shopify order has no matching Printful cost. */
@@ -304,10 +306,16 @@ export function reconcileMerchTransactions(
   // ── Build Printful cost index ─────────────────────────────────────────────
   // Sum all cost entries per order — several fulfilment entries for the same
   // order must not be lost with a last-wins Map.set (#631).
-  const printfulIndex = new Map<string, number>()
+  const printfulIndex = new Map<string, { total: number; currency?: string }>()
   for (const cost of printfulCosts) {
     const key = normaliseOrderId(cost.orderId)
-    printfulIndex.set(key, (printfulIndex.get(key) ?? 0) + cost.total)
+    const existing = printfulIndex.get(key)
+    const currency = cost.currency?.trim().toUpperCase()
+    // Mixed or unknown currencies cannot be summed safely.
+    if (existing && (!currency || !existing.currency || currency !== existing.currency)) {
+      throw new Error(`Printful order ${cost.orderId}: costs have missing or inconsistent currency; correct the source CSV before creating statements`)
+    }
+    printfulIndex.set(key, { total: (existing?.total ?? 0) + cost.total, currency })
   }
 
   const hasPrintfulData = printfulCosts.length > 0
@@ -332,7 +340,16 @@ export function reconcileMerchTransactions(
       })
     }
 
-    const costDeduction = printfulCost ?? 0
+    if (printfulCost) {
+      const sourceCurrency = printfulCost.currency
+      if (!sourceCurrency || !/^[A-Z]{3}$/.test(sourceCurrency)) {
+        throw new Error(`Printful order ${order.orderId}: cost currency is missing; specify Currency or use an unambiguous currency symbol`)
+      }
+      if (!order.currency || order.currency.toUpperCase() !== sourceCurrency) {
+        throw new Error(`Order ${order.orderId}: Shopify ${order.currency || 'unknown'} and Printful ${sourceCurrency} differ. Convert costs with verified exchange rates before reconciling`)
+      }
+    }
+    const costDeduction = printfulCost?.total ?? 0
     const netOrderRevenue = order.subtotal - costDeduction
 
     // ── Calculate total line-item revenue for proportional distribution ──
@@ -480,7 +497,10 @@ export function parseShopifyRaw(content: string): {
           continue
         }
         const subtotal = subtotalResult.value
-        const currency = (row['Currency']?.trim() || 'EUR').toUpperCase()
+        const currency = (row['Currency'] ?? '').trim().toUpperCase()
+        if (!/^[A-Z]{3}$/.test(currency)) {
+          throw new Error('Missing or invalid Shopify Currency; an order currency must be explicit')
+        }
         const country = row['Billing Country']?.trim() || row['Shipping Country']?.trim() || 'Unknown'
 
         orderMap.set(orderId, {
@@ -494,6 +514,10 @@ export function parseShopifyRaw(content: string): {
       } else {
         // Additional line item row for an existing order
         const existing = orderMap.get(orderId)!
+        const additionalCurrency = (row['Currency'] ?? '').trim().toUpperCase()
+        if (additionalCurrency && additionalCurrency !== existing.currency) {
+          throw new Error('Conflicting currencies within Shopify order')
+        }
 
         // Backfill subtotal if it was zero on the first row but present here
         if (existing.subtotal === 0) {

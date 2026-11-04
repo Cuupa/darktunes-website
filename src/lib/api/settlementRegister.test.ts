@@ -260,7 +260,7 @@ describe('archivePeriodWithCarryForward', () => {
     vi.clearAllMocks()
   })
 
-  it('returns without posting carries when the period is already archived', async () => {
+  it('reasserts statement archiving without reposting carries on an archived period', async () => {
     vi.mocked(getSettlementPeriodById).mockResolvedValueOnce({
       ...mockPeriod,
       status: 'archived',
@@ -275,7 +275,9 @@ describe('archivePeriodWithCarryForward', () => {
     )
 
     expect(createPeriodCarryForwards).not.toHaveBeenCalled()
-    expect(archiveSettlementPeriod).not.toHaveBeenCalled()
+    expect(archiveSettlementPeriod).toHaveBeenCalledWith(
+      expect.anything(), 'period-1', 'actor-1',
+    )
   })
 
   it('posts carries and archives an open period', async () => {

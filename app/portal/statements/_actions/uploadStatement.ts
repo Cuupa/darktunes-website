@@ -16,7 +16,7 @@ import { createServerSupabaseClient, createServiceRoleSupabaseClient } from '@/l
 import { getUserRoleWithClient } from '@/lib/getUserRole'
 import { getArtistById } from '@/lib/api/artists'
 import { getImportBatchesByIds } from '@/lib/api/distributorImportBatches'
-import { createSalesStatement, DuplicateDraftStatementError } from '@/lib/api/salesStatements'
+import { createSalesStatement, deleteSalesStatementDraft, DuplicateDraftStatementError } from '@/lib/api/salesStatements'
 import { getWorkspaceForPeriod } from '@/lib/api/sosAccountingWorkspaces'
 import {
   assertSettlementPeriodWritable,
@@ -169,10 +169,15 @@ export async function uploadStatement(
       statementId = statement.id
 
       if (settlementPeriod) {
-        await serviceSupabase
+        const { data: linked, error: linkError } = await serviceSupabase
           .from('sales_statements')
           .update({ settlement_period_id: settlementPeriod.id })
           .eq('id', statement.id)
+          .select('id')
+          .single()
+        if (linkError || !linked) {
+          throw new Error(`Failed to associate statement with settlement period: ${linkError?.message ?? 'no updated row'}`)
+        }
       }
 
       if (input.lineItems && input.lineItems.length > 0) {
@@ -190,6 +195,21 @@ export async function uploadStatement(
         )
       }
     } catch (dbErr) {
+      // A statement can have been persisted before its period link or line-item
+      // insert failed. Never delete its PDF while a DB row still references it.
+      if (statementId) {
+        try {
+          await deleteSalesStatementDraft(serviceSupabase, statementId)
+        } catch (cleanupErr) {
+          console.error('[uploadStatement] DB rollback failed; retaining referenced R2 PDF', {
+            statementId, r2Key, cleanupErr,
+          })
+          throw new Error(
+            'Statement could not be completed and DB rollback failed. ' +
+            'Its PDF was retained for recovery. Contact an administrator before retrying.',
+          )
+        }
+      }
       await deleteStatementPdfFromR2(r2Key)
       throw dbErr
     }
