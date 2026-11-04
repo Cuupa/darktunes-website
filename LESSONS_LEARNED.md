@@ -292,7 +292,12 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 - **Finding:** Public site served `SITE_SETTINGS_DEFAULTS` (`Music Label`) and empty catalogues. Cause: Supabase rate limit — public reads failed, and failed reads are cached as `[]` for up to 1h. Auto-apply of `reset.sql` was first blamed and switched off (3b775a2f); that was the wrong cause (corrected 2026-11-04).
 - **Rule:** Before blaming a deploy step, check Supabase for rate-limit errors (429). Apply `reset.sql` with `psql -f` (one statement at a time), not `client.query(entireFile)` — `ALTER TYPE … ADD VALUE` cannot run inside one implicit transaction.
-- **Status:** Auto-apply after CI success on a push to `main` is back on (`deploy-supabase.yml`, `workflow_run`). Vercel install does not apply the schema.
+- **Status:** Superseded 2026-11-04: the schema is now applied by the Vercel production install step (`scripts/vercel-install.sh`), not by a post-CI workflow. `deploy-supabase.yml` is manual-only.
+
+### 2026-11-04 — Schema must run before the code goes live
+
+- **Finding:** Applying `reset.sql` from a workflow after CI let Vercel deploy new code against the old schema for minutes.
+- **Rule:** Apply the schema in the Vercel production install (`VERCEL_ENV=production` only), before the build; a failed apply fails the build so the previous deployment stays live. Never post-CI. Missing `SUPABASE_DB_URL` in production fails the build instead of skipping.
 
 ### 2026-10-21 — An expired asset row is not the live pointer
 

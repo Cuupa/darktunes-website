@@ -10,6 +10,11 @@
 # Required env vars are documented in DEPLOYMENT.md.
 # Missing variables produce a WARNING but do NOT abort the build, because
 # some variables (e.g. Cloudflare R2 keys) may only be needed at runtime.
+#
+# On PRODUCTION deployments (VERCEL_ENV=production) it also applies
+# supabase/reset.sql BEFORE the build, so the schema is always ready before
+# the new code goes live. A failed apply fails the build and the previous
+# production deployment stays live. Preview/development never apply it.
 # =============================================================================
 set -euo pipefail
 
@@ -103,6 +108,46 @@ if [ "$MISSING" -gt 0 ]; then
   echo "  → See DEPLOYMENT.md for a full description of each variable."
 else
   echo "  ✔  All required environment variables are present."
+fi
+
+# -----------------------------------------------------------------------------
+# 3. Apply Supabase schema (production only)
+# Schema-first: reset.sql is idempotent/additive, so applying it before the
+# new code goes live is safe for the still-running previous deployment.
+# Any failure here exits non-zero (set -e) → Vercel build fails → the previous
+# production deployment stays live. The DB URL is never printed.
+# -----------------------------------------------------------------------------
+if [ "${VERCEL_ENV:-}" = "production" ]; then
+  if [ -z "${SUPABASE_DB_URL:-}" ] && [ -z "${DATABASE_URL:-}" ]; then
+    echo "✖  SUPABASE_DB_URL is not set — cannot apply the Supabase schema." >&2
+    echo "   Set SUPABASE_DB_URL (Supabase Session pooler URI, …pooler.supabase.com:5432," >&2
+    echo "   with ?sslmode=require) in Vercel → Project → Settings → Environment Variables → Production." >&2
+    echo "   The schema must be applied before new code goes live, so the build is aborted." >&2
+    exit 1
+  fi
+
+  if ! command -v psql >/dev/null 2>&1; then
+    echo "▶  psql not found — installing the PostgreSQL client..."
+    SUDO=""
+    if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+      SUDO="sudo"
+    fi
+    if ! $SUDO dnf install -y postgresql15 && ! $SUDO dnf install -y postgresql16; then
+      echo "✖  Could not install the PostgreSQL client (tried postgresql15, postgresql16 via dnf)." >&2
+      echo "   psql is required to apply the Supabase schema; aborting the build." >&2
+      exit 1
+    fi
+    if ! command -v psql >/dev/null 2>&1; then
+      echo "✖  PostgreSQL client installed but psql is still not on PATH; aborting the build." >&2
+      exit 1
+    fi
+  fi
+
+  echo "▶  Applying Supabase schema…"
+  npm run db:apply
+  echo "✔  Schema applied."
+else
+  echo "ℹ  VERCEL_ENV=${VERCEL_ENV:-<unset>} — skipping Supabase schema apply (production only)."
 fi
 
 echo ""

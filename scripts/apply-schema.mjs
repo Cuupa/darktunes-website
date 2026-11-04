@@ -48,7 +48,9 @@ function applySchema() {
 
 function main() {
   if (!dbUrl) {
-    throw new Error('SUPABASE_DB_URL (or DATABASE_URL) is required')
+    throw new Error(
+      'SUPABASE_DB_URL (or DATABASE_URL) is required. On Vercel set SUPABASE_DB_URL (Session pooler URI) under Project → Settings → Environment Variables → Production.',
+    )
   }
 
   applySchema()

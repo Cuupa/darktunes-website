@@ -34,7 +34,7 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 - **Admin → Assets: “All R2 objects” view** — toggle between the DB-tracked catalog and a full listing of every object in Cloudflare R2, with prefix/folder sizes, token search on object keys, and delete-selected to free storage.
 
 ### Changed
-- **Supabase schema auto-apply is back on:** **Deploy Supabase** applies `reset.sql` after CI succeeds on a push to `main` (only pushes, checks out the tested commit). Vercel install still never applies it.
+- **Supabase schema is applied before new code goes live:** the Vercel production install (`scripts/vercel-install.sh`, `VERCEL_ENV=production` only) now runs `npm run db:apply` after `npm ci`; a failed apply fails the build and the previous deployment stays live. Requires `SUPABASE_DB_URL` (Session pooler URI) in Vercel Production env. Preview never applies it. **Deploy Supabase** is now a manual fallback (`workflow_dispatch`) and no longer runs after CI.
 - AI chat defaults to the fast model; deterministic task classification (or explicit Auto/Fast/Deep) selects reasoning. Reasoning uses low effort when supported and has a larger output budget.
 - Connection tests run fast and reasoning independently; a reasoning timeout no longer hides fast/stream/tool success.
 - The assistant prompt, tools and conversations are strictly bound to the resolved role/artist context. Admins can inspect an artist without an `artist_members` row; invalid artist IDs are rejected instead of silently falling back.

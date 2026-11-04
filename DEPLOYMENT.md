@@ -300,11 +300,24 @@ and DOI confirmation emails will never be delivered.
 
 ### Applying the schema
 
-`supabase/reset.sql` is applied **automatically** by the GitHub workflow
-**Deploy Supabase** after **CI** succeeds on a push to `main` (a fork sync
-counts). It needs the repository secret `SUPABASE_DB_URL` (Session Pooler URI,
-`?sslmode=require`) in the repo where the workflow runs. Vercel install
-(`scripts/vercel-install.sh`) never runs `reset.sql`.
+`supabase/reset.sql` is applied **first**, before new code goes live: the Vercel
+install step (`scripts/vercel-install.sh`) runs `npm run db:apply` after `npm ci`
+and the env check, **only when `VERCEL_ENV=production`**.
+
+- If the apply fails (or `psql` cannot be installed), the install step exits
+  non-zero, the Vercel build fails and the previous production deployment stays live.
+- Preview and development deployments never apply the schema.
+- Production requires `SUPABASE_DB_URL` in Vercel → Project → Settings →
+  Environment Variables → **Production**: the Supabase **Session pooler** URI
+  (`…pooler.supabase.com:5432`, `?sslmode=require`). Use the pooler, not the
+  direct connection: the direct host is IPv6-only, while Vercel builds need IPv4.
+  If it is missing, the production build fails with a clear message (no silent skip).
+- The install step installs the PostgreSQL client (`dnf install postgresql15`,
+  fallback `postgresql16`) when `psql` is absent from the build image.
+
+The GitHub workflow **Deploy Supabase** is a **manual fallback only**
+(`workflow_dispatch`, needs the repository secret `SUPABASE_DB_URL`); it no longer
+runs after CI, to avoid applying twice.
 
 Manual options:
 
