@@ -233,7 +233,7 @@ Route handlers must import size limits from `portalUploadLimits` — no local `M
 
 ## Vercel deployment
 
-`scripts/vercel-install.sh` — `npm ci` + env validation. Required: `NEXT_PUBLIC_SUPABASE_*`, R2 vars, `API_CREDENTIALS_ENCRYPTION_KEY`. Integrations in Admin API Keys. See `DEPLOYMENT.md`.
+`scripts/vercel-install.sh` — `npm ci` + env validation + (production only, `VERCEL_ENV=production`) `npm run db:apply` before the build (needs `SUPABASE_DB_URL` Session pooler URI; a failed apply fails the build). Preview never applies the schema. Required: `NEXT_PUBLIC_SUPABASE_*`, R2 vars, `API_CREDENTIALS_ENCRYPTION_KEY`. Integrations in Admin API Keys. See `DEPLOYMENT.md`.
 
 ## Portal write auth (service role vs user JWT)
 
