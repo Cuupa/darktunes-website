@@ -5,7 +5,6 @@ import {
   recoverStuckSyncJobs,
   requeueFailedSyncJobs,
   enqueueArtistSyncJobs,
-  enqueueOdesliSyncJob,
   markSyncJobFailed,
   markSyncJobDone,
   countStuckSyncJobs,
@@ -233,6 +232,13 @@ describe('conflictingArtistJobTypes', () => {
 })
 
 describe('enqueueArtistSyncJobs', () => {
+  it('rejects retired provider jobs before accessing Supabase', async () => {
+    const db = makeSequentialMockDb([])
+    await expect(enqueueArtistSyncJobs(db, ['artist-1'], 'odesli')).rejects.toThrow('Retired sync provider')
+    expect(db.from).not.toHaveBeenCalled()
+  })
+
+
   it('skips artists that already have pending or running jobs', async () => {
     const db = makeSequentialMockDb([
       { data: [{ artist_id: 'artist-1' }] },
@@ -258,15 +264,6 @@ describe('enqueueArtistSyncJobs', () => {
     const db = makeSequentialMockDb([{ data: null, error: { message: 'boom' } }])
     await expect(enqueueArtistSyncJobs(db, ['artist-1'])).rejects.toThrow(
       'Failed to read existing sync jobs',
-    )
-  })
-})
-
-describe('enqueueOdesliSyncJob', () => {
-  it('throws when reading the existing Odesli job fails', async () => {
-    const db = makeSequentialMockDb([{ data: null, error: { message: 'boom' } }])
-    await expect(enqueueOdesliSyncJob(db)).rejects.toThrow(
-      'Failed to read existing Odesli sync jobs',
     )
   })
 })
@@ -377,6 +374,15 @@ describe('listSyncJobs', () => {
 })
 
 describe('retrySyncJob', () => {
+  it('never re-enqueues retired legacy jobs', async () => {
+    const db = makeSequentialMockDb([
+      { data: { id: 'legacy-odesli', status: 'failed', job_type: 'odesli' } },
+    ])
+    await expect(retrySyncJob(db, 'legacy-odesli')).resolves.toBe(false)
+    expect(db.from).toHaveBeenCalledTimes(1)
+  })
+
+
   it('re-queues failed jobs', async () => {
     const db = makeSequentialMockDb([
       { data: { id: 'job-1', status: 'failed' } },

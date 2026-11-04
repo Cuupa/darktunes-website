@@ -16,7 +16,7 @@ Built with **Next.js 15 (App Router)**, React, Supabase, Cloudflare R2, and Tail
 - **CRT scanline aesthetic** – immersive dark atmosphere with animated overlays
 - **Smooth scrolling** – powered by Lenis
 - **Admin panel** – full CMS at `/admin` (sidebar navigation with dedicated pages for artists, releases, news, videos, assets, events, messages, accreditations, promo log, release submissions, video submissions, **artist feedback inbox**, **accounting** with guided SOS workflow + Abrechnungszentrale, **invoice inbox** (`/admin/invoices`, includes free invoices; tokenized/presigned PDF access), **label analytics hub** at `/admin/analytics`, system/health/logs, color theme, features, settings, users)
-- **Artist Auto-Sync** – "Sync Now" per artist triggers multi-API release import (iTunes, Spotify, Discogs, Odesli), R2 cover art caching, and Supabase upsert via an async sync queue (`sync_queue` table, drained by a pg_cron-driven worker every minute)
+- **Artist Auto-Sync** – "Sync Now" per artist triggers multi-API release import (iTunes, Spotify, Discogs, Songkick, Bandsintown), R2 cover art caching, and Supabase upsert via an async sync queue (`sync_queue` table, drained by a pg_cron-driven worker every minute)
 - **YouTube Sync** – `POST /api/sync-youtube` upserts latest channel videos and links them to visible artists by title match; pg_cron triggers a daily sync
 - **Image proxy** – all images served via wsrv.nl (WebP conversion, on-the-fly resize)
 - **Rate limiter** – exponential backoff for all external API calls (`src/lib/rateLimiter.ts`)
@@ -91,7 +91,6 @@ npm run dev
 ## 📈 Performance Monitoring
 
 - **Lighthouse CI**: `.github/workflows/lighthouse-ci.yml` with budgets in `lighthouserc.js`
-- **Web Vitals RUM**: `app/web-vitals.tsx` sends Core Web Vitals to `POST /api/vitals`
 - **Bundle analysis**: enabled via `@next/bundle-analyzer` and `npm run analyze`
 - **Playwright performance tests**: `tests/performance/core-web-vitals.spec.ts`
 - **Bundle budget enforcement**: `scripts/check-bundle-budget.js` + `.github/workflows/performance-budget.yml`
@@ -348,8 +347,7 @@ app/                          # Next.js App Router entry points
     │   ├── fetch-youtube-info/            # YouTube video metadata lookup
     │   ├── prefill-artist/               # Spotify artist data prefill
     │   ├── prefill-artist-itunes/        # Apple Music artist data prefill
-    │   ├── resolve-release-smart-link/   # Odesli smart-link resolution
-    │   ├── rbac-audit/route.ts            # RBAC audit report
+     │   ├── rbac-audit/route.ts            # RBAC audit report
     │   └── send-external-email/          # Admin-triggered outbound email
     └── portal/
         ├── submit-release/route.ts        # Create release submission (is_visible=false)
@@ -388,7 +386,7 @@ src/
 │   │   ├── salesStatements.ts# Royalty statements DAL
 │   │   ├── artistDocuments.ts# Document Vault DAL
 │   │   └── artistRowMapper.ts# Shared ArtistRow → Artist domain mapper
-│   ├── sync/                 # Multi-API sync engine (iTunes, Spotify, Discogs, Odesli, …)
+│   ├── sync/                 # Multi-API sync engine (iTunes, Spotify, Discogs, Songkick, Bandsintown, …)
 │   ├── portal/               # Portal utilities (presigned URLs, label billing, terms gate)
 │   ├── legal/                # VIES VAT check, ECB FX helpers, legal template placeholders
 │   ├── email/                # Email sending utilities (Resend)
