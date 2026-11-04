@@ -33,7 +33,8 @@
   "copy": "Copier la réponse",
   "copied": "Copié",
   "emptyTitle": "Comment puis-je aider ?",
-  "empty": "Posez une question sur vos sorties, relevés, l’état du système ou cette page.",  "messageLog": "Conversation de l’assistant",
+  "empty": "Posez une question sur vos sorties, relevés, l’état du système ou cette page.",
+  "messageLog": "Conversation de l’assistant",
   "working": "En cours…",
   "jumpToLatest": "Aller au plus récent",
   "statusReady": "Prêt",
@@ -44,7 +45,8 @@
   "statusTool": "Lecture des données…",
   "statusFallback": "Passage à une réponse plus courte.",
   "statusFinishing": "Finalisation de la réponse…",
-  "statusFailed": "L’assistant n’a pas pu terminer.",  "retry": "Réessayer",
+  "statusFailed": "L’assistant n’a pas pu terminer.",
+  "retry": "Réessayer",
   "retryWithFast": "Réessayer avec une réponse plus courte",
   "selectArtist": "Sélectionner un artiste",
   "openAdminAi": "Ouvrir Admin → Assistant IA",
@@ -73,7 +75,8 @@
   "connectionDisabled": "Assistant désactivé",
   "disabled": "L’assistant IA est désactivé.",
   "featureDisabled": "L’assistant est désactivé pour ce tableau de bord.",
-  "notConfigured": "L’assistant n’est pas encore configuré.",  "shortcutHint": "Ctrl+J",
+  "notConfigured": "L’assistant n’est pas encore configuré.",
+  "shortcutHint": "Ctrl+J",
   "toolRunning": "En cours…",
   "toolCompleted": "Terminé",
   "toolNoData": "Aucune donnée disponible",
@@ -226,7 +229,24 @@
     "healthFailedStep": "{step} a ?chou? : {code}",
     "diagnosticsLoadFailed": "Les diagnostics n?ont pas pu ?tre charg?s.",
     "notConfigured": "Aucune cl? API",
-    "notConfiguredHint": "Ajoutez la cl? API NVIDIA sous Admin ? Cl?s API."
+    "notConfiguredHint": "Ajoutez la cl? API NVIDIA sous Admin ? Cl?s API.",
+    "providersStatus": "Fournisseurs IA",
+    "providersStatusDetail": "Fournisseurs disponibles et modèles testés",
+    "multiProvider": {
+      "selectModel": "Choisir un modèle",
+      "noFallback": "Aucun modèle de secours",
+      "searchLabel": "Rechercher un modèle",
+      "searchPlaceholder": "Nom, fournisseur ou identifiant du modèle",
+      "providerLabel": "Fournisseur",
+      "allProviders": "Tous les fournisseurs",
+      "taskLabel": "Tâche",
+      "allChatModels": "Tous les modèles de chat",
+      "fast": "Rapide",
+      "reasoning": "Approfondi"
+    },
+    "credits": {
+      "selectAccountForAdjustment": "Sélectionner un compte pour ajuster les crédits"
+    }
   },
   "turnInProgress": "Une autre r?ponse est encore en cours. Arr?tez-la avant d?envoyer une nouvelle question.",
   "confirmSummary": {
@@ -235,8 +255,7 @@
     "save_release_draft": "Enregistrer un brouillon de sortie.",
     "create_support_ticket": "Cr?er le ticket support pr?par?.",
     "save_error_report": "Enregistrer le rapport d?erreur pr?par?."
-  }
-,
+  },
   "suggestions": {
     "releaseStatus": {
       "label": "Quel est le statut de ma soumission ?",

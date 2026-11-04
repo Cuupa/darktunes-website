@@ -1,6 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { AdminCreditPanel } from './AdminCreditPanel'
+import { AdminAiModelSetup, type AdminModelOption, type AdminProviderOption } from './AdminAiModelSetup'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import {
@@ -112,7 +114,8 @@ interface ModelHealth {
 }
 
 interface ModelsPayload {
-  models: Array<{ id: string; name: string }>
+  models: AdminModelOption[]
+  providers: AdminProviderOption[]
   configured: { fast: string; reasoning: string; fallback: string | null }
   capabilities: Record<string, Record<string, unknown>>
   health: Record<string, ModelHealth>
@@ -286,13 +289,13 @@ export function AdminAiDashboard() {
     }
   }
 
-  const testConnection = async (scope: 'fast' | 'reasoning' | 'all') => {
+  const testConnection = async (scope: 'fast' | 'reasoning' | 'all', modelId?: string) => {
     setTesting(scope)
     try {
       const res = await fetch('/api/admin/ai/connection-tests', {
         method: 'POST',
         headers: await authHeaders(),
-        body: JSON.stringify({ scope }),
+        body: JSON.stringify({ scope, ...(modelId ? { model_id: modelId } : {}) }),
       })
       const body = (await res.json().catch(() => null)) as ConnectionTestResult | ApiErrorResponse | null
       if (!res.ok) {
@@ -354,22 +357,6 @@ export function AdminAiDashboard() {
     setErrors((current) => ({ ...current, diagnostics: null }))
   }
 
-  const modelOptions = useMemo(() => {
-    if (!modelsData || !settings) return []
-    const ids = new Set<string>([
-      settings.model_fast,
-      settings.model_reasoning,
-      settings.fallback_model,
-      ...modelsData.models.map((model) => model.id),
-    ])
-    return [...ids]
-      .filter(Boolean)
-      .map((id) => ({
-        value: id,
-        label: modelsData.models.find((model) => model.id === id)?.name || id,
-      }))
-  }, [modelsData, settings])
-
   if (loading && !settings) {
     return <p className="text-sm text-muted-foreground">{t('loading')}</p>
   }
@@ -396,6 +383,7 @@ export function AdminAiDashboard() {
         <TabsTrigger value="models">{t('tabModels')}</TabsTrigger>
         <TabsTrigger value="health">{t('tabHealth')}</TabsTrigger>
         <TabsTrigger value="usage">{t('tabTokens')}</TabsTrigger>
+        <TabsTrigger value="credits">KI-Credits</TabsTrigger>
         <TabsTrigger value="diagnostics">{t('tabDiagnostics')}</TabsTrigger>
         <TabsTrigger value="settings">{t('tabGeneral')}</TabsTrigger>
       </TabsList>
@@ -416,13 +404,13 @@ export function AdminAiDashboard() {
             icon={<Robot className="h-4 w-4" aria-hidden />}
           />
           <StatusCard
-            title={t('admin.nvidiaConfig')}
+            title={t('admin.providersStatus')}
             value={
               settings.provider_configured ? t('admin.configured') : t('admin.notConfigured')
             }
             detail={
               modelsData
-                ? t('admin.keyAcceptedHint')
+                ? t('admin.providersStatusDetail')
                 : settings.provider_configured
                   ? t('admin.modelsUnavailable')
                   : t('admin.notConfiguredHint')
@@ -513,61 +501,21 @@ export function AdminAiDashboard() {
       </TabsContent>
 
       <TabsContent value="models" className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('tabModels')}</CardTitle>
-            <CardDescription>{t('admin.modelsDescription')}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ModelSelect
-              label={t('fastModel')}
-              value={settings.model_fast}
-              options={modelOptions}
-              onChange={(value) => setSettings({ ...settings, model_fast: value })}
-            />
-            <ModelSelect
-              label={t('reasoningModel')}
-              value={settings.model_reasoning}
-              options={modelOptions}
-              onChange={(value) => setSettings({ ...settings, model_reasoning: value })}
-            />
-            <ModelSelect
-              label={t('admin.fallbackModel')}
-              value={settings.fallback_model || '__none__'}
-              options={[{ value: '__none__', label: t('admin.noFallback') }, ...modelOptions]}
-              onChange={(value) =>
-                setSettings({ ...settings, fallback_model: value === '__none__' ? '' : value })
-              }
-            />
-            <p className="text-xs text-muted-foreground">{t('admin.fallbackHint')}</p>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={() => void save()} disabled={saving}>
-                {saving ? t('saving') : t('saveSettings')}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => void refreshModels()}>
-                <ArrowClockwise className="mr-1.5 h-4 w-4" aria-hidden />
-                {t('refreshModels')}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid gap-3 lg:grid-cols-2">
-          <ModelDetail
-            title={t('fastModel')}
-            model={settings.model_fast}
-            health={modelsData?.health[settings.model_fast]}
-            capabilities={modelsData?.capabilities[settings.model_fast]}
-            limits={settings.token_limits.fast}
-          />
-          <ModelDetail
-            title={t('reasoningModel')}
-            model={settings.model_reasoning}
-            health={modelsData?.health[settings.model_reasoning]}
-            capabilities={modelsData?.capabilities[settings.model_reasoning]}
-            limits={settings.token_limits.reasoning}
-          />
-        </div>
+        <AdminAiModelSetup
+          models={modelsData?.models ?? []}
+          providers={modelsData?.providers ?? []}
+          fast={settings.model_fast}
+          reasoning={settings.model_reasoning}
+          fallback={settings.fallback_model}
+          saving={saving}
+          testing={testing !== null}
+          onChange={(slot, id) =>
+            setSettings({ ...settings, [slot === 'fast' ? 'model_fast' : slot === 'reasoning' ? 'model_reasoning' : 'fallback_model']: id })
+          }
+          onSave={() => void save()}
+          onTest={(id) => void testConnection('fast', id)}
+          onRefresh={() => void refreshModels()}
+        />
         {errors.models ? <ErrorLine message={errors.models.message} /> : null}
       </TabsContent>
 
@@ -617,6 +565,10 @@ export function AdminAiDashboard() {
 
       <TabsContent value="usage" className="space-y-4">
         <UsagePanel usage={usage} error={errors.usage} />
+      </TabsContent>
+
+      <TabsContent value="credits" className="space-y-4">
+        <AdminCreditPanel models={[settings.model_fast, settings.model_reasoning, settings.fallback_model]} availableModels={modelsData?.models ?? []} />
       </TabsContent>
 
       <TabsContent value="diagnostics" className="space-y-4">
@@ -740,56 +692,75 @@ export function AdminAiDashboard() {
               checked={settings.default_streaming}
               onChange={(default_streaming) => setSettings({ ...settings, default_streaming })}
             />
-            <ToggleRow
-              id="ai-low-effort"
-              label={t('admin.lowEffort')}
-              checked={settings.reasoning_settings.lowEffort}
-              onChange={(lowEffort) =>
-                setSettings({
-                  ...settings,
-                  reasoning_settings: { ...settings.reasoning_settings, lowEffort },
-                })
-              }
-            />
-            <div className="grid gap-2 sm:grid-cols-3">
-              {(['artist', 'editor', 'admin'] as const).map((role) => (
+            <div className="space-y-2">
+              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                <p className="text-xs font-medium">Zugriff auf den Assistenten</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Wähle, welche Benutzergruppen den KI-Assistenten verwenden dürfen.
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {(['artist', 'editor', 'admin'] as const).map((role) => (
+                  <ToggleRow
+                    key={role}
+                    id={`ai-role-${role}`}
+                    label={t(`admin.role_${role}`)}
+                    checked={settings.feature_flags[role] !== false}
+                    onChange={(enabled) =>
+                      setSettings({
+                        ...settings,
+                        feature_flags: { ...settings.feature_flags, [role]: enabled },
+                      })
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+            <details className="group rounded-lg border border-border bg-muted/10">
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                Erweiterte Einstellungen · Performance, Reasoning und Timeouts
+              </summary>
+              <div className="space-y-4 border-t border-border p-4">
+                <p className="text-xs text-muted-foreground">
+                  Diese Parameter verändern die Zuverlässigkeit der Agenten.
+                  Die Standardeinstellungen sind für die meisten Anfragen ausreichend.
+                </p>
                 <ToggleRow
-                  key={role}
-                  id={`ai-role-${role}`}
-                  label={t(`admin.role_${role}`)}
-                  checked={settings.feature_flags[role] !== false}
-                  onChange={(enabled) =>
+                  id="ai-low-effort"
+                  label={t('admin.lowEffort')}
+                  checked={settings.reasoning_settings.lowEffort}
+                  onChange={(lowEffort) =>
                     setSettings({
                       ...settings,
-                      feature_flags: { ...settings.feature_flags, [role]: enabled },
+                      reasoning_settings: { ...settings.reasoning_settings, lowEffort },
                     })
                   }
                 />
-              ))}
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <NumberField
-                label={t('admin.completeTimeout')}
-                value={settings.timeouts.completeMs}
-                onChange={(completeMs) =>
-                  setSettings({ ...settings, timeouts: { ...settings.timeouts, completeMs } })
-                }
-              />
-              <NumberField
-                label={t('admin.streamTimeout')}
-                value={settings.timeouts.streamMs}
-                onChange={(streamMs) =>
-                  setSettings({ ...settings, timeouts: { ...settings.timeouts, streamMs } })
-                }
-              />
-              <NumberField
-                label={t('admin.reasoningTimeout')}
-                value={settings.timeouts.reasoningMs}
-                onChange={(reasoningMs) =>
-                  setSettings({ ...settings, timeouts: { ...settings.timeouts, reasoningMs } })
-                }
-              />
-            </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <NumberField
+                    label={t('admin.completeTimeout')}
+                    value={settings.timeouts.completeMs}
+                    onChange={(completeMs) =>
+                      setSettings({ ...settings, timeouts: { ...settings.timeouts, completeMs } })
+                    }
+                  />
+                  <NumberField
+                    label={t('admin.streamTimeout')}
+                    value={settings.timeouts.streamMs}
+                    onChange={(streamMs) =>
+                      setSettings({ ...settings, timeouts: { ...settings.timeouts, streamMs } })
+                    }
+                  />
+                  <NumberField
+                    label={t('admin.reasoningTimeout')}
+                    value={settings.timeouts.reasoningMs}
+                    onChange={(reasoningMs) =>
+                      setSettings({ ...settings, timeouts: { ...settings.timeouts, reasoningMs } })
+                    }
+                  />
+                </div>
+              </div>
+            </details>
             <div className="flex flex-wrap gap-2">
               <Button type="button" onClick={() => void save()} disabled={saving}>
                 {saving ? t('saving') : t('saveSettings')}
@@ -879,107 +850,6 @@ function MetricCard({
         </p>
       </CardContent>
     </Card>
-  )
-}
-
-function ModelSelect({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string
-  value: string
-  options: Array<{ value: string; label: string }>
-  onChange: (value: string) => void
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <Select value={value} onValueChange={onChange} disabled={options.length === 0}>
-        <SelectTrigger className="w-full max-w-xl">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  )
-}
-
-function ModelDetail({
-  title,
-  model,
-  health,
-  capabilities,
-  limits,
-}: {
-  title: string
-  model: string
-  health?: ModelHealth
-  capabilities?: Record<string, unknown>
-  limits: { max_input_tokens: number; max_output_tokens: number; max_turn_tokens: number }
-}) {
-  const t = useTranslations('ai')
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">{title}</CardTitle>
-        <CardDescription className="break-all font-mono text-xs">{model}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2 text-xs">
-        <div className="flex flex-wrap gap-1.5">
-          <CapabilityBadge label={t('admin.streaming')} value={health?.supports_streaming ?? capabilities?.supports_streaming} />
-          <CapabilityBadge label={t('admin.tools')} value={health?.supports_tools ?? capabilities?.supports_tools} />
-          <CapabilityBadge
-            label={t('admin.reasoning')}
-            value={health?.supports_enable_thinking ?? capabilities?.supports_enable_thinking}
-          />
-          <CapabilityBadge
-            label={t('admin.lowEffort')}
-            value={health?.supports_low_effort ?? capabilities?.supports_low_effort}
-          />
-        </div>
-        <p className="text-muted-foreground">
-          {t('admin.limits', {
-            input: limits.max_input_tokens,
-            output: limits.max_output_tokens,
-            turn: limits.max_turn_tokens,
-          })}
-        </p>
-        <p className="text-muted-foreground">
-          {health
-            ? health.ok
-              ? t('admin.lastTestPassed', { date: formatDate(health.tested_at) })
-              : t('admin.lastTestFailed', { date: formatDate(health.tested_at) })
-            : t('admin.notTested')}
-        </p>
-      </CardContent>
-    </Card>
-  )
-}
-
-function CapabilityBadge({ label, value }: { label: string; value: unknown }) {
-  const t = useTranslations('ai')
-  const state = value === true ? 'ok' : value === false ? 'no' : 'unknown'
-  return (
-    <Badge
-      variant="outline"
-      className={
-        state === 'ok'
-          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
-          : state === 'no'
-            ? 'border-destructive/30 bg-destructive/10 text-destructive'
-            : 'text-muted-foreground'
-      }
-    >
-      {label}: {state === 'ok' ? t('admin.tested') : state === 'no' ? t('admin.unsupported') : t('admin.notTested')}
-    </Badge>
   )
 }
 

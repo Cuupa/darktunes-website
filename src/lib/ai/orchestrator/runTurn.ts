@@ -13,6 +13,7 @@ import {
   type AiMessageRecord,
 } from '@/lib/api/aiConversations'
 import { TokenBudgetManager } from '@/lib/ai/budget/manager'
+import { CreditBudgetManager } from '@/lib/ai/budget/creditManager'
 import {
   estimateInputTokens,
   estimateTokens,
@@ -20,8 +21,8 @@ import {
   sumAiUsage,
   usageFromEstimate,
 } from '@/lib/ai/budget/estimator'
-import { resolveNvidiaApiKey } from '@/lib/ai/provider/resolveKey'
-import { NvidiaOpenAiCompatibleProvider } from '@/lib/ai/provider/nvidia'
+import { AiProviderRouter } from '@/lib/ai/provider/router'
+import { getCatalogModel } from '@/lib/ai/models/catalog'
 import { MockAiProvider } from '@/lib/ai/provider/mock'
 import { AiProviderError, isAiProviderError, isRetryableProviderError } from '@/lib/ai/provider/errors'
 import { apiErrorFromProvider } from '@/lib/ai/provider/mapToApiError'
@@ -80,18 +81,12 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
   )
   assertConversationContext(conversation, actor)
 
-  const apiKey = await resolveNvidiaApiKey(actor.serviceDb)
   const stored = parseStoredCapabilities(settings.providerCapabilities)
-  const provider: AiProvider | null =
-    input.providerOverride ??
-    (apiKey
-      ? new NvidiaOpenAiCompatibleProvider({
-          apiKey,
-          discoveredCapabilities: stored.models,
-        })
-      : allowMock
-        ? new MockAiProvider()
-        : null)
+  const providerRouter = input.providerOverride
+    ? null : await AiProviderRouter.create(actor.serviceDb, stored)
+  const provider: AiProvider | null = input.providerOverride ??
+    (providerRouter?.hasConfiguredProvider ? providerRouter
+      : allowMock ? new MockAiProvider() : null)
   if (!provider) throw buildApiError('AI_NOT_CONFIGURED', 503)
 
   const classification = classifyTurn({
@@ -107,13 +102,27 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
     stored.health[settings.modelReasoning]?.ok === false
       ? 'fast'
       : classification.role
+  const primaryModel = initialRole === 'reasoning' ? settings.modelReasoning : settings.modelFast
   const fallbackModel = settings.fallbackModel.trim()
+  // Only tested, explicitly configured fallback models can be used; no blind
+  // paid-provider switching on model errors or rate limits.
   const canFallback = Boolean(
-    initialRole === 'reasoning' &&
-      fallbackModel &&
-      fallbackModel !== settings.modelFast &&
+    fallbackModel && fallbackModel !== primaryModel &&
+      (!providerRouter || (getCatalogModel(fallbackModel) && providerRouter.hasKeyForModel(fallbackModel))) &&
       isModelVerified(stored.health, fallbackModel, ['supports_streaming', 'supports_tools']),
   )
+  // Legacy NVIDIA setup remains functional. New providers must pass an
+  // actual text/stream/tool probe before being used with customer data.
+  if (!input.providerOverride && !allowMock) {
+    for (const model of [primaryModel]) {
+      const entry = getCatalogModel(model)
+      if (!entry || (entry.provider !== 'nvidia' &&
+          !isModelVerified(stored.health, model, ['supports_streaming', 'supports_tools']))) {
+        throw new ApiError(503, 'Test the selected chat model in Admin → AI → Models before using it.', 'AI_MODEL_UNVERIFIED')
+      }
+      if (!providerRouter?.hasKeyForModel(model)) throw buildApiError('AI_NOT_CONFIGURED', 503)
+    }
+  }
 
   const history = await listAiMessages(actor.serviceDb, conversation.id, RECENT_MESSAGE_LIMIT)
   const reuseIndex = input.reuseLastUser ? findLastUserIndex(history) : -1
@@ -127,7 +136,7 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
   const historyForProvider = reuseLastUser ? history.slice(0, reuseIndex + 1) : history
   const providerHistory = buildProviderHistory(historyForProvider)
 
-  let currentModel = initialRole === 'reasoning' ? settings.modelReasoning : settings.modelFast
+  let currentModel = primaryModel
   let currentRole: AiModelRole = initialRole
   let caps = provider.getCapabilities(currentModel)
   let useTools = caps.supports_tools && (!settings.defaultStreaming || caps.supports_tools_with_streaming)
@@ -159,6 +168,7 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
         : settings.tokenLimits.max_tool_rounds.fast),
   )
   const budget = TokenBudgetManager.fromLimits(actor.serviceDb, settings.tokenLimits)
+  const credits = await CreditBudgetManager.load(actor.serviceDb)
   const claimed = await claimAiConversationTurn(actor.serviceDb, conversation.id, input.requestId)
   if (!claimed) throw buildApiError('AI_TURN_IN_PROGRESS', 409)
 
@@ -353,7 +363,7 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
           shouldFallback(providerError)
         ) {
           const partial = partialUsage(roundEstimate.total_input, currentRoundContent, currentRoundReasoning, [])
-          await settleRound(roundReservation, partial.total_tokens)
+          await settleRound(roundReservation, partial, false)
           usage = sumAiUsage(usage, partial)
           estimatedUsage = true
           activeReservation = null
@@ -388,7 +398,7 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
         currentRoundUsage ?? (completion.usage.total_tokens > 0 ? completion.usage : null),
       )
       estimatedUsage ||= !currentRoundUsage && completion.usage.total_tokens === 0
-      await settleRound(roundReservation, roundUsage.total_tokens)
+      await settleRound(roundReservation, roundUsage, completion.finish_reason !== 'length')
       activeReservation = null
       usage = sumAiUsage(usage, roundUsage)
       yield {
@@ -579,6 +589,8 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
       metrics.mark('message_persisted')
 
       if (incomplete) {
+        // A failed final answer must not leave charges from earlier tool rounds.
+        await credits.refundTurn(input.requestId)
         yield {
           type: 'warning',
           code: 'AI_OUTPUT_TRUNCATED',
@@ -627,9 +639,14 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
         )
       : usageFromEstimate(0, 0)
     if (activeReservation) {
-      await settleRound(activeReservation, partial.total_tokens)
+      await settleRound(activeReservation, partial, false)
       activeReservation = null
     }
+    // The provider can have charged for earlier tool rounds even if this
+    // turn ends unsuccessfully. Reverse those user credits once.
+    await credits.refundTurn(input.requestId).catch((refundError) => {
+      console.error('[ai] credit refund failed:', refundError instanceof Error ? refundError.message : 'unknown')
+    })
     if (assistantMessageId) {
       await updateAiMessage(actor.serviceDb, assistantMessageId, {
         content: currentRoundContent,
@@ -706,13 +723,26 @@ export async function* runAiTurn(input: RunTurnInput): AsyncGenerator<ClientSseE
       estimatedOutputTokens,
     })
     activeReservation = reservationId
+    try {
+      await credits.reserve(reservationId, currentModel, actor.userId, actor.artistId, actor.role, estimatedInputTokens, estimatedOutputTokens)
+    } catch (error) {
+      await budget.settle(reservationId, 0)
+      activeReservation = null
+      throw error
+    }
   }
 
-  async function settleRound(reservationId: string | null, consumed: number): Promise<void> {
+  async function settleRound(reservationId: string | null, consumed: AiUsage, billable: boolean): Promise<void> {
     if (!reservationId) return
-    await budget.settle(reservationId, Math.max(0, Math.round(consumed))).catch((error) => {
-      console.warn('[ai] budget settle failed:', error instanceof Error ? error.message : 'unknown')
-    })
+    // Persist the credit settlement before releasing the underlying token reservation.
+    // Failures propagate rather than silently giving away credits.
+    try {
+      await credits.settle(reservationId, consumed, currentModel, billable)
+    } finally {
+      await budget.settle(reservationId, Math.max(0, Math.round(consumed.total_tokens))).catch((error) => {
+        console.warn('[ai] budget settle failed:', error instanceof Error ? error.message : 'unknown')
+      })
+    }
   }
 
   async function logUsage(inputLog: {

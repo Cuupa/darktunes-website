@@ -2,7 +2,7 @@ import { FAST_MODEL_ID, REASONING_MODEL_ID, getModelProfile, mergeDiscoveredCapa
 import { AiProviderError, isAiProviderError } from '@/lib/ai/provider/errors'
 import { NvidiaOpenAiCompatibleProvider } from '@/lib/ai/provider/nvidia'
 import type { AiProvider } from '@/lib/ai/provider/interface'
-import type { AiModelRole, AiProviderErrorCode, AiUsage, ModelCapabilities } from '@/lib/ai/types/provider'
+import type { AiModelRole, AiProviderErrorCode, AiToolCall, AiUsage, ModelCapabilities } from '@/lib/ai/types/provider'
 
 export const CONNECTION_TEST_ECHO_TOOL = {
   name: 'echo_test',
@@ -86,7 +86,7 @@ export async function runNvidiaConnectionTest(options: {
     }
   })
   if (auth.ok) {
-    auth.detail = 'NVIDIA accepted the API key on GET /v1/models.'
+    auth.detail = options.provider ? 'Local provider credentials present; remote access is verified by each live model probe.' : 'NVIDIA accepted the API key on GET /v1/models.'
   }
   steps.push(auth)
   if (!auth.ok) {
@@ -137,6 +137,8 @@ export async function runNvidiaConnectionTest(options: {
     const completeId = `${role}_complete`
     const streamId = `${role}_stream`
     const toolId = `${role}_tool`
+    const toolStreamId = `${role}_tool_stream`
+    const roundTripId = `${role}_tool_roundtrip`
     const thinking = role === 'reasoning'
     const lowEffort = role === 'reasoning'
 
@@ -153,16 +155,19 @@ export async function runNvidiaConnectionTest(options: {
         retry: false,
       })
       usage[role] = completion.usage
+      const advertised = provider.getCapabilities(model)
       discovered[model] = {
         ...(discovered[model] ?? {}),
-        ...(thinking ? { supports_enable_thinking: true } : {}),
-        ...(thinking && lowEffort ? { supports_low_effort: true } : {}),
+        ...(thinking && advertised.supports_enable_thinking ? { supports_enable_thinking: true } : {}),
+        ...(thinking && lowEffort && advertised.supports_low_effort ? { supports_low_effort: true } : {}),
       }
     })
     out.push(complete)
     if (!complete.ok) {
       out.push(skippedStep(streamId, model, 'complete failed'))
       out.push(skippedStep(toolId, model, 'complete failed'))
+      out.push(skippedStep(toolStreamId, model, 'complete failed'))
+      out.push(skippedStep(roundTripId, model, 'complete failed'))
       return out
     }
 
@@ -190,6 +195,7 @@ export async function runNvidiaConnectionTest(options: {
     })
     out.push(stream)
 
+    const sampleToolCall: { current: AiToolCall | null } = { current: null }
     const tool = await runStep(toolId, model, async () => {
       const prompt = 'Call echo_test with ping set to pong. Do not answer in prose.'
       const request = async (thinking: boolean, tokenLimit: number, suffix = '') =>
@@ -227,6 +233,12 @@ export async function runNvidiaConnectionTest(options: {
         supported = hasValidEcho(completion)
         requiresThinkingForTools = supported
       }
+      if (supported) {
+        sampleToolCall.current = completion.tool_calls.find((call) => {
+          if (call.name !== 'echo_test') return false
+          try { return (JSON.parse(call.arguments) as { ping?: unknown }).ping === 'pong' } catch { return false }
+        }) ?? null
+      }
       discovered[model] = {
         ...(discovered[model] ?? {}),
         supports_tools: supported,
@@ -240,11 +252,66 @@ export async function runNvidiaConnectionTest(options: {
       }
     })
     out.push(tool)
+    if (!tool.ok || !stream.ok) {
+      out.push(skippedStep(toolStreamId, model, 'tool or streaming test failed'))
+      out.push(skippedStep(roundTripId, model, 'tool or streaming test failed'))
+      return out
+    }
+    // A model might support tools and streaming separately, yet fail when
+    // both are combined. This is the actual production agent request mode.
+    const toolStream = await runStep(toolStreamId, model, async () => {
+      let validCall = false
+      for await (const event of provider.stream({
+        request_id: `connection-test-${role}-tool-stream`,
+        model,
+        messages: [{ role: 'user', content: 'Call echo_test with ping set to pong. No prose.' }],
+        tools: [CONNECTION_TEST_ECHO_TOOL],
+        tool_choice: 'required',
+        max_tokens: discovered[model]?.requires_thinking_for_tools ? 2048 : 512,
+        enable_thinking: discovered[model]?.requires_thinking_for_tools === true,
+        timeout_ms: timeoutMs,
+        retry: false,
+      })) {
+        if (event.type === 'done') {
+          validCall = event.completion.tool_calls.some((call) => {
+            if (call.name !== 'echo_test') return false
+            try { return (JSON.parse(call.arguments) as { ping?: unknown }).ping === 'pong' } catch { return false }
+          })
+        }
+      }
+      discovered[model] = { ...(discovered[model] ?? {}), supports_tools_with_streaming: validCall }
+      if (!validCall) throw new AiProviderError('TOOL_CALL_UNSUPPORTED', 'Streaming tool calls were not supported.')
+    })
+    out.push(toolStream)
+    if (!toolStream.ok || !sampleToolCall.current) {
+      out.push(skippedStep(roundTripId, model, 'streamed tool calls not supported'))
+      return out
+    }
+    const actualCall: AiToolCall = sampleToolCall.current
+    const roundTrip = await runStep(roundTripId, model, async () => {
+      const answer = await provider.complete({
+        request_id: `connection-test-${role}-tool-roundtrip`,
+        model,
+        messages: [
+          { role: 'user', content: 'Call echo_test with ping pong, then confirm its result.' },
+          { role: 'assistant', content: '', tool_calls: [actualCall] },
+          { role: 'tool', name: 'echo_test', tool_call_id: actualCall.id, content: '{"ping":"pong"}' },
+        ],
+        max_tokens: 96,
+        enable_thinking: false,
+        timeout_ms: timeoutMs,
+        retry: false,
+      })
+      if (!answer.content.trim()) {
+        throw new AiProviderError('EMPTY_RESPONSE', 'The model did not produce a visible answer after a tool result.')
+      }
+    })
+    out.push(roundTrip)
     return out
   }
 
   function pushSkipped(model: string, role: AiModelRole, reason: string): void {
-    const ids = [`${role}_complete`, `${role}_stream`, `${role}_tool`]
+    const ids = [`${role}_complete`, `${role}_stream`, `${role}_tool`, `${role}_tool_stream`, `${role}_tool_roundtrip`]
     for (const id of ids) steps.push(skippedStep(id, model, reason))
     models[model] = {
       model,

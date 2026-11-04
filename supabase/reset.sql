@@ -8517,3 +8517,405 @@ CREATE POLICY "r2_orphan_objects: staff read" ON public.r2_orphan_objects
 CREATE POLICY "r2_orphan_objects: admin write" ON public.r2_orphan_objects
   FOR ALL USING (public.get_my_role() = 'admin')
   WITH CHECK (public.get_my_role() = 'admin');
+
+-- =============================================================================
+-- AI CREDITS — additive, artist-shared, transactional monthly allowances
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.ai_credit_settings (
+  id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id),
+  enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  buffer_percent INTEGER NOT NULL DEFAULT 25 CHECK (buffer_percent BETWEEN 0 AND 100),
+  artist_monthly INTEGER NOT NULL DEFAULT 1000 CHECK (artist_monthly >= 0),
+  editor_monthly INTEGER NOT NULL DEFAULT 2000 CHECK (editor_monthly >= 0),
+  admin_monthly INTEGER NOT NULL DEFAULT 10000 CHECK (admin_monthly >= 0),
+  model_prices JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+INSERT INTO public.ai_credit_settings (id) VALUES (TRUE) ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS public.ai_credit_accounts (
+  scope TEXT NOT NULL CHECK (scope IN ('artist', 'editor', 'admin')),
+  scope_id TEXT NOT NULL,
+  period_start DATE NOT NULL,
+  monthly_allowance BIGINT NOT NULL CHECK (monthly_allowance >= 0),
+  adjustment_credits BIGINT NOT NULL DEFAULT 0,
+  used_credits BIGINT NOT NULL DEFAULT 0 CHECK (used_credits >= 0),
+  reserved_credits BIGINT NOT NULL DEFAULT 0 CHECK (reserved_credits >= 0),
+  PRIMARY KEY (scope, scope_id, period_start)
+);
+ALTER TABLE public.ai_credit_accounts
+  ADD COLUMN IF NOT EXISTS adjustment_credits BIGINT NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS public.ai_credit_reservations (
+  request_id TEXT PRIMARY KEY,
+  scope TEXT NOT NULL,
+  scope_id TEXT NOT NULL,
+  period_start DATE NOT NULL,
+  model TEXT NOT NULL,
+  user_id UUID NOT NULL,
+  reserved_credits BIGINT NOT NULL CHECK (reserved_credits >= 0),
+  charged_credits BIGINT,
+  provider_cost_eur NUMERIC(18,9),
+  usage JSONB,
+  price_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
+  original_charged_credits BIGINT,
+  refunded_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  settled_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '3 minutes'),
+  FOREIGN KEY (scope, scope_id, period_start)
+    REFERENCES public.ai_credit_accounts(scope, scope_id, period_start),
+  CHECK (charged_credits IS NULL OR charged_credits >= 0)
+);
+CREATE INDEX IF NOT EXISTS idx_ai_credit_reservations_scope
+  ON public.ai_credit_reservations(scope, scope_id, period_start);
+ALTER TABLE public.ai_credit_reservations
+  ADD COLUMN IF NOT EXISTS original_charged_credits BIGINT;
+ALTER TABLE public.ai_credit_reservations
+  ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ;
+ALTER TABLE public.ai_credit_reservations
+  ADD COLUMN IF NOT EXISTS price_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.ai_credit_reservations
+  ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '3 minutes');
+CREATE INDEX IF NOT EXISTS idx_ai_credit_reservations_expiry
+  ON public.ai_credit_reservations(expires_at) WHERE settled_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_ai_credit_reservations_created
+  ON public.ai_credit_reservations(created_at DESC);
+
+ALTER TABLE public.ai_credit_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_credit_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ai_credit_reservations ENABLE ROW LEVEL SECURITY;
+-- All reads and writes go through authenticated server routes using service role.
+REVOKE ALL ON public.ai_credit_settings FROM anon, authenticated;
+REVOKE ALL ON public.ai_credit_accounts FROM anon, authenticated;
+REVOKE ALL ON public.ai_credit_reservations FROM anon, authenticated;
+GRANT ALL ON TABLE public.ai_credit_settings, public.ai_credit_accounts,
+  public.ai_credit_reservations TO service_role;
+
+CREATE OR REPLACE FUNCTION public.reserve_ai_credits(
+  p_request_id TEXT, p_scope TEXT, p_scope_id TEXT, p_user_id UUID,
+  p_model TEXT, p_allowance BIGINT, p_credits BIGINT
+) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_period DATE := date_trunc('month', NOW() AT TIME ZONE 'UTC')::date;
+  v_account public.ai_credit_accounts%ROWTYPE;
+  v_existing public.ai_credit_reservations%ROWTYPE;
+  v_expired public.ai_credit_reservations%ROWTYPE;
+BEGIN
+  IF p_scope NOT IN ('artist','editor','admin') OR
+     NULLIF(p_scope_id, '') IS NULL OR NULLIF(p_request_id,'') IS NULL OR
+     NULLIF(p_model,'') IS NULL OR p_allowance < 0 OR p_credits < 0 THEN
+    RAISE EXCEPTION 'Invalid credit reservation';
+  END IF;
+  SELECT * INTO v_existing FROM public.ai_credit_reservations WHERE request_id = p_request_id;
+  IF FOUND THEN
+    IF v_existing.scope <> p_scope OR v_existing.scope_id <> p_scope_id OR
+       v_existing.model <> p_model OR v_existing.user_id <> p_user_id OR
+       v_existing.reserved_credits <> p_credits THEN
+      RAISE EXCEPTION 'Credit reservation ID conflict';
+    END IF;
+    RETURN jsonb_build_object('ok', true, 'reserved', v_existing.reserved_credits);
+  END IF;
+  -- Repair abandoned reservations after serverless timeouts. Locks match
+  -- settlement order: reservation first, then account.
+  FOR v_expired IN
+    SELECT * FROM public.ai_credit_reservations
+    WHERE scope = p_scope AND scope_id = p_scope_id AND period_start = v_period
+      AND settled_at IS NULL AND expires_at < NOW()
+    FOR UPDATE SKIP LOCKED
+  LOOP
+    UPDATE public.ai_credit_accounts
+      SET reserved_credits = reserved_credits - v_expired.reserved_credits
+      WHERE scope = v_expired.scope AND scope_id = v_expired.scope_id
+        AND period_start = v_expired.period_start;
+    UPDATE public.ai_credit_reservations
+      SET charged_credits = 0, provider_cost_eur = 0,
+          usage = '{}'::jsonb, settled_at = NOW()
+      WHERE request_id = v_expired.request_id;
+  END LOOP;
+  INSERT INTO public.ai_credit_accounts(scope, scope_id, period_start, monthly_allowance)
+  VALUES (p_scope, p_scope_id, v_period, p_allowance)
+  ON CONFLICT DO NOTHING;
+  SELECT * INTO v_account FROM public.ai_credit_accounts
+   WHERE scope = p_scope AND scope_id = p_scope_id AND period_start = v_period FOR UPDATE;
+  -- Recheck after serializing on the account row. A concurrent request may
+  -- have inserted the same id after our first optimistic lookup.
+  SELECT * INTO v_existing FROM public.ai_credit_reservations WHERE request_id = p_request_id;
+  IF FOUND THEN
+    IF v_existing.scope <> p_scope OR v_existing.scope_id <> p_scope_id OR
+       v_existing.model <> p_model OR v_existing.user_id <> p_user_id OR
+       v_existing.reserved_credits <> p_credits THEN
+      RAISE EXCEPTION 'Credit reservation ID conflict';
+    END IF;
+    RETURN jsonb_build_object('ok', true, 'reserved', v_existing.reserved_credits);
+  END IF;
+  IF v_account.monthly_allowance < v_account.used_credits + v_account.reserved_credits + p_credits THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'AI_CREDITS_EXCEEDED',
+      'remaining', GREATEST(0, v_account.monthly_allowance - v_account.used_credits - v_account.reserved_credits));
+  END IF;
+  UPDATE public.ai_credit_accounts SET reserved_credits = reserved_credits + p_credits
+  WHERE scope = p_scope AND scope_id = p_scope_id AND period_start = v_period;
+  INSERT INTO public.ai_credit_reservations
+  (request_id, scope, scope_id, period_start, model, user_id, reserved_credits)
+  VALUES (p_request_id, p_scope, p_scope_id, v_period, p_model, p_user_id, p_credits);
+  RETURN jsonb_build_object('ok', true, 'reserved', p_credits);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.settle_ai_credits(
+  p_request_id TEXT, p_charge BIGINT, p_provider_cost NUMERIC, p_usage JSONB
+) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE v_res public.ai_credit_reservations%ROWTYPE;
+BEGIN
+  IF p_charge < 0 OR p_provider_cost < 0 OR p_usage IS NULL THEN
+    RAISE EXCEPTION 'Invalid credit settlement';
+  END IF;
+  SELECT * INTO v_res FROM public.ai_credit_reservations
+  WHERE request_id = p_request_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Missing credit reservation'; END IF;
+  IF v_res.settled_at IS NOT NULL THEN
+    RETURN jsonb_build_object('ok', true, 'charged', v_res.charged_credits, 'duplicate', true);
+  END IF;
+  -- A provider may report more tokens than estimated. The reservation is a
+  -- hard ceiling for the user's charge; actual provider cost remains recorded.
+  p_charge := LEAST(p_charge, v_res.reserved_credits);
+  UPDATE public.ai_credit_accounts
+  SET reserved_credits = reserved_credits - v_res.reserved_credits,
+      used_credits = used_credits + p_charge
+  WHERE scope = v_res.scope AND scope_id = v_res.scope_id AND period_start = v_res.period_start;
+  UPDATE public.ai_credit_reservations
+  SET charged_credits = p_charge, provider_cost_eur = p_provider_cost,
+      usage = p_usage - 'pricing', price_snapshot = COALESCE(p_usage->'pricing','{}'::jsonb), settled_at = NOW()
+  WHERE request_id = p_request_id;
+  RETURN jsonb_build_object('ok', true, 'charged', p_charge);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.reserve_ai_credits(TEXT,TEXT,TEXT,UUID,TEXT,BIGINT,BIGINT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.settle_ai_credits(TEXT,BIGINT,NUMERIC,JSONB) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.reserve_ai_credits(TEXT,TEXT,TEXT,UUID,TEXT,BIGINT,BIGINT) TO service_role;
+GRANT EXECUTE ON FUNCTION public.settle_ai_credits(TEXT,BIGINT,NUMERIC,JSONB) TO service_role;
+
+-- One atomic administrative update keeps already-open monthly accounts in sync.
+CREATE OR REPLACE FUNCTION public.update_ai_credit_settings(
+  p_enabled BOOLEAN, p_buffer_percent INTEGER, p_artist_monthly INTEGER,
+  p_editor_monthly INTEGER, p_admin_monthly INTEGER, p_model_prices JSONB
+) RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE v_settings JSONB;
+BEGIN
+  IF p_buffer_percent NOT BETWEEN 0 AND 100 OR
+     LEAST(p_artist_monthly, p_editor_monthly, p_admin_monthly) < 0 OR
+     p_model_prices IS NULL OR jsonb_typeof(p_model_prices) <> 'object' THEN
+    RAISE EXCEPTION 'Invalid credit settings';
+  END IF;
+  UPDATE public.ai_credit_settings
+  SET enabled = p_enabled, buffer_percent = p_buffer_percent,
+      artist_monthly = p_artist_monthly, editor_monthly = p_editor_monthly,
+      admin_monthly = p_admin_monthly, model_prices = p_model_prices,
+      updated_at = NOW()
+  WHERE id = TRUE;
+  UPDATE public.ai_credit_accounts
+  SET monthly_allowance = (CASE scope
+    WHEN 'artist' THEN p_artist_monthly
+    WHEN 'editor' THEN p_editor_monthly
+    ELSE p_admin_monthly END) + adjustment_credits
+  WHERE period_start = date_trunc('month', NOW() AT TIME ZONE 'UTC')::date;
+  SELECT to_jsonb(s) INTO v_settings FROM public.ai_credit_settings s WHERE id = TRUE;
+  RETURN v_settings;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.update_ai_credit_settings(BOOLEAN,INTEGER,INTEGER,INTEGER,INTEGER,JSONB)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.update_ai_credit_settings(BOOLEAN,INTEGER,INTEGER,INTEGER,INTEGER,JSONB)
+  TO service_role;
+
+-- Monthly usage summaries are computed inside PostgreSQL, without row caps.
+CREATE OR REPLACE FUNCTION public.ai_usage_month_summary()
+RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+WITH month_events AS (
+  SELECT e.*, COALESCE(u.role::TEXT, 'unknown') AS user_role
+  FROM public.ai_usage_events e
+  LEFT JOIN public.users u ON u.id = e.user_id
+  WHERE e.created_at >= date_trunc('month', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+),
+today_events AS (
+  SELECT * FROM month_events
+  WHERE created_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+)
+SELECT jsonb_build_object(
+  'today', (SELECT jsonb_build_object(
+    'input_tokens', COALESCE(SUM(input_tokens),0), 'output_tokens', COALESCE(SUM(output_tokens),0),
+    'reasoning_tokens', COALESCE(SUM(reasoning_tokens),0), 'total_tokens', COALESCE(SUM(total_tokens),0),
+    'calls', COUNT(*), 'failed', COUNT(*) FILTER (WHERE NOT success)) FROM today_events),
+  'month', (SELECT jsonb_build_object(
+    'input_tokens', COALESCE(SUM(input_tokens),0), 'output_tokens', COALESCE(SUM(output_tokens),0),
+    'reasoning_tokens', COALESCE(SUM(reasoning_tokens),0), 'total_tokens', COALESCE(SUM(total_tokens),0),
+    'calls', COUNT(*), 'failed', COUNT(*) FILTER (WHERE NOT success)) FROM month_events),
+  'by_model', (SELECT COALESCE(jsonb_agg(to_jsonb(x)), '[]'::jsonb) FROM (
+    SELECT model, SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
+      SUM(reasoning_tokens) AS reasoning_tokens, SUM(total_tokens) AS total_tokens,
+      COUNT(*) AS calls, COUNT(*) FILTER (WHERE NOT success) AS failures
+    FROM month_events GROUP BY model ORDER BY total_tokens DESC
+  ) x),
+  'by_role', (SELECT COALESCE(jsonb_agg(to_jsonb(x)), '[]'::jsonb) FROM (
+    SELECT user_role AS role, SUM(total_tokens) AS total_tokens, COUNT(*) AS calls
+    FROM month_events GROUP BY user_role ORDER BY total_tokens DESC
+  ) x),
+  'by_day', (SELECT COALESCE(jsonb_agg(to_jsonb(x)), '[]'::jsonb) FROM (
+    SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
+      SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
+      SUM(reasoning_tokens) AS reasoning_tokens, SUM(total_tokens) AS total_tokens,
+      COUNT(*) FILTER (WHERE NOT success) AS failures
+    FROM month_events GROUP BY 1 ORDER BY 1
+  ) x),
+  'failures', (SELECT jsonb_build_object(
+    'count', (SELECT COUNT(*) FROM month_events WHERE NOT success),
+    'by_code', (SELECT COALESCE(jsonb_agg(to_jsonb(x)), '[]'::jsonb) FROM (
+      SELECT COALESCE(error_code, 'UNKNOWN') AS code, COUNT(*) AS count
+      FROM month_events WHERE NOT success GROUP BY 1 ORDER BY count DESC
+    ) x)))
+);
+$$;
+REVOKE ALL ON FUNCTION public.ai_usage_month_summary() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ai_usage_month_summary() TO service_role;
+
+-- Exact financial totals come from settled reservations, not a limited event list.
+CREATE OR REPLACE FUNCTION public.ai_credit_cost_summary()
+RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+WITH settled AS (
+  SELECT model, charged_credits, provider_cost_eur
+  FROM public.ai_credit_reservations
+  WHERE period_start = date_trunc('month', NOW() AT TIME ZONE 'UTC')::date
+    AND settled_at IS NOT NULL
+)
+SELECT jsonb_build_object(
+  'provider_cost_eur', COALESCE((SELECT SUM(provider_cost_eur) FROM settled), 0),
+  'charged_credits', COALESCE((SELECT SUM(charged_credits) FROM settled), 0),
+  'calls', (SELECT COUNT(*) FROM settled),
+  'by_model', (SELECT COALESCE(jsonb_agg(to_jsonb(x)), '[]'::jsonb) FROM (
+    SELECT model, COALESCE(SUM(provider_cost_eur),0) AS provider_cost_eur,
+      COALESCE(SUM(charged_credits),0) AS charged_credits, COUNT(*) AS calls
+    FROM settled GROUP BY model ORDER BY provider_cost_eur DESC
+  ) x)
+);
+$$;
+REVOKE ALL ON FUNCTION public.ai_credit_cost_summary() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ai_credit_cost_summary() TO service_role;
+
+-- Reverse all successful model-round charges if a turn ultimately fails.
+-- Provider fees are retained for internal diagnostics. Idempotent by refunded_at.
+CREATE OR REPLACE FUNCTION public.refund_ai_credit_turn(p_turn_id TEXT)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE v_row public.ai_credit_reservations%ROWTYPE;
+  v_refunded BIGINT := 0;
+BEGIN
+  IF NULLIF(p_turn_id, '') IS NULL THEN RAISE EXCEPTION 'Missing turn ID'; END IF;
+  FOR v_row IN
+    SELECT * FROM public.ai_credit_reservations
+    WHERE LEFT(request_id, LENGTH(p_turn_id) + 1) = p_turn_id || ':'
+      AND settled_at IS NOT NULL AND refunded_at IS NULL AND charged_credits > 0
+    ORDER BY request_id FOR UPDATE
+  LOOP
+    UPDATE public.ai_credit_accounts
+    SET used_credits = used_credits - v_row.charged_credits
+    WHERE scope = v_row.scope AND scope_id = v_row.scope_id
+      AND period_start = v_row.period_start AND used_credits >= v_row.charged_credits;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Credit refund account mismatch'; END IF;
+    UPDATE public.ai_credit_reservations
+    SET original_charged_credits = v_row.charged_credits,
+        charged_credits = 0, refunded_at = NOW()
+    WHERE request_id = v_row.request_id;
+    v_refunded := v_refunded + v_row.charged_credits;
+  END LOOP;
+  RETURN jsonb_build_object('ok', true, 'refunded', v_refunded);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.refund_ai_credit_turn(TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.refund_ai_credit_turn(TEXT) TO service_role;
+
+-- Audit trail for administrator-issued credit adjustments. Immutable after insertion.
+CREATE TABLE IF NOT EXISTS public.ai_credit_adjustments (
+  id UUID PRIMARY KEY,
+  actor_id UUID NOT NULL,
+  scope TEXT NOT NULL CHECK (scope IN ('artist', 'editor', 'admin')),
+  scope_id TEXT NOT NULL,
+  period_start DATE NOT NULL,
+  delta_credits BIGINT NOT NULL CHECK (delta_credits <> 0),
+  reason TEXT NOT NULL CHECK (LENGTH(TRIM(reason)) BETWEEN 3 AND 500),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_ai_credit_adjustments_account
+  ON public.ai_credit_adjustments(scope, scope_id, period_start, created_at DESC);
+ALTER TABLE public.ai_credit_adjustments ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.ai_credit_adjustments FROM anon, authenticated;
+GRANT ALL ON public.ai_credit_adjustments TO service_role;
+
+CREATE OR REPLACE FUNCTION public.adjust_ai_credits(
+  p_id UUID, p_actor_id UUID, p_scope TEXT, p_scope_id TEXT, p_delta BIGINT, p_reason TEXT
+) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+  v_period DATE := date_trunc('month', NOW() AT TIME ZONE 'UTC')::date;
+  v_base BIGINT;
+  v_account public.ai_credit_accounts%ROWTYPE;
+  v_old public.ai_credit_adjustments%ROWTYPE;
+BEGIN
+  IF p_scope NOT IN ('artist', 'editor', 'admin') OR NULLIF(p_scope_id,'') IS NULL OR
+     p_delta = 0 OR ABS(p_delta) > 1000000 OR LENGTH(TRIM(p_reason)) NOT BETWEEN 3 AND 500 THEN
+    RAISE EXCEPTION 'Invalid credit adjustment';
+  END IF;
+  SELECT * INTO v_old FROM public.ai_credit_adjustments WHERE id = p_id;
+  IF FOUND THEN
+    IF v_old.scope <> p_scope OR v_old.scope_id <> p_scope_id OR
+       v_old.delta_credits <> p_delta OR v_old.actor_id <> p_actor_id OR v_old.reason <> p_reason THEN
+      RAISE EXCEPTION 'Credit adjustment ID conflict';
+    END IF;
+    RETURN jsonb_build_object('ok', true, 'duplicate', true);
+  END IF;
+  SELECT CASE p_scope WHEN 'artist' THEN artist_monthly
+    WHEN 'editor' THEN editor_monthly ELSE admin_monthly END
+  INTO v_base FROM public.ai_credit_settings WHERE id = TRUE;
+  IF v_base IS NULL THEN RAISE EXCEPTION 'Missing credit settings'; END IF;
+
+  INSERT INTO public.ai_credit_accounts(scope, scope_id, period_start, monthly_allowance)
+  VALUES (p_scope, p_scope_id, v_period, v_base)
+  ON CONFLICT DO NOTHING;
+  SELECT * INTO v_account FROM public.ai_credit_accounts
+  WHERE scope = p_scope AND scope_id = p_scope_id AND period_start = v_period FOR UPDATE;
+  -- Recheck the idempotency key after acquiring the account lock.
+  SELECT * INTO v_old FROM public.ai_credit_adjustments WHERE id = p_id;
+  IF FOUND THEN
+    IF v_old.scope <> p_scope OR v_old.scope_id <> p_scope_id OR
+       v_old.delta_credits <> p_delta OR v_old.actor_id <> p_actor_id OR v_old.reason <> p_reason THEN
+      RAISE EXCEPTION 'Credit adjustment ID conflict';
+    END IF;
+    RETURN jsonb_build_object('ok', true, 'duplicate', true);
+  END IF;
+  IF v_account.monthly_allowance + p_delta <
+     v_account.used_credits + v_account.reserved_credits OR
+     v_account.monthly_allowance + p_delta < 0 THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'AI_CREDITS_ADJUSTMENT_REJECTED');
+  END IF;
+  UPDATE public.ai_credit_accounts
+  SET monthly_allowance = monthly_allowance + p_delta,
+      adjustment_credits = adjustment_credits + p_delta
+  WHERE scope = p_scope AND scope_id = p_scope_id AND period_start = v_period;
+  INSERT INTO public.ai_credit_adjustments
+    (id, actor_id, scope, scope_id, period_start, delta_credits, reason)
+  VALUES (p_id, p_actor_id, p_scope, p_scope_id, v_period, p_delta, TRIM(p_reason));
+  RETURN jsonb_build_object('ok', true,
+    'monthly_allowance', v_account.monthly_allowance + p_delta);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.adjust_ai_credits(UUID,UUID,TEXT,TEXT,BIGINT,TEXT)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.adjust_ai_credits(UUID,UUID,TEXT,TEXT,BIGINT,TEXT)
+  TO service_role;
