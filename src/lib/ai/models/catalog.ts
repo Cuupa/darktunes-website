@@ -36,6 +36,8 @@ export interface CatalogModel {
 export const AI_CHAT_MODELS: readonly CatalogModel[] = [
   { id: 'nvidia/nemotron-3.5-lightning-30b-a3b', model: 'nvidia/nemotron-3.5-lightning-30b-a3b', name: 'Nemotron Lightning 30B', provider: 'nvidia', roles: ['fast'], toolsAdvertised: true, freeTier: 'limited', description: 'Schneller Alltagschat und Agentenwerkzeuge' },
   { id: 'nvidia/nemotron-3-super-120b-a12b', model: 'nvidia/nemotron-3-super-120b-a12b', name: 'Nemotron Super 120B', provider: 'nvidia', roles: ['reasoning'], toolsAdvertised: true, freeTier: 'limited', description: 'Komplexe Anfragen und Planung' },
+  // Keep the previously supported fast/reasoning Nano Omni configuration selectable across the provider migration.
+  { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', model: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', name: 'Nemotron Nano Omni 30B', provider: 'nvidia', roles: ['fast', 'reasoning'], toolsAdvertised: true, freeTier: 'limited', description: 'Vorhandenes NVIDIA-Profil für Chat und Reasoning; Tool-Unterstützung separat testen' },
   { id: 'groq::openai/gpt-oss-20b', model: 'openai/gpt-oss-20b', name: 'GPT-OSS 20B', provider: 'groq', roles: ['fast'], toolsAdvertised: true, freeTier: 'limited', description: 'Sehr schnelle textbasierte Antworten' },
   { id: 'groq::openai/gpt-oss-120b', model: 'openai/gpt-oss-120b', name: 'GPT-OSS 120B', provider: 'groq', roles: ['reasoning'], toolsAdvertised: true, freeTier: 'limited', description: 'Ausführlichere Antworten und Reasoning' },
   { id: 'groq::qwen/qwen3.8-27b', model: 'qwen/qwen3.8-27b', name: 'Qwen 3.8 27B', provider: 'groq', roles: ['fast', 'reasoning'], toolsAdvertised: true, freeTier: 'limited', description: 'Schneller vielseitiger Chat mit Tools' },
