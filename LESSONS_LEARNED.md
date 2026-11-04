@@ -279,10 +279,11 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
-### 2026-10-21 — Auto-apply of reset.sql on deploy is not a no-op
+### 2026-10-21 — Empty public site was the Supabase rate limit, not schema auto-apply
 
-- **Finding:** `vercel-install.sh` and CI-success `deploy-supabase.yml` ran `db:apply` on every production deploy. `apply-schema.mjs` sent all of `reset.sql` as one `pg` query (implicit transaction). Public site then served `SITE_SETTINGS_DEFAULTS` (`Music Label`) and empty catalogues because failed public reads are cached as `[]` for up to 1h.
-- **Rule:** Never apply `reset.sql` from Vercel install or from CI success. Manual only: SQL Editor, `npm run db:apply`, or GitHub `workflow_dispatch`. Apply with `psql -f` (one statement at a time), not `client.query(entireFile)`.
+- **Finding:** Public site served `SITE_SETTINGS_DEFAULTS` (`Music Label`) and empty catalogues. Cause: Supabase rate limit — public reads failed, and failed reads are cached as `[]` for up to 1h. Auto-apply of `reset.sql` was first blamed and switched off (3b775a2f); that was the wrong cause (corrected 2026-11-04).
+- **Rule:** Before blaming a deploy step, check Supabase for rate-limit errors (429). Apply `reset.sql` with `psql -f` (one statement at a time), not `client.query(entireFile)` — `ALTER TYPE … ADD VALUE` cannot run inside one implicit transaction.
+- **Status:** Auto-apply after CI success on a push to `main` is back on (`deploy-supabase.yml`, `workflow_run`). Vercel install does not apply the schema.
 
 ### 2026-10-21 — An expired asset row is not the live pointer
 

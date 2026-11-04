@@ -1,9 +1,14 @@
 name: Deploy Supabase
 
-# Applies supabase/reset.sql to the production database. Manual only —
-# never on CI success, never on Vercel install. Cron jobs stay in the
-# Supabase dashboard (Integrations → Cron).
+# Applies supabase/reset.sql to the production database after CI succeeds
+# on a push to main (e.g. a fork sync), or manually via workflow_dispatch.
+# Never from Vercel install. Cron jobs stay in the Supabase dashboard
+# (Integrations → Cron).
 on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -14,9 +19,18 @@ jobs:
   apply:
     name: Apply schema
     runs-on: ubuntu-latest
+    # Only pushes to main: a PR whose head branch is also named "main"
+    # (e.g. from a fork) must not reach the production database.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Apply exactly the commit CI tested, not whatever main is now.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
