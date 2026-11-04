@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowSquareOut, CheckCircle, ShieldWarning, Lightning, Brain, Key } from '@phosphor-icons/react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -56,6 +57,7 @@ export function AdminAiModelSetup({
   models, providers, fast, reasoning, fallback, saving, testing,
   onChange, onSave, onTest, onRefresh,
 }: Props) {
+  const t = useTranslations('ai.admin.multiProvider')
   const [providerFilter, setProviderFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [modeFilter, setModeFilter] = useState<'all' | 'fast' | 'reasoning'>('all')
@@ -86,10 +88,10 @@ export function AdminAiModelSetup({
       </div>
       <Select value={value || '__none__'} onValueChange={id => onChange(slot, id === '__none__' ? '' : id)}>
         <SelectTrigger aria-label={title} className="w-full">
-          <SelectValue placeholder="Modell auswählen" />
+          <SelectValue placeholder={t('selectModel')} />
         </SelectTrigger>
         <SelectContent>
-          {slot === 'fallback' && <SelectItem value="__none__">Kein Fallback</SelectItem>}
+          {slot === 'fallback' && <SelectItem value="__none__">{t('noFallback')}</SelectItem>}
           {suitable.map(model =>
             <SelectItem key={model.id} value={model.id}>
               {model.provider_name} · {model.name.replace(` (${model.model})`, '')}
@@ -180,24 +182,24 @@ export function AdminAiModelSetup({
       <CardContent className="space-y-3">
         <div className="grid gap-2 sm:grid-cols-3">
           <div className="space-y-1">
-            <Label>Modell suchen</Label>
+            <Label>{t('searchLabel')}</Label>
             <Input value={search} onChange={event => setSearch(event.target.value)}
-              placeholder="Name, Anbieter oder Modell-ID" />
+              placeholder={t('searchPlaceholder')} />
           </div>
           <div className="space-y-1">
-            <Label>Anbieter</Label>
+            <Label>{t('providerLabel')}</Label>
             <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={providerFilter} onChange={event => setProviderFilter(event.target.value)}>
-              <option value="all">Alle Anbieter</option>
+              <option value="all">{t('allProviders')}</option>
               {providers.map(item => <option key={item.provider} value={item.provider}>{item.name}</option>)}
             </select>
           </div>
           <div className="space-y-1">
-            <Label>Aufgabe</Label>
+            <Label>{t('taskLabel')}</Label>
             <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               value={modeFilter} onChange={event => setModeFilter(event.target.value as typeof modeFilter)}>
-              <option value="all">Alle Chatmodelle</option><option value="fast">Schnell</option>
-              <option value="reasoning">Ausführlich</option>
+              <option value="all">{t('allChatModels')}</option><option value="fast">{t('fast')}</option>
+              <option value="reasoning">{t('reasoning')}</option>
             </select>
           </div>
         </div>
@@ -215,7 +217,7 @@ export function AdminAiModelSetup({
               <p className="mt-2 break-all font-mono text-[10px] text-muted-foreground">{model.model}</p>
               <p className="mt-2 text-xs">{model.description}</p>
               <div className="mt-3 flex flex-wrap gap-1">
-                {model.roles.map(role => <Badge key={role} variant="outline">{role === 'fast' ? 'Schnell' : 'Ausführlich'}</Badge>)}
+                {model.roles.map(role => <Badge key={role} variant="outline">{role === 'fast' ? t('fast') : t('reasoning')}</Badge>)}
                 <Badge variant="outline">{model.verified ? 'Getestet' : 'Ungetestet'}</Badge>
               </div>
               <div className="mt-3 flex gap-2">
