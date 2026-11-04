@@ -25,7 +25,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
     ...overrides,
   }
   const rpc = vi.fn(async (): Promise<{
-    data: { ok: boolean; detail: string; location: string; entity_id: string; replayed: boolean } | null
+    data: { ok: boolean; detail: string; location: string; entity_id: string; replayed: boolean; decision?: string } | null
     error: { code: string; message: string } | null
   }> => ({
     data: {
@@ -42,7 +42,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
     })),
     rpc,
   } as unknown as SupabaseClient<Database>
-  const actor = {
+  const actor: AiActor = {
     userId, role: 'editor', accessContext: 'editor', dashboard: 'admin',
     artistId: null, artistMembershipIds: [],
     capabilities: new Set<Capability>(['cms.news.edit']),
@@ -87,6 +87,31 @@ describe('atomic MCP approval', () => {
       .rejects.toMatchObject({ code: 'NOT_FOUND' })
     expect(rpc).not.toHaveBeenCalled()
   })
+  it('allows any authenticated administrator to approve another admin\'s proposal', async () => {
+    const { actor, rpc } = fixture({
+      user_id: '00000000-0000-4000-8000-000000000099',
+    })
+    const adminActor: AiActor = { ...actor, role: 'admin', accessContext: 'admin' }
+    await expect(commitMcpApproval(adminActor, token, 'create_cms_news_draft'))
+      .resolves.toMatchObject({ ok: true })
+    expect(rpc).toHaveBeenCalledOnce()
+  })
+  it('atomically rejects an editor-owned proposal without applying CMS content', async () => {
+    const { actor, rpc } = fixture()
+    rpc.mockResolvedValueOnce({
+      data: {
+        ok: true, detail: 'Declined',
+        location: '/admin/mcp-approvals', entity_id: entityId, replayed: false,
+        decision: 'rejected',
+      }, error: null,
+    })
+    const result = await commitMcpApproval(actor, token, 'create_cms_news_draft', 'reject')
+    expect(result.decision).toBe('rejected')
+    expect(rpc).toHaveBeenCalledWith('reject_mcp_approval', {
+      p_token_hash: hash(token), p_actor_id: userId,
+      p_action: 'create_cms_news_draft', p_payload_hash: hash(canonicalJson(payload)),
+    })
+  })
   it('rejects malformed identifiers without accessing the database', async () => {
     const { actor, rpc } = fixture()
     await expect(commitMcpApproval(actor, 'not-an-approval', 'create_cms_news_draft'))
@@ -99,15 +124,21 @@ describe('atomic MCP approval', () => {
       .rejects.toMatchObject({ code: 'CONFLICT' })
     expect(rpc).not.toHaveBeenCalled()
   })
-  it('rejects another user and an expired pending confirmation', async () => {
+  it('rejects another user while allowing old and non-expiring pending proposals', async () => {
     const a = fixture({ user_id: '00000000-0000-4000-8000-000000000099' })
     await expect(commitMcpApproval(a.actor, token, 'create_cms_news_draft'))
       .rejects.toMatchObject({ code: 'NOT_FOUND' })
     expect(a.rpc).not.toHaveBeenCalled()
-    const b = fixture({ expires_at: '2000-01-01T00:00:00Z' })
-    await expect(commitMcpApproval(b.actor, token, 'create_cms_news_draft'))
-      .rejects.toMatchObject({ code: 'AI_CONFIRMATION_EXPIRED' })
-    expect(b.rpc).not.toHaveBeenCalled()
+
+    const pastExpiry = fixture({ expires_at: '2000-01-01T00:00:00Z' })
+    await expect(commitMcpApproval(pastExpiry.actor, token, 'create_cms_news_draft'))
+      .resolves.toMatchObject({ ok: true })
+    expect(pastExpiry.rpc).toHaveBeenCalledOnce()
+
+    const permanent = fixture({ expires_at: null })
+    await expect(commitMcpApproval(permanent.actor, token, 'create_cms_news_draft'))
+      .resolves.toMatchObject({ ok: true })
+    expect(permanent.rpc).toHaveBeenCalledOnce()
   })
   it('rejects a missing CMS permission and non-editor actor', async () => {
     const { actor, rpc } = fixture()

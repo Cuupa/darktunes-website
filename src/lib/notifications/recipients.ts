@@ -14,6 +14,9 @@ export async function resolveStaffUserIds(
 ): Promise<string[]> {
   if (roles.length === 0) return []
 
+  // Match resolveEffectiveAccess(): a profile's primary role takes precedence.
+  // A secondary user_roles assignment must not receive privileged notifications
+  // when the actual session still resolves as editor/artist.
   const { data, error } = await db.from('users').select('id').in('role', [...roles])
   if (error) throw new Error(error.message)
   return (data ?? []).map((row) => row.id)

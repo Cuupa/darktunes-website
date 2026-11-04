@@ -17,7 +17,7 @@ registerTool({
   output: z.object({
     needs_confirmation: z.literal(true),
     approval_url: z.string(),
-    expires_at: z.string(),
+    expires_at: z.string().nullable(),
     summary: z.string(),
   }),
   capabilities: ['cms.news.edit'],
@@ -42,8 +42,8 @@ registerTool({
     const origin = (process.env.NEXT_PUBLIC_SITE_URL ?? '').replace(/\/$/, '')
     return {
       needs_confirmation: true as const,
-      approval_url: `${origin}/admin/mcp-approvals/${encodeURIComponent(confirmation.confirmation_token)}`,
-      expires_at: confirmation.expires_at,
+      approval_url: `${origin}/admin/mcp-approvals`,
+      expires_at: null,
       summary: confirmation.summary,
     }
   },

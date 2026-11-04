@@ -3514,6 +3514,7 @@ CREATE TABLE IF NOT EXISTS public.ai_action_confirmations (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- MCP review does not enforce expiry. Keep this legacy NOT NULL column.
 CREATE INDEX IF NOT EXISTS idx_ai_action_confirmations_user ON public.ai_action_confirmations (user_id, expires_at);
 
 -- =============================================================================
@@ -3563,8 +3564,12 @@ BEGIN
   WHERE token_hash = p_token_hash
   FOR UPDATE;
 
-  IF NOT FOUND OR v_approval.user_id <> p_actor_id OR
-    v_approval.action <> p_action OR v_approval.payload_hash <> p_payload_hash OR
+  IF NOT FOUND OR (
+    v_approval.user_id <> p_actor_id
+    AND NOT EXISTS (
+      SELECT 1 FROM public.users WHERE id = p_actor_id AND role = 'admin'
+    )
+  ) OR v_approval.action <> p_action OR v_approval.payload_hash <> p_payload_hash OR
     v_approval.artist_id IS NOT NULL THEN
     RAISE EXCEPTION 'MCP_APPROVAL_MISMATCH' USING ERRCODE = 'P0001';
   END IF;
@@ -3572,13 +3577,13 @@ BEGIN
   -- Idempotent network retries return the *recorded* outcome without
   -- running the mutation or creating a second audit entry.
   IF v_approval.used_at IS NOT NULL THEN
+    IF v_approval.result->>'decision' = 'rejected' THEN
+      RAISE EXCEPTION 'MCP_APPROVAL_REJECTED' USING ERRCODE = 'P0001';
+    END IF;
     IF v_approval.result IS NULL THEN
       RAISE EXCEPTION 'MCP_APPROVAL_ALREADY_USED' USING ERRCODE = 'P0001';
     END IF;
     RETURN v_approval.result || jsonb_build_object('replayed', true);
-  END IF;
-  IF v_approval.expires_at <= NOW() THEN
-    RAISE EXCEPTION 'MCP_APPROVAL_EXPIRED' USING ERRCODE = 'P0001';
   END IF;
 
   v_payload := v_approval.payload;
@@ -3620,7 +3625,7 @@ BEGIN
     v_result := jsonb_build_object(
       'ok', true, 'detail', 'News draft saved; not published.',
       'location', '/admin/news/' || v_id::text, 'entity_id', v_id,
-      'replayed', false
+      'replayed', false, 'decision', 'approved', 'reviewed_by', p_actor_id
     );
   ELSE
     v_changes := v_payload->'changes';
@@ -3726,7 +3731,7 @@ BEGIN
         WHEN 'release' THEN '/admin/releases'
         WHEN 'event' THEN '/admin/events'
       END,
-      'entity_id', v_id, 'replayed', false
+      'entity_id', v_id, 'replayed', false, 'decision', 'approved', 'reviewed_by', p_actor_id
     );
   END IF;
 
@@ -3741,6 +3746,83 @@ REVOKE ALL ON FUNCTION public.commit_mcp_approval(TEXT, UUID, TEXT, TEXT)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.commit_mcp_approval(TEXT, UUID, TEXT, TEXT)
   TO service_role;
+
+-- Rejections lock the same row as approvals and never touch CMS content.
+CREATE OR REPLACE FUNCTION public.reject_mcp_approval(
+  p_token_hash TEXT,
+  p_actor_id UUID,
+  p_action TEXT,
+  p_payload_hash TEXT
+) RETURNS JSONB
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
+AS $mcp_reject$
+DECLARE
+  v_approval public.ai_action_confirmations%ROWTYPE;
+  v_result JSONB;
+BEGIN
+  IF CURRENT_USER <> 'service_role' THEN
+    RAISE EXCEPTION 'MCP_APPROVAL_FORBIDDEN' USING ERRCODE = '42501';
+  END IF;
+  IF p_token_hash !~ '^[0-9a-f]{64}$' OR
+      p_payload_hash !~ '^[0-9a-f]{64}$' OR
+      p_action NOT IN ('create_cms_news_draft', 'update_cms_artist',
+                       'update_cms_release', 'update_cms_event') THEN
+    RAISE EXCEPTION 'MCP_APPROVAL_INVALID' USING ERRCODE = '22023';
+  END IF;
+  SELECT * INTO v_approval
+  FROM public.ai_action_confirmations
+  WHERE token_hash = p_token_hash
+  FOR UPDATE;
+
+  IF NOT FOUND OR (
+    v_approval.user_id <> p_actor_id
+    AND NOT EXISTS (
+      SELECT 1 FROM public.users WHERE id = p_actor_id AND role = 'admin'
+    )
+  ) OR v_approval.action <> p_action OR
+     v_approval.payload_hash <> p_payload_hash OR
+     v_approval.artist_id IS NOT NULL THEN
+    RAISE EXCEPTION 'MCP_APPROVAL_MISMATCH' USING ERRCODE = 'P0001';
+  END IF;
+  IF v_approval.used_at IS NOT NULL THEN
+    IF v_approval.result->>'decision' = 'rejected' THEN
+      RETURN v_approval.result || jsonb_build_object('replayed', true);
+    END IF;
+    RAISE EXCEPTION 'MCP_APPROVAL_ALREADY_APPROVED' USING ERRCODE = 'P0001';
+  END IF;
+
+  v_result := jsonb_build_object(
+    'ok', true, 'detail', 'The GPT proposal was declined. No CMS content changed.',
+    'location', '/admin/mcp-approvals', 'entity_id', v_approval.id,
+    'replayed', false, 'decision', 'rejected', 'reviewed_by', p_actor_id
+  );
+  UPDATE public.ai_action_confirmations
+  SET used_at = NOW(), result = v_result
+  WHERE id = v_approval.id;
+  RETURN v_result;
+END;
+$mcp_reject$;
+
+REVOKE ALL ON FUNCTION public.reject_mcp_approval(TEXT, UUID, TEXT, TEXT)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.reject_mcp_approval(TEXT, UUID, TEXT, TEXT)
+  TO service_role;
+
+CREATE INDEX IF NOT EXISTS idx_ai_action_confirmations_mcp_queue
+  ON public.ai_action_confirmations (created_at DESC)
+  WHERE artist_id IS NULL AND used_at IS NULL AND action IN
+    ('create_cms_news_draft', 'update_cms_artist',
+     'update_cms_release', 'update_cms_event');
+
+-- Restore all unreviewed MCP proposals, including previously expired ones.
+-- Keep the pre-existing NOT NULL schema; the stored timestamp is no longer
+-- enforced by the MCP approval functions and is never shown as a deadline.
+UPDATE public.ai_action_confirmations
+SET expires_at = '9999-12-31T23:59:59.999Z'::timestamptz
+WHERE used_at IS NULL AND artist_id IS NULL AND action IN
+  ('create_cms_news_draft', 'update_cms_artist',
+   'update_cms_release', 'update_cms_event');
+
 
 
 
