@@ -6,6 +6,7 @@ import { ApiError, withErrorHandler } from '@/lib/errors'
 import { requireAdminWithServiceClient } from '@/lib/adminAuth'
 import { startOfUtcDay, startOfUtcMonth } from '@/lib/ai/budget/limits'
 import { getAiSettings } from '@/lib/api/aiSettings'
+import { loadLegacyAiUsageSummary } from '@/lib/ai/usage/legacySummary'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,10 +37,22 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
       .select('scope, used_tokens, reserved_tokens, token_limit')
       .eq('period', 'month').eq('period_start', monthStart),
   ])
-  if (summaryError || !rawSummary) {
-    throw new ApiError(503, 'AI usage summary unavailable. Apply the latest database schema.', 'DB_ERROR')
+  let summary: UsageSummary
+  let truncated = false
+  if (summaryError) {
+    // Until the additive RPC migration is deployed, retain the former view.
+    // Do not hide unrelated permission, network or database failures.
+    if (summaryError.code !== 'PGRST202' && summaryError.code !== '42883') {
+      throw new ApiError(503, 'AI usage summary unavailable.', 'DB_ERROR')
+    }
+    const legacy = await loadLegacyAiUsageSummary(serviceClient, dayStart, monthStart)
+    summary = legacy.summary
+    truncated = legacy.truncated
+  } else if (!rawSummary) {
+    throw new ApiError(503, 'AI usage summary unavailable.', 'DB_ERROR')
+  } else {
+    summary = rawSummary as unknown as UsageSummary
   }
-  const summary = rawSummary as unknown as UsageSummary
   return NextResponse.json({
     today_tokens: summary.today.total_tokens,
     month_tokens: summary.month.total_tokens,
@@ -48,7 +61,7 @@ export const GET = withErrorHandler(async (req: NextRequest): Promise<NextRespon
     by_model: summary.by_model,
     by_role: summary.by_role,
     by_day: summary.by_day,
-    truncated: false,
+    truncated,
     budget: {
       global_day: budgetRow(dayBudgets ?? [], 'global', settings.tokenLimits.global.day),
       global_month: budgetRow(monthBudgets ?? [], 'global', settings.tokenLimits.global.month),
