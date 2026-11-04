@@ -81,6 +81,10 @@ Distilled anti-patterns from project history. **Append session findings before o
 
 ## Session additions
 
+### 2026-11-04 — Fallbacks inside unstable_cache cache the outage
+
+- **Finding:** Public read helpers wrapped Supabase calls in `unstable_cache` with `.catch(() => [])` / `.catch(() => null)` / `SITE_SETTINGS_DEFAULTS` inside the callback. A Supabase 429 therefore resolved successfully with an empty value, which Next stored in the Data Cache for up to 1h, overwriting the last good entry (the symptom behind the 2026-10-21 entry: `Music Label` and empty catalogues). If the callback throws, Next logs it and keeps/returns the stale entry (revalidateTag uses `'max'`, so stale entries survive invalidation); with no entry the error propagates and nothing is cached.
+- **Rule:** Never `.catch` with a fallback inside an `unstable_cache` callback. Let it reject and apply the fallback (plus `logError`) outside the cache, as `withUncachedFallback` in `src/lib/cache/publicQueries.ts` does. Callers of throwing cached readers must not turn an error into `notFound()`.
 ### 2026-10-22 — NVIDIA streamed answers can arrive in the reasoning channel
 
 - With a Nemotron reasoning model selected as Fast, non-streaming `fast_complete` passed but the `stream` health step failed with "no text deltas"; chat stored `done` with empty content. NVIDIA/vLLM routes the answer to `delta.reasoning` / `delta.reasoning_content` with `enable_thinking=false` on some streaming deployments while the non-streaming parser swaps the fields.

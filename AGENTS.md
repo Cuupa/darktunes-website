@@ -55,7 +55,7 @@ Playwright / E2E (`tests/e2e/*`, `npm run test:e2e`, `npm run db:e2e:*`) is **fo
 
 - **Schema:** Only `supabase/reset.sql` + `src/types/database.ts` — no `supabase/migrations/`
 - **Artist nav:** Roster cards MUST link to `/artists/[slug]`, never open modals
-- **`unstable_cache`:** Cookie-free Supabase anon client inside callbacks (never `cookies()`)
+- **`unstable_cache`:** Cookie-free Supabase anon client inside callbacks (never `cookies()`). Never `.catch` with a fallback inside an `unstable_cache` callback — let it throw (Next keeps the last good value) and apply the fallback outside the cache (see `src/lib/cache/publicQueries.ts`)
 - **DAL:** Queries in `src/lib/api/`; pass `SupabaseClient` as first argument
 - **Route handlers:** `withErrorHandler`; admin routes use `src/lib/adminAuth.ts`
 - **OpenAPI:** Every API endpoint you create or change MUST ship an accompanying OpenAPI `.yaml` spec — an endpoint is not done until its paths, request/response schemas, and status codes are reflected in the spec
