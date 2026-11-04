@@ -3627,12 +3627,12 @@ BEGIN
     v_kind := v_payload->>'kind';
     IF jsonb_typeof(v_changes) <> 'object' OR v_changes = '{}'::jsonb
       OR jsonb_typeof(v_payload->'before') <> 'object'
-      OR v_kind IS DISTINCT FROM
+      OR v_kind IS DISTINCT FROM (
         CASE p_action
           WHEN 'update_cms_artist' THEN 'artist'
           WHEN 'update_cms_release' THEN 'release'
           WHEN 'update_cms_event' THEN 'event'
-        END THEN
+        END) THEN
       RAISE EXCEPTION 'MCP_PATCH_INVALID' USING ERRCODE = '22023';
     END IF;
     v_id := (v_payload->>'entity_id')::UUID;
