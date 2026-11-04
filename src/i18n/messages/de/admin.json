@@ -40,6 +40,7 @@
     "settings": "Einstellungen",
     "apiKeys": "API-Keys",
     "aiAssistant": "KI-Assistent",
+    "mcpApprovals": "GPT-Freigaben",
     "support": "Support",
     "system": "System",
     "signOut": "Abmelden",
@@ -60,6 +61,19 @@
     "editorToolsDisabledBody": "Die Editor-Tools wurden von einem Administrator deaktiviert. Bitte wende dich an deinen Admin, falls das ein Fehler ist.",
     "noEditorPermissionsTitle": "Keine Editor-Rechte",
     "noEditorPermissionsBody": "Deinem Konto sind keine Content-Berechtigungen zugewiesen. Bitte wende dich an deinen Administrator."
+  },
+  "mcpApprovals": {
+    "description": "Prüfe und bestätige Änderungen von ChatGPT. Hier siehst du nur Freigaben für dein Konto.",
+    "disabled": "Die GPT-Anbindung ist derzeit deaktiviert.",
+    "loadError": "Die Freigaben konnten nicht geladen werden.",
+    "pending": "Offene Freigaben",
+    "empty": "Keine Änderungen warten auf deine Freigabe.",
+    "newsDraft": "News-Entwurf",
+    "expires": "Läuft ab",
+    "review": "Änderungen prüfen",
+    "history": "Letzte Freigaben",
+    "completed": "Bestätigt",
+    "expired": "Abgelaufen"
   },
   "tour_planner_page_title": "Tourplaner",
   "tour_planner_page_desc": "Nur-Lese-Übersicht der Tour-Production-Daten der Künstler.",
@@ -1275,7 +1289,8 @@
       "portal_message": "Neue Nachricht vom Artist",
       "label_message": "Neue Nachricht vom Label",
       "fan_page_decision": "Fan-Page-Review-Entscheidung",
-      "invoice_submitted": "Neue Rechnung eingereicht"
+      "invoice_submitted": "Neue Rechnung eingereicht",
+      "mcp_approval": "GPT-Änderung wartet auf Freigabe"
     },
     "actions": {
       "review_release": "Release prüfen",
@@ -1284,7 +1299,8 @@
       "review_asset": "Asset prüfen",
       "open_messages": "Nachrichten öffnen",
       "open_fan_page": "Fan-Page öffnen",
-      "open_invoices": "Rechnungen öffnen"
+      "open_invoices": "Rechnungen öffnen",
+      "review_mcp": "Änderung prüfen"
     },
     "typeLabels": {
       "artist_release_submission": "Release-Einreichung (Staff)",
@@ -1300,7 +1316,8 @@
       "invoice_submitted": "Rechnung eingereicht",
       "invoice_payment_received": "Rechnungszahlung",
       "journalist_application_submitted": "Journalist-Bewerbung",
-      "journalist_application_decision": "Journalist-Entscheidung"
+      "journalist_application_decision": "Journalist-Entscheidung",
+      "mcp_approval_pending": "GPT-Änderung wartet auf Freigabe"
     }
   },
   "toast": {

@@ -40,6 +40,7 @@
     "settings": "Paramètres",
     "apiKeys": "Clés API",
     "aiAssistant": "Assistant IA",
+    "mcpApprovals": "Validations GPT",
     "support": "Support",
     "system": "Système",
     "signOut": "Déconnexion",
@@ -60,6 +61,19 @@
     "editorToolsDisabledBody": "Les outils éditeur ont été désactivés par un administrateur. Contactez votre admin si vous pensez qu’il s’agit d’une erreur.",
     "noEditorPermissionsTitle": "Aucune permission éditeur",
     "noEditorPermissionsBody": "Aucun droit de contenu n’est assigné à votre compte. Contactez votre administrateur."
+  },
+  "mcpApprovals": {
+    "description": "Examinez et validez les modifications proposées par ChatGPT. Seules les demandes liées à votre compte sont affichées.",
+    "disabled": "Le connecteur GPT est actuellement désactivé.",
+    "loadError": "Impossible de charger les validations.",
+    "pending": "Validations en attente",
+    "empty": "Aucune modification n’attend votre validation.",
+    "newsDraft": "Brouillon d’actualité",
+    "expires": "Expire le",
+    "review": "Examiner les modifications",
+    "history": "Historique récent",
+    "completed": "Validé",
+    "expired": "Expiré"
   },
   "tour_planner_page_title": "Planificateur de tournée",
   "tour_planner_page_desc": "Vue d’ensemble en lecture seule des données de production de tournée des artistes.",
@@ -1275,7 +1289,8 @@
       "portal_message": "Nouveau message d’un artiste",
       "label_message": "Nouveau message du label",
       "fan_page_decision": "Décision de relecture de page fan",
-      "invoice_submitted": "Nouvelle facture soumise"
+      "invoice_submitted": "Nouvelle facture soumise",
+      "mcp_approval": "Modification GPT en attente de validation"
     },
     "actions": {
       "review_release": "Examiner la release",
@@ -1284,7 +1299,8 @@
       "review_asset": "Examiner l’asset",
       "open_messages": "Ouvrir les messages",
       "open_fan_page": "Ouvrir la page fan",
-      "open_invoices": "Ouvrir les factures"
+      "open_invoices": "Ouvrir les factures",
+      "review_mcp": "Examiner la modification"
     },
     "typeLabels": {
       "artist_release_submission": "Envoi de release (équipe)",
@@ -1300,7 +1316,8 @@
       "invoice_submitted": "Facture soumise",
       "invoice_payment_received": "Paiement de facture",
       "journalist_application_submitted": "Candidature journaliste",
-      "journalist_application_decision": "Décision journaliste"
+      "journalist_application_decision": "Décision journaliste",
+      "mcp_approval_pending": "Modification GPT en attente de validation"
     }
   },
   "toast": {
