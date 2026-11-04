@@ -23,6 +23,8 @@ const EXPORTED_TOOLS = new Set([
   'get_artist_overview', 'get_pending_submissions', 'get_system_health',
   'get_sync_job_status', 'get_storage_health',
 ])
+// Supabase OAuth grants identity scopes; CMS permissions are enforced per tool by RBAC.
+const OAUTH_SECURITY_SCHEMES = [{ type: 'oauth2' as const, scopes: [] as string[] }]
 const HEADERS = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } as const
 function reject(status: number, message: string, request: Request) {
   const headers = new Headers(HEADERS)
@@ -59,6 +61,11 @@ export async function POST(req: NextRequest) {
     name: tool.name,
     description: tool.description,
     inputSchema: tool.parameters as Record<string, unknown>,
+    securitySchemes: OAUTH_SECURITY_SCHEMES,
+    _meta: {
+      securitySchemes: OAUTH_SECURITY_SCHEMES,
+      ui: { visibility: ['model' as const, 'app' as const] },
+    },
     annotations: { readOnlyHint: getRegisteredTool(tool.name)?.classification === 'read', destructiveHint: false, openWorldHint: false },
   })) satisfies McpToolDefinition[]
   try {
