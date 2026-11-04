@@ -3627,12 +3627,12 @@ BEGIN
     v_kind := v_payload->>'kind';
     IF jsonb_typeof(v_changes) <> 'object' OR v_changes = '{}'::jsonb
       OR jsonb_typeof(v_payload->'before') <> 'object'
-      OR v_kind IS DISTINCT FROM
+      OR v_kind IS DISTINCT FROM (
         CASE p_action
           WHEN 'update_cms_artist' THEN 'artist'
           WHEN 'update_cms_release' THEN 'release'
           WHEN 'update_cms_event' THEN 'event'
-        END THEN
+        END) THEN
       RAISE EXCEPTION 'MCP_PATCH_INVALID' USING ERRCODE = '22023';
     END IF;
     v_id := (v_payload->>'entity_id')::UUID;
@@ -7233,7 +7233,7 @@ CREATE INDEX IF NOT EXISTS idx_artist_invoices_artist_id ON public.artist_invoic
 -- service-role, direct SQL and concurrent requests. Metadata/status updates
 -- remain allowed as long as the PDF identifier and hash remain unchanged.
 CREATE OR REPLACE FUNCTION public.reject_invoice_pdf_mutation()
-RETURNS TRIGGER LANGUAGE plpgsql AS $
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
   IF (OLD.pdf_url IS NOT NULL OR OLD.pdf_sha256 IS NOT NULL)
      AND (NEW.pdf_url IS DISTINCT FROM OLD.pdf_url
@@ -7242,7 +7242,8 @@ BEGIN
       USING ERRCODE = '23514';
   END IF;
   RETURN NEW;
-END $;
+END;
+$$;
 
 DROP TRIGGER IF EXISTS trg_artist_invoices_pdf_immutable ON public.artist_invoices;
 CREATE TRIGGER trg_artist_invoices_pdf_immutable
