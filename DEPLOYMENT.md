@@ -300,12 +300,17 @@ and DOI confirmation emails will never be delivered.
 
 ### Applying the schema
 
-Schema apply is **manual**. Vercel install (`scripts/vercel-install.sh`) and
-CI success must not run `reset.sql`. Apply when you intend to:
+`supabase/reset.sql` is applied **automatically** by the GitHub workflow
+**Deploy Supabase** after **CI** succeeds on a push to `main` (a fork sync
+counts). It needs the repository secret `SUPABASE_DB_URL` (Session Pooler URI,
+`?sslmode=require`) in the repo where the workflow runs. Vercel install
+(`scripts/vercel-install.sh`) never runs `reset.sql`.
 
-1. Paste `supabase/reset.sql` into the Supabase SQL Editor, or
+Manual options:
+
+1. GitHub → Actions → **Deploy Supabase** → **Run workflow** (`workflow_dispatch`), or
 2. `npm run db:apply` locally (`SUPABASE_DB_URL` / `DATABASE_URL`), or
-3. GitHub → Actions → **Deploy Supabase** → **Run workflow** (`workflow_dispatch`)
+3. Paste `supabase/reset.sql` into the Supabase SQL Editor
 
 `npm run db:apply` (`scripts/apply-schema.mjs`) uses `psql -v ON_ERROR_STOP=1 -f`
 (statement-by-statement). Do not send the whole file as one `pg` query —

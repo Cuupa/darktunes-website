@@ -282,7 +282,8 @@ Distilled anti-patterns from project history. **Append session findings before o
 ### 2026-10-21 — Auto-apply of reset.sql on deploy is not a no-op
 
 - **Finding:** `vercel-install.sh` and CI-success `deploy-supabase.yml` ran `db:apply` on every production deploy. `apply-schema.mjs` sent all of `reset.sql` as one `pg` query (implicit transaction). Public site then served `SITE_SETTINGS_DEFAULTS` (`Music Label`) and empty catalogues because failed public reads are cached as `[]` for up to 1h.
-- **Rule:** Never apply `reset.sql` from Vercel install or from CI success. Manual only: SQL Editor, `npm run db:apply`, or GitHub `workflow_dispatch`. Apply with `psql -f` (one statement at a time), not `client.query(entireFile)`.
+- **Rule:** Never apply `reset.sql` from Vercel install. Apply with `psql -f` (one statement at a time), not `client.query(entireFile)`.
+- **Update 2026-11-04:** Auto-apply after CI success on a push to `main` is back on (`deploy-supabase.yml`, `workflow_run`), now via `psql -f`. Vercel install stays off. If the public site shows `Music Label` / empty catalogues after a deploy, check the **Deploy Supabase** run first.
 
 ### 2026-10-21 — An expired asset row is not the live pointer
 
