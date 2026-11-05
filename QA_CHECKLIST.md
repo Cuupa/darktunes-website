@@ -553,3 +553,14 @@
 - [ ] Two concurrent approval requests produce exactly one CMS mutation and one audit event, and both receive the same stored result (`replayed: true` for the second).
 - [ ] Stale record revision prevents the update without consuming the token.
 - [ ] Missing RPC returns a configuration error without attempting a legacy nontransactional write.
+
+## System audit regression (2026-11-05)
+
+- [ ] Run rollback-only `scripts/maintenance/verify-artist-access.sql`: self read/write succeeds, unrelated private/streaming/finance reads and updates are denied, role/artist privilege changes and service-only RPCs are blocked.
+- [ ] Admin System: coverage includes artists with no checkpoints, pages without omitting provider states, and exposes active cooldown timestamps.
+- [ ] Missing provider mapping (404) is an artist/configuration issue; database online stays online if a diagnostic read fails; a stuck queue remains unhealthy.
+- [ ] No due jobs: heartbeat may update but no sync_runs row is created. No-change success: at most one success log/provider/hour, and it remains visible to health.
+- [ ] Start overlapping workspace saves: the second uses the revision returned by the first. An actual cross-session 409 keeps local edits and pauses saves.
+- [ ] In a production build, login/admin/portal runtime scripts have the response CSP nonce and script-src has no unsafe-inline. Public embeds and CMS theme styles still work.
+- [ ] Artist dates match between UTC and American browser timezones; portal stream totals use the selected language on first render.
+- [ ] Recheck actual R2 archive upload from the production browser, including a freshly signed retry and multipart completion. Historical errors alone do not establish a current failure.

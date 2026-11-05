@@ -169,7 +169,11 @@ This repo’s SSOT is **`supabase/reset.sql`** (no `supabase/migrations/`). Appl
 | Phase | Status |
 |-------|--------|
 | 0 Keep service-role fix shipped | Done |
-| 1 Prod RLS verify | **Todo** — run `scripts/verify-portal-rls.sql` |
+| 1 Prod RLS verify | **Done** — targeted production repair and rollback-only isolation regression (2026-11-05) |
 | 2 Dual-path canary | **Done** (flag off by default; enable in staging/prod when ready) |
 | 3 Flip to user JWT by group | Todo |
 | 4 Remove fallback + harden artists columns | Todo |
+
+## Verified isolation (2026-11-05)
+
+The live membership-policy repair and profile/artist access guards were applied and verified using rollback-only synthetic fixtures. Own private data and approved statements remain accessible; unrelated private, streaming and financial rows are invisible; foreign updates, role changes and artist ownership/publication changes are blocked. Service-role portal writes still require the existing application membership gates. No canary/default switch was made as part of this repair.

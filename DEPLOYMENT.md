@@ -478,3 +478,13 @@ Create the token in Zammad → **Profile → Token Access** with `ticket.agent` 
 ## ChatGPT / remote MCP connector
 
 The connector is disabled by default. Configure Supabase OAuth Server, its authorization consent URL `/oauth/consent`, an asymmetric signing key and your canonical HTTPS public site URL. Set `MCP_CONNECTOR_ENABLED=true` only after the authenticated manual integration tests in [docs/MCP_CONNECTOR.md](docs/MCP_CONNECTOR.md). Configure distributed Upstash Redis rate limiting. Do not expose the Supabase service-role key or client secrets to the browser.
+
+## Audit rollout verification (2026-11-05)
+
+Production access patches have been applied separately from the application deployment. Their idempotent counterparts live in reset.sql and the targeted scripts under scripts/maintenance. Never run the complete reset merely to apply these fixes.
+
+The external production fork must include the application changes before the new sync coverage UI, sparse run ledger and nonce CSP can be verified live. Remaining dashboard actions: remove publish-scheduled-news after confirming the cron-free news build, set the worker safety schedule to five minutes, run the due-artist enqueue endpoint hourly (the existing daily scheduler delays recurring due work), and review/remove legacy full-sync jobs after confirming their destinations. Do not expose cron commands or secrets in UI/logs. Leaked-password protection is an Auth dashboard setting.
+
+The net._http_response table was reorganized with VACUUM FULL/ANALYZE/SKIP_LOCKED without deleting business records. Production measured approximately 300 MB database / 512 kB HTTP-response relation immediately afterwards. These are point-in-time readings. Old technical log rows continue to expire through the existing retention job. No unused indexes were dropped.
+
+R2 follow-up: the connected darktunes-assets bucket already has exact www/apex/preview/local origins without trailing slashes and exposes ETag for multipart uploads. A read-only PUT preflight from https://www.darktunes.com returned HTTP 204 with the correct allowed origin/methods/headers. No CORS rewrite was necessary. The full signed file upload still needs browser verification. The available Vercel connection does not include the external production project.
