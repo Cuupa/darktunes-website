@@ -5,10 +5,15 @@
  * Residual risk: `script-src` / `style-src` include `'unsafe-inline'`.
  * - Scripts: embeds + Next hydration patterns in current stack.
  * - Styles: CMS theme injection (`ThemeStyleInjector`) and Google Fonts.
- * Nonce-based CSP is a follow-up (see SECURITY.md); do not remove without a migration plan.
+ * Dynamic authenticated pages use per-request script nonces from proxy.ts.
+ * Public cached pages keep the compatibility policy until their cache strategy supports nonces.
  */
 export const CONTENT_SECURITY_POLICY_DIRECTIVES: Record<string, readonly string[]> = {
   'default-src': ["'self'"],
+  'base-uri': ["'self'"],
+  'object-src': ["'none'"],
+  'frame-ancestors': ["'self'"],
+  'form-action': ["'self'"],
   'script-src': [
     "'self'",
     "'unsafe-inline'",
@@ -82,7 +87,7 @@ function localSupabaseConnectHosts(): string[] {
   return [origin, wsOrigin]
 }
 
-export function buildContentSecurityPolicy(): string {
+export function buildContentSecurityPolicy(options: { nonce?: string; development?: boolean } = {}): string {
   const localHosts = localSupabaseConnectHosts()
   const directives =
     localHosts.length === 0
@@ -92,8 +97,17 @@ export function buildContentSecurityPolicy(): string {
           'connect-src': [...CONTENT_SECURITY_POLICY_DIRECTIVES['connect-src'], ...localHosts],
         }
 
+  if (options.nonce && !/^[a-zA-Z0-9+/=_-]+$/.test(options.nonce)) {
+    throw new Error('Invalid CSP nonce')
+  }
   return Object.entries(directives)
-    .map(([directive, sources]) => `${directive} ${sources.join(' ')}`)
+    .map(([directive, sources]) => {
+      if (directive === 'script-src' && options.nonce) {
+        const scripts = sources.filter((source) => source !== "'unsafe-inline'")
+        return `${directive} ${[...scripts, `'nonce-${options.nonce}'`, "'strict-dynamic'", ...(options.development ? ["'unsafe-eval'"] : [])].join(' ')}`
+      }
+      return `${directive} ${sources.join(' ')}`
+    })
     .join('; ')
 }
 

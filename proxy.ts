@@ -16,6 +16,7 @@
  * so tokens stay alive for active users.
  */
 
+import { buildContentSecurityPolicy } from '@/lib/security/contentSecurityPolicy'
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { resolveRedirectPath } from '@/lib/auth/resolveRedirectPath'
@@ -67,6 +68,11 @@ function routeIsProtected(flags: ReturnType<typeof classifyRoute>): boolean {
 function withRequestContext(res: NextResponse, request: NextRequest): NextResponse {
   res.headers.set('x-pathname', request.nextUrl.pathname)
   res.headers.set('x-url', request.url)
+  const nonce = request.headers.get('x-nonce')
+  if (nonce) {
+    res.headers.set('Content-Security-Policy', buildContentSecurityPolicy({ nonce, development: process.env.NODE_ENV === 'development' }))
+    res.headers.set('Cache-Control', 'private, no-store')
+  }
   return res
 }
 
@@ -99,6 +105,15 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const route = classifyRoute(pathname)
   const protectedRoute = routeIsProtected(route)
+  // Never accept a nonce supplied by a caller. Next extracts this request CSP
+  // during dynamic rendering and stamps its hydration/runtime scripts.
+  request.headers.delete('x-nonce')
+  request.headers.delete('Content-Security-Policy')
+  if (protectedRoute || route.isLoginPage) {
+    const nonce = crypto.randomUUID().replaceAll('-', '')
+    request.headers.set('x-nonce', nonce)
+    request.headers.set('Content-Security-Policy', buildContentSecurityPolicy({ nonce, development: process.env.NODE_ENV === 'development' }))
+  }
 
   // Public routes (not protected, not login): inject request context and return
   // immediately to avoid unnecessary auth overhead on every public page request.
