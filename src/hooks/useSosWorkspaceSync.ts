@@ -1,5 +1,7 @@
 'use client'
 
+import { createWorkspaceSaveQueue } from '@/lib/sos/workspaceSaveQueue'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { AccountingWorkspaceConfig } from '@/lib/api/sosAccountingWorkspaces'
@@ -64,6 +66,7 @@ export function useSosWorkspaceSync({
   bronzeBatchIds,
   disabled = false,
 }: UseSosWorkspaceSyncOptions) {
+  const [serializeSave] = useState(createWorkspaceSaveQueue)
   const [settingsReady, setSettingsReady] = useState(false)
   const [workspaceLoadedAt, setWorkspaceLoadedAt] = useState<string | null>(null)
   const [workspaceUpdatedBy, setWorkspaceUpdatedBy] = useState<string | null>(null)
@@ -134,7 +137,7 @@ export function useSosWorkspaceSync({
   }, [])
 
   const saveWorkspace = useCallback(
-    async (nextSettings: SosAccountingSettings, periodKey: PeriodKey): Promise<boolean> => {
+    (nextSettings: SosAccountingSettings, periodKey: PeriodKey): Promise<boolean> => serializeSave(async () => {
       if (workspaceConflictRef.current) return false
       setIsWorkspaceSaving(true)
       try {
@@ -193,15 +196,15 @@ export function useSosWorkspaceSync({
       } finally {
         setIsWorkspaceSaving(false)
       }
-    },
-    [markSynced, setConflict, t],
+    }),
+    [markSynced, serializeSave, setConflict, t],
   )
 
   const saveWorkspaceRef = useRef(saveWorkspace)
   saveWorkspaceRef.current = saveWorkspace
 
   const saveDefaultPreset = useCallback(
-    async (nextSettings: SosAccountingSettings): Promise<boolean> => {
+    (nextSettings: SosAccountingSettings): Promise<boolean> => serializeSave(async () => {
       const durable = durableAccountingSettings(nextSettings)
       setIsWorkspaceSaving(true)
       try {
@@ -230,8 +233,8 @@ export function useSosWorkspaceSync({
       } finally {
         setIsWorkspaceSaving(false)
       }
-    },
-    [markDefaultSynced, t],
+    }),
+    [markDefaultSynced, serializeSave, t],
   )
 
   const loadDefaultPreset = useCallback(async (): Promise<void> => {

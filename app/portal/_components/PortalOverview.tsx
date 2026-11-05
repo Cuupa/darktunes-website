@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from 'next-intl'
 import Link from 'next/link'
 import {
   Avatar,
@@ -52,6 +52,7 @@ export function PortalOverview({ artistId,
   artistSlug,
 }: PortalOverviewProps) {
   const t = useTranslations('portal')
+  const format = useFormatter()
 
   const isEnabled = (id: string) => featureFlags[id] ?? true
   const { unreadCount } = useUnreadMessages()
@@ -215,7 +216,7 @@ export function PortalOverview({ artistId,
                 <CardContent>
                   {totalStreams > 0 ? (
                     <>
-                      <p className="text-2xl font-bold">{totalStreams.toLocaleString()}</p>
+                      <p className="text-2xl font-bold">{format.number(totalStreams)}</p>
                       <p className="text-xs text-muted-foreground mt-1">{t('analytics_totalStreams')}</p>
                     </>
                   ) : (
