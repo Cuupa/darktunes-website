@@ -110,7 +110,10 @@
     "prepare_profile_update": "Profiländerung wird vorbereitet",
     "prepare_release_draft": "Release-Entwurf wird vorbereitet",
     "prepare_support_ticket": "Support-Ticket wird vorbereitet",
-    "prepare_error_report": "Fehlerbericht wird vorbereitet"
+    "prepare_error_report": "Fehlerbericht wird vorbereitet",
+    "search_editorial_artists": "Künstlerprofile werden durchsucht",
+    "get_editorial_artist_releases": "Veröffentlichungen werden gesucht",
+    "search_editorial_news": "Veröffentlichte News werden durchsucht"
   },
   "pageDescription": "Assistent konfigurieren, Modelle unabhängig testen und Tokenverbrauch sowie Fehlerdiagnosen prüfen.",
   "tabGeneral": "Allgemein",
@@ -343,6 +346,18 @@
     "help": {
       "label": "Wie funktioniert diese Seite?",
       "prompt": "Wie funktioniert diese Seite?"
+    },
+    "editorArtist": {
+      "label": "Künstler recherchieren",
+      "prompt": "Finde das öffentliche Künstlerprofil und die offiziellen Links eines darkTunes-Künstlers."
+    },
+    "editorReleases": {
+      "label": "Neueste Releases",
+      "prompt": "Hilf mir, die neuesten veröffentlichten Releases eines darkTunes-Künstlers zu finden."
+    },
+    "editorNews": {
+      "label": "Aktuelle Label-News",
+      "prompt": "Welche News hat darkTunes zuletzt veröffentlicht?"
     }
   }
 }

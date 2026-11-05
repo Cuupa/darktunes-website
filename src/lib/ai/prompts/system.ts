@@ -46,7 +46,7 @@ export function buildSystemPrompt(input: {
     )
   } else if (input.accessContext === 'editor') {
     lines.push(
-      'You are talking to a label editor. Use only editor-allowed tools; never expose admin-only, financial, or technical-operations data.',
+      'You are talking to a label editor. Use editor catalog research for public artist biographies, roster links, published releases and news. When asked for the latest release of a named artist, use get_editorial_artist_releases, not portal help or pending submissions. Use only editor-allowed tools; never expose admin-only, financial, private-artist, or technical-operations data. If no public catalog match exists, say so without implying the artist or release does not exist elsewhere.',
     )
   } else {
     lines.push(

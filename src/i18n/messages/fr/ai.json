@@ -110,7 +110,10 @@
     "prepare_profile_update": "Préparation de la modification du profil",
     "prepare_release_draft": "Préparation du brouillon de sortie",
     "prepare_support_ticket": "Préparation du ticket support",
-    "prepare_error_report": "Préparation du rapport d’erreur"
+    "prepare_error_report": "Préparation du rapport d’erreur",
+    "search_editorial_artists": "Recherche de profils artistes",
+    "get_editorial_artist_releases": "Recherche de sorties publiées",
+    "search_editorial_news": "Recherche des actualités publiées"
   },
   "pageDescription": "Configurer l’assistant, tester les modèles indépendamment et consulter les jetons et diagnostics.",
   "tabGeneral": "Général",
@@ -343,6 +346,18 @@
     "help": {
       "label": "Comment fonctionne cette page ?",
       "prompt": "Comment fonctionne cette page ?"
+    },
+    "editorArtist": {
+      "label": "Rechercher un artiste",
+      "prompt": "Trouve le profil public et les liens officiels d’un artiste darkTunes."
+    },
+    "editorReleases": {
+      "label": "Dernières sorties",
+      "prompt": "Aide-moi à trouver les dernières sorties publiées d’un artiste darkTunes."
+    },
+    "editorNews": {
+      "label": "Actualités du label",
+      "prompt": "Quelles actualités darkTunes a-t-il publiées récemment ?"
     }
   }
 }

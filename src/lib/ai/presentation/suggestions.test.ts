@@ -57,6 +57,15 @@ describe('assistant suggestions', () => {
     expect(ids).toEqual(['recentErrors', 'systemHealth', 'integrations'])
   })
 
+  it('offers public catalog research to editors without finance or admin-only suggestions', () => {
+    const ids = buildAssistantSuggestions({
+      audience: 'editor',
+      path: '/editor',
+      tools: ['search_editorial_artists', 'get_editorial_artist_releases', 'search_editorial_news', 'get_pending_submissions', 'get_label_analytics'],
+    })
+    expect(ids).toEqual(['editorArtist', 'editorReleases', 'editorNews', 'pendingSubmissions'])
+  })
+
   it('never offers artist-only suggestions to editors', () => {
     const ids = buildAssistantSuggestions({
       audience: 'editor',

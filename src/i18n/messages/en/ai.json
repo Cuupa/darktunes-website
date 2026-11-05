@@ -110,7 +110,10 @@
     "prepare_profile_update": "Preparing profile update",
     "prepare_release_draft": "Preparing release draft",
     "prepare_support_ticket": "Preparing support ticket",
-    "prepare_error_report": "Preparing error report"
+    "prepare_error_report": "Preparing error report",
+    "search_editorial_artists": "Searching artist profiles",
+    "get_editorial_artist_releases": "Looking up artist releases",
+    "search_editorial_news": "Searching published news"
   },
   "pageDescription": "Configure the assistant, test models independently, and review token usage and diagnostics.",
   "tabGeneral": "General",
@@ -343,6 +346,18 @@
     "help": {
       "label": "How does this page work?",
       "prompt": "How does this page work?"
+    },
+    "editorArtist": {
+      "label": "Find an artist",
+      "prompt": "Find the public artist profile and official links for an artist in the darkTunes roster."
+    },
+    "editorReleases": {
+      "label": "Latest artist releases",
+      "prompt": "Help me find the latest published releases for a darkTunes artist."
+    },
+    "editorNews": {
+      "label": "Recent label news",
+      "prompt": "What news has darkTunes published recently?"
     }
   }
 }
