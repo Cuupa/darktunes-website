@@ -22,6 +22,7 @@ type SyncQueueRow = Database['public']['Tables']['sync_queue']['Row']
 
 export type SyncJobType =
   | 'full'
+  | 'itunes'
   | 'spotify'
   | 'discogs'
   | 'youtube'
@@ -93,6 +94,7 @@ export function newWorkerLeaseToken(): string {
 
 const ARTIST_SCOPED_JOB_TYPES: SyncJobType[] = [
   'full',
+  'itunes',
   'spotify',
   'discogs',
   'youtube',
@@ -105,6 +107,8 @@ export function conflictingArtistJobTypes(jobType: SyncJobType): SyncJobType[] {
   switch (jobType) {
     case 'full':
       return ARTIST_SCOPED_JOB_TYPES
+    case 'itunes':
+      return ['full', 'itunes']
     case 'spotify':
       return ['full', 'spotify']
     case 'discogs':
