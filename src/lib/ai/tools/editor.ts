@@ -11,7 +11,7 @@ const EDITOR_CAPABILITIES = ['admin.panel.editor'] as const
 
 /** Escape SQL LIKE wildcards so a user's search means literal artist/title text. */
 function likePattern(value: string): string {
-  return `%${value.replace(/[\\%_]/g, '\\\\$&')}%`
+  return `%${value.replace(/[\\%_]/g, '\\$&')}%`
 }
 
 const publicReleaseSelect = [
