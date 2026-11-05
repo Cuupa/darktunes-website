@@ -2543,6 +2543,18 @@ ALTER TABLE public.sales_statements ADD COLUMN IF NOT EXISTS revision INTEGER NO
 -- Must exist before distributor_import_batches (FK rules_preset_id).
 -- RLS/policies are applied later in the SOS section.
 -- ---------------------------------------------------------------------------
+-- Content-addressed SOS logo assets. Workspaces and presets store only the hash.
+-- No anon/authenticated access: the server-side service role hydrates logos only
+-- after the caller passed existing accounting authorization checks.
+CREATE TABLE IF NOT EXISTS public.sos_logo_assets (
+  id         TEXT PRIMARY KEY CHECK (id ~ '^[0-9a-f]{32}$'),
+  data_url   TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.sos_logo_assets ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.sos_logo_assets FROM anon, authenticated;
+GRANT SELECT, INSERT ON public.sos_logo_assets TO service_role;
+
 CREATE TABLE IF NOT EXISTS public.sos_rules_presets (
   id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   name       TEXT        NOT NULL,
