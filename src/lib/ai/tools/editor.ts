@@ -14,10 +14,7 @@ function likePattern(value: string): string {
   return `%${value.replace(/[\\%_]/g, '\\$&')}%`
 }
 
-const publicReleaseSelect = [
-  'id', 'title', 'release_date', 'type', 'artist_id',
-  'spotify_url', 'apple_music_url', 'youtube_url', 'bandcamp_url', 'smartlink_url',
-].join(',')
+const publicReleaseSelect = 'id,title,release_date,type,spotify_url,apple_music_url,youtube_url,bandcamp_url,smartlink_url' as const
 
 const releaseSummary = z.object({
   title: z.string(),
