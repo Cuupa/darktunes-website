@@ -5,11 +5,13 @@ import { useLocale, useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { horizontalScrollClass } from '@/components/ui/scroll-panel'
+import { getResponseErrorMessage } from '@/lib/clientErrors'
 import type { SyncOverview } from '@/lib/api/syncOverview'
 
 export function SyncCoveragePanel({ bearerToken }: { bearerToken: string }) {
   const t = useTranslations('admin.syncCoverage')
   const locale = useLocale()
+  const tErrors = useTranslations('errors')
   const [data, setData] = useState<SyncOverview | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -23,7 +25,10 @@ export function SyncCoveragePanel({ bearerToken }: { bearerToken: string }) {
         headers: bearerToken ? { Authorization: `Bearer ${bearerToken}` } : undefined,
         cache: 'no-store',
       })
-      if (!response.ok) throw new Error(String(response.status))
+      if (!response.ok) {
+        setError(await getResponseErrorMessage(response, tErrors))
+        return
+      }
       const result: SyncOverview = await response.json()
       setData((previous) => cursor && previous ? { ...result, items: [...previous.items, ...result.items] } : result)
     } catch {
@@ -31,7 +36,7 @@ export function SyncCoveragePanel({ bearerToken }: { bearerToken: string }) {
     } finally {
       setBusy(false)
     }
-  }, [bearerToken, t])
+  }, [bearerToken, t, tErrors])
   useEffect(() => { void load() }, [load])
   const date = (value: string | null) => value ? new Date(value).toLocaleString(locale) : t('never')
   const status = (value: string) => {
