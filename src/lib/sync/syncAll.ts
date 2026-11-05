@@ -609,7 +609,7 @@ export async function syncSingleArtist(
 ): Promise<SyncAllResult> {
   // Legacy jobs must never fall through to a full multi-provider sync.
   if (jobType === 'odesli') return { results: [], totalErrors: 0 }
-  const onlyApi = ['spotify', 'discogs', 'songkick', 'bandsintown'].includes(jobType)
+  const onlyApi = ['itunes', 'spotify', 'discogs', 'songkick', 'bandsintown'].includes(jobType)
     ? jobType
     : undefined
   return syncAll({ ...deps, onlyArtistId: artistId, onlyApi })

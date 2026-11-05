@@ -22,6 +22,7 @@ type SyncQueueRow = Database['public']['Tables']['sync_queue']['Row']
 
 export type SyncJobType =
   | 'full'
+  | 'itunes'
   | 'spotify'
   | 'discogs'
   | 'youtube'
@@ -47,6 +48,31 @@ export interface SyncJob {
   createdAt: string
 }
 
+/** DB-backed scheduling: one checkpoint for each artist/provider. */
+export type ArtistSyncOutcome = 'success' | 'error' | 'cooldown' | 'permanent'
+
+export async function scheduleDueArtistSyncJobs(db: DbClient, limit = 100): Promise<number> {
+  const { data, error } = await db.rpc('schedule_due_artist_syncs', { p_limit: limit })
+  if (error) throw new Error('Failed to schedule due artist syncs: ' + error.message)
+  return data ?? 0
+}
+
+export async function recordArtistSyncOutcome(
+  db: DbClient,
+  artistId: string,
+  provider: string,
+  outcome: ArtistSyncOutcome,
+  errorMessage?: string | null,
+): Promise<void> {
+  const { error } = await db.rpc('record_sync_artist_outcome', {
+    p_artist_id: artistId,
+    p_provider: provider,
+    p_outcome: outcome,
+    p_error: errorMessage?.slice(0, 300) ?? null,
+  })
+  if (error) throw new Error('Failed to save artist sync checkpoint: ' + error.message)
+}
+
 export const MAX_ATTEMPTS = 3
 /**
  * Visibility timeout — running jobs past this are reset to pending.
@@ -68,6 +94,7 @@ export function newWorkerLeaseToken(): string {
 
 const ARTIST_SCOPED_JOB_TYPES: SyncJobType[] = [
   'full',
+  'itunes',
   'spotify',
   'discogs',
   'youtube',
@@ -80,6 +107,8 @@ export function conflictingArtistJobTypes(jobType: SyncJobType): SyncJobType[] {
   switch (jobType) {
     case 'full':
       return ARTIST_SCOPED_JOB_TYPES
+    case 'itunes':
+      return ['full', 'itunes']
     case 'spotify':
       return ['full', 'spotify']
     case 'discogs':
@@ -302,6 +331,7 @@ export async function enqueueArtistSyncJobs(
   db: DbClient,
   artistIds: string[],
   jobType: SyncJobType = 'full',
+  scheduledAt?: string,
 ): Promise<number> {
   if (jobType === 'odesli') throw new Error('Retired sync provider cannot be enqueued')
   if (artistIds.length === 0) return 0
@@ -327,6 +357,7 @@ export async function enqueueArtistSyncJobs(
     artist_id: artistId,
     job_type: jobType,
     status: 'pending' as const,
+    ...(scheduledAt ? { scheduled_at: scheduledAt } : {}),
   }))
 
   const { error } = await db.from('sync_queue').insert(jobs)

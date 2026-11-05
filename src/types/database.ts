@@ -587,6 +587,39 @@ export interface Database {
         }
         Relationships: []
       }
+      sync_artist_state: {
+        Row: {
+          artist_id: string
+          provider: string
+          last_success_at: string | null
+          last_attempt_at: string | null
+          next_due_at: string
+          last_status: string
+          last_error: string | null
+          updated_at: string
+        }
+        Insert: {
+          artist_id: string
+          provider: string
+          last_success_at?: string | null
+          last_attempt_at?: string | null
+          next_due_at?: string
+          last_status?: string
+          last_error?: string | null
+          updated_at?: string
+        }
+        Update: {
+          artist_id?: string
+          provider?: string
+          last_success_at?: string | null
+          last_attempt_at?: string | null
+          next_due_at?: string
+          last_status?: string
+          last_error?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sync_provider_limits: {
         Row: {
           provider: string
@@ -594,6 +627,7 @@ export interface Database {
           cooldown_until: string
           last_rate_limit_at: string | null
           last_request_at: string | null
+          last_success_log_at: string | null
           rate_limit_count: number
           updated_at: string
         }
@@ -603,6 +637,7 @@ export interface Database {
           cooldown_until?: string
           last_rate_limit_at?: string | null
           last_request_at?: string | null
+          last_success_log_at?: string | null
           rate_limit_count?: number
           updated_at?: string
         }
@@ -612,6 +647,7 @@ export interface Database {
           cooldown_until?: string
           last_rate_limit_at?: string | null
           last_request_at?: string | null
+          last_success_log_at?: string | null
           rate_limit_count?: number
           updated_at?: string
         }
@@ -6193,6 +6229,18 @@ export interface Database {
           created_at: string
           updated_at: string
         }
+      }
+      record_sync_artist_outcome: {
+        Args: { p_artist_id: string; p_provider: string; p_outcome: string; p_error?: string | null }
+        Returns: undefined
+      }
+      schedule_due_artist_syncs: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
+      allow_sync_success_log: {
+        Args: { p_provider: string; p_window_seconds?: number }
+        Returns: boolean
       }
       reserve_sync_provider_slot: {
         Args: { p_provider: string; p_spacing_ms?: number }

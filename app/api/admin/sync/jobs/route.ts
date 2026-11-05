@@ -20,6 +20,7 @@ import { describeJobError } from '@/lib/sync/userFacingErrors'
 const STATUSES: SyncJobStatus[] = ['pending', 'running', 'done', 'failed', 'cancelled']
 const JOB_TYPES: SyncJobType[] = [
   'full',
+  'itunes',
   'spotify',
   'discogs',
   'youtube',
