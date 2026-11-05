@@ -1624,5 +1624,27 @@
     "activityUnavailable": "L’activité récente n’a pas pu être chargée.",
     "metricsUnavailable": "Les chiffres de contenu n’ont pas pu être chargés.",
     "systemOpen": "Ouvrir l’état du système"
+  },
+  "syncCoverage": {
+    "title": "Synchronisation des artistes",
+    "description": "Dernière synchronisation réussie et prochaine tentative par artiste et fournisseur.",
+    "refresh": "Actualiser",
+    "loadError": "Impossible de charger les synchronisations. Vérifiez votre connexion et actualisez ce panneau.",
+    "never": "Jamais",
+    "success": "Réussie",
+    "scheduled": "Planifiée",
+    "cooldown": "En attente du fournisseur",
+    "configuration": "Configuration à vérifier",
+    "failed": "Échec",
+    "pausedUntil": "En pause jusqu’au {date}",
+    "ready": "Disponible",
+    "artist": "Artiste",
+    "provider": "Fournisseur",
+    "status": "Statut",
+    "lastSuccess": "Dernière réussite",
+    "nextDue": "Prochaine tentative",
+    "reviewRequired": "Vérifier l’artiste ou les identifiants",
+    "noCheckpoint": "Aucun suivi disponible. Vérifiez les identifiants de plateforme et la configuration du fournisseur.",
+    "more": "Afficher plus d’artistes"
   }
 }

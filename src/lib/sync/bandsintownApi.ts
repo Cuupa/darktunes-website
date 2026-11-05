@@ -84,7 +84,11 @@ export async function fetchBandsintownArtistEvents(
   if (!response.ok) {
     throw new HttpError(
       response.status,
-      `Bandsintown events fetch failed: ${response.status}`,
+      response.status === 404
+        ? `Bandsintown artist not found (404): ${artistId}. Check the registered artist name.`
+        : response.status === 401 || response.status === 403
+          ? `Bandsintown access denied (${response.status}): ${artistId}. Check the artist API key and its access.`
+          : `Bandsintown events fetch failed (${response.status}): ${artistId}.`,
     )
   }
 
@@ -92,7 +96,7 @@ export async function fetchBandsintownArtistEvents(
 
   // Bandsintown returns an object with "error" if the artist is not found
   if (!Array.isArray(data)) {
-    return []
+    throw new HttpError(404, `Bandsintown artist not found (404): ${artistId}. Check the registered artist name.`)
   }
 
   const concerts: BandsintownConcert[] = []

@@ -346,6 +346,46 @@ lines.push('      type: object');
 lines.push('      required: [data]');
 lines.push('      properties:');
 lines.push('        data: { $ref: "#/components/schemas/AppLog" }');
+lines.push("    SyncArtistStates:");
+lines.push("      type: object");
+lines.push("      required: [items, providers, next_cursor]");
+lines.push("      properties:");
+lines.push("        items:");
+lines.push("          type: array");
+lines.push("          items:");
+lines.push("            type: object");
+lines.push("            required: [artist_id, artist_name, states]");
+lines.push("            properties:");
+lines.push("              artist_id: { type: string, format: uuid }");
+lines.push("              artist_name: { type: string }");
+lines.push("              states:");
+lines.push("                type: array");
+lines.push("                items:");
+lines.push("                  type: object");
+lines.push("                  properties:");
+lines.push("                    artist_id: { type: string, format: uuid }");
+lines.push("                    provider: { type: string }");
+lines.push("                    last_status: { type: string, enum: [scheduled, success, error, cooldown, permanent] }");
+lines.push("                    last_success_at: { type: string, format: date-time, nullable: true }");
+lines.push("                    last_attempt_at: { type: string, format: date-time, nullable: true }");
+lines.push("                    next_due_at: { type: string, format: date-time }");
+lines.push("                    last_error: { type: string, nullable: true }");
+lines.push("                    updated_at: { type: string, format: date-time }");
+lines.push("        providers:");
+lines.push("          type: array");
+lines.push("          items:");
+lines.push("            type: object");
+lines.push("            properties:");
+lines.push("              provider: { type: string }");
+lines.push("              next_request_at: { type: string, format: date-time }");
+lines.push("              cooldown_until: { type: string, format: date-time }");
+lines.push("              last_rate_limit_at: { type: string, format: date-time, nullable: true }");
+lines.push("              last_request_at: { type: string, format: date-time, nullable: true }");
+lines.push("              last_success_log_at: { type: string, format: date-time, nullable: true }");
+lines.push("              rate_limit_count: { type: integer, minimum: 0 }");
+lines.push("              updated_at: { type: string, format: date-time }");
+lines.push("        next_cursor: { type: string, format: uuid, nullable: true }");
+lines.push(..."    McpReviewResult:\n      type: object\n      required: [ok, detail, location, entity_id, replayed]\n      properties:\n        ok: { type: boolean, const: true }\n        detail: { type: string }\n        location: { type: string }\n        entity_id: { type: string, format: uuid }\n        replayed: { type: boolean }\n        decision: { type: string, enum: [approved, rejected] }".split('\n'));
 lines.push('    StorageStats:');
 lines.push('      type: object');
 lines.push('      required: [used_bytes, catalog_used_bytes, asset_count, limit_bytes, source]');
@@ -901,8 +941,20 @@ lines.push('        application/json:');
 lines.push('          schema: { $ref: "#/components/schemas/ErrorResponse" }');
 lines.push('');
 lines.push('paths:');
+// Same-origin review routes live outside app/api. Keep their explicit contracts.
+lines.push(..."  /mcp/content-approvals:\n    post:\n      operationId: reviewMcpContentProposal\n      tags: [Admin]\n      summary: Accept or decline a GPT-proposed artist, release or event edit\n      description: >\n        Requires a same-origin, cookie-authenticated darkTunes admin/editor\n        browser session. OAuth bearer requests are rejected. All administrators\n        may review the shared queue; editors may review only their own proposals.\n        Decisions are atomic and idempotent; pending proposals do not expire. Content changes require the\n        corresponding current CMS capability.\n      security: []\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              additionalProperties: false\n              required: [token, action]\n              properties:\n                token:\n                  type: string\n                  description: Server-generated proposal UUID or legacy one-time token.\n                action:\n                  type: string\n                  enum: [update_cms_artist, update_cms_release, update_cms_event]\n                decision:\n                  type: string\n                  enum: [approve, reject]\n                  default: approve\n      responses:\n        '200':\n          description: Proposal accepted or declined in a database transaction.\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/McpReviewResult'\n        '400': { description: Invalid identifier or action }\n        '401': { description: Login required }\n        '403': { description: Insufficient CMS permission or origin rejected }\n        '409': { description: Proposal changed, already decided or no longer applicable }\n        '429': { description: Too many review attempts }\n        '503': { description: MCP disabled or database function not deployed }\n  /mcp/news-draft-approvals:\n    post:\n      operationId: reviewMcpNewsProposal\n      tags: [Admin]\n      summary: Accept or decline a GPT-prepared unpublished news draft\n      description: >\n        Same-origin browser session required. All administrators may review\n        any pending label proposal while editors can review only their own.\n        Accept creates an unpublished draft; decline never mutates CMS content.\n      security: []\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              additionalProperties: false\n              required: [token]\n              properties:\n                token:\n                  type: string\n                decision:\n                  type: string\n                  enum: [approve, reject]\n                  default: approve\n      responses:\n        '200':\n          description: Proposal declined or replay of a previously committed decision.\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/McpReviewResult'\n        '201':\n          description: An unpublished news draft was created.\n          content:\n            application/json:\n              schema:\n                $ref: '#/components/schemas/McpReviewResult'\n        '400': { description: Invalid identifier }\n        '401': { description: Login required }\n        '403': { description: Insufficient CMS permission or origin rejected }\n        '409': { description: Proposal changed or already decided }\n        '429': { description: Too many review attempts }\n        '503': { description: MCP disabled or database function not deployed }".split('\n'));
 
 const schemaOverrides = {
+  '/api/admin/sync/artist-states': {
+    GET: {
+      summary: 'Artist provider checkpoints and shared API cooldowns',
+      parameters: [
+        { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 100, default: 25 } },
+        { name: 'cursor', in: 'query', schema: { type: 'string', format: 'uuid' } },
+      ],
+      responses: { 200: { schema: 'SyncArtistStates' }, 400: { description: 'Invalid limit or artist cursor.' } },
+    },
+  },
   '/api/admin/assets/storage-stats': {
     GET: {
       summary: 'Catalog and R2 bucket storage totals',

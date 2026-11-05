@@ -81,6 +81,7 @@ vi.mock('@/lib/api/syncQueue', async (importOriginal) => {
     markSyncJobFailed,
     markSyncJobDone,
     isSyncJobCancelRequested,
+    recordArtistSyncOutcome: vi.fn(async () => {}),
   }
 })
 
@@ -109,7 +110,7 @@ afterEach(() => {
 })
 
 describe('POST /api/sync', () => {
-  it('accepts a cron kick, records a worker tick and opens a run', async () => {
+  it('records a heartbeat without opening a run when no job is due', async () => {
     const { POST } = await loadSyncRoute()
     const res = await POST(cronRequest())
     const body = await res.json()
@@ -117,14 +118,9 @@ describe('POST /api/sync', () => {
     expect(res.status).toBe(200)
     expect(body).toEqual({ accepted: true, alreadyRunning: false })
     expect(recordCronTick).toHaveBeenCalledWith(expect.anything(), 'worker', 'ok')
-    expect(startSyncRun).toHaveBeenCalledWith(expect.anything(), 'cron')
-
     await waitUntilPromise
-    expect(finishSyncRun).toHaveBeenCalledWith(
-      expect.anything(),
-      'run-1',
-      expect.objectContaining({ status: 'ok', claimed: 0, completed: 0, failed: 0 }),
-    )
+    expect(startSyncRun).not.toHaveBeenCalled()
+    expect(finishSyncRun).not.toHaveBeenCalled()
     expect(releaseSyncWorkerLease).toHaveBeenCalledWith(expect.anything(), 'token-1')
     expect(getSyncCredentials).not.toHaveBeenCalled()
   })
@@ -236,4 +232,18 @@ describe('POST /api/sync', () => {
     expect(res.status).toBe(401)
     expect(acquireSyncWorkerLease).not.toHaveBeenCalled()
   })
+})
+
+it('counts provider errors returned by the orchestrator as failed work', async () => {
+  claimSyncJobs.mockResolvedValueOnce([{ id: 'job-returned-error', artistId: 'artist-1', jobType: 'spotify', attemptCount: 1 }])
+  const { POST } = await loadSyncRoute()
+  const { syncSingleArtist } = await import('@/lib/sync/syncAll')
+  vi.mocked(syncSingleArtist).mockResolvedValueOnce({
+    results: [{ api: 'spotify', artistsProcessed: 1, releasesUpserted: 0, concertsUpserted: 0, rateLimited: false, errors: ['Spotify access denied (403)'] }],
+    totalErrors: 1,
+  })
+  await POST(cronRequest())
+  await waitUntilPromise
+  expect(markSyncJobFailed).toHaveBeenCalled()
+  expect(finishSyncRun).toHaveBeenCalledWith(expect.anything(), 'run-1', expect.objectContaining({ status: 'partial', completed: 0, failed: 1 }))
 })

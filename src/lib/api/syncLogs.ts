@@ -36,13 +36,15 @@ export async function insertSyncLog(db: DbClient, log: SyncLogInsert): Promise<S
  * the console instead of disappearing. Returns true when the row was persisted.
  */
 export async function recordSyncLog(db: DbClient, log: SyncLogInsert): Promise<boolean> {
-  // Skip pure-success sync logs with nothing synced — they carry no signal and
-  // would otherwise grow sync_logs unbounded on every worker tick.
-  if (log.status === 'success' && (log.releases_synced ?? 0) === 0) {
-    return true
-  }
-
   try {
+    if (log.status === 'success' && ['itunes', 'spotify', 'discogs', 'songkick', 'bandsintown'].includes(log.api_source ?? '')) {
+      const { data: allowed, error } = await db.rpc('allow_sync_success_log', {
+        p_provider: log.api_source!,
+        p_window_seconds: 3600,
+      })
+      if (error) throw new Error(`Success-log sampling failed: ${error.message}`)
+      if (!allowed) return true
+    }
     await insertSyncLog(db, log)
     return true
   } catch (error) {

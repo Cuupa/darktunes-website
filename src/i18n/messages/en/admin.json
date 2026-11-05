@@ -1624,5 +1624,27 @@
     "activityUnavailable": "Recent activity could not be loaded.",
     "metricsUnavailable": "Content counts could not be loaded.",
     "systemOpen": "Open system status"
+  },
+  "syncCoverage": {
+    "title": "Artist sync coverage",
+    "description": "Last successful sync and next attempt for each artist and provider.",
+    "refresh": "Refresh",
+    "loadError": "Sync coverage could not be loaded. Check your connection and refresh this panel.",
+    "never": "Never",
+    "success": "Successful",
+    "scheduled": "Scheduled",
+    "cooldown": "Waiting for provider",
+    "configuration": "Configuration issue",
+    "failed": "Failed",
+    "pausedUntil": "Paused until {date}",
+    "ready": "Ready",
+    "artist": "Artist",
+    "provider": "Provider",
+    "status": "Status",
+    "lastSuccess": "Last success",
+    "nextDue": "Next attempt",
+    "reviewRequired": "Review artist mapping or credentials",
+    "noCheckpoint": "No provider checkpoint yet. Check the artist platform IDs and provider configuration.",
+    "more": "Show more artists"
   }
 }
