@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 import {
   acquireSyncWorkerLease,
+  enqueueArtistSyncJobs,
+  recordArtistSyncOutcome,
   claimSyncJobs,
   finishSyncRun,
   isSyncJobCancelRequested,
@@ -74,6 +76,39 @@ async function processSyncJob(
 
   const result = await syncSingleArtist(job.artistId, job.jobType, deps)
   const rateLimited = result.results.some((r) => r.rateLimited)
+  const retryableProviders: Array<{ api: SyncJobType; delayed: boolean }> = []
+
+  // Save each provider independently. A successful iTunes sync is not invalidated
+  // merely because Spotify has reached a shared application-wide quota.
+  for (const source of result.results) {
+    if (source.artistsProcessed < 1) continue
+    if (!['itunes', 'spotify', 'discogs', 'songkick', 'bandsintown'].includes(source.api)) continue
+    const failed = source.errors.length > 0
+    const permanent = failed && !source.rateLimited
+      && source.errors.every((message) => isPermanentSyncError(message))
+    const outcome = source.rateLimited ? 'cooldown'
+      : permanent ? 'permanent'
+      : failed ? 'error'
+      : 'success'
+    await recordArtistSyncOutcome(db, job.artistId, source.api, outcome, source.errors[0])
+    if (failed && !permanent) {
+      retryableProviders.push({ api: source.api as SyncJobType, delayed: source.rateLimited })
+    }
+  }
+
+  if (job.jobType === 'full') {
+    // Legacy/manual full jobs are split once: only failed providers are retried.
+    // Complete the full job before enqueuing provider jobs, since the existing
+    // single-flight conflict check intentionally blocks a provider behind 'full'.
+    await markSyncJobDone(db, job.id)
+    for (const provider of retryableProviders) {
+      const delay = provider.delayed ? RATE_LIMIT_JOB_COOLDOWN_MS : 2 * 60_000
+      await enqueueArtistSyncJobs(
+        db, [job.artistId], provider.api, new Date(Date.now() + delay).toISOString(),
+      )
+    }
+    return tagsForJobType(job.jobType)
+  }
 
   if (rateLimited) {
     // Push this artist out of the due window; keep draining other artists.
