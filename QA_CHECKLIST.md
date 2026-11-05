@@ -1,6 +1,12 @@
 # Pre-Release QA Checklist
 
 ## AI assistant
+- [ ] Editor assistant resolves a published artist by name (e.g. Frozen Plasma), returns only public bio and links, and does not expose contact, financial or private notes.
+- [ ] Editor assistant finds the newest published release for an exact artist name (e.g. Extize), includes releases credited through the release_artists junction, and excludes hidden/promo releases.
+- [ ] An ambiguous artist name offers candidates; an unknown artist is not misreported as having no releases anywhere outside darkTunes.
+- [ ] Editor published-news search excludes unpublished drafts, press-only news and scheduled news with future publication dates.
+- [ ] Artists cannot invoke editorial label research tools through a crafted tool call; editors cannot invoke admin analytics or financial tools.
+- [ ] Editor empty-chat suggestions offer artists, releases, news and open submissions with valid DE/EN/FR labels.
 - [ ] GPT Freigaben: progress starts at 0/N, increments only after a successful server response and does not count in-flight or failed Accept/Decline actions
 - [ ] GPT Freigaben: a 409 for a genuinely edited proposed field shows a specific conflict and restores the proposal; an unrelated record update does not block the proposal
 - [ ] GPT Freigaben: a missing RPC or arbitrary database failure does not display an incorrect expired/used conflict message; the operator can distinguish status codes

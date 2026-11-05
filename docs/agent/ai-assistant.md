@@ -28,6 +28,13 @@ The server resolves every request into one typed actor:
 
 URL parameters are never authorization. Tool visibility is computed from role, capabilities, data scope and artist scope, and the same checks run again at execution.
 
+## Editorial assistant research
+
+Editors have three read-only, server-authorized research tools (`admin.panel.editor`, label scope):
+`search_editorial_artists` searches visible public artist profiles, `get_editorial_artist_releases` resolves a named visible artist and includes the release-artist credit junction, and `search_editorial_news` searches already-published public news. Each tool uses an explicit bounded column projection; there is no private artist profile, financial, unreleased draft, press-only news, or unannounced scheduled content in the output. Ambiguous artist names return candidates instead of silently choosing the wrong artist. Search results refer only to the darkTunes published catalog, not the entire web.
+
+The editor welcome prompts prioritize artist profiles, releases, news and open submissions. Portal help is not evidence for artist catalog facts. Tool visibility and execution enforce role/capabilities, not dashboard strings.
+
 ## Models and reasoning
 
 Defaults (also `ai_settings` column defaults / `DEFAULT_AI_MODELS`):

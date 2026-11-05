@@ -5,6 +5,9 @@ export type AssistantSuggestionId =
   | 'statementExplain'
   | 'statementIncome'
   | 'invoiceWhere'
+  | 'editorArtist'
+  | 'editorReleases'
+  | 'editorNews'
   | 'pendingSubmissions'
   | 'labelOverview'
   | 'systemHealth'
@@ -47,6 +50,13 @@ export function buildAssistantSuggestions({
   }
 
   const suggestions: AssistantSuggestionId[] = []
+  if (audience === 'editor') {
+    if (has('search_editorial_artists')) suggestions.push('editorArtist')
+    if (has('get_editorial_artist_releases')) suggestions.push('editorReleases')
+    if (has('search_editorial_news')) suggestions.push('editorNews')
+    if (has('get_pending_submissions')) suggestions.push('pendingSubmissions')
+    return unique(suggestions).slice(0, 4)
+  }
   if (on('/admin/system') || on('/admin/ai') || on('/admin/support')) {
     if (has('get_recent_app_errors')) suggestions.push('recentErrors')
     if (has('get_system_health')) suggestions.push('systemHealth')
