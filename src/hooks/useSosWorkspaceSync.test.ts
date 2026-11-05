@@ -153,6 +153,15 @@ describe('useSosWorkspaceSync', () => {
       expect(ok).toBe(true)
     })
 
+    await act(async () => {
+      await Promise.all([result.current.saveCurrentWorkspace(), result.current.saveCurrentWorkspace()])
+    })
+    const concurrentBodies = fetchMock.mock.calls
+      .filter((call) => String(call[0]) === '/api/admin/sos/workspaces' && call[1]?.method === 'POST')
+      .map((call) => JSON.parse(String(call[1]?.body)) as { expected_revision: number })
+    // The fixture returns revision 4. Both follow-up saves must read it after
+    // the preceding response rather than reusing the initial revision 3.
+    expect(concurrentBodies.map((body) => body.expected_revision)).toEqual([3, 4, 4])
     const postCall = fetchMock.mock.calls.find(
       (call) =>
         String(call[0]) === '/api/admin/sos/workspaces' &&

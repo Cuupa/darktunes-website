@@ -42,6 +42,7 @@ import {
 } from '@/lib/health/apiStatus'
 import { isHealthSnapshot, type AlertSeverity, type HealthResponse } from '@/lib/health/types'
 import { describeSyncQueueIssue } from '@/lib/sync/userFacingErrors'
+import { SyncCoveragePanel } from '@/components/admin/sync/SyncCoveragePanel'
 import { SyncAdvancedJobsPanel } from '@/components/admin/sync/SyncAdvancedJobsPanel'
 
 interface SystemHealthWidgetProps {
@@ -641,6 +642,8 @@ export function SystemHealthWidget({ bearerToken }: SystemHealthWidgetProps) {
           </CardContent>
         </Card>
       )}
+
+      <SyncCoveragePanel bearerToken={bearerToken} />
 
       {viewMode === 'advanced' && (
         <SyncAdvancedJobsPanel bearerToken={bearerToken} activeWork={activeWork} />

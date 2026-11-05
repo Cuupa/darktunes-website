@@ -233,3 +233,14 @@ describe('buildHealthSnapshot', () => {
     expect(snapshot.kpis.configuredApis).toBe(2)
   })
 })
+it('keeps a successful database probe when diagnostics fail', async () => {
+  const db = createMockDb()
+  vi.mocked(db.from).mockImplementation((table: string) => {
+    if (table === 'artists') return makeThenableBuilder([]) as never
+    throw new Error('diagnostic relation unavailable')
+  })
+  const result = await buildHealthSnapshot({ db, knownApis: { spotify: true }, nowMs: NOW_MS })
+  expect(result.database.status).toBe('online')
+  expect(result.status).toBe('degraded')
+  expect(result.statusLabel).toBe('Diagnostics unavailable')
+})

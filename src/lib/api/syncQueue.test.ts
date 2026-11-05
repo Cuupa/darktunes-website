@@ -212,6 +212,7 @@ describe('conflictingArtistJobTypes', () => {
   it('treats full jobs as blocking any artist-scoped sync', () => {
     expect(conflictingArtistJobTypes('full')).toEqual([
       'full',
+      'itunes',
       'spotify',
       'discogs',
       'youtube',

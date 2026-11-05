@@ -170,7 +170,7 @@ describe('syncArtist', () => {
     const fromFn = vi.fn().mockReturnValue(
       makeArtistBuilder(null, { message: 'Not found', code: 'PGRST116' }),
     )
-    const db = { from: fromFn } as unknown as DbClient
+    const db = { from: fromFn, rpc: vi.fn().mockResolvedValue({ data: true, error: null }) } as unknown as DbClient
 
     const result = await syncArtist(ARTIST_ID, {
       db,
@@ -209,7 +209,7 @@ describe('syncArtist', () => {
       }
       return makeGenericBuilder()
     })
-    const db = { from: fromFn } as unknown as DbClient
+    const db = { from: fromFn, rpc: vi.fn().mockResolvedValue({ data: true, error: null }) } as unknown as DbClient
 
     await syncArtist(ARTIST_ID, {
       db,
@@ -234,7 +234,7 @@ describe('syncArtist', () => {
       if (table === 'releases') return makeReleasesTableBuilder()
       return makeGenericBuilder()
     })
-    const db = { from: fromFn } as unknown as DbClient
+    const db = { from: fromFn, rpc: vi.fn().mockResolvedValue({ data: true, error: null }) } as unknown as DbClient
 
     const result = await syncArtist(ARTIST_ID, {
       db,
@@ -278,7 +278,7 @@ describe('syncArtist', () => {
       }
       return makeGenericBuilder()
     })
-    const db = { from: fromFn } as unknown as DbClient
+    const db = { from: fromFn, rpc: vi.fn().mockResolvedValue({ data: true, error: null }) } as unknown as DbClient
 
     await syncArtist(ARTIST_ID, {
       db,
@@ -307,7 +307,7 @@ describe('syncArtist', () => {
       if (table === 'releases') return makeReleasesTableBuilder()
       return makeGenericBuilder()
     })
-    const db = { from: fromFn } as unknown as DbClient
+    const db = { from: fromFn, rpc: vi.fn().mockResolvedValue({ data: true, error: null }) } as unknown as DbClient
 
     const result = await syncArtist(ARTIST_ID, {
       db,
@@ -328,7 +328,7 @@ describe('syncArtist', () => {
       if (table === 'artists') return makeArtistBuilder(ARTIST_ROW)
       return makeGenericBuilder()
     })
-    const db = { from: fromFn } as unknown as DbClient
+    const db = { from: fromFn, rpc: vi.fn().mockResolvedValue({ data: true, error: null }) } as unknown as DbClient
 
     const result = await syncArtist(ARTIST_ID, {
       db,
@@ -358,7 +358,7 @@ describe('syncArtist', () => {
       }
       return makeGenericBuilder()
     })
-    const db = { from: fromFn } as unknown as DbClient
+    const db = { from: fromFn, rpc: vi.fn().mockResolvedValue({ data: true, error: null }) } as unknown as DbClient
 
     const result = await syncArtist(ARTIST_ID, {
       db,
@@ -385,7 +385,7 @@ describe('syncArtist', () => {
       }
       return makeGenericBuilder()
     })
-    const db = { from: fromFn } as unknown as DbClient
+    const db = { from: fromFn, rpc: vi.fn().mockResolvedValue({ data: true, error: null }) } as unknown as DbClient
 
     await syncArtist(ARTIST_ID, {
       db,

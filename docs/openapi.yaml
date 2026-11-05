@@ -82,16 +82,6 @@ components:
         must have the `partner_api` feature enabled.
 
   schemas:
-    McpReviewResult:
-      type: object
-      required: [ok, detail, location, entity_id, replayed]
-      properties:
-        ok: { type: boolean, const: true }
-        detail: { type: string }
-        location: { type: string }
-        entity_id: { type: string, format: uuid }
-        replayed: { type: boolean }
-        decision: { type: string, enum: [approved, rejected] }
     ErrorResponse:
       type: object
       required: [error]
@@ -181,6 +171,55 @@ components:
       required: [data]
       properties:
         data: { $ref: "#/components/schemas/AppLog" }
+    SyncArtistStates:
+      type: object
+      required: [items, providers, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [artist_id, artist_name, states]
+            properties:
+              artist_id: { type: string, format: uuid }
+              artist_name: { type: string }
+              states:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    artist_id: { type: string, format: uuid }
+                    provider: { type: string }
+                    last_status: { type: string, enum: [scheduled, success, error, cooldown, permanent] }
+                    last_success_at: { type: string, format: date-time, nullable: true }
+                    last_attempt_at: { type: string, format: date-time, nullable: true }
+                    next_due_at: { type: string, format: date-time }
+                    last_error: { type: string, nullable: true }
+                    updated_at: { type: string, format: date-time }
+        providers:
+          type: array
+          items:
+            type: object
+            properties:
+              provider: { type: string }
+              next_request_at: { type: string, format: date-time }
+              cooldown_until: { type: string, format: date-time }
+              last_rate_limit_at: { type: string, format: date-time, nullable: true }
+              last_request_at: { type: string, format: date-time, nullable: true }
+              last_success_log_at: { type: string, format: date-time, nullable: true }
+              rate_limit_count: { type: integer, minimum: 0 }
+              updated_at: { type: string, format: date-time }
+        next_cursor: { type: string, format: uuid, nullable: true }
+    McpReviewResult:
+      type: object
+      required: [ok, detail, location, entity_id, replayed]
+      properties:
+        ok: { type: boolean, const: true }
+        detail: { type: string }
+        location: { type: string }
+        entity_id: { type: string, format: uuid }
+        replayed: { type: boolean }
+        decision: { type: string, enum: [approved, rejected] }
     StorageStats:
       type: object
       required: [used_bytes, catalog_used_bytes, asset_count, limit_bytes, source]
@@ -911,6 +950,71 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/ai/credits:
+    get:
+      operationId: getadmin_ai_credits
+      tags: [Admin]
+      summary: "Read AI credit settings, artist allowances and financial summaries"
+      security:
+        - AdminBearer: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      operationId: patchadmin_ai_credits
+      tags: [Admin]
+      summary: Atomically update AI credit limits and per-model prices
+      security:
+        - AdminBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/[object Object]"
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/ai/credits/adjustments:
+    post:
+      operationId: postadmin_ai_credits_adjustments
+      tags: [Admin]
+      summary: Grant or correct monthly AI credits with an audited idempotency key
+      security:
+        - AdminBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/[object Object]"
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/admin/ai/diagnostics:
     get:
       operationId: getadmin_ai_diagnostics
@@ -1018,76 +1122,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminAiSettings"
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-  /api/admin/ai/credits/adjustments:
-    post:
-      operationId: postadmin_ai_credits_adjustments
-      tags: [Admin]
-      summary: "Apply an audited credit adjustment to a monthly account"
-      security:
-        - AdminBearer: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-  /api/admin/ai/credits:
-    get:
-      operationId: getadmin_ai_credits
-      tags: [Admin]
-      summary: "Read credit prices, shared artist balances and model cost totals"
-      security:
-        - AdminBearer: []
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-    patch:
-      operationId: patchadmin_ai_credits
-      tags: [Admin]
-      summary: "Configure monthly credit limits and model tariffs atomically"
-      security:
-        - AdminBearer: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: true
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -3342,31 +3376,6 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-  /api/admin/resolve-release-smart-link:
-    post:
-      operationId: postadmin_resolve-release-smart-link
-      tags: [Admin]
-      summary: Create or submit /api/admin/resolve-release-smart-link
-      security:
-        - AdminBearer: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessResponse"
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
   /api/admin/roles/custom:
     get:
       operationId: getadmin_roles_custom
@@ -5016,6 +5025,37 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /api/admin/sync/artist-states:
+    get:
+      operationId: getadmin_sync_artist-states
+      tags: [Admin]
+      summary: Artist provider checkpoints and shared API cooldowns
+      security:
+        - AdminBearer: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncArtistStates"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/admin/sync/jobs:
     get:
       operationId: getadmin_sync_jobs
@@ -6090,6 +6130,60 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/mcp:
+    get:
+      operationId: getmcp
+      tags: [Public]
+      summary: Retrieve /api/mcp
+      security:
+        - {}
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: postmcp
+      tags: [Public]
+      summary: Create or submit /api/mcp
+      security:
+        - {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: deletemcp
+      tags: [Public]
+      summary: Delete /api/mcp
+      security:
+        - {}
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
   /api/newsletter:
     post:
@@ -9325,27 +9419,4 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-  /api/vitals:
-    post:
-      operationId: postvitals
-      tags: [Public]
-      summary: Ingest a Core Web Vital; critical values persist an aggregated app_logs row
-      security:
-        - {}
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: true
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SuccessResponse"
-        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }

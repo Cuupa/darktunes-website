@@ -154,3 +154,17 @@ describe('normalizeHealthApiSource', () => {
     expect(normalizeHealthApiSource('spotify')).toBe('spotify')
   })
 })
+describe('isolated integration failures', () => {
+  it('keeps provider failure visible without declaring a website outage', () => {
+    expect(deriveOverallHealth(true, ['operational', 'failing'], 'operational').status).toBe('degraded')
+    expect(deriveOverallHealth(true, ['operational'], 'failing').status).toBe('unhealthy')
+  })
+  it('identifies an invalid artist mapping separately from rate limits', () => {
+    const result = deriveApiHealth('bandsintown', true, makeSnapshot({ status: 'error', errors: ['Artist not found (404)'] }), NOW)
+    expect(result.operationalState).toBe('degraded')
+    expect(result.statusLabel).toContain('credentials')
+  })
+  it('does not mark a weekly Discogs sync overdue after two days', () => {
+    expect(deriveApiHealth('discogs', true, makeSnapshot({ createdAt: new Date(NOW - 2 * 86400000).toISOString() }), NOW).operationalState).toBe('operational')
+  })
+})

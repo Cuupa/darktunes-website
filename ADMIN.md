@@ -304,3 +304,9 @@ If a public page shows stale data after an admin save:
 ## ChatGPT / MCP connector
 
 The optional connector is off unless `MCP_CONNECTOR_ENABLED=true` and Supabase OAuth Server is configured. Admin → **GPT-Freigaben** (`/admin/mcp-approvals`) is the shared review queue for all administrators. Editors see only their own proposals and may act only with current CMS permissions. Suggestions remain pending indefinitely until accepted or declined, including old formerly expired proposals, and are displayed one at a time with **Back, Skip, Accept, Decline** and full before/after details. Accepting or declining immediately moves to the next proposal while the server commits the decision asynchronously; failures restore the item. All admins are notified through the **existing** notification bell. An accepted news draft is saved unpublished, never auto-published. Atomic database functions `commit_mcp_approval` and `reject_mcp_approval` must be installed before this flow can be used in production. See [docs/MCP_CONNECTOR.md](docs/MCP_CONNECTOR.md).
+
+## Sync coverage and health (2026-11-05)
+
+System health includes an Artist sync coverage panel in both guided and advanced views. It shows each artist/provider checkpoint, last successful sync, next attempt and current shared provider pauses. Refresh updates the first page; Show more artists continues the list. An artist without a checkpoint is shown explicitly so missing platform IDs/configuration can be checked. A configuration failure on one artist does not mean the website is offline.
+
+Accounting autosave and manual saves are serialized within a browser session to prevent a session conflicting with its own workspace revision. Conflicts with another session still preserve local changes and require reload.

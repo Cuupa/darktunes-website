@@ -137,8 +137,9 @@ function formatSyncMetrics(
   return parts.length > 0 ? parts.join(' · ') : 'No items synced'
 }
 
-function isStale(lastSyncAt: string, nowMs: number): boolean {
-  return nowMs - new Date(lastSyncAt).getTime() > STALE_SYNC_MS
+function isStale(api: string, lastSyncAt: string, nowMs: number): boolean {
+  const staleAfter = api === 'discogs' ? 8 * 24 * 60 * 60 * 1000 : STALE_SYNC_MS
+  return nowMs - new Date(lastSyncAt).getTime() > staleAfter
 }
 
 export function deriveApiHealth(
@@ -176,6 +177,14 @@ export function deriveApiHealth(
     }
   }
 
+  if (snapshot.status === 'error' && snapshot.errors.some((error) => /\b(?:401|403|404)\b/.test(error))) {
+    return {
+      operationalState: 'degraded',
+      statusLabel: 'Artist or credentials need review',
+      statusDetail: `Check the affected artist mapping and provider credentials. ${metrics}`,
+    }
+  }
+
   if (snapshot.status === 'error') {
     return {
       operationalState: 'failing',
@@ -198,7 +207,7 @@ export function deriveApiHealth(
     }
   }
 
-  if (isStale(snapshot.createdAt, nowMs)) {
+  if (isStale(api, snapshot.createdAt, nowMs)) {
     return {
       operationalState: 'stale',
       statusLabel: 'Sync overdue',
@@ -314,7 +323,7 @@ export function deriveOverallHealth(
     (s) => s === 'degraded' || s === 'stale' || s === 'failing',
   ).length
 
-  if (maxSeverity >= 4 || queueState === 'failing') {
+  if (queueState === 'failing') {
     const parts: string[] = []
     if (failingApis > 0) parts.push(`${failingApis} API${failingApis === 1 ? '' : 's'} failing`)
     if (queueState === 'failing') parts.push('sync queue needs attention')

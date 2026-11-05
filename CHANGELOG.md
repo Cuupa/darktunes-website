@@ -10,6 +10,12 @@ Release ritual: [docs/RELEASING.md](docs/RELEASING.md).
 
 ## [Unreleased]
 
+### System audit hardening
+- Repair artist membership policies, block profile/artist privilege escalation, trust only managed signup metadata, and restrict legacy trigger/submission RPC grants.
+- Add paginated artist/provider sync coverage, isolate integration failures from website liveness, and retain hourly successful provider samples without idle run rows.
+- Serialize accounting saves to prevent local revision races; make public artist dates and portal totals deterministic across hydration.
+- Add script nonces to dynamic authenticated pages and strengthen CSP/Permissions-Policy. Optimize RLS auth evaluation and access indexes.
+
 ### Added
 - **Shared GPT approvals:** all darkTunes administrators see one inbox of ChatGPT CMS proposals with one-card-at-a-time review (Back, Skip, Accept, Decline, detailed before/after comparison), optimistic async decisions with failure restoration, existing admin bell notifications, atomic PostgreSQL approve/decline and no proposal expiry (including restored legacy proposals). Editors retain own-proposal restrictions and current CMS rights.
 - **MCP CMS detail tools:** bounded, role-scoped lookups of individual news items, artist profiles, releases and events without exposing private columns.

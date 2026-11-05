@@ -58,7 +58,7 @@ async function processSyncJob(
   job: SyncJob,
   uploadFn: ReturnType<typeof createSyncUploadFn>,
   syncCredentials: Awaited<ReturnType<typeof getSyncCredentials>>,
-): Promise<PublicContentTag[]> {
+): Promise<{ tags: PublicContentTag[]; outcome: 'completed' | 'deferred' | 'failed' }> {
   const deps = {
     db,
     fetch: globalThis.fetch,
@@ -71,7 +71,7 @@ async function processSyncJob(
 
   if (!job.artistId) {
     await markSyncJobFailed(db, job.id, 'Job has no artist_id', job.attemptCount)
-    return []
+    return { tags: [], outcome: 'failed' }
   }
 
   const result = await syncSingleArtist(job.artistId, job.jobType, deps)
@@ -107,7 +107,7 @@ async function processSyncJob(
         db, [job.artistId], provider.api, new Date(Date.now() + delay).toISOString(),
       )
     }
-    return tagsForJobType(job.jobType)
+    return { tags: tagsForJobType(job.jobType), outcome: result.totalErrors > 0 ? 'failed' : 'completed' }
   }
 
   if (rateLimited) {
@@ -126,7 +126,7 @@ async function processSyncJob(
     await markSyncJobDone(db, job.id)
   }
 
-  return tagsForJobType(job.jobType)
+  return { tags: tagsForJobType(job.jobType), outcome: rateLimited ? 'deferred' : result.totalErrors > 0 ? 'failed' : 'completed' }
 }
 
 export const POST = withErrorHandler(async (request: NextRequest): Promise<NextResponse> => {
@@ -167,7 +167,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
     return NextResponse.json({ accepted: true, alreadyRunning: true, processed: 0 })
   }
 
-  const runId = await startSyncRun(db, trigger)
+  let runId: string | null = null
 
   const uploadFn = createSyncUploadFn(
     serverEnv.CLOUDFLARE_R2_ACCOUNT_ID,
@@ -204,6 +204,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
           const [job] = await claimSyncJobs(db, 1)
           if (!job) break
 
+          runId ??= await startSyncRun(db, trigger)
           claimed += 1
 
           // Retire legacy jobs without querying the defunct provider or credentials.
@@ -228,15 +229,16 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
               syncCredentialsPromise = null
               throw error
             })
-            const tags = await processSyncJob(db, job, uploadFn, credentials)
+            const processed = await processSyncJob(db, job, uploadFn, credentials)
             // processSyncJob finalises via markSyncJobDone/rescheduleSyncJob, both
             // of which honour cancel_requested_at. Re-check so we never leave a
             // cancel request stranded if finalisation was skipped.
             if (await isSyncJobCancelRequested(db, job.id)) {
               await markSyncJobCancelled(db, job.id)
             }
-            for (const tag of tags) tagsToRevalidate.add(tag)
-            completed += 1
+            for (const tag of processed.tags) tagsToRevalidate.add(tag)
+            if (processed.outcome === 'failed') failed += 1
+            else if (processed.outcome === 'completed') completed += 1
           } catch (err) {
             if (await isSyncJobCancelRequested(db, job.id)) {
               await markSyncJobCancelled(db, job.id)
@@ -269,7 +271,7 @@ export const POST = withErrorHandler(async (request: NextRequest): Promise<NextR
       } finally {
         // 'partial' keeps a run with some failed jobs from reading as a clean success.
         const runStatus = runError ? 'error' : failed > 0 ? 'partial' : 'ok'
-        await finishSyncRun(db, runId, {
+        if (runId) await finishSyncRun(db, runId, {
           status: runStatus,
           claimed,
           completed,

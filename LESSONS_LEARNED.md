@@ -662,3 +662,9 @@ Distilled anti-patterns from project history. **Append session findings before o
 ---
 
 *Last updated: 2026-10-20*
+
+## 2026-11-05: authorization scope and operational signals
+
+A policy name existing is not proof of tenant isolation. SQL subquery column resolution can turn an ownership condition into a tautology. Qualify both sides and test real database behavior with isolated rollback-only fixtures. Revoke explicit legacy grants as well as PUBLIC when restricting RPCs.
+
+Suppressing every zero-change success makes provider health stale even while sync works. Keep a shared sparse success heartbeat and independent artist checkpoints. A diagnostics failure must not overwrite a successful liveness probe. Serialize a session's own workspace saves before attributing revision conflicts to another admin.

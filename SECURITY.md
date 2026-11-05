@@ -58,7 +58,7 @@ We will respond within 72 hours and coordinate a fix before any public disclosur
 
 | Risk | Why it remains | Mitigation / follow-up |
 |------|----------------|------------------------|
-| CSP `unsafe-inline` (script + style) | Theme CSS inject + embed stack | Documented in `contentSecurityPolicy.ts`; nonce migration is a dedicated project |
+| CSP `unsafe-inline` (script + style) | Theme CSS + cached public embeds | Protected/login pages use script nonces; public script/style compatibility remains documented in `contentSecurityPolicy.ts` |
 | In-memory IP rate limits | Serverless multi-instance | Prefer Upstash for distributed routes; Vercel WAF in production |
 | Capability share URLs (tour/EPK) | Token = secret in the URL | Treat as credentials; rotate/revoke in product; rate-limit share endpoints |
 | `select('*')` in some staff DAL paths | Historical convenience | Priority hooks/explorer whitelisted; remaining invoice/SOS inventory in `docs/agent/debt-inventory.md` |
@@ -120,3 +120,15 @@ Bronze presigned PUT URLs target a temporary key. Confirm verifies the copied fi
 `/mcp` is feature-gated and requires a verified Supabase OAuth bearer token with a client identifier and current admin/editor RBAC permissions. Only allowlisted tools are reachable and CMS data is projected to non-sensitive, bounded columns. ChatGPT can prepare a news draft but only a same-origin, human-initiated browser action to `/mcp/news-draft-approvals` can save it. No tool publishes or deletes content. See [docs/MCP_CONNECTOR.md](docs/MCP_CONNECTOR.md).
 
 Supabase OAuth scopes do not currently grant per-domain CMS permissions. Explicitly set `MCP_ALLOWED_OAUTH_CLIENT_IDS` to approved clients. A valid OAuth token for any other client is rejected even if its account is an administrator.
+
+## Artist isolation hardening (2026-11-05)
+
+Membership policies now qualify the protected row (`artist_members.artist_id = <table>.artist_id`, or `artists.id`). The old unqualified references resolved to columns inside the subquery and admitted unrelated artists. Signup consumes only server-managed app metadata. Spotify account login does not establish ownership of a Spotify artist profile; admins grant artist memberships through the existing invitation flow.
+
+Invitations are still provisioned by the server (`syncInvitedUserAccess`). Resending a pending invitation reads its role from the stored profile, with app metadata as fallback, never editable user metadata. Membership lookup functions are SECURITY INVOKER and respect caller RLS. Trigger functions and submission/storage RPCs have explicit grants revoked from PUBLIC, anon and authenticated. The submission/storage RPCs remain service-only after route authorization.
+
+Profile/artist triggers protect access, account lifecycle and administrative artist fields while retaining ordinary profile edits. The production SQL regression (`scripts/maintenance/verify-artist-access.sql`) creates isolated synthetic fixtures and rolls them back. It checks private data, streaming/financial isolation, own writes, role escalation, ownership escalation, and RPC grants. Static CI rejects ambiguous member policies and metadata-based authorization.
+
+Dynamic login and protected pages receive fresh script nonces and strict-dynamic, forwarded to the Next renderer and response. These responses are private/no-store. Cached public pages retain the compatibility script policy, and inline styles remain necessary for CMS themes. CSP now blocks object embeds, foreign base URLs, foreign form targets and foreign framing. Camera, microphone and location are disabled through Permissions-Policy.
+
+Remaining advisor findings require interpretation: role/permission/tour helper SECURITY DEFINER functions intentionally derive access from auth.uid(); service-only tables intentionally have RLS with no client policies. Leaked-password protection is a Supabase Auth dashboard setting and cannot be changed through the connected SQL tools. No claim is made that all advisor notices are vulnerabilities or have been eliminated.

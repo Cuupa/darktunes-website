@@ -27,7 +27,7 @@ function makeBuilder(data: unknown = null, error: unknown = null) {
 }
 
 function makeMockDb(data: unknown = null, error: unknown = null): DbClient {
-  return { from: vi.fn().mockReturnValue(makeBuilder(data, error)) } as unknown as DbClient
+  return { from: vi.fn().mockReturnValue(makeBuilder(data, error)), rpc: vi.fn().mockResolvedValue({ data: true, error: null }) } as unknown as DbClient
 }
 
 const mockRow: SyncLogRow = {
@@ -91,8 +91,9 @@ describe('recordSyncLog', () => {
     expect(mockWriteAppLog).not.toHaveBeenCalled()
   })
 
-  it('skips insert and returns true for success with zero releases synced', async () => {
+  it('skips a successful sync when the shared hourly sample was already written', async () => {
     const db = makeMockDb(mockRow)
+    vi.mocked(db.rpc).mockResolvedValueOnce({ data: false, error: null, count: null, status: 200, statusText: 'OK', success: true })
     const ok = await recordSyncLog(db, { status: 'success', api_source: 'itunes', releases_synced: 0 })
     expect(ok).toBe(true)
     expect(db.from).not.toHaveBeenCalled()

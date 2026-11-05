@@ -43,7 +43,7 @@ External API calls: `withApiRetry()` + per-API profiles in `src/lib/sync/retryPo
 
 ## Sync service
 
-Logic in `src/lib/sync/` with injected `SyncDeps`. `syncSingleArtist` / `syncAll` never throw — errors in `SyncResult.errors`. Each run → `sync_logs`.
+Logic in `src/lib/sync/` with injected `SyncDeps`. `syncSingleArtist` / `syncAll` never throw — errors in `SyncResult.errors`. Failures and hourly sampled provider successes → `sync_logs`; each eligible artist/provider keeps an independent checkpoint.
 
 **Scheduling (no Vercel Cron, no Edge Function):** Supabase Cron jobs, managed **only in the Supabase dashboard** (never via SQL / `reset.sql`). HTTP jobs are plain `net.http_post` calls to `https://www.darktunes.com/...` (`www` mandatory — the apex 308 redirect drops `Authorization`) with `Authorization: Bearer <CRON_SECRET>` inline. No SQL wrapper functions, no Vault. Jobs: `sync-worker` every minute (`POST /api/sync`), `sync-enqueue-daily` (`/api/sync/queue`), `sync-youtube-daily` (`/api/sync-youtube`), `Spotify Playzahlen` (`/api/admin/analytics/sync-spotify-plays`), plus SQL jobs `scheduler-heartbeat`, `sync-telemetry-cleanup`, `app-logs-cleanup`. Table: `DEPLOYMENT.md` → Sync Scheduler. `tests/unit/sync/cronContract.test.ts` fails if `reset.sql` registers cron jobs or wrapper functions.
 
@@ -200,7 +200,7 @@ Both use `requestUserInvite()` in `src/lib/auth/requestUserInvite.ts`:
 1. **Resend configured**: `auth.admin.generateLink({ type: 'invite' })` → branded HTML via `sendInviteEmail()`; link verifies at `/auth/callback?invite=1` then lands on `/login?type=invite` (general) or `/portal/accept-invite` (artist).
 2. **Resend not configured or send fails**: falls back to `auth.admin.inviteUserByEmail()` (Supabase built-in template).
 
-Role and optional `artist_id` are written to auth user metadata; `handle_new_auth_user` + `syncInvitedUserAccess()` keep `users`, `user_roles`, and `artist_members` in sync.
+The server invitation workflow (`syncInvitedUserAccess`) grants roles/memberships. The signup trigger reads only trusted app metadata. Editable user metadata is never an authorization source.
 
 ## Admin users & feature flags
 
@@ -316,3 +316,11 @@ Admin → **Support** (`/admin/support`). Env: `ZAMMAD_URL`, `ZAMMAD_API_TOKEN`,
 - **Auto tickets:** `POST /api/log-error` with `level: error` → background Zammad ticket (`[SYSTEM ERROR REPORT — darkTunes]`).
 - **Filters:** known fingerprints (`blocked_known`); same fingerprint + user within 24 h (`blocked_duplicate`).
 - **Robustness:** unconfigured/offline Zammad never throws; status logged in `zammad_ticket_log`.
+
+## Sync health and coverage update (2026-11-05)
+
+`GET /api/admin/sync/artist-states` is admin-only, private/no-store and keyset-paginates artists (limit 1–100, default 25, UUID cursor). DAL `syncOverview.ts` batches checkpoints for the page and reads shared provider cooldowns. All artists appear, including those with no checkpoint. `SyncCoveragePanel` is visible in guided and advanced views; it loads once and on explicit refresh/load-more, without another polling loop.
+
+Provider failures degrade integration health without declaring the website down; database and stuck queue failures remain unhealthy. Provider 401/403/404 identify mapping/credentials, and Discogs has an eight-day staleness threshold matching its weekly schedule. Diagnostic-query failures preserve a successful database liveness probe. Bandsintown error objects fail the artist job rather than producing a false successful empty sync.
+
+Successful artist-provider logs use the shared `allow_sync_success_log` hourly sample, including no-change successes so health stays fresh. Errors/partial failures remain recorded. `sync_runs` is opened only after the first actual job claim. Cron schedules still require dashboard changes; this application change does not itself alter job intervals.

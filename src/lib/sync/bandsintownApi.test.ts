@@ -144,14 +144,13 @@ describe('fetchBandsintownArtistEvents', () => {
     expect(concerts).toHaveLength(0)
   })
 
-  it('returns empty array when Bandsintown returns an error object (artist not found)', async () => {
+  it('reports an invalid artist mapping instead of a false successful empty sync', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ error: 'Artist not found' }),
     })
 
-    const concerts = await fetchBandsintownArtistEvents('UnknownArtist', 'key', mockFetch as typeof fetch)
-    expect(concerts).toHaveLength(0)
+    await expect(fetchBandsintownArtistEvents('UnknownArtist', 'key', mockFetch as typeof fetch)).rejects.toThrow('artist not found (404)')
   })
 
   it('returns empty array for an empty events list', async () => {

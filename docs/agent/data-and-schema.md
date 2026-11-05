@@ -75,9 +75,9 @@ Bronze limits: SSOT `src/lib/sos/bronzeUploadLimits.ts` only.
 
 ## Operational logs (`app_logs`)
 
-Aggregated error/operational log. Columns: `source`, `level`, `message`, `details` (redacted JSON), `user_id`, plus observability columns `fingerprint` (unique index), `occurrences`, `first_seen_at`, `last_seen_at`, `resolved`/`resolved_at`/`resolved_by`, `ignored`, `environment`, `app_version`, `request_id`, `route_path`, `method`. Writes go through `writeAppLog` → `upsert_app_log` RPC (dedup + counter); see [backend.md](backend.md#error-logging--observability). There is **no browser INSERT policy** — only the service role writes (any authenticated insert could forge/spam rows). Retention via pg_cron `app-logs-cleanup` (90 days).
+Aggregated error/operational log. Columns: `source`, `level`, `message`, `details` (redacted JSON), `user_id`, plus observability columns `fingerprint` (unique index), `occurrences`, `first_seen_at`, `last_seen_at`, `resolved`/`resolved_at`/`resolved_by`, `ignored`, `environment`, `app_version`, `request_id`, `route_path`, `method`. Writes go through `writeAppLog` → `upsert_app_log` RPC (dedup + counter); see [backend.md](backend.md#error-logging--observability). There is **no browser INSERT policy** — only the service role writes (any authenticated insert could forge/spam rows). Retention is managed by the unified `darktunes-technical-retention` job (90 days for app errors).
 
-`sync_logs` (audit) and `admin_audit_log`/`rbac_audit_log` have **no retention job**; clear them manually via Admin → System → Maintenance (`clear_log_table` RPC) or add a dashboard pg_cron job. `app_logs`, `sync_logs` and `cron_ticks` are in `verify:schema-columns`, so evolved columns need `ADD COLUMN IF NOT EXISTS` guards.
+`sync_logs` contains technical sync telemetry and expires through the unified retention job. Business audit tables `admin_audit_log`/`rbac_audit_log` are outside that technical cleanup. `app_logs`, `sync_logs` and `cron_ticks` are in `verify:schema-columns`, so evolved columns need `ADD COLUMN IF NOT EXISTS` guards.
 
 ## Schema management
 
@@ -119,3 +119,9 @@ Apply: paste `reset.sql` into Supabase SQL Editor (idempotent on live DB).
 **Apify vs SOS:** Public Spotify scrapes must never write `streaming_stats` / territory revenue gold. Portal copy labels Apify as non-settlement.
 
 Portal analytics uses authenticated primary client (RLS), not replica.
+
+## Access policy maintenance (2026-11-05)
+
+Always qualify the outer artist row in membership subqueries. `am.artist_id = artist_id` resolves the right side to `am.artist_id` and defeats isolation. Use `am.artist_id = artist_private_data.artist_id` (or the actual target table). Statement-level `(SELECT auth.uid())` and `(SELECT public.get_my_role())` avoid repeated auth evaluation per row. Do not automatically merge different permissive policies or drop unused indexes: their roles, commands, conditions and observation window matter.
+
+Production patch scripts: `scripts/maintenance/harden-artist-access.sql`, `optimize-access-policies.sql`. The schema SSOT remains reset.sql; these patches do not reset production or remove business data. Regression SQL is a rollback-only fixture test. Access lookup indexes cover artist ownership/assets/replies, settlement links, AI usage/diagnostics and portal message folders/senders.

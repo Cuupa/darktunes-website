@@ -227,6 +227,7 @@ export async function buildHealthSnapshot(
   let cronHealth: CronHealthSummary | null = null
   let logStore: { readable: boolean; detail: string } | null = null
 
+  let diagnosticsUnavailable = false
   if (deps.db) {
     try {
       database = await checkDatabaseLiveness(deps.db)
@@ -297,7 +298,8 @@ export async function buildHealthSnapshot(
         })
       }
     } catch {
-      database = deriveDatabaseHealth(false, null)
+      // A failed diagnostics query is not evidence of database downtime.
+      diagnosticsUnavailable = true
       apis = buildUnavailableApis(knownApis)
     }
   }
@@ -326,6 +328,14 @@ export async function buildHealthSnapshot(
       status: 'degraded',
       statusLabel: 'Cron scheduler degraded',
       statusDetail: cronHealth.statusDetail,
+    }
+  }
+
+  if (diagnosticsUnavailable && database.status !== 'offline') {
+    overall = {
+      status: 'degraded',
+      statusLabel: 'Diagnostics unavailable',
+      statusDetail: 'Database is reachable. Sync diagnostics could not be loaded. Refresh the system page and check the error logs.',
     }
   }
 

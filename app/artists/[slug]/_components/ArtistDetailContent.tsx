@@ -628,7 +628,7 @@ export function ArtistDetailContent({
                                   {video.title}
                                 </h3>
                                 <p className="text-xs text-muted-foreground font-mono mt-2">
-                                  {new Date(video.publishedAt).toLocaleDateString(dateLocale, {
+                                  {new Date(video.publishedAt).toLocaleDateString(dateLocale, { timeZone: 'UTC',
                                     year: 'numeric',
                                     month: 'short',
                                     day: 'numeric',
@@ -732,7 +732,7 @@ export function ArtistDetailContent({
                                 {release.title}
                               </h3>
                               <p className="text-xs text-muted-foreground font-mono mt-1">
-                                {new Date(release.releaseDate).toLocaleDateString(dateLocale, {
+                                {new Date(release.releaseDate).toLocaleDateString(dateLocale, { timeZone: 'UTC',
                                   year: 'numeric',
                                   month: 'short',
                                 })}
@@ -794,7 +794,7 @@ export function ArtistDetailContent({
                           )}
                           <div className="min-w-0">
                             <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-1">
-                              {new Date(post.publishedAt).toLocaleDateString(dateLocale, { year: 'numeric', month: 'short', day: 'numeric' })}
+                              {new Date(post.publishedAt).toLocaleDateString(dateLocale, { timeZone: 'UTC', year: 'numeric', month: 'short', day: 'numeric' })}
                             </p>
                             <h3 className="font-bold line-clamp-2 group-hover:text-accent transition-colors">{post.title}</h3>
                             {post.excerpt && (
@@ -862,10 +862,10 @@ export function ArtistDetailContent({
                         <div className="flex items-center gap-4 min-w-0">
                           <div className="text-center shrink-0">
                             <p className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
-                              {new Date(concert.concertDate).toLocaleDateString(dateLocale, { month: 'short' })}
+                              {new Date(concert.concertDate).toLocaleDateString(dateLocale, { timeZone: 'UTC', month: 'short' })}
                             </p>
                             <p className="text-2xl font-bold leading-none">
-                              {new Date(concert.concertDate).getDate()}
+                              {new Date(concert.concertDate).getUTCDate()}
                             </p>
                           </div>
                           <div className="min-w-0">

@@ -46,3 +46,17 @@ describe('contentSecurityPolicy', () => {
     expect(policy.split(';').length).toBeGreaterThanOrEqual(8)
   })
 })
+it('requires nonce-authorized scripts on dynamic authenticated pages', () => {
+  const policy = buildContentSecurityPolicy({ nonce: 'test-random-nonce' })
+  const scripts = policy.split(';').find((directive) => directive.trim().startsWith('script-src'))
+  expect(scripts).toContain("'nonce-test-random-nonce'")
+  expect(scripts).toContain("'strict-dynamic'")
+  expect(scripts).not.toContain("'unsafe-inline'")
+  expect(scripts).not.toContain("'unsafe-eval'")
+  expect(policy).toContain("object-src 'none'")
+  expect(policy).toContain("base-uri 'self'")
+})
+
+it('rejects CSP directive injection through a nonce', () => {
+  expect(() => buildContentSecurityPolicy({ nonce: "x'; script-src *" })).toThrow('Invalid CSP nonce')
+})

@@ -1624,5 +1624,27 @@
     "activityUnavailable": "Letzte Aktivitäten konnten nicht geladen werden.",
     "metricsUnavailable": "Inhaltszahlen konnten nicht geladen werden.",
     "systemOpen": "Systemstatus öffnen"
+  },
+  "syncCoverage": {
+    "title": "Sync-Abdeckung der Artists",
+    "description": "Letzter erfolgreicher Sync und nächster Versuch je Artist und Anbieter.",
+    "refresh": "Aktualisieren",
+    "loadError": "Die Sync-Übersicht konnte nicht geladen werden. Prüfe deine Verbindung und aktualisiere diesen Bereich.",
+    "never": "Noch nie",
+    "success": "Erfolgreich",
+    "scheduled": "Geplant",
+    "cooldown": "Wartet auf Anbieter",
+    "configuration": "Konfiguration prüfen",
+    "failed": "Fehlgeschlagen",
+    "pausedUntil": "Pausiert bis {date}",
+    "ready": "Bereit",
+    "artist": "Artist",
+    "provider": "Anbieter",
+    "status": "Status",
+    "lastSuccess": "Letzter Erfolg",
+    "nextDue": "Nächster Versuch",
+    "reviewRequired": "Artist-Zuordnung oder Zugangsdaten prüfen",
+    "noCheckpoint": "Noch kein Anbieter-Checkpoint. Plattform-IDs des Artists und Anbieter-Konfiguration prüfen.",
+    "more": "Weitere Artists anzeigen"
   }
 }
