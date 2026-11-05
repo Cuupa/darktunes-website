@@ -406,11 +406,11 @@ export async function resendUserInvite(
     .eq('id', options.userId)
     .maybeSingle()
 
-  const metaRole = (user.user_metadata?.role as string | undefined) ?? profile?.role
+  const metaRole = profile?.role ?? (user.app_metadata?.role as string | undefined)
   const role = (options.role ?? metaRole ?? 'user') as UserRole
   const artistId =
     options.artistId ??
-    (user.user_metadata?.artist_id as string | undefined) ??
+    (user.app_metadata?.artist_id as string | undefined) ??
     undefined
   const portal = options.portal ?? (role === 'artist' || Boolean(artistId))
 

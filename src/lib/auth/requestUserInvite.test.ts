@@ -192,21 +192,23 @@ describe('resendUserInvite', () => {
           id: 'pending-user',
           email: 'pending@example.com',
           last_sign_in_at: null,
-          user_metadata: { role: 'editor' },
+          user_metadata: { role: 'admin', artist_id: 'foreign-artist' },
         },
       },
       error: null,
     })
+    const client = makeAdminClient()
     mockFrom.mockImplementation(() => makeMaybeSingle({ role: 'editor' }))
 
     const result = await resendUserInvite(
-      makeAdminClient() as never,
+      client as never,
       { userId: 'pending-user', grantedBy: 'admin-user-id' },
       baseDeps,
     )
 
     expect(result.sent).toBe(true)
     expect(result.resent).toBe(true)
+    expect(mockSyncInvitedUserAccess).toHaveBeenCalledWith(expect.anything(), 'pending-user', 'editor', 'admin-user-id', undefined)
     expect(mockCreateUserInvite).toHaveBeenCalled()
   })
 

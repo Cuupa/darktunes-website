@@ -315,7 +315,7 @@ DECLARE
   v_meta_role TEXT;
   v_artist_id UUID;
 BEGIN
-  v_meta_role := NEW.raw_user_meta_data->>'role';
+  v_meta_role := NEW.raw_app_meta_data->>'role';
   IF v_meta_role IN ('admin', 'editor', 'journalist', 'artist', 'user', 'press') THEN
     v_role := v_meta_role::public.user_role;
   END IF;
@@ -328,9 +328,9 @@ BEGIN
   VALUES (NEW.id, v_role)
   ON CONFLICT (user_id, role) DO NOTHING;
 
-  -- Artist portal invites pass artist_id in user metadata
+  -- Only trusted server-side invitations may assign an artist membership
   BEGIN
-    v_artist_id := (NEW.raw_user_meta_data->>'artist_id')::UUID;
+    v_artist_id := (NEW.raw_app_meta_data->>'artist_id')::UUID;
   EXCEPTION WHEN invalid_text_representation THEN
     v_artist_id := NULL;
   END;
@@ -422,28 +422,9 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public AS $$
-DECLARE
-  v_spotify_id TEXT;
-  v_artist_id  UUID;
 BEGIN
-  v_spotify_id := NEW.raw_user_meta_data->>'provider_id';
-
-  IF NEW.raw_app_meta_data->>'provider' = 'spotify' AND v_spotify_id IS NOT NULL THEN
-    SELECT id INTO v_artist_id
-    FROM public.artists
-    WHERE spotify_id = v_spotify_id
-    LIMIT 1;
-
-    IF v_artist_id IS NOT NULL THEN
-      UPDATE public.artists SET user_id = NEW.id WHERE id = v_artist_id;
-      -- Insert into artist_members instead of overwriting the user's editorial role.
-      -- ON CONFLICT DO NOTHING keeps this idempotent on repeated OAuth logins.
-      INSERT INTO public.artist_members (user_id, artist_id, member_role)
-      VALUES (NEW.id, v_artist_id, 'owner')
-      ON CONFLICT (user_id, artist_id) DO NOTHING;
-    END IF;
-  END IF;
-
+  -- OAuth authenticates an account, not ownership of a roster artist.
+  -- Memberships are granted by the authenticated admin invitation workflow.
   RETURN NEW;
 END;
 $$;
@@ -540,7 +521,7 @@ CREATE POLICY "genres_read_public" ON public.genres
 -- Admin/editor insert/update/delete
 DROP POLICY IF EXISTS "genres_write_admin" ON public.genres;
 CREATE POLICY "genres_write_admin" ON public.genres
-  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR ALL USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- TABLE: artists
@@ -730,31 +711,31 @@ CREATE POLICY "artist_private_data: member read" ON public.artist_private_data
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM public.artist_members am
-      WHERE am.artist_id = artist_id AND am.user_id = auth.uid()
+      WHERE am.artist_id = artist_private_data.artist_id AND am.user_id = (SELECT auth.uid())
     )
-    OR public.get_my_role() IN ('admin', 'editor')
+    OR (SELECT public.get_my_role()) IN ('admin', 'editor')
   );
 
 CREATE POLICY "artist_private_data: member write" ON public.artist_private_data
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM public.artist_members am
-      WHERE am.artist_id = artist_id AND am.user_id = auth.uid()
+      WHERE am.artist_id = artist_private_data.artist_id AND am.user_id = (SELECT auth.uid())
     )
-    OR public.get_my_role() IN ('admin', 'editor')
+    OR (SELECT public.get_my_role()) IN ('admin', 'editor')
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.artist_members am
-      WHERE am.artist_id = artist_id AND am.user_id = auth.uid()
+      WHERE am.artist_id = artist_private_data.artist_id AND am.user_id = (SELECT auth.uid())
     )
-    OR public.get_my_role() IN ('admin', 'editor')
+    OR (SELECT public.get_my_role()) IN ('admin', 'editor')
   );
 
 CREATE POLICY "artist_private_data: admin all" ON public.artist_private_data
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- TABLE: artist_members
@@ -796,13 +777,13 @@ ALTER TABLE public.artist_members ENABLE ROW LEVEL SECURITY;
 -- Members can read their own membership rows
 DROP POLICY IF EXISTS "artist_members: own read"   ON public.artist_members;
 CREATE POLICY "artist_members: own read" ON public.artist_members
-  FOR SELECT USING (user_id = auth.uid());
+  FOR SELECT USING (user_id = (SELECT auth.uid()));
 
 -- Admins can manage all memberships
 DROP POLICY IF EXISTS "artist_members: admin all"  ON public.artist_members;
 CREATE POLICY "artist_members: admin all" ON public.artist_members
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- TABLE: asset_folders
@@ -1549,21 +1530,21 @@ DROP POLICY IF EXISTS "tour_share_links: artist manage" ON public.tour_share_lin
 CREATE POLICY "tour_share_links: artist manage" ON public.tour_share_links
   FOR ALL TO authenticated
   USING (
-    artist_id IN (SELECT am.artist_id FROM public.artist_members am WHERE am.user_id = auth.uid())
+    artist_id IN (SELECT am.artist_id FROM public.artist_members am WHERE am.user_id = (SELECT auth.uid()))
     OR public.has_permission('can_view_admin_panel')
-    OR public.get_my_role() = 'admin'
+    OR (SELECT public.get_my_role()) = 'admin'
   )
   WITH CHECK (
-    artist_id IN (SELECT am.artist_id FROM public.artist_members am WHERE am.user_id = auth.uid())
+    artist_id IN (SELECT am.artist_id FROM public.artist_members am WHERE am.user_id = (SELECT auth.uid()))
     OR public.has_permission('can_view_admin_panel')
-    OR public.get_my_role() = 'admin'
+    OR (SELECT public.get_my_role()) = 'admin'
   );
 
 DROP POLICY IF EXISTS "tour_share_links: admin all" ON public.tour_share_links;
 CREATE POLICY "tour_share_links: admin all" ON public.tour_share_links
   FOR ALL TO authenticated
-  USING (public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin')
-  WITH CHECK (public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin');
+  USING (public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin')
+  WITH CHECK (public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin');
 
 CREATE TABLE IF NOT EXISTS public.tour_stops (
   id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1869,18 +1850,18 @@ $$;
 DROP POLICY IF EXISTS "tours: artist manage" ON public.tours;
 CREATE POLICY "tours: artist manage" ON public.tours
   FOR ALL USING (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
     OR public.user_can_access_tour(id)
   )
   WITH CHECK (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
     OR public.user_can_access_tour(id)
   );
 
 DROP POLICY IF EXISTS "tours: admin all" ON public.tours;
 CREATE POLICY "tours: admin all" ON public.tours
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'editor'))
   );
 
 DROP POLICY IF EXISTS "tour_stops: artist manage" ON public.tour_stops;
@@ -1891,39 +1872,39 @@ CREATE POLICY "tour_stops: artist manage" ON public.tour_stops
 DROP POLICY IF EXISTS "tour_stops: admin all" ON public.tour_stops;
 CREATE POLICY "tour_stops: admin all" ON public.tour_stops
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'editor'))
   );
 
 DROP POLICY IF EXISTS "tour_contacts: artist manage" ON public.tour_contacts;
 CREATE POLICY "tour_contacts: artist manage" ON public.tour_contacts
   FOR ALL USING (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
   )
   WITH CHECK (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
   );
 
 DROP POLICY IF EXISTS "tour_contacts: admin all" ON public.tour_contacts;
 CREATE POLICY "tour_contacts: admin all" ON public.tour_contacts
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'editor'))
   );
 
 DROP POLICY IF EXISTS "tour_tasks: artist manage" ON public.tour_tasks;
 CREATE POLICY "tour_tasks: artist manage" ON public.tour_tasks
   FOR ALL USING (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
     OR (tour_id IS NOT NULL AND public.user_can_access_tour(tour_id))
   )
   WITH CHECK (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
     OR (tour_id IS NOT NULL AND public.user_can_access_tour(tour_id))
   );
 
 DROP POLICY IF EXISTS "tour_tasks: admin all" ON public.tour_tasks;
 CREATE POLICY "tour_tasks: admin all" ON public.tour_tasks
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'editor'))
   );
 
 DROP POLICY IF EXISTS "tour_crew: artist manage" ON public.tour_crew_members;
@@ -1934,37 +1915,37 @@ CREATE POLICY "tour_crew: artist manage" ON public.tour_crew_members
 DROP POLICY IF EXISTS "tour_crew: admin all" ON public.tour_crew_members;
 CREATE POLICY "tour_crew: admin all" ON public.tour_crew_members
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'editor'))
   );
 
 DROP POLICY IF EXISTS "tour_merch_items: artist manage" ON public.tour_merch_items;
 CREATE POLICY "tour_merch_items: artist manage" ON public.tour_merch_items
   FOR ALL USING (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
   )
   WITH CHECK (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
   );
 
 DROP POLICY IF EXISTS "tour_merch_items: admin all" ON public.tour_merch_items;
 CREATE POLICY "tour_merch_items: admin all" ON public.tour_merch_items
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'editor'))
   );
 
 DROP POLICY IF EXISTS "tour_merch_settlements: artist manage" ON public.tour_merch_settlements;
 CREATE POLICY "tour_merch_settlements: artist manage" ON public.tour_merch_settlements
   FOR ALL USING (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
   )
   WITH CHECK (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
   );
 
 DROP POLICY IF EXISTS "tour_merch_settlements: admin all" ON public.tour_merch_settlements;
 CREATE POLICY "tour_merch_settlements: admin all" ON public.tour_merch_settlements
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'editor'))
   );
 
 DROP POLICY IF EXISTS "tour_collaborators: read" ON public.tour_collaborators;
@@ -1997,14 +1978,14 @@ CREATE POLICY "tour_stop_performing_artists: tour access" ON public.tour_stop_pe
 DROP POLICY IF EXISTS "tour_stop_artist_private: own artist" ON public.tour_stop_artist_private;
 CREATE POLICY "tour_stop_artist_private: own artist" ON public.tour_stop_artist_private
   FOR ALL USING (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
     AND EXISTS (
       SELECT 1 FROM public.tour_stops ts
       WHERE ts.id = stop_id AND public.user_can_access_tour(ts.tour_id)
     )
   )
   WITH CHECK (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
     AND EXISTS (
       SELECT 1 FROM public.tour_stops ts
       WHERE ts.id = stop_id AND public.user_can_access_tour(ts.tour_id)
@@ -2014,36 +1995,36 @@ CREATE POLICY "tour_stop_artist_private: own artist" ON public.tour_stop_artist_
 DROP POLICY IF EXISTS "tour_artist_finance: own artist" ON public.tour_artist_finance;
 CREATE POLICY "tour_artist_finance: own artist" ON public.tour_artist_finance
   FOR ALL USING (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
     AND public.user_can_access_tour(tour_id)
   )
   WITH CHECK (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
     AND public.user_can_access_tour(tour_id)
   );
 
 DROP POLICY IF EXISTS "tour_collaborators: admin all" ON public.tour_collaborators;
 CREATE POLICY "tour_collaborators: admin all" ON public.tour_collaborators
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'editor'))
   );
 
 DROP POLICY IF EXISTS "tour_stop_performing_artists: admin all" ON public.tour_stop_performing_artists;
 CREATE POLICY "tour_stop_performing_artists: admin all" ON public.tour_stop_performing_artists
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'editor'))
   );
 
 DROP POLICY IF EXISTS "tour_stop_artist_private: admin all" ON public.tour_stop_artist_private;
 CREATE POLICY "tour_stop_artist_private: admin all" ON public.tour_stop_artist_private
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'editor'))
   );
 
 DROP POLICY IF EXISTS "tour_artist_finance: admin all" ON public.tour_artist_finance;
 CREATE POLICY "tour_artist_finance: admin all" ON public.tour_artist_finance
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role IN ('admin', 'editor'))
   );
 
 ALTER TABLE public.concert_artists ENABLE ROW LEVEL SECURITY;
@@ -2058,21 +2039,21 @@ CREATE POLICY "concert_artists: artist manage" ON public.concert_artists
     EXISTS (
       SELECT 1 FROM public.concerts c
       JOIN public.artist_members am ON am.artist_id = c.artist_id
-      WHERE c.id = concert_id AND am.user_id = auth.uid()
+      WHERE c.id = concert_id AND am.user_id = (SELECT auth.uid())
     )
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.concerts c
       JOIN public.artist_members am ON am.artist_id = c.artist_id
-      WHERE c.id = concert_id AND am.user_id = auth.uid()
+      WHERE c.id = concert_id AND am.user_id = (SELECT auth.uid())
     )
   );
 
 DROP POLICY IF EXISTS "concert_artists: admin all" ON public.concert_artists;
 CREATE POLICY "concert_artists: admin all" ON public.concert_artists
-  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  FOR ALL USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- TABLE: editor_activity_log
@@ -2435,36 +2416,36 @@ ALTER TABLE public.artist_news_posts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "artist_news_posts: artist read own" ON public.artist_news_posts;
 CREATE POLICY "artist_news_posts: artist read own" ON public.artist_news_posts
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_news_posts.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 DROP POLICY IF EXISTS "artist_news_posts: artist insert own" ON public.artist_news_posts;
 CREATE POLICY "artist_news_posts: artist insert own" ON public.artist_news_posts
   FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_news_posts.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 DROP POLICY IF EXISTS "artist_news_posts: artist update own" ON public.artist_news_posts;
 CREATE POLICY "artist_news_posts: artist update own" ON public.artist_news_posts
   FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
+  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_news_posts.artist_id AND am.user_id = (SELECT auth.uid())))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_news_posts.artist_id AND am.user_id = (SELECT auth.uid())));
 
 DROP POLICY IF EXISTS "artist_news_posts: artist delete own" ON public.artist_news_posts;
 CREATE POLICY "artist_news_posts: artist delete own" ON public.artist_news_posts
   FOR DELETE USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_news_posts.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 DROP POLICY IF EXISTS "artist_news_posts: admin all" ON public.artist_news_posts;
 CREATE POLICY "artist_news_posts: admin all" ON public.artist_news_posts
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 DROP POLICY IF EXISTS "artist_news_posts: editor+ read all" ON public.artist_news_posts;
 CREATE POLICY "artist_news_posts: editor+ read all" ON public.artist_news_posts
-  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR SELECT USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 DROP POLICY IF EXISTS "artist_news_posts: public read published" ON public.artist_news_posts;
 CREATE POLICY "artist_news_posts: public read published" ON public.artist_news_posts
@@ -4183,8 +4164,8 @@ ALTER TABLE public.sync_queue ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "sync_queue: admin all" ON public.sync_queue;
 CREATE POLICY "sync_queue: admin all" ON public.sync_queue
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- =============================================================================
 -- SYNC INFRASTRUCTURE — ledger, worker lease, atomic claim, scheduler
@@ -4197,7 +4178,7 @@ CREATE POLICY "sync_queue: admin all" ON public.sync_queue
 --   * claim_sync_jobs()  — atomic batch claim via FOR UPDATE SKIP LOCKED
 -- =============================================================================
 
--- Deploy on darkTunes Supabase BEFORE deploying the scheduler/UI code.
+-- Deploy on the production database BEFORE deploying the scheduler/UI code.
 -- Safe to run repeatedly. Does not modify existing sync_queue rows.
 CREATE TABLE IF NOT EXISTS public.sync_artist_state (
   artist_id UUID NOT NULL REFERENCES public.artists(id) ON DELETE CASCADE,
@@ -4310,7 +4291,7 @@ BEGIN
   IF p_limit IS NULL OR p_limit < 1 OR p_limit > 250 THEN
      RAISE EXCEPTION 'Invalid scheduler batch size';
   END IF;
-  PERFORM pg_advisory_xact_lock(hashtext('darktunes_artist_sync_scheduler'));
+  PERFORM pg_advisory_xact_lock(hashtext('artist_sync_scheduler'));
   -- Seed new artists with stable, provider-specific spread across 24 hours.
   INSERT INTO public.sync_artist_state(artist_id,provider,next_due_at)
   SELECT a.id,p.provider,
@@ -4364,7 +4345,7 @@ CREATE INDEX IF NOT EXISTS idx_cron_ticks_kind_created ON public.cron_ticks (kin
 ALTER TABLE public.cron_ticks ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "cron_ticks: admin read" ON public.cron_ticks;
 CREATE POLICY "cron_ticks: admin read" ON public.cron_ticks
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 
 CREATE TABLE IF NOT EXISTS public.sync_runs (
   id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -4382,7 +4363,7 @@ CREATE INDEX IF NOT EXISTS idx_sync_runs_started_at ON public.sync_runs (started
 ALTER TABLE public.sync_runs ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "sync_runs: admin read" ON public.sync_runs;
 CREATE POLICY "sync_runs: admin read" ON public.sync_runs
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 
 -- Single-row lease table (id = 1). The owner token prevents a stale worker
 -- from clearing a newer worker's lease after a hard kill.
@@ -4398,7 +4379,7 @@ ON CONFLICT (id) DO NOTHING;
 ALTER TABLE public.sync_worker_lease ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "sync_worker_lease: admin read" ON public.sync_worker_lease;
 CREATE POLICY "sync_worker_lease: admin read" ON public.sync_worker_lease
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 
 -- Atomically claim up to p_qty due jobs. Replaces the old KV lease + optimistic
 -- lock: FOR UPDATE SKIP LOCKED makes concurrent workers safe by construction.
@@ -4643,22 +4624,22 @@ DROP POLICY IF EXISTS "users: admin read all"  ON public.users;
 DROP POLICY IF EXISTS "users: admin update all" ON public.users;
 
 CREATE POLICY "users: own read" ON public.users
-  FOR SELECT USING (auth.uid() = id);
+  FOR SELECT USING ((SELECT auth.uid()) = id);
 
 CREATE POLICY "users: own update" ON public.users
-  FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+  FOR UPDATE USING ((SELECT auth.uid()) = id) WITH CHECK ((SELECT auth.uid()) = id);
 
 -- Uses get_my_role() (SECURITY DEFINER) to avoid infinite recursion that
 -- would occur if this policy queried the users table directly.
 CREATE POLICY "users: admin read all" ON public.users
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 
 -- Allows admins to update any user's profile row (e.g. change role, etc.)
 -- get_my_role() is SECURITY DEFINER so it safely reads the caller's own role
 -- without triggering recursive RLS evaluation.
 CREATE POLICY "users: admin update all" ON public.users
-  FOR UPDATE USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR UPDATE USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: role_permissions
@@ -4668,12 +4649,12 @@ DROP POLICY IF EXISTS "role_permissions: admin update"       ON public.role_perm
 
 -- Any authenticated user can read permissions (needed to check their own permissions)
 CREATE POLICY "role_permissions: authenticated read" ON public.role_permissions
-  FOR SELECT USING (auth.role() = 'authenticated');
+  FOR SELECT USING ((SELECT auth.role()) = 'authenticated');
 
 -- Only admins can modify role permissions
 CREATE POLICY "role_permissions: admin update" ON public.role_permissions
-  FOR UPDATE USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR UPDATE USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: artists
@@ -4692,42 +4673,42 @@ DROP POLICY IF EXISTS "artists: can_manage_artists update"    ON public.artists;
 CREATE POLICY "artists: public read visible" ON public.artists
   FOR SELECT USING (
     is_visible = TRUE
-    OR public.get_my_role() IN ('admin', 'editor')
+    OR (SELECT public.get_my_role()) IN ('admin', 'editor')
   );
 
 -- Portal members can read their own artist row even when is_visible = FALSE
 CREATE POLICY "artists: artist read own" ON public.artists
   FOR SELECT USING (
     EXISTS (SELECT 1 FROM public.artist_members am
-            WHERE am.artist_id = id AND am.user_id = auth.uid())
+            WHERE am.artist_id = artists.id AND am.user_id = (SELECT auth.uid()))
   );
 
 -- Requires can_manage_artists permission (admin always bypasses)
 CREATE POLICY "artists: can_manage_artists insert" ON public.artists
   FOR INSERT WITH CHECK (
-    public.has_permission('can_manage_artists') OR public.get_my_role() = 'admin'
+    public.has_permission('can_manage_artists') OR (SELECT public.get_my_role()) = 'admin'
   );
 
 CREATE POLICY "artists: can_manage_artists update" ON public.artists
   FOR UPDATE USING (
-    public.has_permission('can_manage_artists') OR public.get_my_role() = 'admin'
+    public.has_permission('can_manage_artists') OR (SELECT public.get_my_role()) = 'admin'
   ) WITH CHECK (
-    public.has_permission('can_manage_artists') OR public.get_my_role() = 'admin'
+    public.has_permission('can_manage_artists') OR (SELECT public.get_my_role()) = 'admin'
   );
 
 CREATE POLICY "artists: admin delete" ON public.artists
-  FOR DELETE USING (public.get_my_role() = 'admin');
+  FOR DELETE USING ((SELECT public.get_my_role()) = 'admin');
 
 -- Portal members can update shared artist fields (bio, genres, URLs, image)
 CREATE POLICY "artists: own artist update" ON public.artists
   FOR UPDATE
   USING (
     EXISTS (SELECT 1 FROM public.artist_members am
-            WHERE am.artist_id = id AND am.user_id = auth.uid())
+            WHERE am.artist_id = artists.id AND am.user_id = (SELECT auth.uid()))
   )
   WITH CHECK (
     EXISTS (SELECT 1 FROM public.artist_members am
-            WHERE am.artist_id = id AND am.user_id = auth.uid())
+            WHERE am.artist_id = artists.id AND am.user_id = (SELECT auth.uid()))
   );
 
 -- ---------------------------------------------------------------------------
@@ -4755,25 +4736,25 @@ CREATE POLICY "releases: public read visible" ON public.releases
         )
       )
     )
-    OR public.get_my_role() IN ('admin', 'editor')
+    OR (SELECT public.get_my_role()) IN ('admin', 'editor')
   );
 
 -- Requires can_manage_releases permission (admin always bypasses)
 CREATE POLICY "releases: can_manage_releases insert" ON public.releases
   FOR INSERT WITH CHECK (
-    public.has_permission('can_manage_releases') OR public.get_my_role() = 'admin'
+    public.has_permission('can_manage_releases') OR (SELECT public.get_my_role()) = 'admin'
   );
 
 CREATE POLICY "releases: can_manage_releases update" ON public.releases
   FOR UPDATE USING (
-    public.has_permission('can_manage_releases') OR public.get_my_role() = 'admin'
+    public.has_permission('can_manage_releases') OR (SELECT public.get_my_role()) = 'admin'
   ) WITH CHECK (
-    public.has_permission('can_manage_releases') OR public.get_my_role() = 'admin'
+    public.has_permission('can_manage_releases') OR (SELECT public.get_my_role()) = 'admin'
   );
 
 -- Allows only admins to delete releases
 CREATE POLICY "releases: admin delete" ON public.releases
-  FOR DELETE USING (public.get_my_role() = 'admin');
+  FOR DELETE USING ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: news_posts
@@ -4797,26 +4778,26 @@ CREATE POLICY "news_posts: public read" ON public.news_posts
     )
     OR public.has_permission('can_edit_news')
     OR public.has_permission('can_publish_news')
-    OR public.get_my_role() IN ('admin', 'editor', 'journalist')
+    OR (SELECT public.get_my_role()) IN ('admin', 'editor', 'journalist')
   );
 
 -- Requires can_publish_news permission (admin always bypasses)
 CREATE POLICY "news_posts: can_publish_news insert" ON public.news_posts
   FOR INSERT WITH CHECK (
-    public.has_permission('can_publish_news') OR public.get_my_role() = 'admin'
+    public.has_permission('can_publish_news') OR (SELECT public.get_my_role()) = 'admin'
   );
 
 -- Requires can_edit_news permission (admin always bypasses)
 CREATE POLICY "news_posts: can_edit_news update" ON public.news_posts
   FOR UPDATE USING (
-    public.has_permission('can_edit_news') OR public.get_my_role() = 'admin'
+    public.has_permission('can_edit_news') OR (SELECT public.get_my_role()) = 'admin'
   ) WITH CHECK (
-    public.has_permission('can_edit_news') OR public.get_my_role() = 'admin'
+    public.has_permission('can_edit_news') OR (SELECT public.get_my_role()) = 'admin'
   );
 
 -- Allows only admins to delete news posts
 CREATE POLICY "news_posts: admin delete" ON public.news_posts
-  FOR DELETE USING (public.get_my_role() = 'admin');
+  FOR DELETE USING ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: videos
@@ -4832,25 +4813,25 @@ DROP POLICY IF EXISTS "videos: can_manage_videos update" ON public.videos;
 CREATE POLICY "videos: public read" ON public.videos
   FOR SELECT USING (
     is_visible = TRUE
-    OR public.get_my_role() IN ('admin', 'editor')
+    OR (SELECT public.get_my_role()) IN ('admin', 'editor')
   );
 
 -- Requires can_manage_videos permission (admin always bypasses)
 CREATE POLICY "videos: can_manage_videos insert" ON public.videos
   FOR INSERT WITH CHECK (
-    public.has_permission('can_manage_videos') OR public.get_my_role() = 'admin'
+    public.has_permission('can_manage_videos') OR (SELECT public.get_my_role()) = 'admin'
   );
 
 CREATE POLICY "videos: can_manage_videos update" ON public.videos
   FOR UPDATE USING (
-    public.has_permission('can_manage_videos') OR public.get_my_role() = 'admin'
+    public.has_permission('can_manage_videos') OR (SELECT public.get_my_role()) = 'admin'
   ) WITH CHECK (
-    public.has_permission('can_manage_videos') OR public.get_my_role() = 'admin'
+    public.has_permission('can_manage_videos') OR (SELECT public.get_my_role()) = 'admin'
   );
 
 -- Allows only admins to delete videos
 CREATE POLICY "videos: admin delete" ON public.videos
-  FOR DELETE USING (public.get_my_role() = 'admin');
+  FOR DELETE USING ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: assets
@@ -4868,7 +4849,7 @@ DROP POLICY IF EXISTS "assets: public press read"            ON public.assets;
 CREATE POLICY "assets: staff read" ON public.assets
   FOR SELECT USING (
     public.has_permission('can_view_admin_panel')
-    OR public.get_my_role() IN ('admin', 'editor')
+    OR (SELECT public.get_my_role()) IN ('admin', 'editor')
   );
 
 -- Allows anonymous/public read of press-approved assets (replaces press_photos public read)
@@ -4880,19 +4861,19 @@ CREATE POLICY "assets: public press read" ON public.assets
 -- Requires can_view_admin_panel permission (admin always bypasses)
 CREATE POLICY "assets: can_view_admin_panel insert" ON public.assets
   FOR INSERT WITH CHECK (
-    public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+    public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin'
   );
 
 CREATE POLICY "assets: can_view_admin_panel update" ON public.assets
   FOR UPDATE USING (
-    public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+    public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin'
   ) WITH CHECK (
-    public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+    public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin'
   );
 
 -- Allows only admins to delete assets
 CREATE POLICY "assets: admin delete" ON public.assets
-  FOR DELETE USING (public.get_my_role() = 'admin');
+  FOR DELETE USING ((SELECT public.get_my_role()) = 'admin');
 
 ALTER TABLE public.asset_folders ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "asset_folders: authenticated read"          ON public.asset_folders;
@@ -4907,19 +4888,19 @@ CREATE POLICY "asset_folders: staff read" ON public.asset_folders
   FOR SELECT TO authenticated
   USING (
     public.has_permission('can_view_admin_panel')
-    OR public.get_my_role() IN ('admin', 'editor')
+    OR (SELECT public.get_my_role()) IN ('admin', 'editor')
   );
 -- Requires can_view_admin_panel permission
 CREATE POLICY "asset_folders: can_view_admin_panel write"  ON public.asset_folders FOR INSERT TO authenticated WITH CHECK (
-  public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+  public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin'
 );
 -- Allows only admins to delete asset folders
 CREATE POLICY "asset_folders: admin delete"                ON public.asset_folders FOR DELETE TO authenticated USING (
-  public.get_my_role() = 'admin'
+  (SELECT public.get_my_role()) = 'admin'
 );
 -- Requires can_view_admin_panel permission to rename/move asset folders
 CREATE POLICY "asset_folders: can_view_admin_panel update" ON public.asset_folders FOR UPDATE TO authenticated USING (
-  public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+  public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin'
 );
 
 -- ---------------------------------------------------------------------------
@@ -4937,13 +4918,13 @@ CREATE POLICY "asset_artists: authenticated read" ON public.asset_artists
 -- Allows editors and admins to link assets to artists
 CREATE POLICY "asset_artists: editor+ write" ON public.asset_artists
   FOR INSERT TO authenticated WITH CHECK (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin','editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role IN ('admin','editor'))
   );
 
 -- Allows editors and admins to unlink assets from artists
 CREATE POLICY "asset_artists: editor+ delete" ON public.asset_artists
   FOR DELETE TO authenticated USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin','editor'))
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role IN ('admin','editor'))
   );
 
 -- ---------------------------------------------------------------------------
@@ -4957,7 +4938,7 @@ DROP POLICY IF EXISTS "site_settings_admin_write"  ON public.site_settings;
 -- SSOT list mirrored in src/lib/api/siteSettingsPublicKeys.ts
 CREATE POLICY "site_settings_public_read" ON public.site_settings
   FOR SELECT USING (
-    public.get_my_role() IN ('admin', 'editor')
+    (SELECT public.get_my_role()) IN ('admin', 'editor')
     OR key = ANY (ARRAY[
       'label_name',
       'label_short_name',
@@ -5060,8 +5041,8 @@ CREATE POLICY "site_settings_public_read" ON public.site_settings
 -- Allows editors and admins to update site settings
 CREATE POLICY "site_settings_admin_write" ON public.site_settings
   FOR ALL
-  USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: api_credentials
@@ -5071,8 +5052,8 @@ DROP POLICY IF EXISTS "api_credentials_admin_only" ON public.api_credentials;
 -- Admin-only: external API keys must not be readable by editors or the public.
 CREATE POLICY "api_credentials_admin_only" ON public.api_credentials
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: sync_logs
@@ -5081,7 +5062,7 @@ DROP POLICY IF EXISTS "sync_logs: editor+ read" ON public.sync_logs;
 
 -- Allows editors and admins to view sync log entries
 CREATE POLICY "sync_logs: editor+ read" ON public.sync_logs
-  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR SELECT USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: app_logs
@@ -5094,7 +5075,7 @@ DROP POLICY IF EXISTS "app_logs: authenticated insert" ON public.app_logs;
 -- (server-side src/lib/appLog.ts) — there is intentionally no browser INSERT
 -- policy, so clients cannot forge or spam aggregated error rows.
 CREATE POLICY "app_logs: admin read" ON public.app_logs
-  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR SELECT USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: support_known_errors
@@ -5103,11 +5084,11 @@ DROP POLICY IF EXISTS "support_known_errors: admin read"   ON public.support_kno
 DROP POLICY IF EXISTS "support_known_errors: admin write" ON public.support_known_errors;
 
 CREATE POLICY "support_known_errors: admin read" ON public.support_known_errors
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 
 CREATE POLICY "support_known_errors: admin write" ON public.support_known_errors
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: zammad_ticket_log
@@ -5115,7 +5096,7 @@ CREATE POLICY "support_known_errors: admin write" ON public.support_known_errors
 DROP POLICY IF EXISTS "zammad_ticket_log: admin read" ON public.zammad_ticket_log;
 
 CREATE POLICY "zammad_ticket_log: admin read" ON public.zammad_ticket_log
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: AI assistant
@@ -5129,28 +5110,28 @@ DROP POLICY IF EXISTS "ai_settings: admin read" ON public.ai_settings;
 DROP POLICY IF EXISTS "ai_token_budgets: admin read" ON public.ai_token_budgets;
 
 CREATE POLICY "ai_conversations: owner read" ON public.ai_conversations
-  FOR SELECT USING (user_id = auth.uid() OR public.get_my_role() = 'admin');
+  FOR SELECT USING (user_id = (SELECT auth.uid()) OR (SELECT public.get_my_role()) = 'admin');
 
 CREATE POLICY "ai_messages: owner read" ON public.ai_messages
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM public.ai_conversations c
       WHERE c.id = conversation_id
-        AND (c.user_id = auth.uid() OR public.get_my_role() = 'admin')
+        AND (c.user_id = (SELECT auth.uid()) OR (SELECT public.get_my_role()) = 'admin')
     )
   );
 
 CREATE POLICY "ai_usage_events: owner read" ON public.ai_usage_events
-  FOR SELECT USING (user_id = auth.uid() OR public.get_my_role() = 'admin');
+  FOR SELECT USING (user_id = (SELECT auth.uid()) OR (SELECT public.get_my_role()) = 'admin');
 
 CREATE POLICY "ai_diagnostics: owner read" ON public.ai_diagnostics
-  FOR SELECT USING (user_id = auth.uid() OR public.get_my_role() = 'admin');
+  FOR SELECT USING (user_id = (SELECT auth.uid()) OR (SELECT public.get_my_role()) = 'admin');
 
 CREATE POLICY "ai_settings: admin read" ON public.ai_settings
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 
 CREATE POLICY "ai_token_budgets: admin read" ON public.ai_token_budgets
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: concerts
@@ -5173,45 +5154,45 @@ CREATE POLICY "concerts: public read visible" ON public.concerts
       SELECT 1 FROM public.artists a
       WHERE a.id = artist_id AND a.is_visible = TRUE
     )
-    OR public.get_my_role() IN ('admin', 'editor')
+    OR (SELECT public.get_my_role()) IN ('admin', 'editor')
   );
 
 -- Allows editors and admins to create concerts
 CREATE POLICY "Allow admin inserts on concerts" ON public.concerts
-  FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  FOR INSERT WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- Allows editors and admins to update concerts
 CREATE POLICY "Allow admin updates on concerts" ON public.concerts
-  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR UPDATE USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- Allows editors and admins to delete concerts
 CREATE POLICY "Allow admin deletes on concerts" ON public.concerts
-  FOR DELETE USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR DELETE USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- Allows artists to create concerts for their own profile
 CREATE POLICY "concerts: artist own insert" ON public.concerts
   FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = concerts.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 -- Allows artists to update their own concerts
 CREATE POLICY "concerts: artist own update" ON public.concerts
   FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
+  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = concerts.artist_id AND am.user_id = (SELECT auth.uid())))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = concerts.artist_id AND am.user_id = (SELECT auth.uid())));
 
 -- Allows artists to delete their own concerts
 CREATE POLICY "concerts: artist own delete" ON public.concerts
   FOR DELETE USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = concerts.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "concerts: artist manage own" ON public.concerts
   FOR ALL USING (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
   )
   WITH CHECK (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
   );
 
 -- ---------------------------------------------------------------------------
@@ -5222,14 +5203,14 @@ DROP POLICY IF EXISTS "editor_activity_log: editor read own" ON public.editor_ac
 DROP POLICY IF EXISTS "editor_activity_log: editor insert own" ON public.editor_activity_log;
 
 CREATE POLICY "editor_activity_log: admin read" ON public.editor_activity_log
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 
 CREATE POLICY "editor_activity_log: editor read own" ON public.editor_activity_log
-  FOR SELECT USING (public.get_my_role() = 'editor' AND editor_id = auth.uid());
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'editor' AND editor_id = (SELECT auth.uid()));
 
 CREATE POLICY "editor_activity_log: editor insert own" ON public.editor_activity_log
   FOR INSERT WITH CHECK (
-    public.get_my_role() = 'editor' AND editor_id = auth.uid()
+    (SELECT public.get_my_role()) = 'editor' AND editor_id = (SELECT auth.uid())
   );
 
 -- ---------------------------------------------------------------------------
@@ -5241,20 +5222,20 @@ DROP POLICY IF EXISTS "editor_notifications: admin manage" ON public.editor_noti
 
 CREATE POLICY "editor_notifications: editor read own" ON public.editor_notifications
   FOR SELECT USING (
-    public.get_my_role() = 'editor' AND recipient_id = auth.uid()
+    (SELECT public.get_my_role()) = 'editor' AND recipient_id = (SELECT auth.uid())
   );
 
 CREATE POLICY "editor_notifications: editor update own" ON public.editor_notifications
   FOR UPDATE USING (
-    public.get_my_role() = 'editor' AND recipient_id = auth.uid()
+    (SELECT public.get_my_role()) = 'editor' AND recipient_id = (SELECT auth.uid())
   )
   WITH CHECK (
-    public.get_my_role() = 'editor' AND recipient_id = auth.uid()
+    (SELECT public.get_my_role()) = 'editor' AND recipient_id = (SELECT auth.uid())
   );
 
 CREATE POLICY "editor_notifications: admin manage" ON public.editor_notifications
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: notifications (unified; INSERT via service role only)
@@ -5264,14 +5245,14 @@ DROP POLICY IF EXISTS "notifications: own update" ON public.notifications;
 DROP POLICY IF EXISTS "notifications: admin read all" ON public.notifications;
 
 CREATE POLICY "notifications: own read" ON public.notifications
-  FOR SELECT USING (user_id = auth.uid());
+  FOR SELECT USING (user_id = (SELECT auth.uid()));
 
 CREATE POLICY "notifications: own update" ON public.notifications
-  FOR UPDATE USING (user_id = auth.uid())
-  WITH CHECK (user_id = auth.uid());
+  FOR UPDATE USING (user_id = (SELECT auth.uid()))
+  WITH CHECK (user_id = (SELECT auth.uid()));
 
 CREATE POLICY "notifications: admin read all" ON public.notifications
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: notification_preferences
@@ -5279,8 +5260,8 @@ CREATE POLICY "notifications: admin read all" ON public.notifications
 DROP POLICY IF EXISTS "notification_preferences: own all" ON public.notification_preferences;
 
 CREATE POLICY "notification_preferences: own all" ON public.notification_preferences
-  FOR ALL USING (user_id = auth.uid())
-  WITH CHECK (user_id = auth.uid());
+  FOR ALL USING (user_id = (SELECT auth.uid()))
+  WITH CHECK (user_id = (SELECT auth.uid()));
 
 -- ---------------------------------------------------------------------------
 -- RLS: push_subscriptions (users manage own; send uses service role)
@@ -5288,8 +5269,8 @@ CREATE POLICY "notification_preferences: own all" ON public.notification_prefere
 DROP POLICY IF EXISTS "push_subscriptions: own all" ON public.push_subscriptions;
 
 CREATE POLICY "push_subscriptions: own all" ON public.push_subscriptions
-  FOR ALL USING (user_id = auth.uid())
-  WITH CHECK (user_id = auth.uid());
+  FOR ALL USING (user_id = (SELECT auth.uid()))
+  WITH CHECK (user_id = (SELECT auth.uid()));
 
 -- ---------------------------------------------------------------------------
 -- RLS: interview_requests
@@ -5300,19 +5281,19 @@ DROP POLICY IF EXISTS "interview_requests: artist update own" ON public.intervie
 DROP POLICY IF EXISTS "interview_requests: artist delete own" ON public.interview_requests;
 
 CREATE POLICY "interview_requests: journalist manage own" ON public.interview_requests
-  FOR ALL USING (journalist_id = auth.uid())
-  WITH CHECK (journalist_id = auth.uid());
+  FOR ALL USING (journalist_id = (SELECT auth.uid()))
+  WITH CHECK (journalist_id = (SELECT auth.uid()));
 
 CREATE POLICY "interview_requests: artist read own" ON public.interview_requests
-  FOR SELECT USING (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()));
+  FOR SELECT USING (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid())));
 
 CREATE POLICY "interview_requests: artist update own" ON public.interview_requests
-  FOR UPDATE USING (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()))
-  WITH CHECK (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()));
+  FOR UPDATE USING (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid())))
+  WITH CHECK (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid())));
 
 -- Portal artists may remove requests from their inbox (status reply remains optional).
 CREATE POLICY "interview_requests: artist delete own" ON public.interview_requests
-  FOR DELETE USING (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()));
+  FOR DELETE USING (artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid())));
 
 
 
@@ -5332,25 +5313,25 @@ DROP POLICY IF EXISTS "artist_epks: admin all"         ON public.artist_epks;
 -- Allows artists to read their own EPK/profile data
 CREATE POLICY "artist_epks: artist read own" ON public.artist_epks
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_epks.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 -- Allows artists to insert their own EPK/profile (required for first-time upsert)
 CREATE POLICY "artist_epks: artist insert own" ON public.artist_epks
   FOR INSERT
-  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_epks.artist_id AND am.user_id = (SELECT auth.uid())));
 
 -- Allows artists to update their own EPK/profile data
 CREATE POLICY "artist_epks: artist update own" ON public.artist_epks
   FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
+  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_epks.artist_id AND am.user_id = (SELECT auth.uid())))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_epks.artist_id AND am.user_id = (SELECT auth.uid())));
 
 -- Allows admins full access to all artist epks
 CREATE POLICY "artist_epks: admin all" ON public.artist_epks
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- No anon public SELECT on artist_epks (would leak epk_password_hash + full row).
 -- Public/press EPK content is served only via service-role server code
@@ -5366,17 +5347,17 @@ DROP POLICY IF EXISTS "epk_versions: admin all"         ON public.epk_versions;
 
 CREATE POLICY "epk_versions: artist read own" ON public.epk_versions
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = epk_versions.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "epk_versions: artist insert own" ON public.epk_versions
   FOR INSERT
-  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = epk_versions.artist_id AND am.user_id = (SELECT auth.uid())));
 
 CREATE POLICY "epk_versions: admin all" ON public.epk_versions
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: artist_landing_pages
@@ -5389,30 +5370,30 @@ DROP POLICY IF EXISTS "artist_landing_pages: public read published" ON public.ar
 
 CREATE POLICY "artist_landing_pages: artist read own" ON public.artist_landing_pages
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_landing_pages.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "artist_landing_pages: artist insert own" ON public.artist_landing_pages
   FOR INSERT
-  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_landing_pages.artist_id AND am.user_id = (SELECT auth.uid())));
 
 CREATE POLICY "artist_landing_pages: artist update own" ON public.artist_landing_pages
   FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
+  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_landing_pages.artist_id AND am.user_id = (SELECT auth.uid())))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_landing_pages.artist_id AND am.user_id = (SELECT auth.uid())));
 
 CREATE POLICY "artist_landing_pages: admin all" ON public.artist_landing_pages
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 DROP POLICY IF EXISTS "artist_landing_pages: editor+ read all" ON public.artist_landing_pages;
 CREATE POLICY "artist_landing_pages: editor+ read all" ON public.artist_landing_pages
-  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR SELECT USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 DROP POLICY IF EXISTS "artist_landing_pages: editor+ update" ON public.artist_landing_pages;
 CREATE POLICY "artist_landing_pages: editor+ update" ON public.artist_landing_pages
-  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR UPDATE USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 CREATE POLICY "artist_landing_pages: public read published" ON public.artist_landing_pages
   FOR SELECT USING (
@@ -5434,26 +5415,26 @@ DROP POLICY IF EXISTS "epk_fonts: admin all"         ON public.epk_fonts;
 CREATE POLICY "epk_fonts: artist read own" ON public.epk_fonts
   FOR SELECT USING (
     artist_id IS NULL
-    OR EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    OR EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = epk_fonts.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "epk_fonts: artist insert own" ON public.epk_fonts
   FOR INSERT
   WITH CHECK (
     artist_id IS NOT NULL
-    AND EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    AND EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = epk_fonts.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "epk_fonts: artist delete own" ON public.epk_fonts
   FOR DELETE USING (
     artist_id IS NOT NULL
-    AND EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    AND EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = epk_fonts.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "epk_fonts: admin all" ON public.epk_fonts
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 DROP POLICY IF EXISTS "epk_fonts: public read visible artist" ON public.epk_fonts;
 CREATE POLICY "epk_fonts: public read visible artist" ON public.epk_fonts
@@ -5475,28 +5456,28 @@ DROP POLICY IF EXISTS "epk_share_links: admin all"         ON public.epk_share_l
 
 CREATE POLICY "epk_share_links: artist read own" ON public.epk_share_links
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = epk_share_links.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "epk_share_links: artist insert own" ON public.epk_share_links
   FOR INSERT
   WITH CHECK (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = epk_share_links.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "epk_share_links: artist update own" ON public.epk_share_links
   FOR UPDATE
   USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = epk_share_links.artist_id AND am.user_id = (SELECT auth.uid()))
   )
   WITH CHECK (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = epk_share_links.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "epk_share_links: admin all" ON public.epk_share_links
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: epk_download_events
@@ -5506,13 +5487,13 @@ DROP POLICY IF EXISTS "epk_download_events: admin all"     ON public.epk_downloa
 
 CREATE POLICY "epk_download_events: artist read own" ON public.epk_download_events
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = epk_download_events.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "epk_download_events: admin all" ON public.epk_download_events
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: epk_templates
@@ -5522,14 +5503,14 @@ DROP POLICY IF EXISTS "epk_templates: admin all"      ON public.epk_templates;
 
 CREATE POLICY "epk_templates: read published" ON public.epk_templates
   FOR SELECT USING (
-    (is_published = TRUE AND auth.uid() IS NOT NULL)
-    OR public.get_my_role() IN ('admin', 'editor')
+    (is_published = TRUE AND (SELECT auth.uid()) IS NOT NULL)
+    OR (SELECT public.get_my_role()) IN ('admin', 'editor')
   );
 
 CREATE POLICY "epk_templates: admin all" ON public.epk_templates
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: streaming_stats
@@ -5540,14 +5521,14 @@ DROP POLICY IF EXISTS "streaming_stats: admin all"       ON public.streaming_sta
 -- Allows artists to view their own streaming statistics
 CREATE POLICY "streaming_stats: artist read own" ON public.streaming_stats
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = streaming_stats.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 -- Allows admins and editors to manage streaming stats (SOS rollup writes)
 CREATE POLICY "streaming_stats: admin all" ON public.streaming_stats
   FOR ALL
-  USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: sales_statements
@@ -5558,15 +5539,15 @@ DROP POLICY IF EXISTS "sales_statements: admin all"       ON public.sales_statem
 -- Allows artists to view their own approved+ statements (drafts are admin-only)
 CREATE POLICY "sales_statements: artist read own" ON public.sales_statements
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = sales_statements.artist_id AND am.user_id = (SELECT auth.uid()))
     AND status IN ('label_approved', 'artist_notified', 'viewed', 'invoiced', 'paid', 'acknowledged')
   );
 
 -- Allows admins full access to all sales statements
 CREATE POLICY "sales_statements: admin all" ON public.sales_statements
   FOR ALL
-  USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: distributor_import_batches
@@ -5574,8 +5555,8 @@ CREATE POLICY "sales_statements: admin all" ON public.sales_statements
 DROP POLICY IF EXISTS "distributor_import_batches: admin all" ON public.distributor_import_batches;
 CREATE POLICY "distributor_import_batches: admin all" ON public.distributor_import_batches
   FOR ALL
-  USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- Artists may read metadata for bronze batches linked to their visible statements
 -- (hash, distributor, period — chain-of-custody / provenance UI). No write access.
@@ -5589,7 +5570,7 @@ CREATE POLICY "distributor_import_batches: artist read linked" ON public.distrib
         AND ss.status IN ('label_approved', 'artist_notified', 'viewed', 'invoiced', 'paid', 'acknowledged')
         AND EXISTS (
           SELECT 1 FROM public.artist_members am
-          WHERE am.artist_id = ss.artist_id AND am.user_id = auth.uid()
+          WHERE am.artist_id = ss.artist_id AND am.user_id = (SELECT auth.uid())
         )
     )
   );
@@ -5602,13 +5583,13 @@ DROP POLICY IF EXISTS "artist_territory_metrics: admin all"       ON public.arti
 
 CREATE POLICY "artist_territory_metrics: artist read own" ON public.artist_territory_metrics
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_territory_metrics.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "artist_territory_metrics: admin all" ON public.artist_territory_metrics
   FOR ALL
-  USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: artist_listener_metrics
@@ -5618,13 +5599,13 @@ DROP POLICY IF EXISTS "artist_listener_metrics: admin all"       ON public.artis
 
 CREATE POLICY "artist_listener_metrics: artist read own" ON public.artist_listener_metrics
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_listener_metrics.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "artist_listener_metrics: admin all" ON public.artist_listener_metrics
   FOR ALL
-  USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: spotify_track_play_snapshots
@@ -5634,13 +5615,13 @@ DROP POLICY IF EXISTS "spotify_track_play_snapshots: admin all"       ON public.
 
 CREATE POLICY "spotify_track_play_snapshots: artist read own" ON public.spotify_track_play_snapshots
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = spotify_track_play_snapshots.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "spotify_track_play_snapshots: admin all" ON public.spotify_track_play_snapshots
   FOR ALL
-  USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: apify_usage_months (admin/editor only — budget is label infrastructure)
@@ -5649,8 +5630,8 @@ DROP POLICY IF EXISTS "apify_usage_months: admin all" ON public.apify_usage_mont
 
 CREATE POLICY "apify_usage_months: admin all" ON public.apify_usage_months
   FOR ALL
-  USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: sales_statement_line_items
@@ -5664,15 +5645,15 @@ CREATE POLICY "sales_statement_line_items: artist read own" ON public.sales_stat
       SELECT 1 FROM public.sales_statements ss
       JOIN public.artist_members am ON am.artist_id = ss.artist_id
       WHERE ss.id = statement_id
-        AND am.user_id = auth.uid()
+        AND am.user_id = (SELECT auth.uid())
         AND ss.status IN ('label_approved', 'artist_notified', 'viewed', 'invoiced', 'paid', 'acknowledged')
     )
   );
 
 CREATE POLICY "sales_statement_line_items: admin all" ON public.sales_statement_line_items
   FOR ALL
-  USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: event_impact
@@ -5682,13 +5663,13 @@ DROP POLICY IF EXISTS "event_impact: admin all"       ON public.event_impact;
 
 CREATE POLICY "event_impact: artist read own" ON public.event_impact
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = event_impact.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "event_impact: admin all" ON public.event_impact
   FOR ALL
-  USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: promo_impact
@@ -5698,13 +5679,13 @@ DROP POLICY IF EXISTS "promo_impact: admin all"       ON public.promo_impact;
 
 CREATE POLICY "promo_impact: artist read own" ON public.promo_impact
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = promo_impact.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "promo_impact: admin all" ON public.promo_impact
   FOR ALL
-  USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: page_events
@@ -5715,13 +5696,13 @@ DROP POLICY IF EXISTS "page_events: admin all"       ON public.page_events;
 CREATE POLICY "page_events: artist read own" ON public.page_events
   FOR SELECT USING (
     artist_id IS NOT NULL
-    AND EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    AND EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = page_events.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "page_events: admin all" ON public.page_events
   FOR ALL
-  USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: merch_orders
@@ -5731,13 +5712,13 @@ DROP POLICY IF EXISTS "merch_orders: admin all"       ON public.merch_orders;
 
 CREATE POLICY "merch_orders: artist read own" ON public.merch_orders
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = merch_orders.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 CREATE POLICY "merch_orders: admin all" ON public.merch_orders
   FOR ALL
-  USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- RLS: release_checklists
@@ -5750,26 +5731,26 @@ DROP POLICY IF EXISTS "release_checklists: admin all"         ON public.release_
 -- Allows artists to read their own release checklists
 CREATE POLICY "release_checklists: artist read own" ON public.release_checklists
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = release_checklists.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 -- Allows artists to create checklists for their releases
 CREATE POLICY "release_checklists: artist insert own" ON public.release_checklists
   FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = release_checklists.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 -- Allows artists to update their own release checklists
 CREATE POLICY "release_checklists: artist update own" ON public.release_checklists
   FOR UPDATE
-  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid()));
+  USING (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = release_checklists.artist_id AND am.user_id = (SELECT auth.uid())))
+  WITH CHECK (EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = release_checklists.artist_id AND am.user_id = (SELECT auth.uid())));
 
 -- Allows admins full access to all release checklists
 CREATE POLICY "release_checklists: admin all" ON public.release_checklists
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: press_photos  (DEPRECATED — kept for legacy DB backfill source only)
@@ -5783,8 +5764,8 @@ CREATE POLICY "press_photos: public read" ON public.press_photos
 
 CREATE POLICY "press_photos: admin all" ON public.press_photos
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: press_kit_items
@@ -5807,19 +5788,19 @@ CREATE POLICY "press_kit_items: public read" ON public.press_kit_items
 
 CREATE POLICY "press_kit_items: can_view_admin_panel insert" ON public.press_kit_items
   FOR INSERT WITH CHECK (
-    public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+    public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin'
   );
 
 CREATE POLICY "press_kit_items: can_view_admin_panel update" ON public.press_kit_items
   FOR UPDATE USING (
-    public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+    public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin'
   ) WITH CHECK (
-    public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+    public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin'
   );
 
 CREATE POLICY "press_kit_items: can_view_admin_panel delete" ON public.press_kit_items
   FOR DELETE USING (
-    public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+    public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin'
   );
 
 -- ---------------------------------------------------------------------------
@@ -5830,13 +5811,13 @@ DROP POLICY IF EXISTS "promo_tracks: admin all"       ON public.promo_tracks;
 
 -- Allows accredited journalists and admins to access promo tracks
 CREATE POLICY "promo_tracks: journalist read" ON public.promo_tracks
-  FOR SELECT USING (public.get_my_role() IN ('journalist', 'admin'));
+  FOR SELECT USING ((SELECT public.get_my_role()) IN ('journalist', 'admin'));
 
 -- Allows admins full access to promo tracks
 CREATE POLICY "promo_tracks: admin all" ON public.promo_tracks
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: journalist_applications
@@ -5847,17 +5828,17 @@ DROP POLICY IF EXISTS "journalist_applications: admin all"   ON public.journalis
 
 -- Allows applicants to read their own application
 CREATE POLICY "journalist_applications: own read" ON public.journalist_applications
-  FOR SELECT USING (auth.uid() = user_id);
+  FOR SELECT USING ((SELECT auth.uid()) = user_id);
 
 -- Allows authenticated users to submit a journalist application
 CREATE POLICY "journalist_applications: own insert" ON public.journalist_applications
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
+  FOR INSERT WITH CHECK ((SELECT auth.uid()) = user_id);
 
 -- Allows admins full access to journalist applications
 CREATE POLICY "journalist_applications: admin all" ON public.journalist_applications
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: portal_feature_flags
@@ -5867,13 +5848,13 @@ DROP POLICY IF EXISTS "portal_feature_flags: admin write" ON public.portal_featu
 
 -- Allows any authenticated user to read portal feature flags
 CREATE POLICY "portal_feature_flags: authenticated read" ON public.portal_feature_flags
-  FOR SELECT USING (auth.role() = 'authenticated');
+  FOR SELECT USING ((SELECT auth.role()) = 'authenticated');
 
 -- Allows admins to manage portal feature flags
 CREATE POLICY "portal_feature_flags: admin write" ON public.portal_feature_flags
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: label_messages
@@ -5884,14 +5865,14 @@ DROP POLICY IF EXISTS "label_messages: admin all" ON public.label_messages;
 -- Allows artists to read messages sent to their profile
 CREATE POLICY "label_messages: artist own read" ON public.label_messages
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = label_messages.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 -- Allows admins full access to all label messages
 CREATE POLICY "label_messages: admin all" ON public.label_messages
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: message_folders (admin-managed inbox folders)
@@ -5900,8 +5881,8 @@ DROP POLICY IF EXISTS "message_folders: admin all" ON public.message_folders;
 
 CREATE POLICY "message_folders: admin all" ON public.message_folders
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: message_rules (admin-managed inbox routing rules)
@@ -5910,8 +5891,8 @@ DROP POLICY IF EXISTS "message_rules: admin all" ON public.message_rules;
 
 CREATE POLICY "message_rules: admin all" ON public.message_rules
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: message_attachments (attachments on label_messages)
@@ -5925,14 +5906,14 @@ CREATE POLICY "message_attachments: artist own read" ON public.message_attachmen
     EXISTS (
       SELECT 1 FROM public.label_messages lm
       JOIN public.artist_members am ON am.artist_id = lm.artist_id
-      WHERE lm.id = message_id AND am.user_id = auth.uid()
+      WHERE lm.id = message_id AND am.user_id = (SELECT auth.uid())
     )
   );
 
 CREATE POLICY "message_attachments: admin all" ON public.message_attachments
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: message_receipts
@@ -5941,11 +5922,11 @@ DROP POLICY IF EXISTS "message_receipts: own all" ON public.message_receipts;
 DROP POLICY IF EXISTS "message_receipts: admin read" ON public.message_receipts;
 
 CREATE POLICY "message_receipts: own all" ON public.message_receipts
-  FOR ALL USING (user_id = auth.uid())
-  WITH CHECK (user_id = auth.uid());
+  FOR ALL USING (user_id = (SELECT auth.uid()))
+  WITH CHECK (user_id = (SELECT auth.uid()));
 
 CREATE POLICY "message_receipts: admin read" ON public.message_receipts
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: message_internal_notes (staff only)
@@ -5954,12 +5935,12 @@ DROP POLICY IF EXISTS "message_internal_notes: admin all" ON public.message_inte
 DROP POLICY IF EXISTS "message_internal_notes: editor read write" ON public.message_internal_notes;
 
 CREATE POLICY "message_internal_notes: admin all" ON public.message_internal_notes
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 CREATE POLICY "message_internal_notes: editor read write" ON public.message_internal_notes
-  FOR ALL USING (public.get_my_role() = 'editor')
-  WITH CHECK (public.get_my_role() = 'editor');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'editor')
+  WITH CHECK ((SELECT public.get_my_role()) = 'editor');
 
 -- ---------------------------------------------------------------------------
 -- RLS: message_events (staff read; insert via service role or staff)
@@ -5968,12 +5949,12 @@ DROP POLICY IF EXISTS "message_events: admin all" ON public.message_events;
 DROP POLICY IF EXISTS "message_events: editor insert read" ON public.message_events;
 
 CREATE POLICY "message_events: admin all" ON public.message_events
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 CREATE POLICY "message_events: editor insert read" ON public.message_events
-  FOR ALL USING (public.get_my_role() = 'editor')
-  WITH CHECK (public.get_my_role() = 'editor');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'editor')
+  WITH CHECK ((SELECT public.get_my_role()) = 'editor');
 
 -- ---------------------------------------------------------------------------
 -- RLS: journalist_downloads
@@ -5984,15 +5965,15 @@ DROP POLICY IF EXISTS "journalist_downloads: admin read" ON public.journalist_do
 
 -- Allows journalists to view their own download history
 CREATE POLICY "journalist_downloads: own read" ON public.journalist_downloads
-  FOR SELECT USING (journalist_id = auth.uid());
+  FOR SELECT USING (journalist_id = (SELECT auth.uid()));
 
 -- Allows journalists to log new downloads (GDPR Art. 6(1)(f))
 CREATE POLICY "journalist_downloads: own insert" ON public.journalist_downloads
-  FOR INSERT WITH CHECK (journalist_id = auth.uid());
+  FOR INSERT WITH CHECK (journalist_id = (SELECT auth.uid()));
 
 -- Allows admins to read all journalist download logs
 CREATE POLICY "journalist_downloads: admin read" ON public.journalist_downloads
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- RLS: accreditation_requests
@@ -6003,17 +5984,17 @@ DROP POLICY IF EXISTS "accreditation_requests: admin all" ON public.accreditatio
 
 -- Allows journalists to read their own accreditation requests
 CREATE POLICY "accreditation_requests: own read" ON public.accreditation_requests
-  FOR SELECT USING (journalist_id = auth.uid());
+  FOR SELECT USING (journalist_id = (SELECT auth.uid()));
 
 -- Allows authenticated users to submit accreditation requests
 CREATE POLICY "accreditation_requests: own insert" ON public.accreditation_requests
-  FOR INSERT WITH CHECK (journalist_id = auth.uid());
+  FOR INSERT WITH CHECK (journalist_id = (SELECT auth.uid()));
 
 -- Allows admins full access to accreditation requests
 CREATE POLICY "accreditation_requests: admin all" ON public.accreditation_requests
   FOR ALL
-  USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- =============================================================================
 -- SEED DATA
@@ -6089,25 +6070,25 @@ DROP POLICY IF EXISTS "artist_assets_admin_all" ON public.artist_assets;
 -- Allows artists to read their own asset entries
 CREATE POLICY "artist_assets_select_own" ON public.artist_assets
   FOR SELECT USING (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
   );
 
 -- Allows artists to add asset entries for their own profile
 CREATE POLICY "artist_assets_insert_own" ON public.artist_assets
   FOR INSERT WITH CHECK (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
   );
 
 -- Allows artists to delete their own asset entries
 CREATE POLICY "artist_assets_delete_own" ON public.artist_assets
   FOR DELETE USING (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
   );
 
 -- Allows admins full access to all artist assets
 CREATE POLICY "artist_assets_admin_all" ON public.artist_assets
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role = 'admin')
   );
 
 -- ============================================================
@@ -6137,19 +6118,19 @@ DROP POLICY IF EXISTS "artist_replies_admin_all" ON public.artist_replies;
 -- Allows artists to read their own message replies
 CREATE POLICY "artist_replies_select_own" ON public.artist_replies
   FOR SELECT USING (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
   );
 
 -- Allows artists to write replies to messages addressed to them
 CREATE POLICY "artist_replies_insert_own" ON public.artist_replies
   FOR INSERT WITH CHECK (
-    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid())
+    artist_id IN (SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid()))
   );
 
 -- Allows admins full access to all artist message replies
 CREATE POLICY "artist_replies_admin_all" ON public.artist_replies
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
+    EXISTS (SELECT 1 FROM public.users WHERE id = (SELECT auth.uid()) AND role = 'admin')
   );
 
 ALTER TABLE public.label_messages REPLICA IDENTITY FULL;
@@ -6167,8 +6148,8 @@ ALTER TABLE public.message_templates ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "message_templates: admin all" ON public.message_templates;
 -- Allows admins full access to reusable message templates
 CREATE POLICY "message_templates: admin all" ON public.message_templates
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ============================================================
 -- TABLE: media_folders  (dedicated filesystem for Press & Media tab)
@@ -6218,15 +6199,15 @@ DROP POLICY IF EXISTS "media_folders: can_view_admin_panel update" ON public.med
 CREATE POLICY "media_folders: authenticated read"          ON public.media_folders FOR SELECT TO authenticated USING (true);
 -- Requires can_view_admin_panel permission
 CREATE POLICY "media_folders: can_view_admin_panel write"  ON public.media_folders FOR INSERT TO authenticated WITH CHECK (
-  public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+  public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin'
 );
 -- Allows only admins to delete media folders
 CREATE POLICY "media_folders: admin delete"                ON public.media_folders FOR DELETE TO authenticated USING (
-  public.get_my_role() = 'admin'
+  (SELECT public.get_my_role()) = 'admin'
 );
 -- Requires can_view_admin_panel permission to rename/move media folders
 CREATE POLICY "media_folders: can_view_admin_panel update" ON public.media_folders FOR UPDATE TO authenticated USING (
-  public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+  public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin'
 );
 
 -- RLS: media_files
@@ -6241,15 +6222,15 @@ DROP POLICY IF EXISTS "media_files: can_view_admin_panel update" ON public.media
 CREATE POLICY "media_files: authenticated read"          ON public.media_files FOR SELECT TO authenticated USING (true);
 -- Requires can_view_admin_panel permission
 CREATE POLICY "media_files: can_view_admin_panel write"  ON public.media_files FOR INSERT TO authenticated WITH CHECK (
-  public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+  public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin'
 );
 -- Requires can_view_admin_panel permission to update media file metadata
 CREATE POLICY "media_files: can_view_admin_panel update" ON public.media_files FOR UPDATE TO authenticated USING (
-  public.has_permission('can_view_admin_panel') OR public.get_my_role() = 'admin'
+  public.has_permission('can_view_admin_panel') OR (SELECT public.get_my_role()) = 'admin'
 );
 -- Allows only admins to delete media files
 CREATE POLICY "media_files: admin delete"                ON public.media_files FOR DELETE TO authenticated USING (
-  public.get_my_role() = 'admin'
+  (SELECT public.get_my_role()) = 'admin'
 );
 
 -- Scheduled news: promoted to published on public cache refresh (see publishScheduledNewsPosts).
@@ -6270,7 +6251,7 @@ CREATE OR REPLACE FUNCTION public.get_linked_artist_id(p_user_id UUID)
 RETURNS UUID
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = public
 AS $$
   SELECT artist_id FROM public.artist_members WHERE user_id = p_user_id LIMIT 1;
@@ -6284,7 +6265,7 @@ CREATE OR REPLACE FUNCTION public.get_linked_artist_ids(p_user_id UUID)
 RETURNS SETOF UUID
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = public
 AS $$
   SELECT artist_id FROM public.artist_members WHERE user_id = p_user_id;
@@ -6298,7 +6279,7 @@ CREATE OR REPLACE FUNCTION public.is_artist_member(p_user_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = public
 AS $$
   SELECT EXISTS (SELECT 1 FROM public.artist_members WHERE user_id = p_user_id);
@@ -6327,10 +6308,10 @@ DROP POLICY IF EXISTS "role_changes: admin read" ON public.role_changes;
 DROP POLICY IF EXISTS "role_changes: admin insert" ON public.role_changes;
 
 CREATE POLICY "role_changes: admin read" ON public.role_changes
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 
 CREATE POLICY "role_changes: admin insert" ON public.role_changes
-  FOR INSERT WITH CHECK (public.get_my_role() = 'admin');
+  FOR INSERT WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- TRIGGER: auto-log every profiles.role update into role_changes
@@ -6382,10 +6363,10 @@ DROP POLICY IF EXISTS "ban_history: admin read"   ON public.ban_history;
 DROP POLICY IF EXISTS "ban_history: admin insert" ON public.ban_history;
 
 CREATE POLICY "ban_history: admin read" ON public.ban_history
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 
 CREATE POLICY "ban_history: admin insert" ON public.ban_history
-  FOR INSERT WITH CHECK (public.get_my_role() = 'admin');
+  FOR INSERT WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- =============================================================================
 -- CUSTOM ROLES & PERMISSIONS (user-defined, supplemental to the system enum)
@@ -6414,10 +6395,10 @@ DROP POLICY IF EXISTS "custom_permission_definitions: admin read"   ON public.cu
 DROP POLICY IF EXISTS "custom_permission_definitions: admin write"  ON public.custom_permission_definitions;
 
 CREATE POLICY "custom_permission_definitions: admin read"  ON public.custom_permission_definitions
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 CREATE POLICY "custom_permission_definitions: admin write" ON public.custom_permission_definitions
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- TABLE: custom_roles
 -- User-defined roles, supplementary to the system user_role enum.
@@ -6447,15 +6428,15 @@ CREATE POLICY "custom_roles: assigned read" ON public.custom_roles
     EXISTS (
       SELECT 1 FROM public.user_custom_roles ucr
       WHERE ucr.role_id = custom_roles.id
-        AND ucr.user_id = auth.uid()
+        AND ucr.user_id = (SELECT auth.uid())
     )
   );
 
 CREATE POLICY "custom_roles: admin read"  ON public.custom_roles
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 CREATE POLICY "custom_roles: admin write" ON public.custom_roles
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- TABLE: custom_role_permissions
 -- Maps custom roles to permission names (both system and custom-defined keys).
@@ -6476,15 +6457,15 @@ CREATE POLICY "custom_role_permissions: assigned read" ON public.custom_role_per
     EXISTS (
       SELECT 1 FROM public.user_custom_roles ucr
       WHERE ucr.role_id = custom_role_permissions.role_id
-        AND ucr.user_id = auth.uid()
+        AND ucr.user_id = (SELECT auth.uid())
     )
   );
 
 CREATE POLICY "custom_role_permissions: admin read"  ON public.custom_role_permissions
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 CREATE POLICY "custom_role_permissions: admin write" ON public.custom_role_permissions
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- TABLE: user_custom_roles
 -- Assigns custom roles to users (supplementary to profiles.role).
@@ -6506,13 +6487,13 @@ DROP POLICY IF EXISTS "user_custom_roles: admin write" ON public.user_custom_rol
 
 DROP POLICY IF EXISTS "user_custom_roles: own read" ON public.user_custom_roles;
 CREATE POLICY "user_custom_roles: own read" ON public.user_custom_roles
-  FOR SELECT USING (user_id = auth.uid());
+  FOR SELECT USING (user_id = (SELECT auth.uid()));
 
 CREATE POLICY "user_custom_roles: admin read"  ON public.user_custom_roles
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 CREATE POLICY "user_custom_roles: admin write" ON public.user_custom_roles
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- =============================================================================
 -- RBAC AUDIT LOG
@@ -6542,9 +6523,9 @@ DROP POLICY IF EXISTS "rbac_audit_log: admin read"   ON public.rbac_audit_log;
 DROP POLICY IF EXISTS "rbac_audit_log: admin insert" ON public.rbac_audit_log;
 
 CREATE POLICY "rbac_audit_log: admin read"   ON public.rbac_audit_log
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 CREATE POLICY "rbac_audit_log: admin insert" ON public.rbac_audit_log
-  FOR INSERT WITH CHECK (public.get_my_role() = 'admin');
+  FOR INSERT WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- TRIGGER: auto-log every update to role_permissions into rbac_audit_log
 CREATE OR REPLACE FUNCTION public.log_permission_change()
@@ -6598,9 +6579,9 @@ DROP POLICY IF EXISTS "admin_audit_log: admin read"   ON public.admin_audit_log;
 DROP POLICY IF EXISTS "admin_audit_log: admin insert" ON public.admin_audit_log;
 
 CREATE POLICY "admin_audit_log: admin read"   ON public.admin_audit_log
-  FOR SELECT USING (public.get_my_role() = 'admin');
+  FOR SELECT USING ((SELECT public.get_my_role()) = 'admin');
 CREATE POLICY "admin_audit_log: admin insert" ON public.admin_audit_log
-  FOR INSERT WITH CHECK (public.get_my_role() = 'admin');
+  FOR INSERT WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- =============================================================================
 -- RESOURCE OWNERSHIP: artist-own-read RLS for releases and concerts
@@ -6615,8 +6596,8 @@ CREATE POLICY "releases: artist own read" ON public.releases
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM public.artist_members am
-      WHERE am.artist_id = artist_id
-        AND am.user_id = auth.uid()
+      WHERE am.artist_id = releases.artist_id
+        AND am.user_id = (SELECT auth.uid())
     )
   );
 
@@ -6626,8 +6607,8 @@ CREATE POLICY "concerts: artist own read" ON public.concerts
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM public.artist_members am
-      WHERE am.artist_id = artist_id
-        AND am.user_id = auth.uid()
+      WHERE am.artist_id = concerts.artist_id
+        AND am.user_id = (SELECT auth.uid())
     )
   );
 
@@ -7215,27 +7196,27 @@ ALTER TABLE public.submission_release_type_rules    ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "release_submissions: artist insert own" ON public.release_submissions;
 CREATE POLICY "release_submissions: artist insert own" ON public.release_submissions
   FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = release_submissions.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 DROP POLICY IF EXISTS "release_submissions: artist read own" ON public.release_submissions;
 CREATE POLICY "release_submissions: artist read own" ON public.release_submissions
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = release_submissions.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 DROP POLICY IF EXISTS "release_submissions: editor+ read all" ON public.release_submissions;
 CREATE POLICY "release_submissions: editor+ read all" ON public.release_submissions
-  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR SELECT USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 DROP POLICY IF EXISTS "release_submissions: editor+ update" ON public.release_submissions;
 CREATE POLICY "release_submissions: editor+ update" ON public.release_submissions
-  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR UPDATE USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 DROP POLICY IF EXISTS "release_submission_assets: editor+ all" ON public.release_submission_assets;
 CREATE POLICY "release_submission_assets: editor+ all" ON public.release_submission_assets
-  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  FOR ALL USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- release_submission_tracks: artist insert/read via submission ownership
 DROP POLICY IF EXISTS "release_submission_tracks: artist insert own" ON public.release_submission_tracks;
@@ -7244,7 +7225,7 @@ CREATE POLICY "release_submission_tracks: artist insert own" ON public.release_s
     EXISTS (
       SELECT 1 FROM public.release_submissions rs
       JOIN public.artist_members am ON am.artist_id = rs.artist_id
-      WHERE rs.id = submission_id AND am.user_id = auth.uid()
+      WHERE rs.id = submission_id AND am.user_id = (SELECT auth.uid())
     )
   );
 
@@ -7254,34 +7235,34 @@ CREATE POLICY "release_submission_tracks: artist read own" ON public.release_sub
     EXISTS (
       SELECT 1 FROM public.release_submissions rs
       JOIN public.artist_members am ON am.artist_id = rs.artist_id
-      WHERE rs.id = submission_id AND am.user_id = auth.uid()
+      WHERE rs.id = submission_id AND am.user_id = (SELECT auth.uid())
     )
   );
 
 DROP POLICY IF EXISTS "release_submission_tracks: editor+ read all" ON public.release_submission_tracks;
 CREATE POLICY "release_submission_tracks: editor+ read all" ON public.release_submission_tracks
-  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR SELECT USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- video_submissions: same pattern
 DROP POLICY IF EXISTS "video_submissions: artist insert own" ON public.video_submissions;
 CREATE POLICY "video_submissions: artist insert own" ON public.video_submissions
   FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = video_submissions.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 DROP POLICY IF EXISTS "video_submissions: artist read own" ON public.video_submissions;
 CREATE POLICY "video_submissions: artist read own" ON public.video_submissions
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = video_submissions.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 DROP POLICY IF EXISTS "video_submissions: editor+ read all" ON public.video_submissions;
 CREATE POLICY "video_submissions: editor+ read all" ON public.video_submissions
-  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR SELECT USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 DROP POLICY IF EXISTS "video_submissions: editor+ update" ON public.video_submissions;
 CREATE POLICY "video_submissions: editor+ update" ON public.video_submissions
-  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR UPDATE USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- submission_form_schema: public read, editor+ write
 DROP POLICY IF EXISTS "submission_form_schema: public read" ON public.submission_form_schema;
@@ -7290,8 +7271,8 @@ CREATE POLICY "submission_form_schema: public read" ON public.submission_form_sc
 
 DROP POLICY IF EXISTS "submission_form_schema: editor+ write" ON public.submission_form_schema;
 CREATE POLICY "submission_form_schema: editor+ write" ON public.submission_form_schema
-  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  FOR ALL USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- submission_release_type_rules: public read, editor+ write
 DROP POLICY IF EXISTS "submission_release_type_rules: public read" ON public.submission_release_type_rules;
@@ -7300,8 +7281,8 @@ CREATE POLICY "submission_release_type_rules: public read" ON public.submission_
 
 DROP POLICY IF EXISTS "submission_release_type_rules: editor+ write" ON public.submission_release_type_rules;
 CREATE POLICY "submission_release_type_rules: editor+ write" ON public.submission_release_type_rules
-  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  FOR ALL USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- TABLE: submission_form_drafts
@@ -7333,17 +7314,17 @@ DROP POLICY IF EXISTS "submission_form_drafts: member all own" ON public.submiss
 CREATE POLICY "submission_form_drafts: member all own" ON public.submission_form_drafts
   FOR ALL
   USING (
-    user_id = auth.uid()
+    user_id = (SELECT auth.uid())
     AND EXISTS (
       SELECT 1 FROM public.artist_members am
-      WHERE am.artist_id = submission_form_drafts.artist_id AND am.user_id = auth.uid()
+      WHERE am.artist_id = submission_form_drafts.artist_id AND am.user_id = (SELECT auth.uid())
     )
   )
   WITH CHECK (
-    user_id = auth.uid()
+    user_id = (SELECT auth.uid())
     AND EXISTS (
       SELECT 1 FROM public.artist_members am
-      WHERE am.artist_id = submission_form_drafts.artist_id AND am.user_id = auth.uid()
+      WHERE am.artist_id = submission_form_drafts.artist_id AND am.user_id = (SELECT auth.uid())
     )
   );
 
@@ -7400,8 +7381,8 @@ CREATE POLICY "portal_faq_categories: published read" ON public.portal_faq_categ
 
 DROP POLICY IF EXISTS "portal_faq_categories: editor+ write" ON public.portal_faq_categories;
 CREATE POLICY "portal_faq_categories: editor+ write" ON public.portal_faq_categories
-  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  FOR ALL USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 DROP POLICY IF EXISTS "portal_faq_items: published read" ON public.portal_faq_items;
 CREATE POLICY "portal_faq_items: published read" ON public.portal_faq_items
@@ -7415,8 +7396,8 @@ CREATE POLICY "portal_faq_items: published read" ON public.portal_faq_items
 
 DROP POLICY IF EXISTS "portal_faq_items: editor+ write" ON public.portal_faq_items;
 CREATE POLICY "portal_faq_items: editor+ write" ON public.portal_faq_items
-  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  FOR ALL USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- Curated seed: 7 categories, 2–4 FAQ items each (EN required, DE on ~50%).
 INSERT INTO public.portal_faq_categories (id, slug, title_en, title_de, sort_order)
@@ -7748,7 +7729,7 @@ CREATE POLICY "artist_invoices: artist read own" ON public.artist_invoices
     EXISTS (
       SELECT 1 FROM public.artist_members
       WHERE artist_members.artist_id = artist_invoices.artist_id
-        AND artist_members.user_id   = auth.uid()
+        AND artist_members.user_id   = (SELECT auth.uid())
     )
   );
 
@@ -7758,20 +7739,20 @@ CREATE POLICY "artist_invoices: artist write own" ON public.artist_invoices
     EXISTS (
       SELECT 1 FROM public.artist_members
       WHERE artist_members.artist_id = artist_invoices.artist_id
-        AND artist_members.user_id   = auth.uid()
+        AND artist_members.user_id   = (SELECT auth.uid())
     )
   ) WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.artist_members
       WHERE artist_members.artist_id = artist_invoices.artist_id
-        AND artist_members.user_id   = auth.uid()
+        AND artist_members.user_id   = (SELECT auth.uid())
     )
   );
 
 DROP POLICY IF EXISTS "artist_invoices: admin all" ON public.artist_invoices;
 CREATE POLICY "artist_invoices: admin all" ON public.artist_invoices
-  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  FOR ALL USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- TABLE: artist_billing_profiles  (artist legal invoicing master data)
@@ -7832,7 +7813,7 @@ CREATE POLICY "artist_billing_profiles: artist read own" ON public.artist_billin
     EXISTS (
       SELECT 1 FROM public.artist_members
       WHERE artist_members.artist_id = artist_billing_profiles.artist_id
-        AND artist_members.user_id   = auth.uid()
+        AND artist_members.user_id   = (SELECT auth.uid())
     )
   );
 
@@ -7842,20 +7823,20 @@ CREATE POLICY "artist_billing_profiles: artist write own" ON public.artist_billi
     EXISTS (
       SELECT 1 FROM public.artist_members
       WHERE artist_members.artist_id = artist_billing_profiles.artist_id
-        AND artist_members.user_id   = auth.uid()
+        AND artist_members.user_id   = (SELECT auth.uid())
     )
   ) WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.artist_members
       WHERE artist_members.artist_id = artist_billing_profiles.artist_id
-        AND artist_members.user_id   = auth.uid()
+        AND artist_members.user_id   = (SELECT auth.uid())
     )
   );
 
 DROP POLICY IF EXISTS "artist_billing_profiles: admin all" ON public.artist_billing_profiles;
 CREATE POLICY "artist_billing_profiles: admin all" ON public.artist_billing_profiles
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- TABLE: artist_documents  (contract vault — legal docs per artist)
@@ -7888,7 +7869,7 @@ CREATE POLICY "artist_documents: artist read own" ON public.artist_documents
     EXISTS (
       SELECT 1 FROM public.artist_members
       WHERE artist_members.artist_id = artist_documents.artist_id
-        AND artist_members.user_id   = auth.uid()
+        AND artist_members.user_id   = (SELECT auth.uid())
     )
   );
 
@@ -7898,20 +7879,20 @@ CREATE POLICY "artist_documents: artist write own" ON public.artist_documents
     EXISTS (
       SELECT 1 FROM public.artist_members
       WHERE artist_members.artist_id = artist_documents.artist_id
-        AND artist_members.user_id   = auth.uid()
+        AND artist_members.user_id   = (SELECT auth.uid())
     )
   ) WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.artist_members
       WHERE artist_members.artist_id = artist_documents.artist_id
-        AND artist_members.user_id   = auth.uid()
+        AND artist_members.user_id   = (SELECT auth.uid())
     )
   );
 
 DROP POLICY IF EXISTS "artist_documents: admin all" ON public.artist_documents;
 CREATE POLICY "artist_documents: admin all" ON public.artist_documents
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- TABLE: portal_feedback  (artist product feedback about portal / site)
@@ -7947,11 +7928,11 @@ ALTER TABLE public.portal_feedback ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "portal_feedback: artist insert own" ON public.portal_feedback;
 CREATE POLICY "portal_feedback: artist insert own" ON public.portal_feedback
   FOR INSERT WITH CHECK (
-    user_id = auth.uid()
+    user_id = (SELECT auth.uid())
     AND EXISTS (
       SELECT 1 FROM public.artist_members am
       WHERE am.artist_id = portal_feedback.artist_id
-        AND am.user_id = auth.uid()
+        AND am.user_id = (SELECT auth.uid())
     )
   );
 
@@ -7961,17 +7942,17 @@ CREATE POLICY "portal_feedback: artist read own" ON public.portal_feedback
     EXISTS (
       SELECT 1 FROM public.artist_members am
       WHERE am.artist_id = portal_feedback.artist_id
-        AND am.user_id = auth.uid()
+        AND am.user_id = (SELECT auth.uid())
     )
   );
 
 DROP POLICY IF EXISTS "portal_feedback: editor+ read all" ON public.portal_feedback;
 CREATE POLICY "portal_feedback: editor+ read all" ON public.portal_feedback
-  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR SELECT USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 DROP POLICY IF EXISTS "portal_feedback: editor+ update" ON public.portal_feedback;
 CREATE POLICY "portal_feedback: editor+ update" ON public.portal_feedback
-  FOR UPDATE USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR UPDATE USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ===========================================================================
 -- USER ROLES (multi-role junction table)  — added 2026-06
@@ -8045,12 +8026,12 @@ ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "user_roles: own read"  ON public.user_roles;
 CREATE POLICY "user_roles: own read" ON public.user_roles
-  FOR SELECT USING (user_id = auth.uid());
+  FOR SELECT USING (user_id = (SELECT auth.uid()));
 
 DROP POLICY IF EXISTS "user_roles: admin all" ON public.user_roles;
 CREATE POLICY "user_roles: admin all" ON public.user_roles
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ===========================================================================
 -- PORTAL MESSAGES — artist-to-artist and artist-to-label messaging
@@ -8075,16 +8056,16 @@ ALTER TABLE public.portal_message_folders ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "portal_msg_folders: artist own" ON public.portal_message_folders;
 CREATE POLICY "portal_msg_folders: artist own" ON public.portal_message_folders
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = portal_message_folders.artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = portal_message_folders.artist_id AND am.user_id = (SELECT auth.uid()))
   )
   WITH CHECK (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = portal_message_folders.artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = portal_message_folders.artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 DROP POLICY IF EXISTS "portal_msg_folders: admin all" ON public.portal_message_folders;
 CREATE POLICY "portal_msg_folders: admin all" ON public.portal_message_folders
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- TABLE: portal_messages — outbound messages from artists
 -- ---------------------------------------------------------------------------
@@ -8134,10 +8115,10 @@ ALTER TABLE public.portal_messages ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "portal_messages: sender own" ON public.portal_messages;
 CREATE POLICY "portal_messages: sender own" ON public.portal_messages
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = from_artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = from_artist_id AND am.user_id = (SELECT auth.uid()))
   )
   WITH CHECK (
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = from_artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = from_artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 -- Recipient artist members can read received messages
@@ -8145,14 +8126,14 @@ DROP POLICY IF EXISTS "portal_messages: recipient read" ON public.portal_message
 CREATE POLICY "portal_messages: recipient read" ON public.portal_messages
   FOR SELECT USING (
     to_artist_id IS NOT NULL AND
-    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = to_artist_id AND am.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM public.artist_members am WHERE am.artist_id = to_artist_id AND am.user_id = (SELECT auth.uid()))
   );
 
 -- Admins can do everything (needed for label-side inbox view)
 DROP POLICY IF EXISTS "portal_messages: admin all" ON public.portal_messages;
 CREATE POLICY "portal_messages: admin all" ON public.portal_messages
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- TABLE: portal_message_attachments
 -- ---------------------------------------------------------------------------
@@ -8176,21 +8157,21 @@ CREATE POLICY "portal_attach: via message sender" ON public.portal_message_attac
     EXISTS (
       SELECT 1 FROM public.portal_messages pm
       JOIN public.artist_members am ON am.artist_id = pm.from_artist_id
-      WHERE pm.id = portal_message_attachments.message_id AND am.user_id = auth.uid()
+      WHERE pm.id = portal_message_attachments.message_id AND am.user_id = (SELECT auth.uid())
     )
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.portal_messages pm
       JOIN public.artist_members am ON am.artist_id = pm.from_artist_id
-      WHERE pm.id = portal_message_attachments.message_id AND am.user_id = auth.uid()
+      WHERE pm.id = portal_message_attachments.message_id AND am.user_id = (SELECT auth.uid())
     )
   );
 
 DROP POLICY IF EXISTS "portal_attach: admin all" ON public.portal_message_attachments;
 CREATE POLICY "portal_attach: admin all" ON public.portal_message_attachments
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- =============================================================================
 -- SOS (Statement-of-Sales) PERSISTENCE
@@ -8205,8 +8186,8 @@ ALTER TABLE public.sos_rules_presets ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "sos_rules_presets: admin all" ON public.sos_rules_presets;
 CREATE POLICY "sos_rules_presets: admin all" ON public.sos_rules_presets
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 DROP TRIGGER IF EXISTS sos_rules_presets_updated_at ON public.sos_rules_presets;
 CREATE TRIGGER sos_rules_presets_updated_at
@@ -8241,8 +8222,8 @@ ALTER TABLE public.sos_accounting_workspaces ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "sos_accounting_workspaces: admin/editor all" ON public.sos_accounting_workspaces;
 CREATE POLICY "sos_accounting_workspaces: admin/editor all" ON public.sos_accounting_workspaces
-  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  FOR ALL USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 DROP TRIGGER IF EXISTS sos_accounting_workspaces_updated_at ON public.sos_accounting_workspaces;
 CREATE TRIGGER sos_accounting_workspaces_updated_at
@@ -8282,8 +8263,8 @@ ALTER TABLE public.settlement_operations ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "settlement_operations: admin all" ON public.settlement_operations;
 CREATE POLICY "settlement_operations: admin all" ON public.settlement_operations
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 DROP TRIGGER IF EXISTS settlement_operations_updated_at ON public.settlement_operations;
 CREATE TRIGGER settlement_operations_updated_at
@@ -8313,8 +8294,8 @@ ALTER TABLE public.sepa_payment_orders ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "sepa_payment_orders: admin all" ON public.sepa_payment_orders;
 CREATE POLICY "sepa_payment_orders: admin all" ON public.sepa_payment_orders
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- TABLE: sos_period_summaries  — per-period aggregate revenue figures
@@ -8341,8 +8322,8 @@ ALTER TABLE public.sos_period_summaries ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "sos_period_summaries: admin all" ON public.sos_period_summaries;
 CREATE POLICY "sos_period_summaries: admin all" ON public.sos_period_summaries
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- ALTER TABLE guards for schema parity on existing databases
@@ -8410,8 +8391,8 @@ ALTER TABLE public.settlement_periods ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "settlement_periods: admin all" ON public.settlement_periods;
 CREATE POLICY "settlement_periods: admin all" ON public.settlement_periods
-  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  FOR ALL USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- Artist settlement ledger (append-only journal)
@@ -8474,14 +8455,14 @@ CREATE POLICY "settlement_ledger: artist read own" ON public.artist_settlement_l
     EXISTS (
       SELECT 1 FROM public.artist_members
       WHERE artist_members.artist_id = artist_settlement_ledger.artist_id
-        AND artist_members.user_id   = auth.uid()
+        AND artist_members.user_id   = (SELECT auth.uid())
     )
   );
 
 DROP POLICY IF EXISTS "settlement_ledger: admin all" ON public.artist_settlement_ledger;
 CREATE POLICY "settlement_ledger: admin all" ON public.artist_settlement_ledger
-  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  FOR ALL USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- Period carry-forwards (opening balances into next period)
@@ -8509,14 +8490,14 @@ CREATE POLICY "carry_forwards: artist read own" ON public.period_carry_forwards
     EXISTS (
       SELECT 1 FROM public.artist_members
       WHERE artist_members.artist_id = period_carry_forwards.artist_id
-        AND artist_members.user_id   = auth.uid()
+        AND artist_members.user_id   = (SELECT auth.uid())
     )
   );
 
 DROP POLICY IF EXISTS "carry_forwards: admin all" ON public.period_carry_forwards;
 CREATE POLICY "carry_forwards: admin all" ON public.period_carry_forwards
-  FOR ALL USING (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  FOR ALL USING ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- ---------------------------------------------------------------------------
 -- Financial audit events (immutable)
@@ -8539,11 +8520,11 @@ ALTER TABLE public.financial_audit_events ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "financial_audit: admin read" ON public.financial_audit_events;
 CREATE POLICY "financial_audit: admin read" ON public.financial_audit_events
-  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR SELECT USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 DROP POLICY IF EXISTS "financial_audit: admin insert" ON public.financial_audit_events;
 CREATE POLICY "financial_audit: admin insert" ON public.financial_audit_events
-  FOR INSERT WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  FOR INSERT WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- Migrate legacy statement status
 UPDATE public.sales_statements SET status = 'invoiced' WHERE status = 'acknowledged';
@@ -8646,15 +8627,15 @@ DROP POLICY IF EXISTS "promo_log: artist read" ON public.promo_log_entries;
 -- Admins and editors can manage all entries
 CREATE POLICY "promo_log: admin all" ON public.promo_log_entries
   FOR ALL
-  USING  (public.get_my_role() IN ('admin', 'editor'))
-  WITH CHECK (public.get_my_role() IN ('admin', 'editor'));
+  USING  ((SELECT public.get_my_role()) IN ('admin', 'editor'))
+  WITH CHECK ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 
 -- Artists can read only their own entries (strict data isolation)
 CREATE POLICY "promo_log: artist read" ON public.promo_log_entries
   FOR SELECT
   USING (
     artist_id IN (
-      SELECT artist_id FROM public.artist_members WHERE user_id = auth.uid()
+      SELECT artist_id FROM public.artist_members WHERE user_id = (SELECT auth.uid())
     )
   );
 
@@ -8854,10 +8835,10 @@ ALTER TABLE public.r2_storage_snapshots ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "r2_storage_snapshots: staff read" ON public.r2_storage_snapshots;
 DROP POLICY IF EXISTS "r2_storage_snapshots: admin write" ON public.r2_storage_snapshots;
 CREATE POLICY "r2_storage_snapshots: staff read" ON public.r2_storage_snapshots
-  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR SELECT USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 CREATE POLICY "r2_storage_snapshots: admin write" ON public.r2_storage_snapshots
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- TABLE: r2_orphan_objects  (unreferenced R2 keys from the latest scan)
@@ -8879,10 +8860,10 @@ ALTER TABLE public.r2_orphan_objects ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "r2_orphan_objects: staff read" ON public.r2_orphan_objects;
 DROP POLICY IF EXISTS "r2_orphan_objects: admin write" ON public.r2_orphan_objects;
 CREATE POLICY "r2_orphan_objects: staff read" ON public.r2_orphan_objects
-  FOR SELECT USING (public.get_my_role() IN ('admin', 'editor'));
+  FOR SELECT USING ((SELECT public.get_my_role()) IN ('admin', 'editor'));
 CREATE POLICY "r2_orphan_objects: admin write" ON public.r2_orphan_objects
-  FOR ALL USING (public.get_my_role() = 'admin')
-  WITH CHECK (public.get_my_role() = 'admin');
+  FOR ALL USING ((SELECT public.get_my_role()) = 'admin')
+  WITH CHECK ((SELECT public.get_my_role()) = 'admin');
 
 -- =============================================================================
 -- AI CREDITS — additive, artist-shared, transactional monthly allowances
@@ -9285,3 +9266,78 @@ REVOKE ALL ON FUNCTION public.adjust_ai_credits(UUID,UUID,TEXT,TEXT,BIGINT,TEXT)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.adjust_ai_credits(UUID,UUID,TEXT,TEXT,BIGINT,TEXT)
   TO service_role;
+
+
+-- Security boundary: profile updates never change access or account lifecycle.
+CREATE OR REPLACE FUNCTION public.guard_profile_access_columns()
+RETURNS TRIGGER LANGUAGE plpgsql SET search_path = '' AS $$
+BEGIN
+  IF current_user IN ('anon', 'authenticated') AND public.get_my_role() IS DISTINCT FROM 'admin'
+     AND (to_jsonb(NEW) - ARRAY['full_name','avatar_url','updated_at'])
+         IS DISTINCT FROM (to_jsonb(OLD) - ARRAY['full_name','avatar_url','updated_at']) THEN
+    RAISE EXCEPTION 'Account access fields require an administrator' USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS guard_profile_access_columns ON public.users;
+CREATE TRIGGER guard_profile_access_columns BEFORE UPDATE ON public.users
+FOR EACH ROW EXECUTE FUNCTION public.guard_profile_access_columns();
+
+-- Do not allow artist members to reassign ownership or publication privileges.
+CREATE OR REPLACE FUNCTION public.guard_artist_access_columns()
+RETURNS TRIGGER LANGUAGE plpgsql SET search_path = '' AS $$
+BEGIN
+  IF current_user IN ('anon', 'authenticated') AND NOT public.has_permission('can_manage_artists')
+     AND (to_jsonb(NEW) - ARRAY['bio','hometown','genres','website_url','country','founding_year','twitter_url','shop_url','logo_url','smart_links','apple_music_url','spotify_url','instagram_url','facebook_url','youtube_url','bandcamp_url','soundcloud_url','tiktok_url','image_url','image_position_x','image_position_y','image_scale','portal_terms_version','portal_terms_accepted_at','portal_terms_accepted_by','updated_at'])
+         IS DISTINCT FROM (to_jsonb(OLD) - ARRAY['bio','hometown','genres','website_url','country','founding_year','twitter_url','shop_url','logo_url','smart_links','apple_music_url','spotify_url','instagram_url','facebook_url','youtube_url','bandcamp_url','soundcloud_url','tiktok_url','image_url','image_position_x','image_position_y','image_scale','portal_terms_version','portal_terms_accepted_at','portal_terms_accepted_by','updated_at']) THEN
+    RAISE EXCEPTION 'Artist administrative fields require staff access' USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS guard_artist_access_columns ON public.artists;
+CREATE TRIGGER guard_artist_access_columns BEFORE UPDATE ON public.artists
+FOR EACH ROW EXECUTE FUNCTION public.guard_artist_access_columns();
+
+-- Trigger functions are not RPC endpoints. Service-only RPCs must also revoke
+-- explicit grants left over from older deployments, not only inherited PUBLIC.
+DO $$
+DECLARE f record;
+BEGIN
+  FOR f IN SELECT p.oid::regprocedure AS signature, p.prorettype
+    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='public' AND (p.prorettype='trigger'::regtype OR p.proname IN
+      ('create_release_submission_with_tracks','replace_rejected_release_submission_with_tracks','get_assets_storage_stats'))
+  LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon, authenticated', f.signature);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', f.signature);
+  END LOOP;
+END;
+$$;
+
+
+-- Fixed resolution for trigger-only functions (built-ins only).
+ALTER FUNCTION public.reject_invoice_pdf_mutation() SET search_path = '';
+ALTER FUNCTION public.set_api_credentials_updated_at() SET search_path = '';
+ALTER FUNCTION public.set_site_settings_updated_at() SET search_path = '';
+ALTER FUNCTION public.set_updated_at() SET search_path = '';
+DO $$ BEGIN
+  IF to_regprocedure('public.update_updated_at_column()') IS NOT NULL THEN
+    ALTER FUNCTION public.update_updated_at_column() SET search_path = '';
+  END IF;
+END; $$;
+CREATE INDEX IF NOT EXISTS idx_artist_assets_artist_id_lookup ON public.artist_assets (artist_id);
+CREATE INDEX IF NOT EXISTS idx_artist_replies_message_id_lookup ON public.artist_replies (message_id);
+CREATE INDEX IF NOT EXISTS idx_artist_replies_artist_id_lookup ON public.artist_replies (artist_id);
+CREATE INDEX IF NOT EXISTS idx_artists_user_id_lookup ON public.artists (user_id);
+CREATE INDEX IF NOT EXISTS idx_sales_statements_batch_id_lookup ON public.sales_statements (batch_id);
+CREATE INDEX IF NOT EXISTS idx_sales_statements_settlement_period_id_lookup ON public.sales_statements (settlement_period_id);
+CREATE INDEX IF NOT EXISTS idx_artist_invoices_settlement_period_id_lookup ON public.artist_invoices (settlement_period_id);
+CREATE INDEX IF NOT EXISTS idx_sales_statement_line_items_release_id_lookup ON public.sales_statement_line_items (release_id);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_events_artist_id_lookup ON public.ai_usage_events (artist_id);
+CREATE INDEX IF NOT EXISTS idx_ai_usage_events_conversation_id_lookup ON public.ai_usage_events (conversation_id);
+CREATE INDEX IF NOT EXISTS idx_ai_diagnostics_user_id_lookup ON public.ai_diagnostics (user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_diagnostics_artist_id_lookup ON public.ai_diagnostics (artist_id);
+CREATE INDEX IF NOT EXISTS idx_portal_messages_folder_id_lookup ON public.portal_messages (folder_id);
+CREATE INDEX IF NOT EXISTS idx_portal_messages_sender_user_id_lookup ON public.portal_messages (sender_user_id);
