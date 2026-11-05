@@ -42,6 +42,7 @@ function makeBuilder(result: QueryResult) {
 function makeMockDb(factory: (table: string) => QueryResult): DbClient {
   return {
     from: vi.fn().mockImplementation((table: string) => makeBuilder(factory(table))),
+    rpc: vi.fn().mockResolvedValue({ data: 0, error: null }),
   } as unknown as DbClient
 }
 

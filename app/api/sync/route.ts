@@ -24,7 +24,7 @@ import { createSyncUploadFn } from '@/lib/r2Utils'
 import { isValidCronSecret } from '@/lib/cronAuth'
 import { waitUntil } from '@vercel/functions'
 import { syncSingleArtist } from '@/lib/sync/syncAll'
-import { RATE_LIMIT_JOB_COOLDOWN_MS, isRateLimitedSyncError } from '@/lib/sync/retryPolicy'
+import { RATE_LIMIT_JOB_COOLDOWN_MS, isPermanentSyncError, isRateLimitedSyncError } from '@/lib/sync/retryPolicy'
 import { extractBearerToken, verifySyncTrigger } from '@/lib/adminAuth'
 import { withErrorHandler } from '@/lib/errors'
 import { getSyncCredentials } from '@/lib/secrets/getExternalCredentials'
@@ -80,6 +80,12 @@ async function processSyncJob(
     await rescheduleSyncJob(db, job.id, RATE_LIMIT_JOB_COOLDOWN_MS, {
       undoAttemptIncrement: true,
       currentAttemptCount: job.attemptCount,
+    })
+  } else if (result.totalErrors > 0) {
+    const messages = result.results.flatMap((source) => source.errors)
+    const message = messages[0] ?? 'Sync completed with errors'
+    await markSyncJobFailed(db, job.id, message.slice(0, 400), job.attemptCount, {
+      permanent: messages.every((error) => isPermanentSyncError(error)),
     })
   } else {
     await markSyncJobDone(db, job.id)

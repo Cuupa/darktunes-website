@@ -677,7 +677,7 @@ export async function markSyncJobFailed(
   jobId: string,
   errorMessage: string,
   currentAttemptCount: number,
-  options?: { rateLimited?: boolean },
+  options?: { rateLimited?: boolean; permanent?: boolean }, 
 ): Promise<void> {
   if (await isSyncJobCancelRequested(db, jobId)) {
     await markSyncJobCancelled(db, jobId)
@@ -685,7 +685,7 @@ export async function markSyncJobFailed(
   }
 
   const rateLimited = options?.rateLimited ?? false
-  const willRetry = rateLimited || currentAttemptCount < MAX_ATTEMPTS
+  const willRetry = !options?.permanent && (rateLimited || currentAttemptCount < MAX_ATTEMPTS)
 
   const delayMs = rateLimited
     ? RATE_LIMIT_JOB_COOLDOWN_MS

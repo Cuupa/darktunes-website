@@ -61,6 +61,10 @@ export function classifySyncError(err: unknown): SyncErrorClass {
   // errors are already classified as permanent via the HttpError branch above.
   if (msg.includes('PUBLIC_API_ACCESS_DEPRECATED')) return 'permanent'
   if (
+    msg.includes('403') ||
+    msg.includes('401') ||
+    msg.includes('400') ||
+    msg.includes('410') ||
     msg.includes('404') ||
     msg.includes('405') ||
     msg.includes('422') ||

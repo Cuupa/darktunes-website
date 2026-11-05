@@ -430,6 +430,7 @@ exports[`RLS Policies – supabase/reset.sql > snapshot: all tables with RLS ena
   "submission_release_type_rules",
   "support_known_errors",
   "sync_logs",
+  "sync_provider_limits",
   "sync_queue",
   "sync_runs",
   "sync_worker_lease",

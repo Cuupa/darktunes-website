@@ -587,6 +587,36 @@ export interface Database {
         }
         Relationships: []
       }
+      sync_provider_limits: {
+        Row: {
+          provider: string
+          next_request_at: string
+          cooldown_until: string
+          last_rate_limit_at: string | null
+          last_request_at: string | null
+          rate_limit_count: number
+          updated_at: string
+        }
+        Insert: {
+          provider: string
+          next_request_at?: string
+          cooldown_until?: string
+          last_rate_limit_at?: string | null
+          last_request_at?: string | null
+          rate_limit_count?: number
+          updated_at?: string
+        }
+        Update: {
+          provider?: string
+          next_request_at?: string
+          cooldown_until?: string
+          last_rate_limit_at?: string | null
+          last_request_at?: string | null
+          rate_limit_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sync_queue: {
         Row: {
           id: string
@@ -6163,6 +6193,14 @@ export interface Database {
           created_at: string
           updated_at: string
         }
+      }
+      reserve_sync_provider_slot: {
+        Args: { p_provider: string; p_spacing_ms?: number }
+        Returns: number
+      }
+      block_sync_provider: {
+        Args: { p_provider: string; p_cooldown_ms: number }
+        Returns: undefined
       }
       claim_sync_jobs: {
         Args: {

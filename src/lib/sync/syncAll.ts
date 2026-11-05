@@ -31,6 +31,7 @@ import { deduplicateReleases, pruneOrphanedDuplicates, type CrossSourceReleaseRo
 import { isRateLimitedSyncError, withApiRetry } from './retryPolicy'
 import { cacheReleaseCoverArt } from './coverArtUpload'
 import { syncArtist } from './syncArtist'
+import { createProviderFetch } from './providerLimits'
 import type { SyncDeps } from './syncArtist'
 
 // ---------------------------------------------------------------------------
@@ -173,6 +174,15 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
     onlyArtistId,
   } = deps
   const results: ApiSyncResult[] = []
+  // Each API request, including Spotify pagination and token refresh, shares a
+  // provider-specific budget across artists, manual syncs and Vercel instances.
+  const providerFetches = {
+    itunes: createProviderFetch(db, 'itunes', fetchFn),
+    spotify: createProviderFetch(db, 'spotify', fetchFn),
+    discogs: createProviderFetch(db, 'discogs', fetchFn),
+    songkick: createProviderFetch(db, 'songkick', fetchFn),
+    bandsintown: createProviderFetch(db, 'bandsintown', fetchFn),
+  }
 
   // 1. Fetch artists — either all or just the one targeted by the queue job
   const artistQuery = db.from('artists').select('*')
@@ -224,7 +234,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
     }
     const itunesOutcomes = await Promise.allSettled(
       artists.map((artist) =>
-        syncArtist(artist.id, { db, fetch: fetchFn, uploadToR2, skipSyncLog: true }),
+        syncArtist(artist.id, { db, fetch: providerFetches.itunes, uploadToR2, skipSyncLog: true }),
       ),
     )
     for (const outcome of itunesOutcomes) {
@@ -272,13 +282,13 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
             artist.spotify_id!,
             spotify.clientId,
             spotify.clientSecret,
-            fetchFn,
+            providerFetches.spotify,
           ),
         )
 
         const discogsReleases = discogsToken && artist.discogs_id
           ? await withApiRetry('discogs', () =>
-              fetchDiscogsArtistReleases(artist.discogs_id!, discogsToken, fetchFn),
+              fetchDiscogsArtistReleases(artist.discogs_id!, discogsToken, providerFetches.discogs),
             ).catch((e) => {
               spotifyResult.errors.push(`Discogs fetch for ${artist.name}: ${String(e)}`)
               return []
@@ -374,7 +384,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
         const existingReleases = await loadArtistExistingReleases(db, artist.id)
 
         const discogsReleases = await withApiRetry('discogs', () =>
-          fetchDiscogsArtistReleases(artist.discogs_id!, discogsToken, fetchFn),
+          fetchDiscogsArtistReleases(artist.discogs_id!, discogsToken, providerFetches.discogs),
         )
 
         for (const release of discogsReleases) {
@@ -463,7 +473,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 
       try {
         const concerts = await withApiRetry('songkick', () =>
-          fetchSongkickArtistCalendar(artist.songkick_id!, songkickApiKey, fetchFn),
+          fetchSongkickArtistCalendar(artist.songkick_id!, songkickApiKey, providerFetches.songkick),
         )
 
         if (concerts.length > 0) {
@@ -529,7 +539,7 @@ export async function syncAll(deps: SyncAllDeps): Promise<SyncAllResult> {
 
       try {
         const concerts = await withApiRetry('bandsintown', () =>
-          fetchBandsintownArtistEvents(artist.bandsintown_id!, effectiveKey, fetchFn),
+          fetchBandsintownArtistEvents(artist.bandsintown_id!, effectiveKey, providerFetches.bandsintown),
         )
 
         if (concerts.length > 0) {
