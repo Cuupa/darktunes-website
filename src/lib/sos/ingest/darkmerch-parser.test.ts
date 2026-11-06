@@ -70,6 +70,19 @@ describe('Darkmerch archive period metadata', () => {
     expect(result.transactions.every((row) => row.release_title === 'Q2 - Q3 2026')).toBe(true)
   })
 
+  it('preserves a period appearing only on a non-payable source row', () => {
+    const csv = [
+      'DATE,ORDER NUMBER,BAND,NET REVENUE',
+      'Q2 - Q3 2026,101,Artist A,',
+      ',102,Artist A,15',
+    ].join('\n')
+    const result = parseDarkmerchCSV(csv)
+    expect(result.transactions).toHaveLength(1)
+    expect(result.transactions[0]?.sales_month).toBe('')
+    expect(result.periodStart).toBe('2026-04')
+    expect(result.periodEnd).toBe('2026-09')
+  })
+
   it('accepts shorthand dash variations and rejects reverse quarter ranges', () => {
     expect(parseDarkmerchReportingPeriod('Q2–Q3 2026')).toEqual({
       periodStart: '2026-04', periodEnd: '2026-09',

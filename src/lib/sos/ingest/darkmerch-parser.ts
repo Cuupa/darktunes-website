@@ -146,6 +146,14 @@ export function parseDarkmerchCSV(content: string): DarkmerchParseResult {
     const revenueStr = cols[colRevenue] ?? ''
     const dateValue = colDate >= 0 ? (cols[colDate] ?? '') : ''
 
+    // Report bounds describe the whole source file, including rows without
+    // payable revenue. Do not invent a sale month for individual orders.
+    const sourcePeriod = parseDarkmerchReportingPeriod(dateValue)
+    if (sourcePeriod) {
+      if (!periodStart || sourcePeriod.periodStart < periodStart) periodStart = sourcePeriod.periodStart
+      if (!periodEnd || sourcePeriod.periodEnd > periodEnd) periodEnd = sourcePeriod.periodEnd
+    }
+
     // Skip rows with no artist name
     if (!bandValue) {
       errors.push({ row: i + 1, reason: 'Empty BAND value', data: line })
@@ -167,12 +175,6 @@ export function parseDarkmerchCSV(content: string): DarkmerchParseResult {
     }
     const netRevenue = revenueResult.value
     if (netRevenue === 0) continue
-
-    const sourcePeriod = parseDarkmerchReportingPeriod(dateValue)
-    if (sourcePeriod) {
-      if (!periodStart || sourcePeriod.periodStart < periodStart) periodStart = sourcePeriod.periodStart
-      if (!periodEnd || sourcePeriod.periodEnd > periodEnd) periodEnd = sourcePeriod.periodEnd
-    }
 
     const sourceId = crypto.randomUUID()
     transactions.push({

@@ -545,6 +545,14 @@ Owner issues: #619, #626. Mirror into #619/#626.
 Die Referenzdateien sind **nicht** im Repository zu committen (Testdaten-Verzeichnis
 bleibt untracked; Ablage und Zugriff werden in #626 dokumentiert).
 
+Darkmerch-Reportzeiträume (z. B. `Q4 2025 - Q1 2026` oder `Q2 - Q3 2026`)
+sind Dateiprovenienz, keine einzelnen Verkaufsmonate. Sie werden aus der
+DATE-Spalte auch dann ermittelt, wenn die Datumszeile keinen Umsatz enthält.
+Fehlen die Metadaten nach der Worker-Verarbeitung, kann der Bronze-Archivweg
+sie aus den noch geladenen Quelldaten zurückgewinnen. Für übersprungene
+Archive ist Retry sichtbar. Dateiname und aktueller Monat sind keine
+zulässigen Ersatzquellen für einen Abrechnungszeitraum.
+
 ### F.2 Budgets (verbindliche Abnahmeziele, endgültige Werte werden in #626 gemessen)
 
 | Vorgang | Budget |
