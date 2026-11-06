@@ -74,7 +74,7 @@ describe('useFileManager', () => {
       'Q2 - Q3 2026,101,Artist A,10',
       'Q2 - Q3 2026,102,Artist B,15',
     ].join('\n')
-    vi.mocked(readFileWithProgress).mockResolvedValueOnce(new TextEncoder().encode(csv).buffer)
+    vi.mocked(readFileWithProgress).mockResolvedValueOnce(new TextEncoder().encode(csv).buffer as ArrayBuffer)
     vi.mocked(uploadBronzeDistributorCsv).mockResolvedValue({
       ok: true, batchId: 'darkmerch-batch', r2Key: 'darkmerch-key',
     })
@@ -108,7 +108,7 @@ describe('useFileManager', () => {
 
   it('does not infer Darkmerch archive dates from a filename alone', async () => {
     const csv = 'DATE,BAND,NET REVENUE\n,Artist A,10'
-    vi.mocked(readFileWithProgress).mockResolvedValueOnce(new TextEncoder().encode(csv).buffer)
+    vi.mocked(readFileWithProgress).mockResolvedValueOnce(new TextEncoder().encode(csv).buffer as ArrayBuffer)
     const ids: string[] = []
     const { result } = renderHook(() =>
       useFileManager('darkmerch', { onFileAdded: (file) => ids.push(file.id) }),
