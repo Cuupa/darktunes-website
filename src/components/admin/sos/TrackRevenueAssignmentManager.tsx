@@ -20,7 +20,7 @@ import { PercentField } from '@/components/admin/sos/fields/AccountingNumberFiel
 import { parseOptionalPercent, parseRequiredPercent } from '@/lib/sos/accountingInputValidation'
 import { useAccountingLabels } from '@/lib/i18n/accountingFallbacks'
 import { v4 as uuidv4 } from 'uuid'
-import { AccountingListPagination, ACCOUNTING_PAGE_SIZE } from './AccountingListPagination'
+import { AccountingListPagination, useAccountingAdaptivePageSize } from './AccountingListPagination'
 
 interface TrackRevenueAssignmentManagerProps {
   assignments: TrackRevenueAssignment[]
@@ -104,13 +104,14 @@ export function TrackRevenueAssignmentManager({
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
+  const { listRef, pageSize } = useAccountingAdaptivePageSize(128, assignments.length > 0)
   const filteredAssignments = assignments.filter(assignment => {
     const query = search.trim().toLocaleLowerCase()
     return !query || assignment.trackTitle.toLocaleLowerCase().includes(query) ||
       (assignment.owners ?? []).some(owner => owner.artist.toLocaleLowerCase().includes(query))
   })
-  const currentPage = Math.min(page, Math.max(0, Math.ceil(filteredAssignments.length / ACCOUNTING_PAGE_SIZE) - 1))
-  const pagedAssignments = filteredAssignments.slice(currentPage * ACCOUNTING_PAGE_SIZE, (currentPage + 1) * ACCOUNTING_PAGE_SIZE)
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(filteredAssignments.length / pageSize) - 1))
+  const pagedAssignments = filteredAssignments.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
 
   const ownerSum = owners.reduce((s, o) => {
     const parsed = parseOptionalPercent(o.percentage)
@@ -161,13 +162,13 @@ export function TrackRevenueAssignmentManager({
   }, [trackTitle, owners, onAddAssignment, t])
 
   return (
-    <div className="w-full min-w-0 space-y-4">
-      <div className="flex items-center gap-2">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-3">
+      <div className="flex shrink-0 items-center gap-2">
         <MusicNote size={20} weight="bold" className="text-primary" />
         <h3 className="font-semibold">Track Revenue Assignments</h3>
       </div>
 
-      <Card className="p-4 border border-primary/20 bg-primary/5">
+      <Card className="shrink-0 border border-primary/20 bg-primary/5 px-3 py-2">
         <div className="flex gap-2">
           <Info size={16} className="text-primary flex-shrink-0 mt-0.5" />
           <p className="text-sm text-muted-foreground">
@@ -179,7 +180,7 @@ export function TrackRevenueAssignmentManager({
       </Card>
 
       {/* The creation form stays available but does not consume the entire list view. */}
-      <details className="rounded-lg border border-border bg-card/30">
+      <details className="shrink-0 rounded-lg border border-border bg-card/30 open:max-h-[45%] open:overflow-y-auto" data-lenis-prevent>
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
           {t.uiTrackAddRule}
         </summary>
@@ -245,7 +246,7 @@ export function TrackRevenueAssignmentManager({
 
       {/* Existing assignments */}
       {assignments.length > 0 && (
-        <div className="space-y-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h4 className="text-sm font-semibold">Active Assignments ({assignments.length})</h4>
             <Input value={search}
@@ -253,6 +254,7 @@ export function TrackRevenueAssignmentManager({
               className="h-10 w-full max-w-sm text-sm" placeholder={t.uiTrackSearch}
               aria-label={t.uiTrackSearch} />
           </div>
+          <div ref={listRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain" data-lenis-prevent>
           {pagedAssignments.map(a => {
             const ownerList = a.owners && a.owners.length > 0
               ? a.owners
@@ -289,7 +291,8 @@ export function TrackRevenueAssignmentManager({
           {filteredAssignments.length === 0 && (
             <p className="rounded-md border border-dashed border-border p-5 text-center text-sm text-muted-foreground">{t.uiTrackNoMatches}</p>
           )}
-          <AccountingListPagination count={filteredAssignments.length} page={currentPage} onPageChange={setPage} />
+          </div>
+          <AccountingListPagination count={filteredAssignments.length} page={currentPage} pageSize={pageSize} onPageChange={setPage} />
         </div>
       )}
 

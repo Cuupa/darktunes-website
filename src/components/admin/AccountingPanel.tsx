@@ -56,15 +56,12 @@ import { UniversalFileUploadZone } from '@/components/admin/sos/UniversalFileUpl
 import { ReportingPanel } from '@/components/admin/sos/ReportingPanel'
 import { CurrencyRatesBanner } from '@/components/admin/sos/CurrencyRatesBanner'
 import { SettlementCenterPanel } from '@/components/admin/sos/SettlementCenterPanel'
-import { OperatorPlaybook } from '@/components/admin/sos/OperatorPlaybook'
 import { PayoutManager } from '@/components/admin/sos/PayoutManager'
 import { PdfExportSettingsPanel } from '@/components/admin/sos/PdfExportSettingsPanel'
 import { RulesPanel, type RulesTab } from '@/components/admin/sos/RulesPanel'
 import { SosAnalyticsPersistPanel } from '@/components/admin/sos/SosAnalyticsPersistPanel'
 import { ImportBatchesPanel } from '@/components/admin/sos/ImportBatchesPanel'
 import { SosConfirmDialog } from '@/components/admin/sos/SosConfirmDialog'
-import { ExternalMetricsSyncPanel } from '@/components/admin/sos/ExternalMetricsSyncPanel'
-import { ApifySpotifySyncPanel } from '@/components/admin/sos/ApifySpotifySyncPanel'
 import dynamic from 'next/dynamic'
 const TrendsDashboard = dynamic(() => import('@/components/admin/sos/TrendsDashboard').then(mod => mod.TrendsDashboard), { ssr: false, loading: () => <Skeleton className="h-96 w-full" /> })
 import { CsvProfileManager } from '@/components/admin/sos/CsvProfileManager'
@@ -1233,7 +1230,7 @@ function SosGeneratorPanel() {
   )
 
   return (
-    <div className="mx-auto w-full max-w-[1680px] space-y-0">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1680px] flex-col overflow-hidden">
       {currencyBanner}
       {/* Primary destinations stay separate from tools for the current workspace. */}
       <div className="border-b border-border bg-card/20 px-4 py-3 sm:px-6">
@@ -1385,7 +1382,7 @@ function SosGeneratorPanel() {
       {rulesStatusBanner}
 
       {/* Billing flow: Files → Checks → Amounts → Statements */}
-      <div className="min-h-[500px] min-w-0">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {!secondaryView && (
           <AccountingGuidedWizard
             hasData={hasData}
@@ -1406,7 +1403,7 @@ function SosGeneratorPanel() {
         )}
 
         {secondaryView && (
-          <div className="flex items-center justify-between gap-3 px-4 py-4 sm:px-6">
+          <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3 sm:px-6">
             <h2 className="text-lg font-semibold text-foreground">
               {activeSubTab === 'rules' ? t.subTabRules : t.subTabAnalytics}
             </h2>
@@ -1423,8 +1420,8 @@ function SosGeneratorPanel() {
         )}
 
         {activeSubTab === 'analytics' && (
-          <div id="accounting-analytics-panel" className="w-full min-w-0 space-y-5 p-4 sm:p-6">
-            <nav role="tablist" aria-label={t.subTabAnalytics} className="flex flex-wrap gap-2 border-b border-border pb-3">
+          <div id="accounting-analytics-panel" className="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:p-4">
+            <nav role="tablist" aria-label={t.subTabAnalytics} className="flex shrink-0 flex-wrap gap-2 border-b border-border pb-3">
               {([
                 { id: 'operations', label: t.analyticsOpsHeading, disabled: false },
                 { id: 'reports', label: t.analyticsPreviewHeading, disabled: !hasData },
@@ -1441,7 +1438,7 @@ function SosGeneratorPanel() {
               ))}
             </nav>
             {insightsView === 'operations' && (
-            <section id="accounting-insights-operations" role="tabpanel" className="space-y-4" aria-labelledby="analytics-ops-heading">
+            <section id="accounting-insights-operations" role="tabpanel" className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-2" aria-labelledby="analytics-ops-heading">
               <h3 id="analytics-ops-heading" className="text-sm font-semibold text-foreground">
                 {t.analyticsOpsHeading}
               </h3>
@@ -1501,21 +1498,6 @@ function SosGeneratorPanel() {
                 </span>
               </div>
 
-              <OperatorPlaybook
-                title={t.playbookTitle}
-                step1={t.playbookStep1}
-                step2={t.playbookStep2}
-                step3={t.playbookStep3}
-              />
-              <ImportBatchesPanel
-                labelArtists={labelArtists}
-                onLoadBatch={loadBronzeBatch}
-                exchangeRates={exchangeRates}
-                historicalRates={historicalRates ?? undefined}
-                carryForwardByArtist={carryForwardByArtist}
-              />
-              <ExternalMetricsSyncPanel />
-              <ApifySpotifySyncPanel />
               {hasData ? (
                 <SosAnalyticsPersistPanel
                   periodStart={effectivePeriodStart}
@@ -1537,7 +1519,7 @@ function SosGeneratorPanel() {
             )}
 
             {insightsView === 'reports' && hasData && (
-              <section id="accounting-insights-reports" role="tabpanel" className="space-y-4" aria-labelledby="analytics-preview-heading">
+              <section id="accounting-insights-reports" role="tabpanel" className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-2" aria-labelledby="analytics-preview-heading">
                 <div className="space-y-2">
                   <h3 id="analytics-preview-heading" className="text-sm font-semibold text-foreground">
                     {t.analyticsPreviewHeading}
@@ -1556,7 +1538,7 @@ function SosGeneratorPanel() {
             )}
 
             {insightsView === 'trends' && (
-            <section id="accounting-insights-trends" role="tabpanel" className="space-y-3" aria-labelledby="analytics-trends-heading">
+            <section id="accounting-insights-trends" role="tabpanel" className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain pr-2" aria-labelledby="analytics-trends-heading">
               <h3 id="analytics-trends-heading" className="text-sm font-semibold text-foreground">
                 {t.subTabTrends}
               </h3>
@@ -1572,7 +1554,7 @@ function SosGeneratorPanel() {
         )}
 
         {activeSubTab === 'rules' && (
-          <div id="accounting-rules-panel">
+          <div id="accounting-rules-panel" className="min-h-0 flex-1 overflow-hidden">
           <RulesPanel
             activeRuleTab={activeRuleTab}
             onRuleTabChange={setActiveRuleTab}
@@ -1668,8 +1650,8 @@ export function AccountingPanel() {
   const tAudit = useTranslations('admin.accounting.dataAudit')
 
   return (
-    <Tabs defaultValue="generate" className="flex flex-col h-full">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-6">
+    <Tabs defaultValue="generate" className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-6">
         <TabsList className="h-10">
           <TabsTrigger value="generate" className="min-h-9 gap-2 text-sm">
             <Wallet size={14} />
@@ -1689,13 +1671,13 @@ export function AccountingPanel() {
         </Link>
       </div>
 
-      <TabsContent value="generate" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col">
+      <TabsContent value="generate" className="mt-0 min-h-0 flex-1 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
         <Suspense fallback={<Skeleton className="h-96 w-full m-6" />}>
           <SosGeneratorPanel />
         </Suspense>
       </TabsContent>
 
-      <TabsContent value="history" className="flex-1 mt-0 p-6">
+      <TabsContent value="history" className="mt-0 min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
         <Suspense fallback={<Skeleton className="h-64 w-full" />}>
           <StatementsManager readOnly settlementHref="/admin/accounting?subTab=settlements" />
         </Suspense>

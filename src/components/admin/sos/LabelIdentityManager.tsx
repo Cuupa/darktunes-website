@@ -6,6 +6,9 @@
  */
 
 import { Buildings, Coins } from '@phosphor-icons/react'
+import { useState } from 'react'
+import Image from 'next/image'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,16 +37,71 @@ function mergeLabel(partial: Partial<LabelInfo>, patch: Partial<LabelInfo>): Lab
   }
 }
 
+const MAX_LOGO_BYTES = 4 * 1024 * 1024
+const ACCEPTED_LOGO_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp'])
+
 export function LabelIdentityManager({
   labelInfo,
   onUpdate,
   embedded = false,
 }: LabelIdentityManagerProps) {
   const t = useAccountingLabels()
+  const [logoError, setLogoError] = useState<string | null>(null)
+  const logoPreview = labelInfo.logoBase64 || labelInfo.logo
   const patch = (partial: Partial<LabelInfo>) => onUpdate(mergeLabel(labelInfo, partial))
+
+  const handleLogoFile = (file?: File) => {
+    if (!file) return
+    if (!ACCEPTED_LOGO_TYPES.has(file.type)) {
+      setLogoError(t.uiLogoInvalidType)
+      return
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      setLogoError(t.uiLogoTooLarge)
+      return
+    }
+    setLogoError(null)
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result !== 'string' || !reader.result.startsWith('data:image/')) {
+        setLogoError(t.uiLogoUnreadable)
+        return
+      }
+      patch({ logo: reader.result, logoBase64: reader.result, logoAssetId: undefined })
+    }
+    reader.onerror = () => setLogoError(t.uiLogoUnreadable)
+    reader.readAsDataURL(file)
+  }
 
   const body = (
     <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="label-identity-logo">{t.uiLogoTitle}</Label>
+        <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border/70 p-3">
+          {logoPreview ? (
+            <div className="flex h-24 w-48 items-center justify-center rounded-md bg-white p-2">
+              <Image src={logoPreview} width={184} height={80} alt={t.uiLogoAlt}
+                unoptimized className="max-h-full max-w-full object-contain" />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t.uiLogoMissing}</p>
+          )}
+          <div className="min-w-0 flex-1 space-y-2">
+            <Input id="label-identity-logo" type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+              className="h-auto py-2 text-sm"
+              onChange={event => {
+                handleLogoFile(event.currentTarget.files?.[0])
+                event.currentTarget.value = ''
+              }} />
+            <p className="text-xs text-muted-foreground">{t.uiLogoHelp}</p>
+            {logoPreview && <Button type="button" size="sm" variant="outline"
+              onClick={() => { patch({ logo: undefined, logoBase64: undefined, logoAssetId: undefined }); setLogoError(null) }}>
+              {t.uiLogoRemove}
+            </Button>}
+          </div>
+        </div>
+        {logoError && <p className="text-sm text-destructive" role="alert">{logoError}</p>}
+      </div>
       <div className="space-y-2">
         <Label htmlFor="label-identity-name">{t.setupLabelName}</Label>
         <Input
