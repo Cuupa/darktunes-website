@@ -1,5 +1,11 @@
 # Pre-Release QA Checklist
 
+## SOS / Darkmerch archive
+- [ ] Import `Darkmerch_Q4_2025-Q1_2026.xlsx`: source bounds are `2025-10` through `2026-03`, with no fabricated per-order `sales_month`.
+- [ ] Import a Darkmerch source using `Q2 - Q3 2026` in DATE: archive bounds are `2026-04` through `2026-09`, even if the only dated row has empty NET REVENUE.
+- [ ] Simulate missing worker period metadata with the source still loaded: R2 archival recovers the source period, persists it on the file card and does not require re-uploading.
+- [ ] A skipped archive card offers Retry. A file with no valid source period remains skipped rather than using its filename or the current month.
+
 ## AI assistant
 - [ ] Switch the website language among English, German and French. Admin → AI Assistant → Credits and the chat credit balance show localized titles, controls, notices, table headers, dates and currency values with no German text in English mode.
 - [ ] Repository-wide i18n contract checks every namespace for EN/DE/FR key and placeholder parity. Run `npm run audit:i18n` and review remaining hardcoded UI candidates across public, portal, press, admin and shared pages.

@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useFileManager } from './useSosFileManager'
 import { uploadBronzeDistributorCsv, type BronzeUploadOutcome } from '@/lib/sos/bronzeUpload'
+import { readFileWithProgress } from '@/lib/sos/readFileWithProgress'
 import type { SosParseDoneStats } from '@/lib/sos/ingestProgress'
 
 vi.mock('sonner', () => ({
@@ -65,6 +66,61 @@ function stats(fileId: string): SosParseDoneStats {
 describe('useFileManager', () => {
   beforeEach(() => {
     vi.mocked(uploadBronzeDistributorCsv).mockReset()
+  })
+
+  it('recovers a Darkmerch reporting period when parser metadata is missing', async () => {
+    const csv = [
+      'DATE,ORDER NUMBER,BAND,NET REVENUE',
+      'Q2 - Q3 2026,101,Artist A,10',
+      'Q2 - Q3 2026,102,Artist B,15',
+    ].join('\n')
+    vi.mocked(readFileWithProgress).mockResolvedValueOnce(new TextEncoder().encode(csv).buffer as ArrayBuffer)
+    vi.mocked(uploadBronzeDistributorCsv).mockResolvedValue({
+      ok: true, batchId: 'darkmerch-batch', r2Key: 'darkmerch-key',
+    })
+    const ids: string[] = []
+    const { result } = renderHook(() =>
+      useFileManager('darkmerch', { onFileAdded: (file) => ids.push(file.id) }),
+    )
+    await act(async () => {
+      await result.current.addFiles([new File([csv], 'darkmerch_q2-q3.csv')])
+    })
+    await act(async () => {
+      result.current.applyParseResult({
+        ...stats(ids[0]), rowsParsed: 2, uniqueArtistsCount: 2,
+        periodStart: '', periodEnd: '',
+      })
+    })
+    await waitFor(() => {
+      expect(uploadBronzeDistributorCsv).toHaveBeenCalledWith(expect.objectContaining({
+        distributor: 'darkmerch',
+        filename: 'darkmerch_q2-q3.csv',
+        periodStart: '2026-04',
+        periodEnd: '2026-09',
+      }))
+      expect(result.current.files[0]).toMatchObject({
+        periodStart: '2026-04',
+        periodEnd: '2026-09',
+        bronzeBatchId: 'darkmerch-batch',
+      })
+    })
+  })
+
+  it('does not infer Darkmerch archive dates from a filename alone', async () => {
+    const csv = 'DATE,BAND,NET REVENUE\n,Artist A,10'
+    vi.mocked(readFileWithProgress).mockResolvedValueOnce(new TextEncoder().encode(csv).buffer as ArrayBuffer)
+    const ids: string[] = []
+    const { result } = renderHook(() =>
+      useFileManager('darkmerch', { onFileAdded: (file) => ids.push(file.id) }),
+    )
+    await act(async () => {
+      await result.current.addFiles([new File([csv], 'darkmerch_Q2-Q3_2026.csv')])
+    })
+    await act(async () => {
+      result.current.applyParseResult({ ...stats(ids[0]), periodStart: '', periodEnd: '' })
+    })
+    await waitFor(() => expect(result.current.fileStates[ids[0]]?.bronzeStatus).toBe('skipped'))
+    expect(uploadBronzeDistributorCsv).not.toHaveBeenCalled()
   })
 
   it('returns empty file list and ignores empty addFiles calls', async () => {

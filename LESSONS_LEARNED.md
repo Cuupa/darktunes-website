@@ -239,6 +239,7 @@ Distilled anti-patterns from project history. **Append session findings before o
 | `documentElement.style` for theme preview | Declarative `<style>` tag + `useReducer` (`ColorThemeManager`) |
 | Fixed `max-w-lg` modals | Viewport-relative breakpoints — see `docs/agent/frontend.md` |
 | `setTimeout` for drag-vs-click | Pointer delta tracking or library-native events (Swiper) |
+| Trusting worker metadata as the only source for archived report bounds | When valid source periods are mandatory, recover missing metadata from the still-loaded source and expose Retry for skipped archives; never substitute a filename or today's date. |
 
 ## CSP & performance
 

@@ -122,11 +122,32 @@ export function useFileManager(type: FileType, callbacks?: FileEventCallbacks) {
         })
         return
       }
-      const bounds = extractPeriodBounds(
+      let bounds = extractPeriodBounds(
         [periodHint?.periodStart ?? meta.periodStart, periodHint?.periodEnd ?? meta.periodEnd].filter(
           (value): value is string => Boolean(value),
         ),
       )
+      // Older worker results and already-open browser tabs may have missing
+      // archive metadata even though the Darkmerch source has valid dates.
+      // Recover provenance from the in-memory source, never from the filename
+      // or the current month. This also makes "Retry archive" effective.
+      if (!bounds && type === 'darkmerch') {
+        try {
+          const { parseDarkmerchCSV } = await import('@/lib/sos/ingest/darkmerch-parser')
+          const report = parseDarkmerchCSV(data)
+          bounds = extractPeriodBounds([report.periodStart ?? '', report.periodEnd ?? ''])
+        } catch {
+          // Invalid source files still cannot be archived with fabricated dates.
+        }
+        if (bounds) {
+          const { periodStart, periodEnd } = bounds
+          setFileMetas((current) =>
+            (current ?? []).map((file) =>
+              file.id === id ? { ...file, periodStart, periodEnd } : file,
+            ),
+          )
+        }
+      }
       if (!bounds) {
         setFileState(id, {
           bronzeStatus: 'skipped',

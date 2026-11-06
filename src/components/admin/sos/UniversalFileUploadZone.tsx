@@ -701,7 +701,7 @@ function FileItem({ file, source, state, index, onRemove, onReplace, replaceRef,
           </div>
 
           <div className="flex items-center gap-1 flex-shrink-0">
-            {onRetryArchive && state?.bronzeStatus === 'error' && !file.bronzeBatchId && (
+            {onRetryArchive && (state?.bronzeStatus === 'error' || state?.bronzeStatus === 'skipped') && !file.bronzeBatchId && (
               <Button
                 variant="ghost"
                 size="sm"
