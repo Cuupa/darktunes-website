@@ -41,13 +41,16 @@ export function parseImportSample(content: string): ImportSample {
 
 /** Redact obvious personal/contact identifiers before a sample leaves the browser. */
 export function sanitizeAiSample(sample: ImportSample): ImportSample {
-  const sensitiveHeader = /(?:e-?mail|iban|bic|address|adresse|street|phone|telefon|mobile|customer|buyer name|first name|last name)/i
+  const sensitiveHeader = /(?:e-?mail|iban|swift|bic|address|adresse|street|phone|telefon|mobile|customer|buyer|recipient|contact|invoice|tax.?id|account.?holder|first.?name|last.?name|full.?name|person)/i
   return {
     ...sample,
     sampleRows: sample.sampleRows.slice(0, 3).map((row) =>
       sample.headers.map((header, i) => {
         if (sensitiveHeader.test(header)) return '[redacted]'
-        return (row[i] ?? '').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted]')
+        return (row[i] ?? '')
+          .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted]')
+          .replace(/\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]){11,30}\b/gi, '[redacted]')
+          .replace(/\+?\d[\d\s()./-]{8,}\d/g, '[redacted]')
       }),
     ),
   }
@@ -84,4 +87,30 @@ export async function readImportSample(file: File): Promise<ImportSample> {
   const encoding = first[0] === 0xFF && first[1] === 0xFE ? 'utf-16le'
     : first[0] === 0xFE && first[1] === 0xFF ? 'utf-16be' : 'utf-8'
   return parseImportSample(new TextDecoder(encoding).decode(chunk))
+}
+
+// This is used ONLY after the user confirms an XLSX import, never for AI.
+export async function readXlsxAsCsv(file: File): Promise<File> {
+  const ExcelJS = await import('exceljs')
+  const wb = new ExcelJS.Workbook()
+  await wb.xlsx.load(Buffer.from(await file.arrayBuffer()) as never)
+  const sheet = wb.worksheets.find((ws) => ws.actualRowCount > 0)
+  if (!sheet) throw new Error('The spreadsheet contains no rows.')
+  const rows: string[][] = []
+  for (let rowIndex = 1; rowIndex <= sheet.rowCount; rowIndex++) {
+    const row = sheet.getRow(rowIndex)
+    const cells = (row.values as import('exceljs').CellValue[]).slice(1).map((value) => {
+      if (value == null) return ''
+      if (value instanceof Date) return value.toISOString().slice(0, 10)
+      if (typeof value !== 'object') return String(value)
+      if ('text' in value && typeof value.text === 'string') return value.text
+      if ('result' in value && value.result != null) return String(value.result)
+      if ('richText' in value && Array.isArray(value.richText)) return value.richText.map((r) => r.text).join('')
+      return ''
+    })
+    if (cells.some((cell) => cell.trim())) rows.push(cells)
+  }
+  if (!rows.length) throw new Error('The spreadsheet contains no data.')
+  const csv = Papa.unparse(rows, { header: false })
+  return new File([csv], file.name.replace(/\.xlsx$/i, '.csv'), { type: 'text/csv' })
 }

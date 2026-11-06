@@ -19,7 +19,7 @@ import { fingerprintHeaders } from './importSample'
 import { parseCSVLine } from './csv-parser'
 import { parseCSVContentStreaming } from './streaming-csv-parser'
 import type { StreamingParseResult } from './streaming-csv-parser'
-import type { CsvImportProfile, FinancialFieldKey } from './types'
+import type { CsvImportProfile, FinancialFieldKey, ProfileDelimiter } from './types'
 import {
   FINANCIAL_KEY_TO_INTERNAL,
   SYSTEM_BANDCAMP_PROFILE_ID,
@@ -126,41 +126,39 @@ function normaliseCsvContent(content: string): string {
  */
 export function matchProfile(
   headers: string[],
-  profiles: CsvImportProfile[]
+  profiles: CsvImportProfile[],
+  delimiter?: ProfileDelimiter,
 ): CsvImportProfile | null {
   const normalized = headers.map(h => h.toLowerCase().trim())
   const signature = fingerprintHeaders(headers)
   // A user-confirmed schema is authoritative; do not let a broad system
   // heuristic misclassify an identical file and override its mapping.
-  const exact = profiles.find((profile) =>
+  const exact = profiles.filter((profile) =>
     profile.type === 'financial' &&
     profile.headerFingerprint === signature &&
-    signature.length > 0,
+    signature.length > 0 &&
+    (!delimiter || profile.delimiter === delimiter),
   )
-  if (exact) return exact
+  // Identical signatures with conflicting profiles are ambiguous. A user
+  // must resolve them before importing any financial rows.
+  if (exact.length > 1) return null
+  if (exact.length === 1) return exact[0]
 
-  let bestProfile: CsvImportProfile | null = null
-  let bestScore = 0
-
-  for (const profile of profiles) {
-    const required = profile.autoDetectHeaders.map(h => h.toLowerCase().trim())
-    if (required.length === 0) continue
-
-    const matches = required.filter((h) =>
-      normalized.some((col) => col === h || col.includes(h) || h.includes(col)),
-    ).length
-    const minRequired = Math.min(2, required.length)
-
-    if (matches < minRequired) continue
-
-    const score = matches / required.length
-    if (score > bestScore) {
-      bestScore = score
-      bestProfile = profile
-    }
-  }
-
-  return bestProfile
+  // A legacy profile without a confirmed fingerprint can match only when
+  // at least three headers agree exactly and the match is unambiguous.
+  const candidates = profiles
+    .filter((profile) => profile.type === 'financial' && !profile.headerFingerprint &&
+      profile.autoDetectHeaders.length >= 3 && (!delimiter || profile.delimiter === delimiter))
+    .map((profile) => {
+      const expected = profile.autoDetectHeaders.map((header) => header.toLowerCase().trim())
+      const matches = expected.filter((header) => normalized.includes(header)).length
+      return { profile, matches, score: matches / expected.length }
+    })
+    .filter(({ matches, score }) => matches >= 3 && score >= 0.8)
+    .sort((left, right) => right.score - left.score || right.matches - left.matches)
+  if (candidates.length > 1 && candidates[0].score === candidates[1].score &&
+    candidates[0].matches === candidates[1].matches) return null
+  return candidates[0]?.profile ?? null
 }
 
 // ── Column mapping helpers ────────────────────────────────────────────────────

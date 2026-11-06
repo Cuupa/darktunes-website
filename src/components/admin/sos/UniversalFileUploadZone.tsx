@@ -57,7 +57,7 @@ import { toast } from 'sonner'
 import type { UploadedFile, FileProcessingState } from '@/lib/sos/types'
 import { formatBytes, formatInteger, type SosProcessProgress } from '@/lib/sos/ingestProgress'
 import { interpolate } from '@/lib/i18n/interpolate'
-import { fingerprintHeaders, parseImportSample, readImportSample, sanitizeAiSample, type ImportSample } from '@/lib/sos/ingest/importSample'
+import { fingerprintHeaders, parseImportSample, readImportSample, readXlsxAsCsv, sanitizeAiSample, type ImportSample } from '@/lib/sos/ingest/importSample'
 import { matchProfile } from '@/lib/sos/ingest/parser-facade'
 import {
   SYSTEM_SHOPIFY_PROFILE_ID,
@@ -67,7 +67,28 @@ import {
   SYSTEM_DARKMERCH_PROFILE_ID,
 } from '@/lib/sos/ingest/default-profiles'
 import { suggestColumnMappings } from '@/lib/sos/ingest/columnMappingSuggestions'
-import type { CsvImportProfile } from '@/lib/sos/ingest/types'
+import type { CsvImportProfile, FinancialFieldKey, ImportDateSemantics, ImportDateOrder, ImportParserSource } from '@/lib/sos/ingest/types'
+
+const OPTIONAL_FIELDS: Array<{ field: FinancialFieldKey; label: string }> = [
+  { field: 'currency', label: 'Currency' },
+  { field: 'quantity', label: 'Quantity' },
+  { field: 'platform', label: 'Platform' },
+  { field: 'country', label: 'Country' },
+  { field: 'releaseTitle', label: 'Release' },
+  { field: 'trackTitle', label: 'Track' },
+  { field: 'releaseType', label: 'Release type' },
+  { field: 'isrc', label: 'ISRC' },
+  { field: 'upcEan', label: 'UPC / EAN' },
+  { field: 'catalogNumber', label: 'Catalogue number' },
+]
+
+const AI_FIELD_TO_PROFILE: Record<string, FinancialFieldKey> = {
+  artist_name: 'artistName', net_revenue: 'netRevenue', sales_month: 'salesMonth',
+  release_title: 'releaseTitle', track_title: 'trackTitle', quantity: 'quantity',
+  currency: 'currency', platform: 'platform', country: 'country',
+  isrc: 'isrc', upc_ean: 'upcEan', catalog_number: 'catalogNumber',
+  release_type: 'releaseType',
+}
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,6 +99,7 @@ export interface FileManagerCallbacks {
   removeFile: (id: string) => void
   replaceFile: (id: string, file: File) => void
   retryArchive?: (id: string) => void
+  prepareProfileRepair?: (id: string) => void
   restoreArchivedFile?: (id: string) => Promise<void>
 }
 
@@ -95,6 +117,7 @@ export interface EcommerceManagerCallbacks {
   addFiles: (files: File[]) => void
   removeFile: (id: string) => void
   retryArchive?: (id: string) => void
+  prepareProfileRepair?: (id: string) => void
   restoreArchivedFile?: (id: string) => Promise<void>
 }
 
@@ -107,10 +130,8 @@ interface UniversalFileUploadZoneProps {
   printfulManager: EcommerceManagerCallbacks
   /** Manager for Darkmerch orders export CSVs. */
   darkmerchManager: EcommerceManagerCallbacks
-  /** Called when an unknown CSV is confirmed with user-defined column aliases. */
-  onAddAliases: (aliases: { fieldName: string; synonym: string }[]) => void
   /** Confirmed profiles are saved to the current accounting workspace. */
-  onSaveProfile: (profile: CsvImportProfile) => void
+  onSaveProfile: (profile: CsvImportProfile) => Promise<void>
   isProcessing?: boolean
   pipelineProgress?: SosProcessProgress | null
   /**
@@ -127,6 +148,12 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`
+  return String(n)
 }
 
 function humanizeError(error: string | undefined): string {
@@ -164,7 +191,7 @@ async function detectCSVSource(
   // ── Phase 1: Profile-based matching (financial only) ─────────────────────
   if (profiles.length > 0) {
     const financialProfiles = profiles.filter((p) => p.type !== 'master-data')
-    const matched = matchProfile(rawHeaders, financialProfiles)
+    const matched = matchProfile(rawHeaders, financialProfiles, sample.delimiter)
     if (matched) {
       if (matched.id === SYSTEM_SHOPIFY_PROFILE_ID) {
         return { source: 'shopify', headers: rawHeaders, sample, matchedProfile: matched }
@@ -314,10 +341,9 @@ interface ProfileSelectionDialogProps {
   sampleRows: string[][]
   delimiter: ',' | ';' | '\t'
   profiles: CsvImportProfile[]
-  onSaveAndImport: (profile: CsvImportProfile) => void
+  onSaveAndImport: (profile: CsvImportProfile) => Promise<void>
   isRepair?: boolean
-  onSelectProfile: (profile: CsvImportProfile) => void
-  onFallbackMapping: (mapping: { artist: string; revenue: string; date: string }) => void
+  repairSource?: 'believe' | 'bandcamp'
   onCancel: () => void
 }
 
@@ -330,8 +356,7 @@ function ProfileSelectionDialog({
   profiles,
   onSaveAndImport,
   isRepair = false,
-  onSelectProfile,
-  onFallbackMapping,
+  repairSource,
   onCancel,
 }: ProfileSelectionDialogProps) {
   const [selectedProfileId, setSelectedProfileId] = useState('')
@@ -346,6 +371,12 @@ function ProfileSelectionDialog({
   const [profileName, setProfileName] = useState('')
   const [updateId, setUpdateId] = useState('')
   const [aiError, setAiError] = useState('')
+  const [extraMappings, setExtraMappings] = useState<Partial<Record<FinancialFieldKey, string>>>({})
+  const [dateSemantics, setDateSemantics] = useState<ImportDateSemantics>('sale-date')
+  const [dateOrder, setDateOrder] = useState<ImportDateOrder>('day-first')
+  const [amountConvention, setAmountConvention] = useState<'en' | 'de' | 'auto'>('auto')
+  const [parserSource, setParserSource] = useState<'believe' | 'bandcamp'>(repairSource ?? 'believe')
+  const [savingProfile, setSavingProfile] = useState(false)
   const tImport = useTranslations('admin.accounting')
 
   // This request is only possible in the unknown-format dialog. The main
@@ -374,11 +405,29 @@ function ProfileSelectionDialog({
         field_mapping?: Record<string, string>
         question?: string | null
         explanation?: string
+        parser_source?: ImportParserSource | null
+        date_semantics?: ImportDateSemantics | null
+        date_order?: ImportDateOrder | null
+        amount_convention?: 'en' | 'de' | 'auto' | null
       }
       const mapping = suggestion.field_mapping ?? {}
       if (mapping.artist_name && headers.includes(mapping.artist_name)) setArtist(mapping.artist_name)
       if (mapping.net_revenue && headers.includes(mapping.net_revenue)) setRevenue(mapping.net_revenue)
       if (mapping.sales_month && headers.includes(mapping.sales_month)) setDate(mapping.sales_month)
+      const extras: Partial<Record<FinancialFieldKey, string>> = {}
+      for (const [key, value] of Object.entries(mapping)) {
+        const field = AI_FIELD_TO_PROFILE[key]
+        if (field && !['artistName', 'netRevenue', 'salesMonth'].includes(field) && headers.includes(value)) {
+          extras[field] = value
+        }
+      }
+      setExtraMappings(extras)
+      if (suggestion.date_semantics) setDateSemantics(suggestion.date_semantics)
+      if (suggestion.date_order) setDateOrder(suggestion.date_order)
+      if (suggestion.amount_convention) setAmountConvention(suggestion.amount_convention)
+      if (suggestion.parser_source === 'believe' || suggestion.parser_source === 'bandcamp') {
+        if (!isRepair) setParserSource(suggestion.parser_source)
+      }
       if (suggestion.profile_name) setProfileName(suggestion.profile_name)
       setAiQuestion(suggestion.question ?? null)
       setAiExplanation(suggestion.explanation ?? '')
@@ -390,38 +439,76 @@ function ProfileSelectionDialog({
     }
   }
 
-  const saveConfirmedProfile = () => {
-    if (!artist || !revenue || !date || !profileName.trim()) return
+  const applyExistingProfile = (profile: CsvImportProfile) => {
+    const mapping = profile.columnMapping
+    setArtist(mapping.artistName && headers.includes(mapping.artistName) ? mapping.artistName : '')
+    setRevenue(mapping.netRevenue && headers.includes(mapping.netRevenue) ? mapping.netRevenue : '')
+    setDate(mapping.salesMonth && headers.includes(mapping.salesMonth) ? mapping.salesMonth : '')
+    setExtraMappings(Object.fromEntries(
+      OPTIONAL_FIELDS.map(({ field }) => [field, mapping[field] && headers.includes(mapping[field]) ? mapping[field] : undefined]),
+    ) as Partial<Record<FinancialFieldKey, string>>)
+    setProfileName(profile.name)
+    setUpdateId(profile.isSystemDefault ? '' : profile.id)
+    if (!repairSource && (profile.parserSource === 'believe' || profile.parserSource === 'bandcamp')) {
+      setParserSource(profile.parserSource)
+    }
+    setDateSemantics(profile.dateSemantics ?? 'sale-date')
+    setDateOrder(profile.dateOrder ?? 'day-first')
+    setAmountConvention(profile.amountConvention ?? 'auto')
+    setMode('manual')
+  }
+
+  const saveConfirmedProfile = async () => {
+    if (!artist || !revenue || (dateSemantics !== 'none' && !date) || !profileName.trim() || savingProfile) return
     const existing = profiles.find((p) => p.id === updateId && !p.isSystemDefault)
-    onSaveAndImport({
+    const profile: CsvImportProfile = {
       ...existing,
       id: existing?.id ?? crypto.randomUUID(),
       name: profileName.trim(),
       type: 'financial',
-      delimiter: delimiter === '\t' ? ',' : delimiter,
+      parserSource: repairSource ?? parserSource,
+      dateSemantics,
+      dateOrder,
+      amountConvention,
+      delimiter,
       autoDetectHeaders: headers.slice(0, 12),
       headerFingerprint: fingerprintHeaders(headers),
       columnMapping: {
-        ...existing?.columnMapping,
+        ...extraMappings,
         artistName: artist,
         netRevenue: revenue,
-        salesMonth: date,
+        ...(dateSemantics === 'none' ? {} : { salesMonth: date }),
       },
-    })
+    }
+    setSavingProfile(true)
+    setAiError('')
+    try {
+      await onSaveAndImport(profile)
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : tImport('aiImportFailed'))
+    } finally {
+      setSavingProfile(false)
+    }
   }
 
   useEffect(() => {
     if (!open) return
-    if (isRepair) setMode('manual')
+    if (isRepair) {
+      setMode('manual')
+      if (repairSource) setParserSource(repairSource)
+    }
+    if (sampleRows.some((row) => row.some((cell) => /\bQ[1-4]\s*(?:[-–—]\s*Q[1-4])?\s+20\d{2}/i.test(cell)))) {
+      setDateSemantics('report-period')
+    }
     const suggestions = suggestColumnMappings(headers)
     if (suggestions.artistName) setArtist(suggestions.artistName)
     if (suggestions.netRevenue) setRevenue(suggestions.netRevenue)
     if (suggestions.salesMonth) setDate(suggestions.salesMonth)
-  }, [open, headers, isRepair])
+  }, [open, headers, isRepair, repairSource, sampleRows])
 
   const financialProfiles = profiles.filter(p => p.type === 'financial')
   const canConfirmProfile = selectedProfileId !== ''
-  const canConfirmManual = artist && revenue && date
+  const canConfirmManual = artist && revenue && (dateSemantics === 'none' || date)
 
   return (
     <Dialog open={open} onOpenChange={o => { if (!o) onCancel() }}>
@@ -519,13 +606,75 @@ function ProfileSelectionDialog({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">{tImport('aiImportDateColumn')}</Label>
-              <Select value={date} onValueChange={setDate}>
+              <Select value={date} onValueChange={setDate} disabled={dateSemantics === 'none'}>
                 <SelectTrigger><SelectValue placeholder={tImport('aiImportSelectColumn')} /></SelectTrigger>
                 <SelectContent>
                   {headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>{tImport('aiImportSource')}</Label>
+              <Select value={parserSource} onValueChange={(value) => setParserSource(value as 'believe' | 'bandcamp')} disabled={Boolean(repairSource)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="believe">{tImport('aiImportStandardSource')}</SelectItem>
+                  <SelectItem value="bandcamp">Bandcamp</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">{tImport('aiImportSpecializedHelp')}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>{tImport('aiImportDateSemantics')}</Label>
+              <Select value={dateSemantics} onValueChange={(value) => setDateSemantics(value as ImportDateSemantics)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sale-date">{tImport('aiImportSaleDate')}</SelectItem>
+                  <SelectItem value="report-period">{tImport('aiImportReportPeriod')}</SelectItem>
+                  <SelectItem value="none">{tImport('aiImportNoDate')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {dateSemantics === 'sale-date' && <div className="space-y-2">
+              <Label>{tImport('aiImportDateFormat')}</Label>
+              <Select value={dateOrder} onValueChange={(value) => setDateOrder(value as ImportDateOrder)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day-first">DD/MM/YYYY</SelectItem>
+                  <SelectItem value="month-first">MM/DD/YYYY</SelectItem>
+                  <SelectItem value="iso">YYYY-MM-DD</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>}
+            <div className="space-y-2">
+              <Label>{tImport('aiImportDecimal')}</Label>
+              <Select value={amountConvention} onValueChange={(value) => setAmountConvention(value as 'en' | 'de' | 'auto')}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">{tImport('aiImportAutoUnambiguous')}</SelectItem>
+                  <SelectItem value="en">{tImport('aiImportEnglishDecimal')}</SelectItem>
+                  <SelectItem value="de">{tImport('aiImportGermanDecimal')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <details className="rounded-md border border-border p-2">
+              <summary className="cursor-pointer text-sm">{tImport('aiImportOptionalFields')}</summary>
+              <div className="grid gap-2 pt-3">
+                {OPTIONAL_FIELDS.map(({ field, label }) => (
+                  <div key={field} className="space-y-1">
+                    <Label>{label}</Label>
+                    <Select value={extraMappings[field] ?? '__none__'} onValueChange={(value) =>
+                      setExtraMappings((prev) => ({ ...prev, [field]: value === '__none__' ? undefined : value }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">{tImport('aiImportNotMapped')}</SelectItem>
+                        {headers.map((header) => <SelectItem key={header} value={header}>{header}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            </details>
           <div className="space-y-2">
             <Label>{tImport('aiImportProfileName')}</Label>
             <Input value={profileName} onChange={(e) => setProfileName(e.target.value)}
@@ -554,21 +703,16 @@ function ProfileSelectionDialog({
             <Button
               onClick={() => {
                 const profile = financialProfiles.find(p => p.id === selectedProfileId)
-                if (profile) onSelectProfile(profile)
+                if (profile) applyExistingProfile(profile)
               }}
               disabled={!canConfirmProfile}
               size="sm"
             >
-              {tImport('aiImportWithProfile')}
+              {tImport('aiImportReviewProfile')}
             </Button>
           ) : (
             <>
-              <Button variant="outline"
-                onClick={() => canConfirmManual && onFallbackMapping({ artist, revenue, date })}
-                disabled={!canConfirmManual}
-                size="sm"
-              >{tImport('aiImportOnce')}</Button>
-              <Button onClick={saveConfirmedProfile} disabled={!canConfirmManual || !profileName.trim()}
+              <Button onClick={() => { void saveConfirmedProfile() }} disabled={!canConfirmManual || !profileName.trim() || savingProfile}
                 size="sm">{tImport('aiImportSaveProfile')}</Button>
             </>
           )}
@@ -774,7 +918,6 @@ export function UniversalFileUploadZone({
   shopifyManager,
   printfulManager,
   darkmerchManager,
-  onAddAliases,
   onSaveProfile,
   csvProfiles = [],
   isProcessing = false,
@@ -794,6 +937,34 @@ export function UniversalFileUploadZone({
   const [pendingHeaders, setPendingHeaders] = useState<string[]>([])
   const [pendingSample, setPendingSample] = useState<ImportSample | null>(null)
   const [repairFileId, setRepairFileId] = useState<string | null>(null)
+  const [pendingDialogEpoch, setPendingDialogEpoch] = useState(0)
+  const [repairSource, setRepairSource] = useState<'believe' | 'bandcamp' | undefined>()
+  const pendingQueueRef = useRef<Array<{ file: File; headers: string[]; sample: ImportSample }>>([])
+  const pendingActiveRef = useRef(false)
+
+  const showPending = useCallback((job: { file: File; headers: string[]; sample: ImportSample }) => {
+    pendingActiveRef.current = true
+    setPendingDialogEpoch((epoch) => epoch + 1)
+    setPendingFile(job.file)
+    setPendingHeaders(job.headers)
+    setPendingSample(job.sample)
+  }, [])
+  const enqueuePending = useCallback((job: { file: File; headers: string[]; sample: ImportSample }) => {
+    if (pendingActiveRef.current) pendingQueueRef.current.push(job)
+    else showPending(job)
+  }, [showPending])
+  const finishPending = useCallback(() => {
+    setRepairFileId(null)
+    setRepairSource(undefined)
+    const next = pendingQueueRef.current.shift()
+    if (next) showPending(next)
+    else {
+      pendingActiveRef.current = false
+      setPendingFile(null)
+      setPendingHeaders([])
+      setPendingSample(null)
+    }
+  }, [showPending])
 
 
   // Per-file replace input refs (keyed by file id)
@@ -818,43 +989,46 @@ export function UniversalFileUploadZone({
   // ── File routing ──────────────────────────────────────────────────────────
 
   const routeFile = useCallback(async (file: File) => {
-    // XLSX files are always routed to Darkmerch — no header inspection needed.
-    if (file.name.toLowerCase().endsWith('.xlsx')) {
-      toast.info(`"${file.name}" detected as Darkmerch XLSX`, { duration: 3000 })
-      darkmerchManager.addFiles([file])
+    const { source, headers, matchedProfile, sample } = await detectCSVSource(file, csvProfiles)
+    const parser = matchedProfile?.parserSource ??
+      (source === 'profile-financial' ? 'believe' : source)
+
+    if (parser === 'unknown' || (
+      matchedProfile && !matchedProfile.isSystemDefault &&
+      (parser === 'shopify' || parser === 'printful' || parser === 'darkmerch')
+    )) {
+      // No second unknown upload can overwrite the dialog for the first one.
+      enqueuePending({ file, headers, sample })
       return
     }
 
-    const { source, headers, matchedProfile, sample } = await detectCSVSource(file, csvProfiles)
-
-    if (source === 'believe') {
-      toast.info(`"${file.name}" detected as Believe CSV`, { duration: 3000 })
-      believeManager.addFiles([file])
-    } else if (source === 'bandcamp') {
-      const label = matchedProfile ? `"${matchedProfile.name}" profile` : 'Bandcamp CSV'
-      toast.info(`"${file.name}" detected as ${label}`, { duration: 3000 })
-      bandcampManager.addFiles([file])
-    } else if (source === 'profile-financial') {
-      // Generic financial profile — route to believe manager (streaming parser)
-      const label = matchedProfile?.name ?? 'custom profile'
-      toast.info(`"${file.name}" matched profile "${label}"`, { duration: 3000 })
-      believeManager.addFiles([file])
-    } else if (source === 'shopify') {
-      toast.info(`"${file.name}" detected as Shopify export`, { duration: 3000 })
-      shopifyManager.addFiles([file])
-    } else if (source === 'printful') {
-      toast.info(`"${file.name}" detected as Printful export`, { duration: 3000 })
-      printfulManager.addFiles([file])
-    } else if (source === 'darkmerch') {
-      toast.info(`"${file.name}" detected as Darkmerch export`, { duration: 3000 })
-      darkmerchManager.addFiles([file])
-    } else {
-      // Unknown format: open profile selection / mapping dialog
-      setPendingFile(file)
-      setPendingHeaders(headers)
-      setPendingSample(sample)
+    // XLSX must be sniffed exactly like CSV. Only confirmed Darkmerch
+    // workbooks use the Darkmerch-specific conversion and parser.
+    const upload = file.name.toLowerCase().endsWith('.xlsx') && parser !== 'darkmerch'
+      ? await readXlsxAsCsv(file)
+      : file
+    switch (parser) {
+      case 'believe':
+        believeManager.addFiles([upload])
+        break
+      case 'bandcamp':
+        bandcampManager.addFiles([upload])
+        break
+      case 'shopify':
+        shopifyManager.addFiles([upload])
+        break
+      case 'printful':
+        printfulManager.addFiles([upload])
+        break
+      case 'darkmerch':
+        darkmerchManager.addFiles([upload])
+        break
+      default:
+        enqueuePending({ file, headers, sample })
+        return
     }
-  }, [believeManager, bandcampManager, shopifyManager, printfulManager, darkmerchManager, csvProfiles])
+    toast.info(`"${file.name}" identified as ${matchedProfile?.name ?? parser}`, { duration: 3000 })
+  }, [believeManager, bandcampManager, shopifyManager, printfulManager, darkmerchManager, csvProfiles, enqueuePending])
 
   const processFiles = useCallback(async (rawFiles: File[]) => {
     const acceptedFiles = rawFiles.filter(f => {
@@ -882,7 +1056,11 @@ export function UniversalFileUploadZone({
     }
 
     for (const file of acceptedFiles) {
-      await routeFile(file)
+      try {
+        await routeFile(file)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Could not read the import file.')
+      }
     }
   }, [routeFile, tToast, t])
 
@@ -915,66 +1093,42 @@ export function UniversalFileUploadZone({
 
   // ── Unknown CSV mapping dialog ─────────────────────────────────────────────
 
-  const handleProfileSelected = useCallback(
-    (profile: CsvImportProfile) => {
-      if (!pendingFile || repairFileId) return
-      // Route based on matched profile (same logic as routeFile)
-      const label = profile.name
-      if (profile.id === SYSTEM_BANDCAMP_PROFILE_ID) {
-        bandcampManager.addFiles([pendingFile])
-      } else {
-        believeManager.addFiles([pendingFile])
-      }
-      toast.success(`"${pendingFile.name}" imported with profile "${label}"`)
-      setPendingFile(null)
-      setPendingHeaders([])
-      setPendingSample(null)
-    },
-    [pendingFile, repairFileId, believeManager, bandcampManager]
-  )
-
-  const handleMappingConfirm = useCallback(
-    (mapping: { artist: string; revenue: string; date: string }) => {
-      if (!pendingFile) return
-
-      // Add the user's column selections as global aliases so the parser can
-      // auto-map them. These also persist to help future similar CSVs.
-      onAddAliases([
-        { fieldName: 'original_artist', synonym: mapping.artist },
-        { fieldName: 'net_revenue', synonym: mapping.revenue },
-        { fieldName: 'sales_month', synonym: mapping.date },
-      ])
-
-      // Never add the short preview as a duplicate on a repair.
-      if (!repairFileId) believeManager.addFiles([pendingFile])
-      toast.success(`"${pendingFile.name}" imported with custom column mapping`)
-      setPendingFile(null)
-      setPendingHeaders([])
-      setPendingSample(null)
-      setRepairFileId(null)
-    },
-    [pendingFile, repairFileId, believeManager, onAddAliases]
-  )
-
-  const handleSaveAndImport = useCallback((profile: CsvImportProfile) => {
+  const handleSaveAndImport = useCallback(async (profile: CsvImportProfile): Promise<void> => {
     if (!pendingFile) return
-    onSaveProfile(profile)
-    if (!repairFileId) believeManager.addFiles([pendingFile])
+    const source = profile.parserSource ?? 'believe'
+    if (repairFileId && repairSource && source !== repairSource) {
+      throw new Error('A repair cannot change the source parser. Re-import the file if the source type is different.')
+    }
+    if (source !== 'believe' && source !== 'bandcamp') {
+      throw new Error('This custom mapping requires the complete supplier schema. Select Standard or Bandcamp.')
+    }
+    const uploadFile = pendingFile.name.toLowerCase().endsWith('.xlsx') && !repairFileId
+      ? await readXlsxAsCsv(pendingFile)
+      : pendingFile
+    // Only a confirmed server write can trigger a financial import.
+    await onSaveProfile(profile)
+    if (repairFileId) {
+      const manager = repairSource === 'bandcamp' ? bandcampManager : believeManager
+      manager.prepareProfileRepair?.(repairFileId)
+    } else {
+      const manager = source === 'bandcamp' ? bandcampManager : believeManager
+      await manager.addFiles([uploadFile])
+    }
     toast.success(t('aiImportProfileSaved'))
-    setPendingFile(null)
-    setPendingHeaders([])
-    setPendingSample(null)
-    setRepairFileId(null)
-  }, [pendingFile, repairFileId, onSaveProfile, believeManager, t])
+    finishPending()
+  }, [pendingFile, repairFileId, repairSource, onSaveProfile, believeManager, bandcampManager, finishPending, t])
 
   const openRepair = useCallback((file: UploadedFile) => {
-    if (!file.data) return
+    if (!file.data || pendingActiveRef.current) return
     try {
       const preview = parseImportSample(file.data.slice(0, 256 * 1024))
+      pendingActiveRef.current = true
+      setPendingDialogEpoch((epoch) => epoch + 1)
       setPendingFile(new File([], file.name))
       setPendingHeaders(preview.headers)
       setPendingSample(preview)
       setRepairFileId(file.id)
+      setRepairSource(file.type === 'bandcamp' ? 'bandcamp' : 'believe')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t('aiImportFailed'))
     }
@@ -982,11 +1136,8 @@ export function UniversalFileUploadZone({
 
   const handleMappingCancel = useCallback(() => {
     toast.info(tToast('import_cancelled'))
-    setPendingFile(null)
-    setPendingHeaders([])
-    setPendingSample(null)
-    setRepairFileId(null)
-  }, [tToast])
+    finishPending()
+  }, [tToast, finishPending])
 
   // ── Combined file list (all sources) ─────────────────────────────────────
 
@@ -1002,8 +1153,12 @@ export function UniversalFileUploadZone({
         replaceRef: makeRefSetter(f.id),
         onReplaceInput: (e: React.ChangeEvent<HTMLInputElement>) => handleReplaceInput(manager, f.id, e),
         onRetryArchive: manager.retryArchive ? () => manager.retryArchive?.(f.id) : null,
-        onRepair: f.data && manager.fileStates[f.id]?.status === 'error'
-          ? () => openRepair(f) : null,
+        onRepair: f.data && (
+          manager.fileStates[f.id]?.status === 'error' ||
+          manager.fileStates[f.id]?.bronzeStatus === 'skipped' ||
+          manager.fileStates[f.id]?.bronzeStatus === 'error' ||
+          (f.rowsSkipped ?? 0) > 0
+        ) ? () => openRepair(f) : null,
         onRestore: manager.restoreArchivedFile
           ? () => { void manager.restoreArchivedFile!(f.id).catch((err) => {
               toast.error(t('bronzeArchiveLoadError'), {
@@ -1173,13 +1328,12 @@ export function UniversalFileUploadZone({
         </div>
       )}
 
-      {/* Explicitly distinguish archived backups from data loaded for calculation. */}
       {allFiles.length > 0 && (
         <div role="status" className="rounded-lg border border-border bg-card/30 px-4 py-2 text-sm text-muted-foreground">
           {t('uiArchiveSummary')
-            .replace('{loaded}', String(allFiles.filter(entry => Boolean(entry.file.data)).length))
-            .replace('{saved}', String(allFiles.filter(entry => Boolean(entry.file.bronzeBatchId) && !entry.file.data).length))
-            .replace('{missing}', String(allFiles.filter(entry => !entry.file.bronzeBatchId).length))}
+            .replace('{loaded}', String(allFiles.filter((entry) => Boolean(entry.file.data)).length))
+            .replace('{saved}', String(allFiles.filter((entry) => Boolean(entry.file.bronzeBatchId) && !entry.file.data).length))
+            .replace('{missing}', String(allFiles.filter((entry) => !entry.file.bronzeBatchId).length))}
         </div>
       )}
       {/* Combined file list */}
@@ -1214,7 +1368,7 @@ export function UniversalFileUploadZone({
 
       {/* Unknown CSV dialog — profile selection or manual mapping */}
       {pendingFile && pendingSample && (
-        <ProfileSelectionDialog
+        <ProfileSelectionDialog key={pendingDialogEpoch}
           open={true}
           fileName={pendingFile.name}
           headers={pendingHeaders}
@@ -1223,8 +1377,7 @@ export function UniversalFileUploadZone({
           profiles={csvProfiles}
           onSaveAndImport={handleSaveAndImport}
           isRepair={repairFileId !== null}
-          onSelectProfile={handleProfileSelected}
-          onFallbackMapping={handleMappingConfirm}
+          repairSource={repairSource}
           onCancel={handleMappingCancel}
         />
       )}

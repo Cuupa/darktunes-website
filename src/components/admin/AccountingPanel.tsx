@@ -285,7 +285,7 @@ function SosGeneratorPanel() {
     setEmailConfig(bundle.emailConfig)
     setLabelBranding(bundle.labelInfo ?? DEFAULT_LABEL_INFO)
     setPdfSettings(bundle.pdfSettings ?? DEFAULT_PDF_EXPORT_SETTINGS)
-    setCsvImportProfilesCustom(bundle.csvImportProfiles ?? [])
+    // Global import profiles are loaded and saved independently of period settings.
     setExcelExport(bundle.excelExport ?? DEFAULT_EXCEL_EXPORT_STATE)
   }, [])
 
@@ -986,9 +986,6 @@ function SosGeneratorPanel() {
         csvProfiles={csvImportProfiles}
         isProcessing={isProcessing}
         pipelineProgress={pipelineProgress}
-        onAddAliases={(aliases) => {
-          aliases.forEach((alias) => handleAddCsvAlias(alias))
-        }}
         onSaveProfile={saveCsvProfile}
       />
       <section className="space-y-3 border-t border-border pt-4" aria-label={t.uiBrowseArchives}>

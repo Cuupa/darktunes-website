@@ -21,6 +21,10 @@ export function csvProfileDefinitionKey(profile: CsvImportProfile): string {
     headers,
     mapping,
     fingerprint: profile.headerFingerprint || '',
+    parserSource: profile.parserSource ?? '',
+    dateSemantics: profile.dateSemantics ?? '',
+    dateOrder: profile.dateOrder ?? '',
+    amountConvention: profile.amountConvention ?? '',
   })
 }
 

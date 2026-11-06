@@ -741,19 +741,26 @@ export function useCSVProcessor(
         content: file.data,
         source: file.type,
         customAliases: customAliasesRef.current,
-        columnMapping: file.type === 'believe' || file.type === 'bandcamp'
-          ? (() => {
-              try {
-                const headers = parseImportSample(file.data.slice(0, 256 * 1024)).headers
-                const profile = matchProfile(headers, profilesRef.current)
-                return profile?.type === 'financial'
-                  ? buildStreamingColumnMapping(profile, headers)
-                  : undefined
-              } catch {
-                return undefined
-              }
-            })()
-          : undefined,
+        ...(() => {
+          if (file.type !== 'believe' && file.type !== 'bandcamp') return {}
+          try {
+            const sample = parseImportSample(file.data.slice(0, 256 * 1024))
+            const headers = sample.headers
+            const profile = matchProfile(headers, profilesRef.current, sample.delimiter)
+            if (!profile || profile.type !== 'financial') return {}
+            const family = profile.parserSource ??
+              (profile.id.startsWith('system-bandcamp') ? 'bandcamp' : 'believe')
+            if (family !== file.type) return {}
+            return {
+              columnMapping: buildStreamingColumnMapping(profile, headers),
+              dateSemantics: profile.dateSemantics ?? 'sale-date',
+              dateOrder: profile.dateOrder,
+              amountConvention: profile.amountConvention,
+            }
+          } catch {
+            return {}
+          }
+        })(),
       } satisfies WorkerRequest)
       setIsProcessing(true)
     }
